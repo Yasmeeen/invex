@@ -1,0 +1,9 @@
+<span *ngIf="!isParent" class="s-checkbox size-small flex">
+    <input type="checkbox" id="select-{{id}}" [checked]="checkedCells.includes(id)"
+        (change)="checkCell($event, id)">
+    <label for="select-{{id}}"></label>
+</span>
+<span *ngIf="isParent" class="s-checkbox size-small flex" [class.partially-checked]="partiallyChecked">
+    <input type="checkbox" id="selectAll" [checked]="allChecked" (change)="checkAll($event)">
+    <label for="selectAll"></label>
+</span>

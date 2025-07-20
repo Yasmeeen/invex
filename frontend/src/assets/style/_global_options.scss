@@ -1,0 +1,149 @@
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: $start;
+}
+
+.text-right {
+    text-align: $end;
+}
+.force-text-right {
+    text-align: right !important;
+}
+.force-text-left {
+    text-align: left !important;
+}
+.force-text-center {
+    text-align: center !important;
+}
+.force-rtl {
+    direction: rtl !important;
+}
+.force-ltr {
+    direction: ltr !important;
+}
+.max-center {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.width-100 {
+    width: 100%;
+}
+
+.height-100 {
+    height: 100%;
+}
+.min-height-100 {
+    min-height: 100%;
+}
+
+//
+// spacing
+//
+
+// margin
+.m-0 {
+    margin: 0;
+}
+.ml-auto{
+    margin-#{$start}: auto;
+}
+
+// padding
+.p-0 {
+    padding: 0;
+}
+
+@for $i from 0 through 10 {
+    .mb-#{$i} {
+        margin-bottom: (0.3125rem * $i) !important;
+    }
+
+    .mt-#{$i} {
+        margin-top: (0.3125rem * $i) !important;
+    }
+
+    .ml-#{$i} {
+        margin-#{$start}: (0.3125rem * $i) !important;
+    }
+
+    .mr-#{$i} {
+        margin-#{$end}: (0.3125rem * $i) !important;
+    }
+
+    .mlr-#{$i} {
+        margin-right: (0.3125rem * $i) !important;
+        margin-left: (0.3125rem * $i) !important;
+    }
+
+    .mtb-#{$i} {
+        margin-top: (0.3125rem * $i) !important;
+        margin-bottom: (0.3125rem * $i) !important;
+    }
+
+    .pb-#{$i} {
+        padding-bottom: (0.3125rem * $i) !important;
+    }
+
+    .pt-#{$i} {
+        padding-top: (0.3125rem * $i) !important;
+    }
+
+    .pl-#{$i} {
+        padding-#{$start}: (0.3125rem * $i) !important;
+    }
+
+    .pr-#{$i} {
+        padding-#{$end}: (0.3125rem * $i) !important;
+    }
+
+    .plr-#{$i} {
+        padding-left: (0.3125rem * $i) !important;
+        padding-right: (0.3125rem * $i) !important;
+    }
+
+    .ptb-#{$i} {
+        padding-top: (0.3125rem * $i) !important;
+        padding-bottom: (0.3125rem * $i) !important;
+    }
+}
+
+
+//max-width
+$i: 50;
+
+@while $i < 1100 {
+    .max-#{$i} {
+        max-width: (1px * $i);
+    }
+
+    $i: $i+50;
+}
+
+// colors
+@import 'color_scheme';
+
+// -----color
+.steel {
+    fill: $steel;
+    color: $steel !important;
+}
+
+.steel-lighter {
+    color: $steel-lighter;
+    fill: $steel-lighter;
+}
+
+.dark-gray {
+    color: $dark-gray;
+    fill: $dark-gray;
+}
+
+// -----bg-color
+.zircon-bg {
+    background-color: $zircon;
+}
+

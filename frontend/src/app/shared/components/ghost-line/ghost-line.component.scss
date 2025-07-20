@@ -1,0 +1,39 @@
+
+
+.container {
+    height: 100%;
+  }
+.line {
+    margin-top: 12px;
+    border-radius: 2px;
+    background-image: linear-gradient(90deg, #ddd 0px, #e8e8e8 40px, #ddd 80px);
+    background-size: 600px;
+    animation: shine-lines 1.6s infinite linear;
+  }
+ .line {
+    margin-top: 11px;
+  }
+.line {
+    background-color: #ddd;
+  }
+  table .line{
+    width: 120px;
+    height: 10px;
+  }
+  
+  @keyframes shine-lines {
+    0% {
+      background-position: -100px;
+    }
+    40%, 100% {
+      background-position: 140px;
+    }
+  }
+  @keyframes shine-avatar {
+    0% {
+      background-position: -32px;
+    }
+    40%, 100% {
+      background-position: 208px;
+    }
+  }

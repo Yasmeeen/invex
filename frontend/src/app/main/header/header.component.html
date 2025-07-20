@@ -1,0 +1,49 @@
+<div class="header-container inline-block-100 flex flex-space-between">
+    <div class="flex flex-middle app-journal-container width-100">
+        <span class="fa fa-bars mr-4 menu-icon no-select text-primary hidden-desktop" (click)="openSidebar()"></span>
+        <div class="inline-block width-100 app-journal-wrapper">
+
+        </div>
+    </div>
+    <div class="header-boxes-container inline-block prevent-flex-shrink">
+
+      <div class="single-header-box header-options-menu">
+        <span class="fa fa-caret-down options-menu">
+            <div class="options-menu-container size-small weight-bold">
+                <div class="single-option flex flex-middle hidden-desktop" (click)="openChangeLanguageDailog()">
+                    <i class="fa fa-language steel" aria-hidden="true"></i>
+                    {{'tr_language' | translate}}
+                </div>
+
+            </div>
+        </span>
+    </div>
+
+      <div class="single-header-box header-options-menu">
+        <div class="single-option flex flex-middle text-primary logout"  (click)="logout()">
+          <i class="fa fa-user mr-2"></i>
+          {{'tr_signin.logout' | translate}}
+        </div>
+      </div>
+
+      <div class="single-header-box header-options-menu">
+        <i class="fa fa-bell cursor-pointer"></i>
+       </div>
+
+
+
+
+        <div class="single-header-box header-options-menu hidden-mobile" (click)="openChangeLanguageDailog()">
+            <i class="fa fa-language" aria-hidden="true"></i>
+        </div>
+        <div class="single-header-box header-options-menu hidden-mobile">
+          <button class="s-btn btn-secondary btn-sm"> online </button>
+        </div>
+
+
+
+
+
+    </div>
+</div>
+

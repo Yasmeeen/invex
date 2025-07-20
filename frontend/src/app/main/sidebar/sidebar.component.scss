@@ -1,0 +1,316 @@
+@import 'mixins';
+@import 'blocks';
+@import 'color_scheme';
+@import 'initializer';
+
+.main-sidebar {
+    position: absolute;
+    min-height: 100%;
+    background-color: $side-menue-backgrond;
+    margin: 20px 0;
+    border-radius: 18px;
+    @include boxshadow(0 2px 6px rgba(37, 83, 185, 0.1));
+    top: 0;
+    width: 270px;
+    z-index: 9;
+
+    .app-sidebar {
+        padding: 2rem 0;
+        height: 100vh;
+        top: 0;
+        overflow: auto;
+        position: fixed;
+        width: inherit;
+        z-index: 9;
+
+        .main-routing-links {
+
+            .anchor-container {
+                position: relative;
+                display: block;
+                text-decoration: none !important;
+                font-size: 1.125rem;
+
+                .link-content {
+                    @extend %flex-middle;
+                    line-height: 25px;
+                    position: relative;
+                    font-size: 16px;
+                    color: $dark-gray;
+                    padding: 1rem 1rem 1rem 1.8rem;
+
+                    .icon {
+                        font-size: 1.2rem;
+                    }
+
+                    .icon:before {
+                        background: -webkit-gradient(linear, left top, left bottom, from(#B2BEC5), to(#7A8993));
+                        -webkit-background-clip: text;
+
+                    }
+                    .pink-icon:before {
+                        background:#f56db0;
+                        -webkit-background-clip: text;
+
+                    }
+                    .orang-icon:before{
+                        background: #fd8268;
+                        -webkit-background-clip: text;
+
+                    }
+                    .blue-icon::before{
+                        background: #00c4cc;
+                        -webkit-background-clip: text;
+
+                    }
+                    .yellow-icon::before{
+                        background: #fdca68;
+                        -webkit-background-clip: text;
+
+                    }
+                    .purpule-icon::before{
+                        background: #9968cc;
+                        -webkit-background-clip: text;
+
+                    }
+                }
+
+                .children-arrow {
+                    position: absolute;
+                    @extend %flex-middle;
+                    justify-content: center;
+                    height: 64px;
+                    top: 0;
+                    color: inherit;
+                    width: 100%;
+                    transition: 0.3s;
+                    justify-content: flex-end;
+                    cursor: pointer;
+
+                    &::before {
+                        transition: 0.6s;
+                    }
+                }
+
+                .children-arrow:hover {
+                    background-color: rgba(0, 0, 0, 0.03);
+                }
+
+                .child-menu,
+                .grandchild-menu {
+                    max-height: 0;
+                    overflow: hidden;
+                    transition: 0.6s;
+                    transition-timing-function: ease;
+                    transform-origin: top;
+                }
+
+                .grandchild-menu {
+                    a {
+                        font-size: 80%;
+                    }
+                }
+            }
+
+
+
+            .anchor-container.active-link {
+                >a .link-content {
+
+                    .icon:before {
+                        background: -webkit-gradient(linear, left top, left bottom, from(#fff), to(#fff));
+                        -webkit-background-clip: text;
+
+                    }
+                }
+
+                >.children-arrow::before {
+                    color: #fff;
+                }
+            }
+
+            .children-active,
+            .active-link,
+            .child-active {
+
+                >.child-menu,
+                >.grandchild-menu {
+                    max-height: 600px;
+                    overflow: auto;
+                    transition: 1.2s;
+                }
+            }
+
+            .children-active,
+            .active-link,
+            .child-active {
+                >.children-arrow::before {
+                    transform: rotate(180deg)
+                }
+            }
+        }
+
+        .whitelabel-container img {
+            position: absolute;
+            top: 0;
+            width: 70px;
+        }
+    }
+    .logo-container{
+      margin: 10px;
+      padding: 20px;
+      border-bottom: 1px solid #ffffff73;
+      .logo{
+        width: 52px;
+        margin: 0 8px;
+        border-radius: 28px;
+      }
+    }
+    .flip-logo{
+        transform: scaleX(-1);
+    }
+    .child-avatar {
+        width: 40px;
+        height: 40px;
+        padding: 2px;
+        object-fit: cover;
+        border-radius: 50%;
+    }
+}
+.user-picture{
+    max-width: 120px;
+}
+
+// main mixin
+@mixin biDirectional($start, $end) {
+    .main-sidebar {
+        #{$start}: 22px;
+        transition: 0.6s;
+
+        .app-sidebar {
+            .main-routing-links {
+                .link-content {
+                    .icon {
+                        margin-#{$end}: 1rem;
+                    }
+                }
+
+                .children-arrow {
+                    #{$end}: 0;
+                    padding-#{$end}: 1rem;
+                }
+
+                .child-menu {
+                    .link-content span {
+                        padding-#{$start}: 1rem
+                    }
+
+                    .grandchild-menu {
+                        border-#{$start}: 3px solid;
+
+                        .link-content span {
+                            padding-#{$start}: 2rem;
+                        }
+                    }
+                }
+
+                .child-active>a {
+                    .link-content {
+                        border-#{$end}: 5px solid;
+
+                    }
+                }
+            }
+
+            .whitelabel-container img {
+                #{$start}: 0;
+            }
+        }
+    }
+}
+
+// directions
+@import 'directions/decide';
+
+// actor styles
+@mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
+    .main-routing-links {
+        .active-link {
+          background-color: $secondary;
+          transition: 0.6s;
+
+            a .link-content {
+              span{
+                color: $primary ;
+              }
+
+            }
+        }
+
+        .children-arrow {
+          &::before {
+            color: $primary;
+          }
+        }
+
+        .child-active>a .link-content {
+            border-color: $from !important;
+            background-color: $to;;
+            span{
+              color: $from;
+            }
+        }
+
+        .child-active .has-no-grandchildren,
+        .grandchild-active {
+            .link-content {
+                background-color: $siteBackground;
+                border-color: transparent !important;
+            }
+        }
+
+        .child-menu {
+            // background: $primary;
+            border-radius: 5px;
+        }
+
+        .grandchild-menu {
+            border-color: $primary !important;
+        }
+        .child-avatar {
+            border: 1px solid $primary;
+        }
+    }
+
+}
+
+// decide which theme
+@import 'themes/decide';
+
+
+@media (max-width: 991px) {
+    ::ng-deep.sidebar-active {
+        .sidebar-background {
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            position: fixed;
+            z-index: 8;
+            top: 0;
+            left: 0;
+        }
+    }
+    @mixin biDirectional($start, $end) {
+        .main-sidebar {
+            margin-#{$start}: -100vw;
+            #{$start}: 0;
+        }
+
+        &.sidebar-active .main-sidebar {
+            margin-#{$start}: 0;
+        }
+    }
+
+    // directions
+    @import 'directions/decide';
+}

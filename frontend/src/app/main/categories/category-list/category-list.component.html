@@ -1,0 +1,172 @@
+<div
+  class="content-shadow bg-white mb-5"
+  not-authorized
+  [notAuthorized]="isNotAuthorized"
+>
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ "tr_categories" | translate }}</span>
+    <div class="btn-group">
+      <button class="s-btn btn-primary" (click)="createOrEditcategory(false)">
+        {{ "tr_add_category" | translate }}
+      </button>
+      <button
+        class="s-btn btn-secondary size-body"
+        (click)="isFilterOpen = !isFilterOpen"
+      >
+        <i class="fa fa-filter text-primary" aria-hidden="false"></i>
+      </button>
+    </div>
+  </h2>
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="text"
+              class="s-control"
+              (keyup)="filtercategories($event, 'searchTerm')"
+              placeholder="{{ 'tr_search' | translate }}"
+              [(ngModel)]="nameSearchTerm"
+            />
+          </div>
+        </div>
+      </div>
+      <!-- <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ "tr_code" | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="text"
+              (keyup)="filtercategories($event, 'byCode')"
+              class="s-control"
+              placeholder="{{ 'tr_search_by_code' | translate }}"
+              [(ngModel)]="numberSearchTerm"
+            />
+          </div>
+        </div>
+      </div> -->
+      <!-- <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ "tr_category" | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              (change)="filtercategories(selectedcategory, 'by_category_id')"
+              bindValue="id"
+              (scrollToEnd)="nextBatch()"
+              bindLabel="name"
+              [loading]="categorysLoading"
+              [searchable]="false"
+              placeholder="{{ 'tr_select' | translate }}"
+              notFoundText="{{ 'tr_no_items_found' | translate }}"
+              (clear)="filtercategories('', 'by_category_id')"
+              autofocus
+              [(ngModel)]="selectedcategory"
+              [items]="categorys"
+              name="category"
+            >
+              <ng-template ng-footer-tmp>
+                <div class="mb-2 bg-white" *ngIf="categorysLoading">
+                  <app-ghost-line
+                    [height]="10"
+                    [length]="3"
+                    [width]="100"
+                    [type]="'list'"
+                  ></app-ghost-line>
+                </div>
+                <div
+                  class="text-error size-tiny bg-white plr-2"
+                  *ngIf="iscategoryNotAuthorized"
+                >
+                  {{ "tr_permission_error_message" | translate }}
+                </div>
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div> -->
+  
+    </div>
+  </div>
+  <div>
+    <div class="plr-4 mt-4" *ngIf="!categoriesLoading">
+      <div
+        class="table-container categories-list"
+        id="table-container"
+        *ngIf="categoriesList.length > 0"
+      >
+        <table class="s-table table layout-fixed categories-list">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>category Name</th>
+                <th>Number of products</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let category of categoriesList">
+                <td>{{ category._id }}</td>
+                <td>{{ category.name }}</td>
+                <td>{{ category.numberOfProducts }}</td>
+                <td>
+                  <span class="options-menu">
+                    <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                    <div class="options-menu-container p-0">
+                      <div
+                        class="single-option"
+                        (click)="createOrEditcategory(true, category)"
+                      >
+                        {{ "tr_action.edit" | translate }}
+                      </div>
+                      <div class="border-bottom"></div>
+                      <div class="single-option" (click)="deleteCategory(category._id)">
+                        <div class="text-error" >
+                          {{ "tr_action.delete" | translate }}
+                        </div>
+                      </div>
+                    </div>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+
+
+        </table>
+      </div>
+      <div
+        class="empty-state-here text-center ptb-8"
+        *ngIf="categoriesList.length == 0"
+      >
+        <img
+          class="placeholder-icon"
+          src="assets/images/placeholders/announcments.svg"
+          alt=""
+        />
+        <p>{{ "tr_empty_state" | translate }}</p>
+      </div>
+      <div
+      class="empty-state-here text-center ptb-8"
+      *ngIf="categoriesList.length == 0"
+    >
+    <i class="fas fa-box-open empty-icon"></i>
+    <p class="empty-text">No items found.</p>
+    </div>
+
+      <div class="plr-4 ptb-4">
+        <pagination
+          [paginationData]="paginationData"
+          [perPage]="paginationPerPage"
+          (paginationUpdate)="paginationUpdate($event)"
+        ></pagination>
+      </div>
+    </div>
+
+    <div *ngIf="categoriesLoading">
+      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
+    </div>
+  </div>
+</div>

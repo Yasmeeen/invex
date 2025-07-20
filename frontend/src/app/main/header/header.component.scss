@@ -1,0 +1,213 @@
+@import 'color_scheme';
+@import 'blocks';
+@import 'variables';
+
+.header-container {
+    .dragon-image {
+        height: 70px;
+        width: 70px;
+        margin-top: -10px;
+        margin-bottom: -10px;
+        position: absolute;
+        top: 0;
+        img {
+            object-fit: contain;
+            height: 70px;
+            width: 70px;
+            animation: cheerfulDragon 10s ease 0s infinite;
+            display: inline-block;
+        }
+    }
+    .app-journal-container {
+        // width: calc(100% - 400px);
+        .app-journal-wrapper{
+            position: relative;
+        }
+    }
+    .app-journal {
+        height: 50px;
+    }
+    .app-journal-text {
+        width: auto;
+        border-radius: 100px;
+        border: 1px solid;
+        background: #fff;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        p {
+            line-height: 18px;
+        }
+    }
+    .single-header-box {
+        @extend %flex-centered;
+        cursor: pointer;
+        width: 50px;
+        height: 50px;
+        background-color: rgba(255, 255, 255, .7);
+        border-radius: 4px;
+        padding: 4px;
+        border: 1px solid $light_gray;
+        position: relative;
+        font-size: 1.875rem;
+        color: $steel;
+        .notifications-count-container{
+            position: relative;
+        }
+        .notifications-count {
+            position: absolute;
+            top: -32px;
+            width: 22px;
+            height: 22px;
+            color: #fff;
+            border-radius: 50%;
+            font-size: 12px;
+            line-height: 22px;
+            text-shadow: 0 0.5px 0 rgba(0, 0, 0, .19);
+            text-align: center;
+            background-color: #ff3b30;
+            background: linear-gradient(to right, #ff5c6a, #ff3b30);
+            @extend %flex-centered;
+        }
+
+        &.header-options-menu {
+            font-size: 1rem;
+            background: transparent;
+            border: 0;
+            width: auto;
+            padding: 0;
+
+            .options-menu {
+                padding: 0 6px;
+                transition: $transition_1;
+                height: 100%;
+                @extend %flex-centered;
+
+                .options-menu-container .logout {
+                    color: $salmon;
+                }
+            }
+
+            & .options-menu:hover,
+            & .options-menu.active {
+                background-color: rgba(0, 0, 0, 0.03);
+            }
+        }
+        .single-notification{
+            &:hover{
+                background-color: #dfeefa !important;
+            }
+            &.unread{
+                background-color: #f6fbfe;
+            }
+            .notifications-icon{
+                width: 58px;
+                height: 58px;
+                background-color: #fff;
+                border-radius: 6px;
+                .annoncement-img{
+                    width: 24px;
+                }
+                .notification-img{
+                    width: 30px;
+                }
+            }
+            .messages-icon{
+                width: 40px;
+                height: 40px;
+                object-fit: contain;
+                border-radius: 6px;
+            }
+            .message-actor{
+                border-radius: 6px;
+                color: #fff;
+                padding: 0.1rem;
+            }
+            .notifications-title{
+                max-width: 220px;
+                min-width: 220px;
+            }
+        }
+
+    }
+    .menu-icon {
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+}
+
+
+@keyframes cheerfulDragon {
+    0% {
+        transform: rotate(0deg) scale(1);
+    }
+    10% {
+        transform: rotate(0deg) scale(1);
+    }
+    20% {
+        transform: rotate(0deg) scale(1);
+    }
+    30% {
+        transform: rotate(0deg) scale(1);
+    }
+    40% {
+        transform: rotate(0deg) scale(1);
+    }
+    50% {
+        transform: rotate(-10deg) scale(1.2);
+    }
+    60% {
+        transform: rotate(0deg) scale(1);
+    }
+    70% {
+        transform: rotate(0deg) scale(1);
+    }
+    80% {
+        transform: rotate(0deg) scale(1);
+    }
+    90% {
+        transform: rotate(0deg) scale(1);
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+::ng-deep.freshwidget-theme {
+    display: none;
+}
+
+
+// main mixin
+@mixin biDirectional($start, $end) {
+    .header-boxes-container {
+        float: $end;
+
+        .single-header-box {
+            .notifications-count{
+                #{$start}: 0;
+            }
+            margin-#{$start}: 15px;
+            float: $end;
+        }
+    }
+    .app-journal-text {
+        padding-#{$start}: 50px;
+        padding-#{$end}: 30px;
+    }
+    .app-journal-wrapper {
+        padding-#{$start}: 30px;
+    }
+    .dragon-image {
+        #{$start}: 0;
+    }
+}
+
+// directions
+@import 'directions/decide';
+
+@mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
+    .app-journal-text {
+        border-color: $primary !important;
+    }
+}
+@import 'themes/decide';

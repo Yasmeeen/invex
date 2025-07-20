@@ -1,0 +1,40 @@
+@import 'initializer';
+
+.system-alerts-container {
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 99;
+    .system-alerts {
+        padding: 6px 10px;
+
+        p {
+            color: #fff;
+        }
+    }
+    .system-alerts.error {
+        background: $error;
+    }
+    .refresh-text {
+        padding-left: 15px;
+        font-weight: bold;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+
+    animation: revealHeight 0.6s ease 0.5s 1 forwards;
+    max-height: 0;
+    transition: 0.3s;
+    transform: translateY(-150%);
+    overflow: hidden;
+}
+
+@keyframes revealHeight {
+    50% {
+        max-height: 200px;
+    }
+    100% {
+        transform: translateY(0px);
+        max-height: 200px;
+    }
+}

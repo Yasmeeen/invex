@@ -1,0 +1,52 @@
+<div class="sidebar-background" (click)="closeSidebar()"></div>
+<div class="main-sidebar">
+  <div class="app-sidebar">
+
+    <div class="logo-container pb-3 flex flex-middle flex-center">
+      <img class="logo" default="/assets/images/logo2.png">
+      <span class="size-lead weight-bold">E-commerce</span>
+
+    </div>
+
+    <!-- <div class="main-routing-links">
+            <div *ngFor="let link of appSidebar" routerLinkActive="active-link" class="anchor-container">
+              <div>
+                <a [routerLink]="link.routerLink">
+                  <div class="link-content">
+                    <span [class]="link.icon"></span>
+                    <span class="main-icon-text">
+                            {{ link.name | translate }}
+                        </span>
+                  </div>
+                </a>
+              </div>
+            </div>
+        </div> -->
+    <div class="main-routing-links plr-2">
+      <div *ngFor="let link of appSidebar" routerLinkActive="active-link" class="anchor-container">
+        <div >
+          <a [routerLink]="link.routerLink">
+            <div class="link-content">
+              <span [class]="link.icon"></span>
+              <span class="main-icon-text">
+                {{ link.name | translate }}
+              </span>
+            </div>
+          </a>
+        </div>
+        <span *ngIf="link.children" class="fa fa-caret-down children-arrow" (click)="toggleChildren($event)">
+        </span>
+        <div *ngIf="link.children" class="child-menu mr-2">
+          <div *ngFor="let child of link.children" routerLinkActive="child-active" class="anchor-container">
+            <a [routerLink]="child.routerLink" >
+              <div class="link-content">
+                  <span class="size-small" >
+                    {{child.name | translate}}
+                  </span>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

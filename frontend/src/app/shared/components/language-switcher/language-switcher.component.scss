@@ -1,0 +1,78 @@
+@import 'color_scheme';
+@import 'blocks';
+@import 'initializer';
+
+
+.language-switcher-modal .modal-wrapper {
+    max-width: 360px;
+    direction: inherit;
+
+    .single-language {
+        input {
+            display: none;
+        }
+
+        label {
+            border-radius: 2px;
+            padding: 14px 18px;
+            background-color: #f5f6fa;
+            margin-bottom: 8px;
+            cursor: pointer;
+            width: 100%;
+            border: 2px solid transparent;
+            @extend %flex-middle;
+        }
+
+        label::before {
+            content: '';
+            background: #fff;
+            border-radius: 100%;
+            border: 2px solid rgba(0, 0, 0, .54);
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            position: relative;
+            cursor: pointer;
+            text-align: center;
+            transition: all 250ms ease;
+        }
+        input:checked+label {
+            border: 2px solid #007ee5;
+        }
+
+        input:checked+label::before {
+            background-color: #007ee5;
+            border-color: #007ee5;
+            box-shadow: inset 0 0 0 3px #fff;
+        }
+    }
+}
+
+
+// main mixin
+@mixin biDirectional($start, $end) {
+
+    .single-language label::before {
+        margin-#{$end}: 15px;
+    }
+}
+
+// directions 
+@import 'directions/decide';
+
+
+@mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
+
+    .single-language input:checked+label {
+        border: 2px solid $primary;
+    }
+
+    .single-language input:checked+label::before {
+        background-color: $primary;
+        border-color: $primary;
+        box-shadow: inset 0 0 0 3px #fff;
+    }
+}
+
+@import 'themes/decide';
+

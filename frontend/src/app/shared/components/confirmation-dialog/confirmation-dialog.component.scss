@@ -1,0 +1,37 @@
+@import 'blocks';
+.lightbox-container {
+    .lightbox-wrapper {
+        position: relative;
+        z-index: 99999;
+        padding: 10px;
+        max-width: 90%;
+        max-height: 90%;
+        margin: auto;
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            animation: scaleDown 0.3s ease 0s 1 forwards;
+            transform: scale(1.5);
+            opacity: 0;
+        }
+    }
+    &, .lightbox-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 9999;
+        @extend %flex-centered;
+    }
+    .lightbox-background {
+        background: rgba(0,0,0,0.85);
+    }
+}
+
+@keyframes scaleDown {
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

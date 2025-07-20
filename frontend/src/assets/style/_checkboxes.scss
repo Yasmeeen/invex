@@ -1,0 +1,429 @@
+@import 'blocks';
+@import'variables';
+@import'color_scheme';
+@import 'initializer';
+
+%checkbox-style {
+    display: inline-flex;
+    font-size: 1rem;
+
+    input {
+        display: none;
+
+        &+label {
+            position: relative;
+            cursor: pointer;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            margin: 0;
+            transition: $transition_1;
+            color: $text;
+            font-weight: inherit;
+            min-height: 20px;
+            -webkit-touch-callout: none;
+            /* iOS Safari */
+            -webkit-user-select: none;
+            /* Safari */
+            -khtml-user-select: none;
+            /* Konqueror HTML */
+            -moz-user-select: none;
+            /* Firefox */
+            -ms-user-select: none;
+            /* Internet Explorer/Edge */
+            user-select: none;
+            /* Non-prefixed version, currently supported by Chrome and Opera */
+        }
+
+        &+label:hover,
+        &:checked+label {
+            color: $text;
+        }
+
+        &+label::before,
+        &+label::after {
+            border-radius: 4px;
+            content: '';
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            margin-top: -10px;
+            position: absolute;
+            font: normal normal normal 12px/1 FontAwesome;
+            text-rendering: auto;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-size: inherit;
+            transition: $transition_1;
+        }
+
+        &+label::before {
+            z-index: 2;
+            @extend %flex-centered;
+        }
+
+        &:disabled+label {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        &:disabled+label:before,
+        &:disabled+label:after {
+            box-shadow: none;
+        }
+
+        &+label::before {
+            transform: scale(0);
+        }
+
+        &:checked+label::before {
+            transform: scale(0.75);
+        }
+    }
+}
+
+.s-checkbox,
+.s-checkbox-round,
+.s-radio {
+    @extend %checkbox-style;
+}
+
+.s-checkbox,
+.treeview-container .form-inline,
+.treeview-container.form-check {
+    input {
+        &+label::before {
+            color: #fff;
+            content: "\f00c";
+        }
+    }
+}
+
+.treeview-container .form-inline,
+.treeview-container.form-check {
+    margin-bottom: 0.5rem;
+}
+
+.s-radio {
+    input {
+        &+label::before {
+            border-radius: 50%;
+            content: '';
+            border: 2px solid #fff;
+        }
+    }
+}
+
+.s-checkbox-round {
+
+    input {
+        &+label:after {
+            border-radius: 50%;
+        }
+
+        &+label::before {
+            color: #fff;
+            content: "\f00c";
+            border-radius: 50%;
+        }
+    }
+}
+
+.checkbox-colored {
+    label {
+        color: inherit !important;
+    }
+
+    label::before,
+    label::after {
+        border-color: inherit !important;
+    }
+}
+
+.s-checkbox-slider {
+    display: inline-flex;
+
+    input {
+        display: none;
+    }
+
+    label {
+        display: inline-flex;
+        margin: 0;
+    }
+
+    .slider {
+        width: 30px;
+        height: 16px;
+        position: relative;
+        display: inline-block;
+
+        .slider-bg {
+            height: 10px;
+            width: 100%;
+            top: 3px;
+            left: 0;
+            position: absolute;
+            background: #d8dde6;
+            border-radius: 20px;
+            display: inline-block;
+            transition: 0.3s;
+        }
+
+        .slider-handle {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #7a8993;
+            transition: 0.3s;
+            top: 0;
+            display: inline-block;
+            position: absolute;
+            border: 1px solid transparent;
+        }
+    }
+}
+
+.s-checkbox-slider-second {
+    display: inline-flex;
+
+    input {
+        display: none;
+    }
+
+    label {
+        display: inline-flex;
+        margin: 0;
+    }
+
+    .slider {
+        width: 45px;
+        height: 20px;
+        position: relative;
+        display: inline-block;
+
+        .slider-bg {
+            height: 20px;
+            width: 100%;
+            top: 3px;
+            left: 0;
+            position: absolute;
+            background: #d8dde6;
+            border-radius: 20px;
+            display: inline-block;
+            transition: 0.3s;
+        }
+
+        .slider-handle {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: white;
+            transition: 0.3s;
+            top: 5px;
+            display: inline-block;
+            position: absolute;
+            border: 1px solid transparent;
+        }
+    }
+
+    input:disabled+label {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    input:checked+label {
+        .slider-bg {
+            background: $green;
+
+            &::after {
+                top: 3px;
+                color: white;
+                position: absolute;
+                font: normal normal normal 14px/1 FontAwesome;
+                content: '\f00c';
+            }
+        }
+
+        .slider-handle {
+            background: #fff;
+            border-color: $green;
+        }
+    }
+}
+
+.partially-checked {
+    input+label::before {
+        transform: scale(0.5);
+        content: '\f111';
+        color: orange;
+    }
+}
+
+.s-checkbox input:indeterminate {
+    &+label::before {
+        transform: scale(0.5) !important;
+        content: '\f111' !important;
+        color: orange !important;
+    }
+}
+
+.treeview-container {
+    .form-inline,
+    .form-check {
+        display: inline-flex;
+        align-items: center;
+        @extend %checkbox-style;
+
+        input {
+            display: none;
+        }
+    }
+
+    .form-check-label {
+        margin: 0;
+    }
+}
+
+
+@mixin biDirectional($start, $end) {
+
+    .s-checkbox,
+    .s-checkbox-round,
+    .s-radio,
+    .treeview-container .form-inline,
+    .treeview-container.form-check {
+        input {
+            &+label {
+                padding-#{$start}: 30px;
+            }
+
+            &+label::before,
+            &+label::after {
+                #{$start}: 0;
+            }
+        }
+    }
+
+    .s-checkbox-slider {
+        .slider-handle {
+            #{$start}: 0px;
+        }
+
+        input:checked+label {
+
+            .slider-handle {
+                #{$start}: 15px;
+            }
+        }
+    }
+
+    .s-checkbox-slider-second {
+        .slider-handle {
+            #{$start}: 2px;
+        }
+
+        input:checked+label {
+            .slider-handle {
+                #{$start}: 27px;
+            }
+
+            .slider-bg::after {
+                #{$start}: 8px;
+            }
+        }
+    }
+}
+
+@import 'directions/decide';
+
+
+@mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
+
+    .s-checkbox,
+    .s-checkbox-round,
+    .s-radio,
+    .treeview-container .form-inline,
+    .treeview-container.form-check {
+        input+label::after {
+            border: 1px solid $primary;
+        }
+    }
+
+
+    .s-checkbox,
+    .treeview-container .form-inline,
+    .treeview-container.form-check {
+        input {
+            &:checked+label::after {
+                background: $primary;
+                border-color: $primary;
+            }
+            &:indeterminate+label::before {
+                transform: scale(0.5);
+                content: '\f111';
+                color: orange;
+            }
+        }
+    }
+
+    .s-radio {
+
+        input {
+            &+label:after {
+                border-radius: 50%;
+            }
+
+            &:checked+label:after {
+                background: white;
+                border-color: $primary;
+            }
+
+            &:checked+label:before {
+                background: $primary;
+            }
+        }
+    }
+
+    .s-checkbox-round {
+
+        input {
+
+            &:checked+label:after {
+                background: $primary;
+                border-color: $primary;
+            }
+        }
+    }
+
+    .s-checkbox-slider {
+
+        input:checked+label {
+            .slider-bg {
+                background: $primary;
+            }
+
+            .slider-handle {
+                background: #fff;
+                border-color: $primary;
+            }
+        }
+    }
+
+    .s-checkbox-slider-second.per-actor {
+
+        input:checked+label {
+            .slider-bg {
+                background: $primary;
+            }
+
+            .slider-handle {
+                background: #fff;
+                border-color: $primary;
+            }
+        }
+    }
+
+}
+
+@import 'themes/decide';

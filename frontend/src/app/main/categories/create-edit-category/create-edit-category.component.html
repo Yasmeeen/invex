@@ -1,0 +1,65 @@
+<div class="complex-modal">
+    <div class="modal-wrapper">
+      <div class="close-modal-icon" (click)="closeModal()"></div>
+      <div class="modal-content" #modalContent>
+        <div class="modal-header border-bottom">
+          <h3 class="steel weight-medium size-default m-0">New category</h3>
+        </div>
+        <div class="modal-body weight-medium steel">
+          <div class="add-student-modal-container">
+            <div>
+              <div class="content-container plr-4 ptb-3">
+                <div
+                  class="alert alert-error mb-3"
+                  *ngIf="categoryForm.invalid && categoryForm.submitted"
+                >
+                  Please fill all the required fields
+                </div>
+  
+                <form #categoryForm="ngForm">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div
+                        class="form-group"
+                        [class.has-error]="
+                          branchName.invalid && categoryForm.submitted
+                        "
+                      >
+                        <label for="">category Name</label>
+                        <input
+                          #branchName="ngModel"
+                          type="text"
+                          class="s-control"
+                          name="name"
+                          ngModel
+                          required
+                        />
+                        <span
+                          class="text-error size-small validator"
+                          *ngIf="branchName.invalid && categoryForm.submitted"
+                        >
+                          category name is required.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+  
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer mt-3 text-right">
+          <button class="s-btn btn-secondary mr-3" (click)="closeModal()">Cancel</button>
+          <button
+            (click)="submitForm()"
+            class="s-btn btn-primary"
+            type="submit"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  

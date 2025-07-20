@@ -1,0 +1,118 @@
+// !--- Lato Font Family ---!
+@import url('https://fonts.googleapis.com/css?family=Lato:400,700');
+
+.weight-bold {
+    font-weight: 700;
+}
+
+.italic {
+    font-style: italic;
+}
+
+.capitalize {
+    text-transform: capitalize;
+}
+
+.lowercase {
+    text-transform: lowercase;
+}
+
+.uppercase {
+    text-transform: uppercase;
+}
+
+.transform-none {
+    text-transform: none;
+}
+
+// font size
+h1 {
+    font-size: 2.8125rem;
+}
+
+h2 {
+    font-size: 2.3125rem;
+}
+
+h3 {
+    font-size: 1.9375rem;
+}
+
+h4 {
+    font-size: 1.625rem;
+}
+
+h5 {
+    font-size: 1.3125rem;
+}
+
+h6 {
+    font-size: 1.1rem;
+}
+
+.size-lead {
+    font-size: 1.375rem;
+}
+
+.size-body {
+    font-size: 1.25rem;
+}
+
+.size-default {
+    font-size: 1rem;
+}
+
+.size-small {
+    font-size: 0.875rem;
+}
+
+.size-tiny {
+    font-size: 0.75rem;
+}
+.size-small-tiny {
+    font-size: 0.65rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+    margin: 0;
+    font-weight: normal;
+}
+
+p {
+    line-height: 1.6;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 700;
+}
+.section-title {
+    font-size: 1.25rem;
+    line-height: 1.5rem;
+    font-weight: 700;
+}
+.component-title {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 700;
+}
+.text-line {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 400;
+}
+.text-block {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+.info-line {
+    font-size: 0.75rem;
+    line-height: 1rem;
+}

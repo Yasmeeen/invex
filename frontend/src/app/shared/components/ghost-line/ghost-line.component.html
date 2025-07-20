@@ -1,0 +1,28 @@
+<!-- [style.height]="height? height+'px': ''" -->
+<div class="container">
+  <div class="table-container"  *ngIf="type == 'table'">
+    <table class="s-table table layout-fixed">
+      <thead>
+        <tr>
+          <th *ngFor="let i of ' '.repeat(length/2).split('')">
+            <div class="line"></div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let i of ' '.repeat(length).split('')">
+          <td *ngFor="let i of ' '.repeat(length/2).split('')">
+            <div class="line"></div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+ 
+  <div *ngIf="type == 'line'">
+    <div class="line" [style.height]="height? height+'px': ''" [style.width]="width? width+'px': ''" ></div>
+  </div>
+  <div  *ngIf="type == 'list'">
+    <div class="line" [style.width]="width? width+'px': ''"  [style.height]="height? height+'px': ''" *ngFor="let i of ' '.repeat(length).split('')"></div>
+  </div>
+</div>

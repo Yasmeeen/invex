@@ -1,0 +1,10 @@
+<div (click)="orderCallback()" (mouseenter)="onHover = true" (mouseleave)="onHover = false" class="order-by-wrapper flex flex-middle no-select pointer" [class.not-me]="notMe" [class.on-hover]="onHover">
+    <div class="order-by-content">
+        <ng-content></ng-content>
+    </div>
+    <img class="ml-1 {{type == orderBy? current: ''}}" src="assets/images/sort-arrow.svg"  alt="">
+</div>
+
+<!-- example  -->
+<!-- <div class="" order-by (order)="onOrder($event)" [orderBy]="'well'">well well</div> -->
+<!-- example  -->

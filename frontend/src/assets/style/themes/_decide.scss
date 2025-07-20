@@ -1,0 +1,63 @@
+::ng-deep body {
+    &.admin_theme {
+        @import 'themes/admin.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.hod_theme {
+        @import 'themes/hod.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.teacher_theme {
+        @import 'themes/teacher.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.student_theme {
+        @import 'themes/student-male.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.student_theme.female {
+        @import 'themes/student-female.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.parent_theme {
+        @import 'themes/parent.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+}
+
+body {
+    &.admin_theme {
+        @import 'themes/admin.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.hod_theme {
+        @import 'themes/hod.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.teacher_theme {
+        @import 'themes/teacher.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.student_theme {
+        @import 'themes/student-male.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.student_theme.female {
+        @import 'themes/student-female.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+
+    &.parent_theme {
+        @import 'themes/parent.scss';
+        @include actorStyles($primary, $secondary, $from, $to, $siteBackground);
+    }
+}

@@ -1,0 +1,27 @@
+<div class="system-alerts-container" *ngIf="globals.systemAlerts.noPermission">
+    <div class="system-alerts error text-center">
+        <p class="line-block">
+            {{'tr_permission_error_message' | translate}}
+        </p>
+    </div>
+</div>
+
+<div class="system-alerts-container" *ngIf="globals.systemAlerts.noConnection">
+    <div class="system-alerts error text-center mb-3">
+        <p class="line-block">
+            There's a problem with the internet connection
+        </p>
+    </div>
+</div>
+
+<div class="system-alerts-container" *ngIf="globals.systemAlerts.newVersion">
+    <div class="system-alerts newVersion bg-primary text-center mb-3">
+        <p class="line-block">
+                <i class="fa fa-info-circle" style="padding-right: 10px"></i>
+            We just released some improvements ! Please refresh your browser to update your version.
+            <span class = "refresh-text" (click)="reload()">
+                Refresh
+            </span>
+        </p>
+    </div>
+</div>

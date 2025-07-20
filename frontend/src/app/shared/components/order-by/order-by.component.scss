@@ -1,0 +1,28 @@
+.order-by-wrapper {
+
+    &.on-hover {
+        img {
+            opacity: 0.5;
+            display: block !important;
+        }
+    }
+    &.not-me {
+        img {
+            display: none;
+        }
+    }
+
+    img {
+        transition: 0.3s;
+        opacity: 0;
+        cursor: pointer;
+        width: 14px;
+        transform: rotate(180deg);
+        &.descending, &.ascending {
+            opacity: 0.95;
+        }
+        &.ascending {
+            transform: rotate(0deg)
+        }
+    }
+}

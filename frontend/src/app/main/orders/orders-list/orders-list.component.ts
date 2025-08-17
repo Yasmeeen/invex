@@ -60,6 +60,7 @@ export class OrdersListComponent implements OnInit {
     private CategoriesServce: CategoriesServce
   ) { }
 
+
   ngOnInit(): void {
     this.getOrders();
   }

@@ -65,11 +65,16 @@ export const createProduct = async (req, res) => {
   try {
     const { name, code, price, category, branch } = req.body;
 
-    if (!name || !code || !price || !category || !branch) {
+    if (!name || !code || !price || !category._id || !branch._id) {
       return res.status(400).json({ error: 'All fields are required' });
     }
-
-    const product = await Product.create({ name, code, price, category, branch });
+    const product = await Product.create({
+      name,
+      code,
+      price,
+      category: category._id,
+      branch: branch._id
+    });
 
     res.status(201).json({ message: '✅ Product created', product });
   } catch (error) {

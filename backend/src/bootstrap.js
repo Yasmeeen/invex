@@ -3,6 +3,7 @@ import categoriesRoutes from './modules/categories_module/router.js';
 import branchesRoutes from './modules/branches_module/router.js';
 import ordersRoutes from './modules/orders_module/router.js';
 import productRoutes from './modules/products_module/router.js'; 
+import userRoutes from './modules/userModule/user.controller.js'; 
 import connectToMongoDB from './DB/connection.js';
 
 const PORT = 3000;
@@ -23,6 +24,7 @@ const bootstrap = (app, express) => {
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/branches', branchesRoutes);
   app.use('/api/orders', ordersRoutes);
+  app.use('/api/users', userRoutes);
 
   // Start server
   app.listen(PORT, () => {

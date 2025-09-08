@@ -21,7 +21,7 @@
                         type="text"
                         class="s-control"
                         name="clientName"
-                        ngModel
+                        [(ngModel)] = "order.clientName"
                         #clientName="ngModel"
                         required
                       />
@@ -44,7 +44,7 @@
                         type="text"
                         class="s-control"
                         name="clientPhone"
-                        ngModel
+                        [(ngModel)] = "order.clientPhoneNumber"
                         #clientPhone="ngModel"
                         required
                       />
@@ -67,7 +67,7 @@
                         type="text"
                         class="s-control"
                         name="sellerName"
-                        ngModel
+                        [(ngModel)] = "order.sellerName"
                         #sellerName="ngModel"
                         required
                       />
@@ -76,6 +76,28 @@
                         *ngIf="sellerName.invalid && orderForm.submitted"
                       >
                         phone number is required.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div
+                      class="form-group"
+                      [class.has-error]="clientAddress.invalid && orderForm.submitted"
+                    >
+                      <label for="">client Address</label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="clientAddress"
+                        [(ngModel)] = "order.clientAddress"
+                        #clientAddress="ngModel"
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="clientAddress.invalid && orderForm.submitted"
+                      >
+                        client address is required.
                       </span>
                     </div>
                   </div>
@@ -120,9 +142,9 @@
                              
                                   bindLabel="code"
                                   [clearable]="false"
-                                  ngModel
+                                  [(ngModel)] = "product.selectedProduct"
                                   #productCodes="ngModel"
-                                  name="product"
+                                  name="product{{i}}"
                                   [items]="products"
                                   required
                                 >
@@ -159,7 +181,7 @@
                       <div class="col-md-3">
                         <div class="form-group">
                           <label >Price</label>
-                         <div class="mt-3">500$</div>
+                         <div class="mt-3">{{product.selectedProduct.price}}</div>
                         </div>
                       </div>
   
@@ -176,6 +198,8 @@
                 </div>
               </form>
             </div>
+
+       
           </div>
         </div>
   
@@ -191,111 +215,110 @@
      
       </div>
     </div>
-
-    <div class="invoice-container" id = "print-container">
+    <div class="invoice-container" id ="print-container">
+      <div class="center">
+          <div class="bold">solddoutt store</div>
+        </div>
+      
+        <table>
+          <tr>
+            <td>العميل:</td>
+            <td>{{order.clientName}}</td>
+          </tr>
+          <tr>
+            <td>الهاتف:</td>
+            <td>{{order.clientPhoneNumber}}</td>
+          </tr>
+          <tr>
+            <td>العنوان:</td>
+            <td>{{order.clientAddress}}</td>
+          </tr>
+        </table>
+      
+        <div class="dashed"></div>
+      
+        <table>
+          <tr>
+            <td>رقم الفاتورة:</td>
+            <td>4431</td>
+            <td>عدد المواد:</td>
+            <td>{{order.products?.length}}</td>
+          </tr>
+          <tr>
+            <td>التاريخ:</td>
+            <td colspan="3">{{todayDate}}</td>
+          </tr>
+        </table>
+      
+        <div class="dashed"></div>
+      
+        <table>
+          <tr class="bold">
+            <td>المجموع</td>
+            <td>الكمية</td>
+            <td>السعر</td>
+            <td>الاسم</td>
+          </tr>
+          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ZARA QUARTER ZIPPER</td></tr>
+          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>moncler</td></tr>
+          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ae reflect</td></tr>
+          <tr><td>1300.00</td><td>2.00</td><td>650.00</td><td>kenzo</td></tr>
+          <tr><td>2400.00</td><td>3.00</td><td>800.00</td><td>p&amp;b</td></tr>
+          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>phlip plein</td></tr>
+          <tr><td>650.00</td><td>1.00</td><td>650.00</td><td>one piece</td></tr>
+        </table>
+      
+        <div class="dashed"></div>
+      
+        <table>
+          <tr class="total">
+            <td>إجمالي الفاتورة:</td>
+            <td>7,150.00</td>
+          </tr>
+          <tr>
+            <td>% الخصم:</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>مبلغ الخصم:</td>
+            <td>2,350.00</td>
+          </tr>
+          <tr>
+            <td>% الضريبة:</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>مبلغ الضريبة:</td>
+            <td>0.00</td>
+          </tr>
+        </table>
+      
+        <div class="dashed"></div>
+      
+        <table>
+          <tr>
+            <td>المبلغ المدفوع:</td>
+            <td>4,800.00</td>
+          </tr>
+          <tr>
+            <td>المبلغ المتبقي مرتجع:</td>
+            <td>0.00</td>
+          </tr>
+          <tr>
+            <td>مبلغ ذمم الفاتورة:</td>
+            <td>0.00</td>
+          </tr>
+        </table>
+      
+        <div class="double-border"></div>
+        <div class="final-total">صافي قيمة الفاتورة<br />4,800.00</div>
+        <div class="double-border"></div>
+      
         <div class="center">
-            <div class="bold">solddoutt store</div>
-          </div>
-        
-          <table>
-            <tr>
-              <td>العميل:</td>
-              <td>ياسمين عبدالحي محمد</td>
-            </tr>
-            <tr>
-              <td>الهاتف:</td>
-              <td>01115673071</td>
-            </tr>
-            <tr>
-              <td>العنوان:</td>
-              <td>القاهره</td>
-            </tr>
-          </table>
-        
-          <div class="dashed"></div>
-        
-          <table>
-            <tr>
-              <td>رقم الفاتورة:</td>
-              <td>4431</td>
-              <td>عدد المواد:</td>
-              <td>7</td>
-            </tr>
-            <tr>
-              <td>التاريخ:</td>
-              <td colspan="3">2025/07/30 19:01</td>
-            </tr>
-          </table>
-        
-          <div class="dashed"></div>
-        
-          <table>
-            <tr class="bold">
-              <td>المجموع</td>
-              <td>الكمية</td>
-              <td>السعر</td>
-              <td>الاسم</td>
-            </tr>
-            <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ZARA QUARTER ZIPPER</td></tr>
-            <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>moncler</td></tr>
-            <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ae reflect</td></tr>
-            <tr><td>1300.00</td><td>2.00</td><td>650.00</td><td>kenzo</td></tr>
-            <tr><td>2400.00</td><td>3.00</td><td>800.00</td><td>p&amp;b</td></tr>
-            <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>phlip plein</td></tr>
-            <tr><td>650.00</td><td>1.00</td><td>650.00</td><td>one piece</td></tr>
-          </table>
-        
-          <div class="dashed"></div>
-        
-          <table>
-            <tr class="total">
-              <td>إجمالي الفاتورة:</td>
-              <td>7,150.00</td>
-            </tr>
-            <tr>
-              <td>% الخصم:</td>
-              <td>0</td>
-            </tr>
-            <tr>
-              <td>مبلغ الخصم:</td>
-              <td>2,350.00</td>
-            </tr>
-            <tr>
-              <td>% الضريبة:</td>
-              <td>0</td>
-            </tr>
-            <tr>
-              <td>مبلغ الضريبة:</td>
-              <td>0.00</td>
-            </tr>
-          </table>
-        
-          <div class="dashed"></div>
-        
-          <table>
-            <tr>
-              <td>المبلغ المدفوع:</td>
-              <td>4,800.00</td>
-            </tr>
-            <tr>
-              <td>المبلغ المتبقي مرتجع:</td>
-              <td>0.00</td>
-            </tr>
-            <tr>
-              <td>مبلغ ذمم الفاتورة:</td>
-              <td>0.00</td>
-            </tr>
-          </table>
-        
-          <div class="double-border"></div>
-          <div class="final-total">صافي قيمة الفاتورة<br />4,800.00</div>
-          <div class="double-border"></div>
-        
-          <div class="center">
-            <div class="bold">solddoutt store</div>
-            <div>مدينة نصر، شارع الطاقة بجوار النادي الأهلي</div>
-            <div>01150564880</div>
-          </div>
-    </div>
+          <div class="bold">solddoutt store</div>
+          <div>مدينة نصر، شارع الطاقة بجوار النادي الأهلي</div>
+          <div>01150564880</div>
+        </div>
+  </div>
   </div>
   

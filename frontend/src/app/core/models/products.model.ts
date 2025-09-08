@@ -19,11 +19,22 @@ export interface Branch {
   name: string;
 }
 export interface Order {
-  _id: string;
-  client_name: string;
-  product: Product;
-  branch:  Branch;
-  number_of_products : number;
-  total_price: number;
-  products: Product [];
+  _id?: string;
+  clientName: string;
+  clientPhoneNumber: string;
+  sellerName: string;
+  clientAddress: string
+  branch?:  Branch;
+  numberOfProducts? : number;
+  totalPrice?: number;
+  products?: Product [];
 }
+export interface productOrder{
+  _id: string;
+code: string;
+name: string;
+quantity: number;
+price: number;    // changed to number
+discount: number;
+selectedProduct: any
+}  

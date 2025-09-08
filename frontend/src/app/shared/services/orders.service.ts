@@ -26,7 +26,7 @@ getOrder(orderId: any) {
 createOrder(params: any) {
   return this.http.post(ORDER_CREATE_URL, params);
 }
-updateOrder(order: Order): Observable<Order> {
+updateOrder(order:any): Observable<Order> {
   return this.http.put<Order>(ORDER_UPDATE_URL, order).pipe(
     tap({
       error: (errorResponse: Error) => {

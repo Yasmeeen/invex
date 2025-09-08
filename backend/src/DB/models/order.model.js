@@ -1,23 +1,59 @@
 import mongoose from 'mongoose';
 
-const orderSchema = new mongoose.Schema({
-  client_name: { type: String, required: true },
-  products: [
-    {
-      _id: false,
-      product_id: {
+const orderSchema = new mongoose.Schema(
+  {
+    clientName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    clientPhoneNumber: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    sellerName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    clientAddress: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: false,
+    },
+    numberOfProducts: {
+      type: Number,
+      required: false,
+      min: 0,
+    },
+    totalPrice: {
+      type: Number,
+      required: false,
+      min: 0,
+    },
+    products: [
+      {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Product',
-        required: true,
       },
-      name: String,
-      code: String,
-      price: Number,
+    ],
+    status: {
+      type: String,
+      enum: ['pending', 'processing', 'completed', 'cancelled'],
+      default: 'pending',
+      required: true,
     },
-  ],
-  total_amount: { type: Number, required: true },
-  status: { type: String, required: true }, // You can later use enum for specific statuses
-}, { timestamps: true });
+  },
+  {
+    timestamps: true,
+  }
+);
 
 const Order = mongoose.model('Order', orderSchema);
 export default Order;

@@ -30,7 +30,7 @@ export const BRANCH_DELETE_BRANCH_URL = BRANCHES_URL + '/deleteBranch';
 
 
 export const ORDERS_URL = BASE_URL + '/api/orders';
-export const ORDER_CREATE_URL = ORDERS_URL + '/create';
+export const ORDER_CREATE_URL = ORDERS_URL + '/createOrder';
 export const ORDER_UPDATE_URL = ORDERS_URL + '/updateOrder';
 
 export const ORDER_PAY_URL = ORDERS_URL + '/pay';

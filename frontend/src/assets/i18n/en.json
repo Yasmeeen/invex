@@ -241,6 +241,7 @@
     "tr_add_branch":"Add Branch",
     "tr_add_category":"Add Category",
     "tr_orders": "Orders",
-    "tr_users":"Users"
+    "tr_users":"Users",
+    "tr_add_order":"Add Order"
 
 }

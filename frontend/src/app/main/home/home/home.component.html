@@ -1,225 +1,134 @@
-
-<div class="mlr-4">
-  <div class="flex flex-middle flex-wrap">
-
-
-    <div  *ngFor="let link of appSidebar" routerLinkActive="active-link">
-      <!-- <div class="childreen-link-container flex flex-middle" *ngIf="link.children">
-        <div class="child-link-container" *ngFor="let child of link.children">
-          <div class="text-center">
-            <div class="link-circle-container" >
-              <a [routerLink]="child.routerLink">
-                <div class="link-content">
-                  <span class="text-primary icon" [class]="child.icon"></span>
-
-                </div>
-              </a>
-            </div>
-            <span >
-              {{ child.name | translate }}
-            </span>
-          </div>
-        </div>
-      </div> -->
-
-      <!-- <div class="link-container" *ngIf="!link.children">
-        <div class="text-center">
-          <div class="link-circle-container" >
-            <a [routerLink]="link.routerLink">
-              <div class="link-content">
-                <span class="text-primary icon" [class]="link.icon"></span>
-
-              </div>
-            </a>
-          </div>
-          <span >
-            {{ link.name | translate }}
-          </span>
-        </div>
-      </div> -->
-
-
-
-
-      <!-- <div *ngIf="link.children" class="child-menu mlr-2">
-        <div *ngFor="let child of link.children" routerLinkActive="child-active" class="anchor-container">
-          <a [routerLink]="child.routerLink" >
-            <div class="link-content">
-              <span>
-
-                <p class="size-small" >
-                  {{child.name | translate}}
-                </p>
-              </span>
-            </div>
-          </a>
-        </div>
-      </div> -->
-    </div>
-  </div>
-
 <div class="row">
-  <div class="col-md-6">
+  <!-- Congratulations Section -->
+  <div class="col-md-12">
     <div class="container-card">
       <div class="mb-4 border-bottom pb-3">
-          <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-            <div>
-              <a class="hover-link pointer weight-bold">Congratulations Jonathan</a>
-              <div class="size-small mtb-1 plr-1">You have done 38% more saless</div>
-            </div>
-
-          </div>
-          <div class="flex flex-middle">
-            <div>
-              <div class="flex flex-middle mt-6">
-                  <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
-                    <i class="fa fa-users"></i>
-                  </div>
-                  <div class="ml-3">
-                    <a class="hover-link pointer weight-bold" href="/employees">60 new user</a>
-                    <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
-                  </div>
-              </div>
-
-              <div class="flex flex-middle mt-6">
-                  <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
-                    <i class="fa fa-link"></i>
-                  </div>
-                  <div class="ml-3">
-                    <a class="hover-link pointer weight-bold" href="/employees">54 new products</a>
-                    <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
-                  </div>
-              </div>
-
-              <div class="flex flex-middle mt-6">
-                  <div class="bg-warning text-warning border rounded-100 size-small ptb-3 plr-3">
-                    <i class="fa fa-calendar"></i>
-                  </div>
-                  <div class="ml-3 ">
-                    <a class="hover-link pointer weight-bold" href="/employees">87 new uploaded file</a>
-                    <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
-                  </div>
-              </div>
-            </div>
-
-            <div>
-              <img src="assets/images/laptop.png" alt="">
-            </div>
-          </div>
-      </div>
-
-      <div class="mt-8 pt-4">
         <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
           <div>
-            <a class="hover-link pointer weight-bold">Performance Mangment</a>
-            <div class="size-small mtb-1 plr-1">You have done 38% more saless</div>
+            <a class="hover-link pointer weight-bold">Congratulations Mahmoud</a>
+            <div class="size-small mtb-1 plr-1">You have done 38% more sales</div>
           </div>
-
         </div>
-        <div>
-          <div class="mtb-6" id="performance-container" style="width: 100%; height: 250px;"></div>
-        </div>
-    </div>
-
-
-    </div>
-  </div>
-
-
-
-  <div class="col-md-6">
-    <div class="row">
-      <div class="col-md-6">
-        <div class="container-card">
-          <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-            <div class="flex flex-middle flex-direction-column ">
-              <a class="hover-link pointer weight-bold" href="/employees">Employees</a>
-              <div class="size-small mtb-1 plr-3">Last 7 days</div>
+        <div class="flex flex-middle">
+          <div>
+            <div class="flex flex-middle mt-6">
+              <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
+                <i class="fa fa-users"></i>
+              </div>
+              <div class="ml-3">
+                <a class="hover-link pointer weight-bold" href="/employees">60 new user</a>
+                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+              </div>
             </div>
 
-            <div class="flex flex-middle flex-direction-column ">
-              <div class="mb-1 weight-bold">234</div> <!-- total number of employes -->
-              <div class="bg-light-success text-success border-success border rounded size-small mtb-1 plr-3">26.5%</div>
+            <div class="flex flex-middle mt-6">
+              <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
+                <i class="fa fa-link"></i>
+              </div>
+              <div class="ml-3">
+                <a class="hover-link pointer weight-bold" href="/employees">54 new products</a>
+                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+              </div>
             </div>
 
-          </div>
-          <div class="mtb-6" id="employees-container" style="width: 100%; height: 200px;"></div>
-          <div class="steel text-center weight-bold">
-            10 employee online today
-          </div>
-
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="container-card">
-          <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-            <div class="flex flex-middle flex-direction-column ">
-              <a class="hover-link pointer weight-bold" href="/employees">Payroll</a>
-              <div class="size-small mtb-1 plr-3">Last 7 days</div>
+            <div class="flex flex-middle mt-6">
+              <div class="bg-warning text-warning border rounded-100 size-small ptb-3 plr-3">
+                <i class="fa fa-calendar"></i>
+              </div>
+              <div class="ml-3 ">
+                <a class="hover-link pointer weight-bold" href="/employees">87 new invoices</a>
+                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+              </div>
             </div>
-
-            <div class="flex flex-middle flex-direction-column ">
-              <div class="mb-1 weight-bold">234</div> <!-- total number of employes -->
-              <div class="bg-light-success text-success border-success border rounded size-small mtb-1 plr-3">26.5%</div>
-            </div>
-
           </div>
-          <div class="mtb-6" id="payroll-container" style="width: 100%; height: 200px;"></div>
-          <div class="steel text-center weight-bold">
-            10 employee online today
+          <div>
+            <img src="assets/images/laptop.png" alt="">
           </div>
-
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="container-card">
-          <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-            <div class="flex flex-middle flex-direction-column ">
-              <a class="hover-link pointer weight-bold" href="/employees">Employees</a>
-              <div class="size-small mtb-1 plr-3">Last 7 days</div>
-            </div>
-
-            <div class="flex flex-middle flex-direction-column ">
-              <div class="mb-1 weight-bold">234</div> <!-- total number of employes -->
-              <div class="bg-light-success text-success border-success border rounded size-small mtb-1 plr-3">26.5%</div>
-            </div>
-
-          </div>
-          <div class="mtb-6" id="employees-container" style="width: 100%; height: 200px;"></div>
-          <div class="steel text-center weight-bold">
-            10 employee online today
-          </div>
-
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="container-card">
-          <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-            <div class="flex flex-middle flex-direction-column ">
-              <a class="hover-link pointer weight-bold" href="/employees">Payroll</a>
-              <div class="size-small mtb-1 plr-3">Last 7 days</div>
-            </div>
-
-            <div class="flex flex-middle flex-direction-column ">
-              <div class="mb-1 weight-bold">234</div> <!-- total number of employes -->
-              <div class="bg-light-success text-success border-success border rounded size-small mtb-1 plr-3">26.5%</div>
-            </div>
-
-          </div>
-          <div class="mtb-6" id="payroll-container" style="width: 100%; height: 200px;"></div>
-          <div class="steel text-center weight-bold">
-            10 employee online today
-          </div>
-
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Users -->
+  <div class="col-md-4">
+    <div class="container-card" (click)="openUsersDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Users</span>
+        <span class="count">{{ totalUsers }}</span>
+      </div>
+      <div id="users-chart" style="width: 100%; height: 200px;"></div>
+      <div class="text-center steel">Active vs Inactive Users</div>
+    </div>
+  </div>
 
+  <!-- Products -->
+  <div class="col-md-4">
+    <div class="container-card" (click)="openProductsDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Products</span>
+        <span class="count">{{ totalProducts }}</span>
+      </div>
+      <div id="products-chart" style="width: 100%; height: 200px;"></div>
+      <div class="text-center steel">In Stock vs Out of Stock</div>
+    </div>
+  </div>
 
+  <!-- Orders -->
+  <div class="col-md-4">
+    <div class="container-card" (click)="openOrdersDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Orders</span>
+        <span class="count">{{ totalOrders }}</span>
+      </div>
+      <div id="orders-chart" style="width: 100%; height: 200px;"></div>
+      <div class="text-center steel">Pending / Completed / Cancelled</div>
+    </div>
+  </div>
+
+  <!-- Invoices -->
+  <div class="col-md-6 mt-4">
+    <div class="container-card" (click)="openInvoicesDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Invoices</span>
+        <span class="count">{{ totalInvoices }}</span>
+      </div>
+      <div id="invoices-chart" style="width: 100%; height: 250px;"></div>
+      <div class="text-center steel">Daily / Monthly Invoices</div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="col-md-6 mt-4">
+    <div class="container-card" (click)="openCategoriesDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Categories</span>
+        <span class="count">{{ totalCategories }}</span>
+      </div>
+      <div id="categories-chart" style="width: 100%; height: 250px;"></div>
+      <div class="text-center steel">Category Distribution</div>
+    </div>
+  </div>
+
+  <!-- Inventory Treemap -->
+  <div class="col-md-12 mt-4">
+    <div class="container-card" (click)="openInventoryDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Inventory</span>
+      </div>
+      <div id="inventory-chart" style="width: 100%; height: 300px;"></div>
+      <div class="text-center steel">Stock Distribution</div>
+    </div>
+  </div>
+
+  <!-- Clients Gauge -->
+  <!-- <div class="col-md-12 mt-4">
+    <div class="container-card" (click)="openClientsDetails()">
+      <div class="dashboard-card-header">
+        <span class="title">Clients</span>
+        <span class="count">{{ totalClients }}</span>
+      </div>
+      <div id="clients-chart" style="width: 100%; height: 300px;"></div>
+      <div class="text-center steel">Clients Growth</div>
+    </div>
+  </div> -->
 </div>
-</div>
-
-
-

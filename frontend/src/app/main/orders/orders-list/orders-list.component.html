@@ -98,7 +98,7 @@
         id="table-container"
         *ngIf="ordersList.length > 0"
       >
-        <table class="s-table table layout-fixed orders-list">
+        <table class="s-table table orders-table layout-fixed orders-list">
             <thead>
               <tr>
                 <th>Order Number</th>
@@ -124,7 +124,7 @@
                         class="single-option"
                         (click)="createOrEditOrder(true, order)"
                       >
-                        {{ "tr_action.edit" | translate }}
+                        <!-- {{ "tr_action.edit" | translate }} -->
                       </div>
                     
                     </div>

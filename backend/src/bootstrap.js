@@ -14,9 +14,9 @@ const PORT = 3000;
 const bootstrap = (app, express) => {
   // Middleware
   app.use(express.json());
-  app.get('/',(req,res,next) => {
-    res.json({msg:"hellow from aws"})
-  })
+  app.get('/', (req, res) => {
+    res.send('Hello from Node.js!');
+  });
   app.use(cors({
     credentials: true,
     origin: ['http://localhost:4400']

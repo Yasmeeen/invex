@@ -2,30 +2,32 @@ import cors from 'cors';
 import categoriesRoutes from './modules/categories_module/router.js';
 import branchesRoutes from './modules/branches_module/router.js';
 import ordersRoutes from './modules/orders_module/router.js';
-import productRoutes from './modules/products_module/router.js'; 
-import userRoutes from './modules/userModule/user.controller.js'; 
+import productRoutes from './modules/products_module/router.js';
+import userRoutes from './modules/userModule/user.controller.js';
 import connectToMongoDB from './DB/connection.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 const bootstrap = (app, express) => {
   // Middleware
   app.use(express.json());
+
+  // Health check route
   app.get('/', (req, res) => {
-    res.send('Hello from Node.js!');
+    res.send('✅ Hello from Node.js API running on AWS!');
   });
 
+  // Enable CORS
   app.use(cors({
     credentials: true,
     origin: '*'
   }));
-  
 
   // Connect to MongoDB
-   connectToMongoDB();
+  connectToMongoDB();
 
   // Routes
   app.use('/api/products', productRoutes);
@@ -38,8 +40,6 @@ const bootstrap = (app, express) => {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
   });
-
 };
-
 
 export default bootstrap;

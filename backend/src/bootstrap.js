@@ -17,10 +17,12 @@ const bootstrap = (app, express) => {
   app.get('/', (req, res) => {
     res.send('Hello from Node.js!');
   });
+
   app.use(cors({
     credentials: true,
-    origin: ['http://localhost:4400']
+    origin: '*'
   }));
+  
 
   // Connect to MongoDB
    connectToMongoDB();
@@ -33,8 +35,8 @@ const bootstrap = (app, express) => {
   app.use('/api/users', userRoutes);
 
   // Start server
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
   });
 
 };

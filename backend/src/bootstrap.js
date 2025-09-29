@@ -5,9 +5,7 @@ import ordersRoutes from './modules/orders_module/router.js';
 import productRoutes from './modules/products_module/router.js';
 import userRoutes from './modules/userModule/user.controller.js';
 import connectToMongoDB from './DB/connection.js';
-import dotenv from 'dotenv';
 
-dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 

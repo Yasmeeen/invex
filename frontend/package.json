@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --port 4400",
+    "start": "ng serve",
     "build": "npm install --force && ng build --configuration production",
     "heroku-postbuild": "ng build --prod"
   },

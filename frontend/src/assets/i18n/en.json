@@ -104,7 +104,8 @@
       "assign_to_classes":"Assign to Classes",
       "hide-grades":"Hide-Grades",
       "copy": "Copy",
-      "create_album": "Create Album"
+      "create_album": "Create Album",
+      "Restore":"Restore"
     },
     "tr_no_items_found":"No Items Found",
     "tr_select":"Select"   ,
@@ -242,6 +243,7 @@
     "tr_add_category":"Add Category",
     "tr_orders": "Orders",
     "tr_users":"Users",
-    "tr_add_order":"Add Order"
+    "tr_add_order":"Add Order",
+    "tr_inventory":"Inventory"
 
 }

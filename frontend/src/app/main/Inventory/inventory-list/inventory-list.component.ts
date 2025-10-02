@@ -14,11 +14,11 @@ import { CreateEditProductComponent } from '../create-edit-product/create-edit-p
 import { ProductsSerivce } from '@shared/services/products.service';
 
 @Component({
-  selector: 'app-products-list',
-  templateUrl: './products-list.component.html',
-  styleUrls: ['./products-list.component.scss']
+  selector: 'app-inventory-list',
+  templateUrl: './inventory-list.component.html',
+  styleUrls: ['./inventory-list.component.scss']
 })
-export class ProductsListComponent implements OnInit {
+export class InventoryListComponent implements OnInit {
   productsLoading: boolean = true;
   isFilterOpen: boolean = true;
   paginationPerPage:number = 10;
@@ -116,6 +116,18 @@ export class ProductsListComponent implements OnInit {
     this.getproducts();
   }
 
+  createOrEditproduct(isEdit: boolean, product?: Product){
+    let dialogRef = this.dialog.open(CreateEditProductComponent, {
+      width: '850px',
+      data: {isEdit:isEdit,product:product, productId: product?._id},
+      disableClose: true,
+  });
+  dialogRef.afterClosed().subscribe(event => {
+    if(event){
+       this.getproducts();
+    }
+  })
+  }
 
   deleteProduct(productId: string){
     this.productsService.deleteProduct(productId).subscribe(() => {

@@ -1,0 +1,24 @@
+
+   .course-navigation, .s-btn, .main-header, .section-title, .course-tab {
+    display: none !important;
+    visibility:hidden;
+  }
+  .content-wrapper, .content-shadow{
+      box-shadow: none !important;
+      width: 100%;
+      padding: 0 !important;
+  }
+  .questions-title{
+      background-color: #2977ff !important;
+  }
+  .paper-container{
+      padding: 0 !important;
+      page-break-inside: avoid;
+  }
+  .pagebreak { page-break-before: always; }
+  .question-print-border-top{
+    border-top: solid 2px #2977ff;
+}
+  input, .item-container {
+      break-inside: avoid;
+}

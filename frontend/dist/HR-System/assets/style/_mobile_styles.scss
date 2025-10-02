@@ -1,0 +1,259 @@
+@import 'initializer';
+
+.title-with-btn {
+    padding-bottom: 1.5rem;
+}
+
+.btn-block-mob {
+    display: block;
+    width: 100%;
+}
+
+@mixin biDirectional($start, $end) {
+    @for $i from 0 through 10 {
+        .mb-#{$i}-mob {
+            margin-bottom: (0.3125rem * $i) !important;
+        }
+
+        .mt-#{$i}-mob {
+            margin-top: (0.3125rem * $i) !important;
+        }
+
+        .mtb-#{$i}-mob {
+            margin-top: (0.3125rem * $i) !important;
+            margin-bottom: (0.3125rem * $i) !important;
+        }
+
+        .ml-#{$i}-mob {
+            margin-#{$start}: (0.3125rem * $i) !important;
+        }
+
+        .mr-#{$i}-mob {
+            margin-#{$end}: (0.3125rem * $i) !important;
+        }
+
+        .mlr-#{$i}-mob {
+            margin-right: (0.3125rem * $i) !important;
+            margin-left: (0.3125rem * $i) !important;
+        }
+
+        .pb-#{$i}-mob {
+            padding-bottom: (0.3125rem * $i) !important;
+        }
+
+        .plr-#{$i}-mob {
+            padding-left: (0.3125rem * $i) !important;
+            padding-right: (0.3125rem * $i) !important;
+        }
+
+
+        .ptb-#{$i}-mob {
+            padding-top: (0.3125rem * $i) !important;
+            padding-bottom: (0.3125rem * $i) !important;
+        }
+    }
+}
+
+@import 'directions/decide';
+
+.hidden-mobile {
+    display: none !important;
+}
+
+.tooltip {
+    max-width: 200px !important;
+    left: 0 !important;
+}
+
+.header-container {
+    position: relative !important;
+}
+
+.single-header-box {
+    position: initial !important;
+}
+
+.options-menu-container {
+    width: 100% !important;
+}
+
+.options-menu-container::before {
+    background-image: none !important;
+}
+
+.single-notification {
+    .notifications-title {
+        max-width: 170px !important;
+        min-width: 170px !important;
+    }
+}
+
+.border-bottom-mobile {
+    border-bottom: 1px solid $border;
+}
+
+.message-body {
+    max-width: 180px !important;
+}
+
+.course-navigation {
+    overflow: auto;
+}
+
+.navigation-link {
+    width: 100px;
+}
+
+.stepper-container {
+    padding: 0 20px !important;
+}
+
+.stepper-point {
+    .stepper-title {
+        width: 100px !important;
+        left: -36px !important;
+        white-space: normal !important;
+    }
+}
+.back-next{
+    margin-left: auto;
+    margin-right: auto;
+}
+.edit-comment{
+    width: inherit !important;
+    max-width: inherit !important;
+}
+.s-pagination {
+    .pagination-cells{
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+}
+
+.messages-view {
+    .messages-and-sidebar {
+        .messages-scroll {
+            height: auto !important
+        }
+    }
+}
+
+.close-modal-icon::before {
+    right: 0 !important;
+    background: transparent !important;
+    z-index: 10;
+}
+.hidden-mobile{
+display: none !important;
+}
+.tooltip{
+    max-width: 200px !important;
+    left: 0 !important;
+}
+.header-container {
+    position: relative !important;
+}
+.single-header-box{
+    position: initial !important;
+}
+.options-menu-container{
+    width: 100% !important;
+}
+.options-menu-container::before {
+    background-image: none !important;
+}
+.single-notification{
+    .notifications-title{
+        max-width: 170px !important;
+        min-width: 170px !important;
+      }
+}
+.zones-container{
+    .members-zone-container{
+        max-width: 100px !important;
+    }
+}
+.navigation-links {
+    overflow: auto;
+    overflow-y: hidden;
+    padding-bottom: 15px;
+    .single-link-container{
+        min-width: 85px;
+        .single-link{
+            padding-bottom: 0px !important;
+        }
+    }
+}
+.container-responsive{
+    overflow: auto;
+}
+
+
+
+.gradebook-table-wrapper {
+
+    .s-table {
+        thead th:first-child,
+        tbody td:first-child {
+            width: 300px !important;
+            min-width: 300px !important;
+        }
+    }
+
+}
+.progress-report-form{
+    .competency{
+        width: 400px !important;
+    }
+    .evaluation-criteria{
+        width: 100px !important;
+    }
+}
+.event-cell{
+    width: 30px !important;
+}
+.table-responsive{
+    overflow: auto !important;
+}
+.small-table-in-width{
+    min-width: 275px !important;
+}
+.automatic-attendance{
+    .qr-input{
+        width: 100% !important;
+    }
+}
+.mat-datepicker-content .mat-calendar{
+    height: 300px !important;
+}
+@media (max-height: 575px){
+    .mat-datepicker-content .mat-calendar{
+        height: 200px !important;
+        overflow: auto;
+    }
+  }
+
+.timetable-table{
+    td,
+    th {
+        &:nth-child(1) {
+            width: 80px !important;
+        }
+
+        &:nth-child(2) {
+            width: 100px !important;
+        }
+    }
+}
+.wrs_modal_dialogContainer{
+    position: absolute;
+    top:0;
+    width: 100%;
+    height: 100%;
+}
+.wrs_closed{
+    display: none;
+}
+.app-notification{
+    max-width: 250px !important;
+}

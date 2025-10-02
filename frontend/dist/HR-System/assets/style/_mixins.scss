@@ -1,0 +1,41 @@
+@mixin transform($property) {
+    -webkit-transform: $property;
+    -ms-transform: $property;
+    transform: $property;
+}
+
+@mixin boxshadow($property) {
+    -webkit-box-shadow: $property;
+    -moz-box-shadow: $property;
+    box-shadow: $property;
+}
+
+@mixin gradientHorizontal($from, $to) {
+    background: $from;
+    /* Old browsers */
+    background: -moz-linear-gradient(left, $from 0%, $to 100%);
+    /* FF3.6-15 */
+    background: -webkit-linear-gradient(left, $from 0%, $to 100%);
+    /* Chrome10-25,Safari5.1-6 */
+    background: linear-gradient(to right, $from 0%, $to 100%);
+    /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+}
+
+@mixin gradientHorizontalTop($from, $to) {
+    background: $from;
+    /* Old browsers */
+    background: -moz-linear-gradient(top, $from 0%, $to 100%);
+    /* FF3.6-15 */
+    background: -webkit-linear-gradient(top, $from 0%, $to 100%);
+    /* Chrome10-25,Safari5.1-6 */
+    background: linear-gradient(to bottom, $from 0%, $to 100%);
+    /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+}
+
+@mixin animation($animation) {
+    -webkit-animation: $animation;
+    -moz-animation: $animation;
+    -ms-animation: $animation;
+    -o-animation: $animation;
+    animation: $animation;
+}

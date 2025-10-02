@@ -1,0 +1,255 @@
+@import 'color_scheme';
+@import 'variables';
+@import 'mixins';
+@import 'blocks';
+
+.s-btn {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    transition: $transition_1;
+    border: 1px solid;
+    font-size: 0.875rem;
+    border-radius: 4px;
+    font-weight: normal;
+    vertical-align: middle;
+    padding: 0.375rem 1rem;
+    height: 2.375rem;
+    display: inline-block;
+    line-height: calc(1.625rem - 2px);
+    cursor: pointer;
+
+    &.min-btn {
+        min-width: 6rem;
+    }
+
+    &.btn-with-arrow>.arrow {
+        font-size: 0.5rem;
+        transform: translateY(-30%);
+        display: inline-block;
+    }
+
+    &.btn-with-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+
+        &.btn-block {
+            display: flex;
+        }
+
+        img {
+            height: 0.9em;
+        }
+
+        i, .fa {
+            font-size: 1em;
+            line-height: inherit;
+        }
+    }
+}
+
+.s-btn:hover {
+    @include boxshadow(0 8px 18px 0 rgba(122, 137, 147, 0.3));
+}
+
+.s-btn:focus {
+    @include boxshadow(0 0 6px rgba(122, 137, 147, 0.3));
+    outline: 0;
+}
+
+.s-btn:disabled {
+    @include boxshadow(0 0 6px rgba(122, 137, 147, 0));
+    outline: 0;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+[class*="btn-outlined-"] {
+    background: transparent;
+}
+
+.s-btn.btn-lg {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+    height: 2.625rem;
+    line-height: calc(1.625rem - 2px);
+}
+
+.s-btn.btn-sm {
+    font-size: 0.85rem;
+    padding: 2px 1rem;
+    height:  1.875rem;
+    line-height: calc(1.875rem - 6px);
+}
+
+.s-btn.btn-block {
+    display: block;
+    width: 100%
+}
+
+.btn-group {
+    display: inline-flex;
+}
+
+.btn-danger {
+    background-color: #ffebeb !important;
+    color: $error !important;
+    border-color: $error !important;
+    border-style: dashed;
+}
+
+.btn-link {
+    background-color: transparent;
+    border-color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-link.btn-block {
+    display: flex;
+}
+
+
+.s-pagination {
+    font-size: 0.875rem;
+
+    .pagination-cells {
+        border-radius: 4px;
+        color: $steel;
+        display: inline-flex;
+        justify-content: center;
+        margin: 0 10px;
+
+        .pagination-cell {
+            @extend %no-select;
+            border: 1px solid #dddddd;
+            line-height: 35px;
+            text-align: center;
+            height: 2.25rem;
+            width: 2rem;
+            @extend %flex-centered;
+            display: inline-flex !important;
+            transition: 0.3s;
+            cursor: pointer;
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.05);
+            }
+
+            &.active {
+                color: #fff;
+            }
+        }
+    }
+
+    .pagination-btn {
+        @extend %no-select;
+        border-radius: 6px;
+        border: solid 1px #dddddd;
+        height: 2.25rem;
+        padding: 0 20px;
+        @extend %flex-centered;
+        display: inline-flex !important;
+        cursor: pointer;
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+    }
+    .btn-disabled {
+        opacity: 0.5;
+        cursor: not-allowed !important;
+        background: rgba(0, 0, 0, 0.05) !important;
+    }
+}
+
+@mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
+    .btn-primary {
+        background-color: $primary !important;
+        color: #fff;
+        border-color: $primary !important;
+    }
+
+    .btn-primary:hover {
+        color: #fff !important;
+    }
+
+    .btn-secondary {
+        background-color: transparent;
+        color: $primary !important;
+        border-color: $primary !important;
+        > * {
+            color: $primary !important;
+            fill: $primary !important;
+        }
+    }
+
+    .btn-secondary:hover {
+        color: $primary !important;
+    }
+    .s-btn:focus {
+        @include boxshadow(0 0 8px -1px  $primary);
+        outline: 0;
+    }
+    .s-btn.btn-danger:focus {
+        @include boxshadow(0 0 8px -1px  $error);
+    }
+    .btn-link {
+        color: $primary;
+    }
+    .s-pagination {
+        .pagination-cells {
+            .pagination-cell {
+                &.active {
+                    background: $primary;
+                    border-color: $primary;
+                }
+            }
+        }
+    }
+}
+
+@import 'themes/decide';
+
+
+@mixin biDirectional($start, $end) {
+    .btn-group {
+
+        & button {
+            margin: 0;
+            border-radius: 0px;
+            border-#{$start}-width: 0;
+        }
+
+        & button:first-child {
+            border-top-#{$start}-radius: 4px;
+            border-bottom-#{$start}-radius: 4px;
+            border-#{$start}-width: 1px;
+        }
+
+        & button:last-child {
+            border-top-#{$end}-radius: 4px;
+            border-bottom-#{$end}-radius: 4px;
+        }
+    }
+
+    .s-pagination {
+        .pagination-cell {
+            border-#{$end}: 0px solid #dddddd;
+
+            &:last-child {
+                border-#{$end}: 1px solid #dddddd;
+                border-top-#{$end}-radius: 4px;
+                border-bottom-#{$end}-radius: 4px;
+            }
+
+            &:first-child {
+                border-top-#{$start}-radius: 4px;
+                border-bottom-#{$start}-radius: 4px;
+            }
+        }
+    }
+}
+
+@import 'directions/decide';

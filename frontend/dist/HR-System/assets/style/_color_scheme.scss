@@ -1,0 +1,221 @@
+$bg_color: #feebff;
+$cool-grey: #8898a0;
+$steel: #7a8993;
+$steel-lighter: #a7b7c1;
+$tiffany-blue: #80deea;
+$light-salmon: #ffab91;
+$wheat: #ffcc80;
+$salmon: #ff8a65;
+$cerulean-blue: #007ee5;
+$light_gray_low: #e8e8e8;
+$light_gray: #e5e5e5;
+$light_orange: #ffa726;
+$green: #66bb6a;
+$turquoise-blue: #00c4cc;
+$coral: #f87981;
+$dark-gray: #4a4a4a;
+$zircon: #f7faff;
+$whisper: #f5f6fa;
+$danube: #719ece;
+$orang: #fdb263;
+$white: #ffffff;
+$black: #000000;
+$very-dark-gray: #111c2d;
+$warning-light: #fff6ea;
+// .
+// .
+// colors
+$error: #e50000;
+$success: #66bb6a;
+$warning: #ffcc02;
+$select: #007ee5;
+
+// .
+// .
+// .
+
+
+// new colors
+
+$side-menue-backgrond: #ffffff;
+// Validations
+.text-success {
+    color: #66bb6a !important
+}
+
+.text-warning {
+    color: $warning !important
+}
+
+.text-error {
+    color: $error !important
+}
+
+.bg-success {
+    background-color: $success !important;
+    background: $success !important
+}
+.bg-light-success {
+  background-color: #dffff3 !important;
+  background:#dffff3!important
+}
+.border-success{
+  border-color: $success !important;
+}
+.border{
+  border: 1px solid;
+}
+.rounded{
+  border-radius: 18px;
+}
+.rounded-100{
+  border-radius: 50%;
+}
+
+.bg-warning {
+    background-color: $warning-light !important
+}
+
+.bg-error {
+    background-color: $error !important
+}
+
+// .
+// .
+// Shades Of Gray
+// .text-black {
+//     color: #4e5665
+// }
+
+.text-gray-dark {
+    color: #4e5665;
+}
+
+.text-gray {
+    color: #b0bec5;
+}
+
+.text-gray-light {
+    color: #d8dde6;
+}
+.text-white {
+    color: #fff
+}
+.text-offwhite {
+    color: #f8f8f8
+}
+
+.text-black {
+    color: #000;
+}
+
+.bg-black {
+    background-color: #4e5665
+}
+
+.bg-transparent {
+    background: transparent !important;
+}
+
+.bg-gray-dark {
+    background-color: #4e5665;
+}
+
+.bg-gray {
+    background-color: #b0bec5;
+}
+
+.bg-gray-light {
+    background-color: #d8dde6;
+}
+
+.bg-offwhite {
+    background-color: #f8f8f8
+}
+
+.bg-basic{
+    background-color: #f7f9fe;
+}
+
+.bg-white {
+    background-color: #fff
+}
+.border-gray-light {
+    border-color: #d8dde6 !important;
+}
+
+.border-gray {
+    border-color: #b0bec5;
+}
+
+.border-offwhite {
+    border-color: #f8f8f8;
+}
+// .
+// .
+// Legends
+.legend-orange{
+    background: $light-salmon;
+    color: #fff;
+}
+.legend-yellow{
+    background: $wheat;
+    color: #fff;
+}
+.legend-blue{
+    background: $tiffany-blue;
+    color: #fff;
+}
+
+// .
+// .
+// Actor Themes
+@mixin actorColors($primary, $secondary, $from, $to, $siteBackground) {
+    .text-primary, .text-link {
+        color: $primary;
+    }
+
+    .text-secondary {
+        color: $secondary;
+    }
+
+    .bg-primary {
+        background-color: $primary;
+    }
+
+    .bg-secondary {
+        background-color: $secondary;
+    }
+}
+
+.admin_theme {
+    @import 'themes/admin.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+.hod_theme {
+    @import 'themes/hod.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+.teacher_theme {
+    @import 'themes/teacher.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+.student_theme {
+    @import 'themes/student-male.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+.student_theme.female {
+    @import 'themes/student-female.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+.parent_theme {
+    @import 'themes/parent.scss';
+    @include actorColors($primary, $secondary, $from, $to, $siteBackground);
+}
+
+

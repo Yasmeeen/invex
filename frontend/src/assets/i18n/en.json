@@ -296,6 +296,30 @@
     "tr_stock_required": "Stock is required.",
     "tr_discount_percentage": "Discount percentage %",
     "tr_cancel": "Cancel",
-    "tr_save": "Save"
+    "tr_save": "Save",
+    "tr_password": "Password",
+    "tr_password_required": "Password is required.",
+    "tr_new_user": "New User",
+    "tr_branch_name": "Branch Name",
+    "tr_new_btanch":"New Branch",
+    "tr_category_name": "Category Name",
+    "tr_number_of_products": "Number of Products",
+    "tr_new_category": "New Category",
+    "tr_order_number": "Order Number",
+    "tr_client_name": "Client Name",
+    "tr_new_order": "New Order",
+    "tr_client_name": "Client Name",
+    "tr_client_name_required": "Client name is required.",
+    "tr_client_phone": "Client Phone",
+    "tr_client_phone_required": "Phone number is required.",
+    "tr_seller_name": "Seller Name",
+    "tr_seller_name_required": "Seller name is required.",
+    "tr_client_address": "Client Address",
+    "tr_client_address_required": "Client address is required.",
+    "tr_product_code": "Product Code",
+    "tr_delete": "Delete",
+    "tr_save_print": "Save & Print",
+    "tr_print": "Print"
+
 
 }

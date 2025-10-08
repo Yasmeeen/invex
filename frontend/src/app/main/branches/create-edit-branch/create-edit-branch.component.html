@@ -3,7 +3,7 @@
       <div class="close-modal-icon" (click)="closeModal()"></div>
       <div class="modal-content" #modalContent>
         <div class="modal-header border-bottom">
-          <h3 class="steel weight-medium size-default m-0">New Branch</h3>
+          <h3 class="steel weight-medium size-default m-0">{{'tr_new_branch' | translate}}</h3>
         </div>
         <div class="modal-body weight-medium steel">
           <div class="add-student-modal-container">
@@ -13,7 +13,7 @@
                   class="alert alert-error mb-3"
                   *ngIf="branchForm.invalid && branchForm.submitted"
                 >
-                  Please fill all the required fields
+                {{'tr_tr_fill_required_fields' | translate}}
                 </div>
   
                 <form #branchForm="ngForm">
@@ -25,7 +25,7 @@
                           branchName.invalid && branchForm.submitted
                         "
                       >
-                        <label for="">Branch Name</label>
+                        <label for="">{{'tr_branch_name' | translate}}</label>
                         <input
                           #branchName="ngModel"
                           type="text"

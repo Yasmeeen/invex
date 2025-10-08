@@ -1,318 +1,241 @@
 <div class="complex-modal">
-    <div class="modal-wrapper">
-      <div class="close-modal-icon" (click)="closeModal()"></div>
-      <div class="modal-content" #modalContent>
-        <div class="modal-header border-bottom">
-          <h3 class="steel weight-medium size-default m-0">New Order</h3>
-        </div>
-        <div class="modal-body weight-medium steel">
-          <div class="add-student-modal-container">
-            <div class="content-container plr-4 ptb-3">
-              <form #orderForm="ngForm">
-                <div class="row">
-                  <!-- Client Name -->
-                  <div class="col-md-4">
-                    <div
-                      class="form-group"
-                      [class.has-error]="clientName.invalid && orderForm.submitted"
-                    >
-                      <label for="">Client Name</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        name="clientName"
-                        [(ngModel)] = "order.clientName"
-                        #clientName="ngModel"
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="clientName.invalid && orderForm.submitted"
-                      >
-                        Client name is required.
-                      </span>
-                    </div>
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="closeModal()"></div>
+    <div class="modal-content" #modalContent>
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">{{ 'tr_new_order' | translate }}</h3>
+      </div>
+      <div class="modal-body weight-medium steel">
+        <div class="add-student-modal-container">
+          <div class="content-container plr-4 ptb-3">
+            <form #orderForm="ngForm">
+              <div class="row">
+                <!-- Client Name -->
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="clientName.invalid && orderForm.submitted">
+                    <label>{{ 'tr_client_name' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="clientName"
+                      [(ngModel)]="order.clientName"
+                      #clientName="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="clientName.invalid && orderForm.submitted">
+                      {{ 'tr_client_name_required' | translate }}
+                    </span>
                   </div>
-
-                  <div class="col-md-4">
-                    <div
-                      class="form-group"
-                      [class.has-error]="clientPhone.invalid && orderForm.submitted"
-                    >
-                      <label for="">Client Phone</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        name="clientPhone"
-                        [(ngModel)] = "order.clientPhoneNumber"
-                        #clientPhone="ngModel"
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="clientPhone.invalid && orderForm.submitted"
-                      >
-                        phone number is required.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="col-md-4">
-                    <div
-                      class="form-group"
-                      [class.has-error]="sellerName.invalid && orderForm.submitted"
-                    >
-                      <label for="">seller name</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        name="sellerName"
-                        [(ngModel)] = "order.sellerName"
-                        #sellerName="ngModel"
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="sellerName.invalid && orderForm.submitted"
-                      >
-                        phone number is required.
-                      </span>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div
-                      class="form-group"
-                      [class.has-error]="clientAddress.invalid && orderForm.submitted"
-                    >
-                      <label for="">client Address</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        name="clientAddress"
-                        [(ngModel)] = "order.clientAddress"
-                        #clientAddress="ngModel"
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="clientAddress.invalid && orderForm.submitted"
-                      >
-                        client address is required.
-                      </span>
-                    </div>
-                  </div>
-  
-                  <!-- Total Price -->
-                  <!-- <div class="col-md-6">
-                    <div class="form-group">
-                      <label for="">Total Price</label>
-                      <input
-                        type="number"
-                        class="s-control"
-                        [value]="totalPrice"
-                        readonly
-                      />
-                    </div>
-                  </div>
-   -->
-            
                 </div>
-                <div class="row mt-6">
-                          <!-- Product Inputs -->
-                  <div class="col-12" *ngFor="let product of orderProducts; let i = index">
-                    <div class="row ">
-               
-                        <div class="col-md-4">
-                            <div
-                              class="form-group"
-                              [class.has-error]="
-                                productCodes.invalid && orderForm.submitted
-                              "
-                            >
-                              <label for="">Products Code</label>
-                              <div class="input-with-icon bg-white">
-                                <ng-select
-                                  class="s-control s-select"
-                                  placeholder="{{ 'tr_select' | translate }}"
-                             
-                                  bindLabel="code"
-                                  [clearable]="false"
-                                  [(ngModel)] = "product.selectedProduct"
-                                  #productCodes="ngModel"
-                                  name="product{{i}}"
-                                  [items]="products"
-                                  required
-                                >
-                                </ng-select>
-                                <i class="fa fa-search input-icon"></i>
-                              </div>
-      
-                              <span
-                                class="text-error size-small validator"
-                                *ngIf="
-                                  productCodes.invalid && orderForm.submitted
-                                "
-                              >
-                                Product code is required.
-                              </span>
-                            </div>
-                          </div>
-  
-                      <div class="col-md-2" *ngIf="product.selectedProduct?.code">
-                        <div class="form-group">
-                          <label for="">Quantity</label>
-                          <input
-                            type="number"
-                            class="s-control"
-                            [(ngModel)]="product.quantity"
-                            name="quantity{{i}}"
-            
+
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="clientPhone.invalid && orderForm.submitted">
+                    <label>{{ 'tr_client_phone' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="clientPhone"
+                      [(ngModel)]="order.clientPhoneNumber"
+                      #clientPhone="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="clientPhone.invalid && orderForm.submitted">
+                      {{ 'tr_client_phone_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="sellerName.invalid && orderForm.submitted">
+                    <label>{{ 'tr_seller_name' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="sellerName"
+                      [(ngModel)]="order.sellerName"
+                      #sellerName="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="sellerName.invalid && orderForm.submitted">
+                      {{ 'tr_seller_name_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="clientAddress.invalid && orderForm.submitted">
+                    <label>{{ 'tr_client_address' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="clientAddress"
+                      [(ngModel)]="order.clientAddress"
+                      #clientAddress="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="clientAddress.invalid && orderForm.submitted">
+                      {{ 'tr_client_address_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Products Section -->
+              <div class="row mt-6">
+                <div class="col-12" *ngFor="let product of orderProducts; let i = index">
+                  <div class="row">
+                    <div class="col-md-4">
+                      <div class="form-group" [class.has-error]="productCodes.invalid && orderForm.submitted">
+                        <label>{{ 'tr_product_code' | translate }}</label>
+                        <div class="input-with-icon bg-white">
+                          <ng-select
+                            class="s-control s-select"
+                            placeholder="{{ 'tr_select' | translate }}"
+                            bindLabel="code"
+                            [clearable]="false"
+                            [(ngModel)]="product.selectedProduct"
+                            #productCodes="ngModel"
+                            name="product{{i}}"
+                            [items]="products"
                             required
-                            min="1"
-                          />
+                          ></ng-select>
+                          <i class="fa fa-search input-icon"></i>
                         </div>
+                        <span class="text-error size-small validator" *ngIf="productCodes.invalid && orderForm.submitted">
+                          {{ 'tr_product_code_required' | translate }}
+                        </span>
                       </div>
-                      <div class="col-md-2" *ngIf="product.selectedProduct.code">
-                        <div class="form-group">
-                          <label>{{'tr_discount' | translate}}</label>
+                    </div>
 
-                        </div>
-                        <div class="s-checkbox size-small mb-2">
-                          <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount" >
-                          <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
+                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                      <div class="form-group">
+                        <label>{{ 'tr_quantity' | translate }}</label>
+                        <input type="number" class="s-control" [(ngModel)]="product.quantity" name="quantity{{i}}" required min="1"/>
                       </div>
-                    
+                    </div>
+
+                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                      <label>{{ 'tr_discount' | translate }}</label>
+                      <div class="s-checkbox size-small mb-2">
+                        <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount">
+                        <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
                       </div>
-  
-                      <div class="col-md-2" *ngIf="product.selectedProduct.code">
-                        <div class="form-group">
-                          <label >Price</label>
-                         <div class="mt-3">{{getOrderProductPrice(product)}} </div>
-                        </div>
-                      </div>
-                  
-                      <div class="col-md-2">
-                        <label>delete</label>
-                             <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
-                               <i class="fa fa-trash"></i>
-                             </button>
-                           </div>
-               
+                    </div>
+
+                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                      <label>{{ 'tr_price' | translate }}</label>
+                      <div class="mt-3">{{ getOrderProductPrice(product) }}</div>
+                    </div>
+
+                    <div class="col-md-2">
+                      <label>{{ 'tr_delete' | translate }}</label>
+                      <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
+                        <i class="fa fa-trash"></i>
+                      </button>
                     </div>
                   </div>
-  
-                  <!-- Add Product Button -->
-                  <div class="col-12 mt-2 flex flex-end">
-                    <button type="button" class="s-btn btn-primary" (click)="addProductRow()">
-                      <i class="fa fa-plus mr-1"></i>Add Product
-                    </button>
-                  </div>
                 </div>
-              </form>
-            </div>
 
-       
+                <div class="col-12 mt-2 flex flex-end">
+                  <button type="button" class="s-btn btn-primary" (click)="addProductRow()">
+                    <i class="fa fa-plus mr-1"></i> {{ 'tr_add_product' | translate }}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
-  
-        <!-- Footer -->
-        <div class="modal-footer mt-3 text-right">
-          <button class="s-btn btn-secondary mr-3" (click)="closeModal()">Cancel</button>
-          <button class="s-btn btn-primary mr-3" (click)="submitForm()">Save & Print</button>
-          <button class="s-btn btn-primary" (click)="printInvoice()">Print</button>
-        </div>
+      </div>
 
-
-
-     
+      <!-- Footer -->
+      <div class="modal-footer mt-3 text-right">
+        <button class="s-btn btn-secondary mr-3" (click)="closeModal()">{{ 'tr_cancel' | translate }}</button>
+        <button class="s-btn btn-primary mr-3" (click)="submitForm()">{{ 'tr_save_print' | translate }}</button>
+        <button class="s-btn btn-primary" (click)="printInvoice()">{{ 'tr_print' | translate }}</button>
       </div>
     </div>
-    <div class="invoice-container" id ="print-container">
+
+    <!-- Invoice -->
+    <div class="invoice-container" id="print-container">
       <div class="center">
-          <div class="bold">solddoutt store</div>
-        </div>
-      
-        <table>
-          <tr>
-            <td>{{'tr_client' | translate}}:</td>
-            <td>{{order.clientName}}</td>
-          </tr>
-          <tr>
-            <td>{{'tr_phone_number' | translate}}:</td>
-            <td>{{order.clientPhoneNumber}}</td>
-          </tr>
-          <tr>
-            <td>{{'tr_address' | translate}}:</td>
-            <td>{{order.clientAddress}}</td>
-          </tr>
-        </table>
-      
-        <div class="dashed"></div>
-      
-        <table>
-          <tr>
-            <td> {{'tr_invoice_number' | translate}}: </td>
-            <td>{{createdOrder?.orderNumber}}</td>
-            <td> {{'tr_number_of_items' | translate}}:</td>
-            <td>{{createdOrder?.numberOfProducts}}</td>
-          </tr>
-          <tr>
-            <td>{{'tr_date' | translate}}:</td>
-            <td colspan="3">{{todayDate | date: 'dd, MMM, Y' }}</td>
-          </tr>
-        </table>
-      
-        <div class="dashed"></div>
-      
-        <table>
-          <tr class="bold">
-            <td>{{ 'tr_total' | translate }}</td>
-            <td>{{ 'tr_quantity' | translate }}</td>
-            <td>{{ 'tr_discount' | translate }}</td>
-            <td>{{ 'tr_price' | translate }}</td>
-            <td>{{ 'tr_name' | translate }}</td>
-          </tr>
+        <div class="bold">solddoutt store</div>
+      </div>
 
-          <tr *ngFor="let item of orderProducts">
-            <td>{{item.totalPrice}}</td>
-            <td>{{item.quantity}}</td>
-            <td>{{item.selectedProduct.discount}} %</td>
-            <td>{{item.selectedProduct.price}}</td>
-            <td>{{item.selectedProduct.name}}</td>
-          </tr>
+      <table>
+        <tr>
+          <td>{{'tr_client' | translate}}:</td>
+          <td>{{order.clientName}}</td>
+        </tr>
+        <tr>
+          <td>{{'tr_phone_number' | translate}}:</td>
+          <td>{{order.clientPhoneNumber}}</td>
+        </tr>
+        <tr>
+          <td>{{'tr_address' | translate}}:</td>
+          <td>{{order.clientAddress}}</td>
+        </tr>
+      </table>
 
-        </table>
-      
-        <div class="dashed"></div>
-      
-        <table>
-          <tr class="total">
-            <td>{{ 'tr_total_invoice' | translate }}</td>
-            <td>{{createdOrder?.totalPrice}}</td>
-          </tr>
-          <tr>
-            <td>{{ 'tr_discount_percent' | translate }}</td>
-            <td>0</td>
-          </tr>
-          <tr>
-            <td>{{ 'tr_discount_amount' | translate }}</td>
-            <td>0</td>
-          </tr>
-      
-    
-        </table>
-    
-        
-      
-        <div class="double-border"></div>
-        <div class="final-total"> {{'tr_final_invoice_value' |translate}}<br />{{createdOrder?.totalPrice}}</div>
-        <div class="double-border"></div>
-      
-        <div class="center">
-          <div class="bold">solddoutt store</div>
-          <div>مدينة نصر، شارع الطاقة بجوار النادي الأهلي</div>
-          <div>01150564880</div>
-        </div>
+      <div class="dashed"></div>
+
+      <table>
+        <tr>
+          <td>{{'tr_invoice_number' | translate}}:</td>
+          <td>{{createdOrder?.orderNumber}}</td>
+          <td>{{'tr_number_of_items' | translate}}:</td>
+          <td>{{createdOrder?.numberOfProducts}}</td>
+        </tr>
+        <tr>
+          <td>{{'tr_date' | translate}}:</td>
+          <td colspan="3">{{todayDate | date: 'dd, MMM, Y'}}</td>
+        </tr>
+      </table>
+
+      <div class="dashed"></div>
+
+      <table>
+        <tr class="bold">
+          <td>{{ 'tr_total' | translate }}</td>
+          <td>{{ 'tr_quantity' | translate }}</td>
+          <td>{{ 'tr_discount' | translate }}</td>
+          <td>{{ 'tr_price' | translate }}</td>
+          <td>{{ 'tr_name' | translate }}</td>
+        </tr>
+        <tr *ngFor="let item of orderProducts">
+          <td>{{item.totalPrice}}</td>
+          <td>{{item.quantity}}</td>
+          <td>{{item.selectedProduct.discount}} %</td>
+          <td>{{item.selectedProduct.price}}</td>
+          <td>{{item.selectedProduct.name}}</td>
+        </tr>
+      </table>
+
+      <div class="dashed"></div>
+
+      <table>
+        <tr class="total">
+          <td>{{ 'tr_total_invoice' | translate }}</td>
+          <td>{{createdOrder?.totalPrice}}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_discount_percent' | translate }}</td>
+          <td>0</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_discount_amount' | translate }}</td>
+          <td>0</td>
+        </tr>
+      </table>
+
+      <div class="double-border"></div>
+      <div class="final-total">{{'tr_final_invoice_value' | translate}}<br />{{createdOrder?.totalPrice}}</div>
+      <div class="double-border"></div>
+
+      <div class="center">
+        <div class="bold">solddoutt store</div>
+        <div>مدينة نصر، شارع الطاقة بجوار النادي الأهلي</div>
+        <div>01150564880</div>
+      </div>
+    </div>
   </div>
-  </div>
-  
+</div>

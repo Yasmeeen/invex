@@ -1,22 +1,36 @@
 import Category from '../../DB/models/category.model.js';
-
+import Product from '../../DB/models/product.model.js';
 // Get all categories with pagination and search
+
 export const getCategories = async (req, res) => {
+  
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const skip = (page - 1) * limit;
-    const searchRegex = new RegExp(search, 'i'); // case-insensitive
+    const searchRegex = new RegExp(search, 'i');
 
     const query = { name: { $regex: searchRegex } };
 
+    // Fetch categories with pagination
     const categories = await Category.find(query)
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Category.countDocuments(query); // Fixed variable name (category → Category)
+    const total = await Category.countDocuments(query);
+
+    // ✅ Add product count for each category
+    const categoriesWithCount = await Promise.all(
+      categories.map(async (category) => {
+        const count = await Product.countDocuments({ category: category._id });
+        return {
+          ...category.toObject(),
+          productsCount: count,
+        };
+      })
+    );
 
     res.json({
-      categories,
+      categories: categoriesWithCount,
       meta: {
         total,
         page: parseInt(page),
@@ -29,6 +43,7 @@ export const getCategories = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 // Get category by ID
 export const getCategoryById = async (req, res) => {

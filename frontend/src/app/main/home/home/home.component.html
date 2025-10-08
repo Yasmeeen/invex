@@ -5,8 +5,8 @@
       <div class="mb-4 border-bottom pb-3">
         <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
           <div>
-            <a class="hover-link pointer weight-bold">Congratulations Mahmoud</a>
-            <div class="size-small mtb-1 plr-1">You have done 38% more sales</div>
+            <a class="hover-link pointer weight-bold">{{ 'tr_congratulations_name' | translate:{name:'Mahmoud'} }}</a>
+            <div class="size-small mtb-1 plr-1">{{ 'tr_sales_increase' | translate:{percent:38} }}</div>
           </div>
         </div>
         <div class="flex flex-middle">
@@ -16,8 +16,8 @@
                 <i class="fa fa-users"></i>
               </div>
               <div class="ml-3">
-                <a class="hover-link pointer weight-bold" href="/employees">60 new user</a>
-                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_users' | translate:{count:60} }}</a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
               </div>
             </div>
 
@@ -26,8 +26,8 @@
                 <i class="fa fa-link"></i>
               </div>
               <div class="ml-3">
-                <a class="hover-link pointer weight-bold" href="/employees">54 new products</a>
-                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_products' | translate:{count:54} }}</a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
               </div>
             </div>
 
@@ -35,9 +35,9 @@
               <div class="bg-warning text-warning border rounded-100 size-small ptb-3 plr-3">
                 <i class="fa fa-calendar"></i>
               </div>
-              <div class="ml-3 ">
-                <a class="hover-link pointer weight-bold" href="/employees">87 new invoices</a>
-                <div class="size-small mtb-1 steel weight-bold">Last 7 days</div>
+              <div class="ml-3">
+                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_invoices' | translate:{count:87} }}</a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
               </div>
             </div>
           </div>
@@ -53,11 +53,11 @@
   <div class="col-md-4">
     <div class="container-card" (click)="openUsersDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Users</span>
+        <span class="title">{{ 'tr_users' | translate }}</span>
         <span class="count">{{ totalUsers }}</span>
       </div>
       <div id="users-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">Active vs Inactive Users</div>
+      <div class="text-center steel">{{ 'tr_active_inactive_users' | translate }}</div>
     </div>
   </div>
 
@@ -65,11 +65,11 @@
   <div class="col-md-4">
     <div class="container-card" (click)="openProductsDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Products</span>
+        <span class="title">{{ 'tr_products' | translate }}</span>
         <span class="count">{{ totalProducts }}</span>
       </div>
       <div id="products-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">In Stock vs Out of Stock</div>
+      <div class="text-center steel">{{ 'tr_stock_status' | translate }}</div>
     </div>
   </div>
 
@@ -77,11 +77,11 @@
   <div class="col-md-4">
     <div class="container-card" (click)="openOrdersDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Orders</span>
+        <span class="title">{{ 'tr_orders' | translate }}</span>
         <span class="count">{{ totalOrders }}</span>
       </div>
       <div id="orders-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">Pending / Completed / Cancelled</div>
+      <div class="text-center steel">{{ 'tr_order_status' | translate }}</div>
     </div>
   </div>
 
@@ -89,11 +89,11 @@
   <div class="col-md-6 mt-4">
     <div class="container-card" (click)="openInvoicesDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Invoices</span>
+        <span class="title">{{ 'tr_invoices' | translate }}</span>
         <span class="count">{{ totalInvoices }}</span>
       </div>
       <div id="invoices-chart" style="width: 100%; height: 250px;"></div>
-      <div class="text-center steel">Daily / Monthly Invoices</div>
+      <div class="text-center steel">{{ 'tr_invoice_stats' | translate }}</div>
     </div>
   </div>
 
@@ -101,11 +101,11 @@
   <div class="col-md-6 mt-4">
     <div class="container-card" (click)="openCategoriesDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Categories</span>
+        <span class="title">{{ 'tr_categories' | translate }}</span>
         <span class="count">{{ totalCategories }}</span>
       </div>
       <div id="categories-chart" style="width: 100%; height: 250px;"></div>
-      <div class="text-center steel">Category Distribution</div>
+      <div class="text-center steel">{{ 'tr_category_distribution' | translate }}</div>
     </div>
   </div>
 
@@ -113,22 +113,10 @@
   <div class="col-md-12 mt-4">
     <div class="container-card" (click)="openInventoryDetails()">
       <div class="dashboard-card-header">
-        <span class="title">Inventory</span>
+        <span class="title">{{ 'tr_inventory' | translate }}</span>
       </div>
       <div id="inventory-chart" style="width: 100%; height: 300px;"></div>
-      <div class="text-center steel">Stock Distribution</div>
+      <div class="text-center steel">{{ 'tr_stock_distribution' | translate }}</div>
     </div>
   </div>
-
-  <!-- Clients Gauge -->
-  <!-- <div class="col-md-12 mt-4">
-    <div class="container-card" (click)="openClientsDetails()">
-      <div class="dashboard-card-header">
-        <span class="title">Clients</span>
-        <span class="count">{{ totalClients }}</span>
-      </div>
-      <div id="clients-chart" style="width: 100%; height: 300px;"></div>
-      <div class="text-center steel">Clients Growth</div>
-    </div>
-  </div> -->
 </div>

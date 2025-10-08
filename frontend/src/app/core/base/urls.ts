@@ -8,7 +8,7 @@ export const USER_REGISTER_URL = BASE_URL + '/api/users/register';
 export const USER_UPDATE_PASSWORD_URL = BASE_URL + '/api/users/updatePassword';
 
 export const USERS_URL = BASE_URL + '/api/users';
-export const USER_CREATE_URL = USERS_URL;
+export const USER_CREATE_URL = USERS_URL + '/createUser';
 export const USER_UPDATE_URL = USERS_URL;
 export const USER_DELETE_URL = USERS_URL;
 

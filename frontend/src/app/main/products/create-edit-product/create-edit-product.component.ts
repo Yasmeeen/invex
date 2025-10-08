@@ -99,9 +99,6 @@ export class CreateEditProductComponent implements OnInit {
 
   createProduct() {
     this.product = this.basicInfoForm.value;
-
-    console.log("   this.product",   this.product);
-    
     if (!this.basicInfoForm.valid) {
       return;
     }
@@ -109,6 +106,9 @@ export class CreateEditProductComponent implements OnInit {
     this.productsSerivce.createProduct(this.product).subscribe(() => {
       this.appNotificationService.push('product created successfully', 'sucess');
       this.closeModal(true);
+    }, error=> {
+      console.log(error.error);
+      this.appNotificationService.push(error.error.error, 'error');
     });
 
   }
@@ -122,6 +122,9 @@ export class CreateEditProductComponent implements OnInit {
     this.productsSerivce.updateProduct(this.product,this.productId).subscribe(() => {
       this.appNotificationService.push('product updated successfully', 'sucess');
       this.closeModal(true);
+    }, error=> {
+      console.log(error.error);
+      this.appNotificationService.push(error.error.error, 'error');
     });
 
   }

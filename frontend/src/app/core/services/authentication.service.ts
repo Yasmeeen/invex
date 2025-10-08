@@ -6,6 +6,7 @@ import { IUserLogin, User } from '@core/models/users-interfaces.model';
 import { USER_LOGIN_URL,USER_REGISTER_URL,USER_UPDATE_PASSWORD_URL  } from '@core/base/urls';
 import { tap } from 'rxjs/operators';
 import { Router } from '@angular/router';
+import { Globals } from '@core/globals';
 
 
 
@@ -22,7 +23,8 @@ export class AuthenticationService {
   constructor(
      private http:HttpClient,
      private appNotificationService:AppNotificationService,
-     private router: Router
+     private router: Router,
+     private globals: Globals
      ) {
     this.userObservable = this.userSubject.asObservable();
   }
@@ -34,9 +36,10 @@ export class AuthenticationService {
   login(userLogin:IUserLogin):Observable<User>{
     return this.http.post<User>(USER_LOGIN_URL, userLogin).pipe(
       tap({
-        next: (user:User) =>{
-          this.setUserToLocalStorage(user);
-          this.userSubject.next(user);
+        next: (user:any) =>{
+          this.setUserToLocalStorage(user.user);
+          this.globals.currentUser = user.user
+          this.userSubject.next(user.user);
         },
         error: (errorResponse:any) => {
           this.appNotificationService.push(errorResponse.error, 'error');
@@ -84,7 +87,7 @@ export class AuthenticationService {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 
-  private getUserFromLocalStorage():User{
+   getUserFromLocalStorage():any{
     const userJson = localStorage.getItem(USER_KEY);
     if(userJson) return JSON.parse(userJson) as User;
     return new User();

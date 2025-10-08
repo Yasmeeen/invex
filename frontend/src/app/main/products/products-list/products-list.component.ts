@@ -124,6 +124,20 @@ export class ProductsListComponent implements OnInit {
 
     })
   }
+  createOrEditproduct(isEdit: boolean, product?: Product){
+    let dialogRef = this.dialog.open(CreateEditProductComponent, {
+      width: '850px',
+      data: {isEdit:isEdit,product:product, productId: product?._id},
+      disableClose: true,
+  });
+  dialogRef.afterClosed().subscribe(event => {
+    if(event){
+       this.getproducts();
+    }
+  })
+  }
+
+ 
 
   ngOnDestroy() {
     this.subscriptions.forEach(s => s && s.unsubscribe())

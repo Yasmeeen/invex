@@ -48,7 +48,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
       this.userSerivce.getUsers(this.params).subscribe(
         (response: any) => {
           this.usersList = response.users;
-          // this.paginationData = response.meta;
+          this.paginationData = response.meta;
           this.usersLoading = false;
         },
         (error:any) => {

@@ -1,0 +1,17 @@
+
+@import 'mixins';
+@import 'color_scheme';
+@import 'blocks';
+@import 'variables';
+
+.eye-icon{
+    padding: 10px;
+    border-top: 1px solid $steel-lighter;
+    border-bottom: 1px solid $steel-lighter;
+    border-right: 1px solid $steel-lighter;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    background-color: #fff;
+    width: 44px;
+    height: 37px;
+}

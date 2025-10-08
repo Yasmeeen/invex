@@ -7,12 +7,13 @@ export interface Product {
   category: Category;
   code: string;
   stock: number;
-  price: number
+  price: number;
+  discount: number;
 }
 export interface Category {
   _id: string;
   name: string;
-  numberOfProducts: number
+  productsCount: number
 }
 export interface Branch {
   _id: string;
@@ -28,13 +29,11 @@ export interface Order {
   numberOfProducts? : number;
   totalPrice?: number;
   products?: Product [];
+  orderNumber?: number;
 }
 export interface productOrder{
-  _id: string;
-code: string;
-name: string;
+  _id?: string;
 quantity: number;
-price: number;    // changed to number
-discount: number;
+totalPrice: number;    // changed to number
 selectedProduct: any
 }  

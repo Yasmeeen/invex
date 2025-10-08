@@ -29,23 +29,24 @@ export class LanguageSwitcherComponent implements OnInit {
     ) { }
 
     ngOnInit() {
-        // this.selectedLanguage = this.data;
-        // this.currentUser = this.authenticationService.getCurrentUser();
+        this.selectedLanguage = this.data;
+        this.currentUser = this.authenticationService.getUserFromLocalStorage();
+        // this.globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     }
 
     switchLanguage() {
         let params = {
-            id: this.currentUser.id,
-            language: this.selectedLanguage,
+            id: this.currentUser._id,
+            locale: this.selectedLanguage,
         }
-        // this.userService.updateUser(this.currentUser.id, params).subscribe((response: any) => {
-        //     this.translate.use(this.selectedLanguage);
-        //     this.globals.updateUserLanguage.next(this.selectedLanguage);
-        //     this.globals.currentUser = response;
-        //     localStorage.setItem('currentUser', JSON.stringify(this.globals.currentUser));
-        //     document.querySelector('body')?.setAttribute('dir', this.selectedLanguage == 'ar' ? 'rtl' : 'ltr');
-        //     location.reload();
-        // })
+        this.userService.updateUser(this.currentUser._id, params).subscribe((response: any) => {
+            this.translate.use(this.selectedLanguage);
+            this.globals.updateUserLanguage.next(this.selectedLanguage);
+            this.globals.currentUser = response.user; // ✅ changed from [0] to direct object
+            localStorage.setItem('currentUser', JSON.stringify(this.globals.currentUser));
+            document.querySelector('body')?.setAttribute('dir', this.selectedLanguage === 'ar' ? 'rtl' : 'ltr');
+            location.reload();
+          });
 
         this.closeModal(this.selectedLanguage);
     }

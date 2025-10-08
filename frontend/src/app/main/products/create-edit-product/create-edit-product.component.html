@@ -3,188 +3,223 @@
     <div class="close-modal-icon" (click)="closeModal()"></div>
     <div class="modal-content" #modalContent>
       <div class="modal-header border-bottom">
-        <h3 class="steel weight-medium size-default m-0">New Product</h3>
+        <h3 class="steel weight-medium size-default m-0">
+          {{ 'tr_new_product' | translate }}
+        </h3>
       </div>
+
       <div class="modal-body weight-medium steel">
         <div class="add-student-modal-container">
-            <div>
-              <div class="content-container plr-4 ptb-3">
-                <div
-                  class="alert alert-error mb-3"
-                  *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
-                >
-                  Please fill all the required fileds
-                </div>
-                <div
-                  class="alert alert-error mb-3"
-                  *ngIf="
-                    basicInfoForm.valid &&
-                    basicInfoForm.submitted
-                  "
-                >
-                  Leaving Date must be before Admission Date
-                </div>
-                <form #basicInfoForm="ngForm">
-                  <div class="row">
-                    <div class="col-md-6">
-                      <div
-                        class="form-group"
-                        [class.has-error]="
-                          username_en.invalid && basicInfoForm.submitted
-                        "
+          <div>
+            <div class="content-container plr-4 ptb-3">
+              <div
+                class="alert alert-error mb-3"
+                *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
+              >
+                {{ 'tr_fill_required_fields' | translate }}
+              </div>
+
+              <div
+                class="alert alert-error mb-3"
+                *ngIf="basicInfoForm.valid && basicInfoForm.submitted"
+              >
+                {{ 'tr_leaving_before_admission' | translate }}
+              </div>
+
+              <form #basicInfoForm="ngForm">
+                <div class="row">
+
+                  <!-- Name -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="username_en.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_name' | translate }}</label>
+                      <input
+                        #username_en="ngModel"
+                        type="text"
+                        class="s-control"
+                        name="name"
+                        ngModel
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="username_en.invalid && basicInfoForm.submitted"
                       >
-                        <label for="">Name</label>
-                        <input
-                          #username_en="ngModel"
-                          type="text"
-                          class="s-control"
-                          name="name"
-                          ngModel
-                          required
-                        />
-                        <span
-                          class="text-error size-small validator"
-                          *ngIf="username_en.invalid && basicInfoForm.submitted"
-                        >
-                          name is required.
-                        </span>
-                      </div>
+                        {{ 'tr_name_required' | translate }}
+                      </span>
                     </div>
+                  </div>
 
-
-                    <div class="col-md-6">
-                      <div class="form-group" [class.has-error]="
-                      code.invalid && basicInfoForm.submitted
-                    ">
-                        <label for="">Code</label>
-                        <input
-                          type="string"
-                          class="s-control"
-                          name="code"
-                          #code ="ngModel"
-                          ngModel
-                          required
-                        />
-                        <span
+                  <!-- Code -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="code.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_code' | translate }}</label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="code"
+                        #code="ngModel"
+                        ngModel
+                        required
+                      />
+                      <span
                         class="text-error size-small validator"
                         *ngIf="code.invalid && basicInfoForm.submitted"
                       >
-                        this is required.
+                        {{ 'tr_code_required' | translate }}
                       </span>
-                      </div>
                     </div>
-                    <div class="col-md-6">
-                      <div class="form-group" [class.has-error]="
-                      code.invalid && basicInfoForm.submitted
-                    ">
-                        <label for="">Price</label>
-                        <input
-                          type="string"
-                          class="s-control"
-                          name="price"
-                          #price ="ngModel"
-                          ngModel
-                          required
-                        />
-                        <span
+                  </div>
+
+                  <!-- Price -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="price.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_price' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="price"
+                        #price="ngModel"
+                        ngModel
+                        required
+                      />
+                      <span
                         class="text-error size-small validator"
                         *ngIf="price.invalid && basicInfoForm.submitted"
                       >
-                        this is required.
+                        {{ 'tr_price_required' | translate }}
                       </span>
-                      </div>
                     </div>
-
-
-                    <div class="col-md-6">
-                      <div
-                        class="form-group"
-                        [class.has-error]="
-                          branch.invalid && basicInfoForm.submitted
-                        "
-                      >
-                        <label for="">Branches</label>
-                        <div class="input-with-icon bg-white">
-                          <ng-select
-                            class="s-control s-select"
-                            placeholder="{{ 'tr_select' | translate }}"
-                            bindLabel="name"
-                       
-                            [clearable]="false"
-                            ngModel
-                            #branch="ngModel"
-                            name="branch"
-                            [items]="branches"
-                            required
-                          >
-                          </ng-select>
-                          <i class="fa fa-caret-down input-icon"></i>
-                        </div>
-
-                        <span
-                          class="text-error size-small validator"
-                          *ngIf="
-                            branch.invalid && basicInfoForm.submitted
-                          "
-                        >
-                          Product branches is required.
-                        </span>
-                      </div>
-                    </div>
-
-
-                    <div class="col-md-6">
-                      <div
-                        class="form-group"
-                        [class.has-error]="
-                          category.invalid && basicInfoForm.submitted
-                        "
-                      >
-                        <label for="">Categories</label>
-                        <div class="input-with-icon bg-white">
-                          <ng-select
-                            class="s-control s-select"
-                            placeholder="{{ 'tr_select' | translate }}"
-                       
-                            bindLabel="name"
-                            [clearable]="false"
-                            ngModel
-                            #category="ngModel"
-                            name="category"
-                            [items]="categories"
-                            required
-                          >
-                          </ng-select>
-                          <i class="fa fa-caret-down input-icon"></i>
-                        </div>
-
-                        <span
-                          class="text-error size-small validator"
-                          *ngIf="
-                            category.invalid && basicInfoForm.submitted
-                          "
-                        >
-                          Product category is required.
-                        </span>
-                      </div>
-                    </div>
-
-
                   </div>
 
-                </form>
-              </div>
+                  <!-- Branch -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_branch' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          [clearable]="false"
+                          ngModel
+                          #branch="ngModel"
+                          name="branch"
+                          [items]="branches"
+                          required
+                        ></ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="branch.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_branch_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Category -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="category.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_category' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          [clearable]="false"
+                          ngModel
+                          #category="ngModel"
+                          name="category"
+                          [items]="categories"
+                          required
+                        ></ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="category.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_category_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Stock -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="stock.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_stock' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="stock"
+                        #stock="ngModel"
+                        ngModel
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="stock.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_stock_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Discount -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="discount.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_discount' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="discount"
+                        placeholder="{{ 'tr_discount_percentage' | translate }}"
+                        #discount="ngModel"
+                        ngModel
+                      />
+                    </div>
+                  </div>
+
+                </div>
+              </form>
             </div>
+          </div>
         </div>
       </div>
+
       <div class="modal-footer mt-3 text-right">
-        <button class="s-btn btn-secondary mr-3" (click)="closeModal()">Cancel</button>
+        <button class="s-btn btn-secondary mr-3" (click)="closeModal()">
+          {{ 'tr_cancel' | translate }}
+        </button>
         <button
           (click)="submitForm()"
           class="s-btn btn-primary"
           type="submit"
         >
-          Save
+          {{ 'tr_save' | translate }}
         </button>
       </div>
     </div>

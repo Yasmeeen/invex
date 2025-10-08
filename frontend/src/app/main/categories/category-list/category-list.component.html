@@ -101,17 +101,17 @@
         <table class="s-table table layout-fixed categories-list">
             <thead>
               <tr>
-                <th>ID</th>
+                <th></th>
                 <th>category Name</th>
                 <th>Number of products</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let category of categoriesList">
-                <td>{{ category._id }}</td>
+              <tr *ngFor="let category of categoriesList; let i = index">
+                <td>{{ i+1}}</td>
                 <td>{{ category.name }}</td>
-                <td>{{ category.numberOfProducts }}</td>
+                <td>{{ category.productsCount }}</td>
                 <td>
                   <span class="options-menu">
                     <i class="fa fa-ellipsis-v" aria-hidden="true"></i>

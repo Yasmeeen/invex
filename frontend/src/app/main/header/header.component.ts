@@ -31,18 +31,16 @@ export class HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     // this.avatarURL = BASE_URL + this.globals.currentSchool.avatar_url;
-    // this.currentUser = this.authenticationService.getCurrentUser();
+    this.currentUser = this.authenticationService.getUserFromLocalStorage();
+    this.globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.setUserLanguage();
-    // this.getUserInfo();
-  }
-  getUserInfo() {
- 
   }
 
+
   setUserLanguage() {
-    const userLocal = this.authenticationService.currentUser.local
+    const userLocal =   this.currentUser.locale
     document.querySelector('body')?.setAttribute('dir', userLocal == 'ar' ? 'rtl' : 'ltr');
-    // this.translate.use('en');
+    this.translate.use(userLocal);
     // this.userService.getCurrentUser(this.currentUser.id).subscribe(Response => {
     //   this.user = Response;
     //   this.globals.currentUser.locale = this.user.locale;
@@ -56,10 +54,11 @@ export class HeaderComponent implements OnInit {
   logout() {
     this.authenticationService.logout();
   }
+
   openChangeLanguageDailog() {
     const dialogRef = this.dialog.open(LanguageSwitcherComponent, {
         width: '400px',
-        data: this.globals.currentUser.locale,
+        data: this.currentUser.locale,
         disableClose: true,
     });
 }

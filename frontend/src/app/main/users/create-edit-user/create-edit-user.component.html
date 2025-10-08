@@ -1,135 +1,192 @@
 <div class="complex-modal">
-    <div class="modal-wrapper">
-      <div class="close-modal-icon" (click)="closeModal()"></div>
-      <div class="modal-content" #modalContent>
-        <div class="modal-header border-bottom">
-          <h3 class="steel weight-medium size-default m-0">New User</h3>
-        </div>
-        <div class="modal-body weight-medium steel">
-          <div class="add-student-modal-container">
-              <div>
-                <div class="content-container plr-4 ptb-3">
-                  <div
-                    class="alert alert-error mb-3"
-                    *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
-                  >
-                    Please fill all the required fileds
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="closeModal(false)"></div>
+    <div class="modal-content" #modalContent>
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">New User</h3>
+      </div>
+      <div class="modal-body weight-medium steel">
+        <div class="add-student-modal-container">
+          <div>
+            <div class="content-container plr-4 ptb-3">
+              <div
+                class="alert alert-error mb-3"
+                *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
+              >
+                Please fill all the required fileds
+              </div>
+              <div
+                class="alert alert-error mb-3"
+                *ngIf="basicInfoForm.valid && basicInfoForm.submitted"
+              >
+                Leaving Date must be before Admission Date
+              </div>
+              <form #basicInfoForm="ngForm">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        username_en.invalid && basicInfoForm.submitted
+                      "
+                    >
+                      <label for="">Name</label>
+                      <input
+                        #username_en="ngModel"
+                        type="text"
+                        class="s-control"
+                        name="name"
+                        ngModel
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="username_en.invalid && basicInfoForm.submitted"
+                      >
+                        name is required.
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        branch.invalid && basicInfoForm.submitted
+                      "
+                    >
+                      <label for="">Branches</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [clearable]="false"
+                          ngModel
+                          #branch="ngModel"
+                          name="branchId"
+                          [items]="branches"
+                          required
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="branch.invalid && basicInfoForm.submitted"
+                      >
+                        Product branches is required.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        email.invalid && basicInfoForm.submitted
+                      "
+                    >
+                      <label for="">email</label>
+                      <input
+                        type="string"
+                        class="s-control"
+                        name="email"
+                        #email="ngModel"
+                        ngModel
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="email.invalid && basicInfoForm.submitted"
+                      >
+                        this is required.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        role.invalid && basicInfoForm.submitted
+                      "
+                    >
+                      <label for="">Role</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          [clearable]="false"
+                          ngModel
+                          #role="ngModel"
+                          name="role"
+                          [items]="roles"
+                          required
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="role.invalid && basicInfoForm.submitted"
+                      >
+                        this is required.
+                      </span>
+                    </div>
                   </div>
                   <div
-                    class="alert alert-error mb-3"
-                    *ngIf="
-                      basicInfoForm.valid &&
-                      basicInfoForm.submitted
+                    class="col-md-6 form-group mb-6"
+                    [class.has-error]="
+                      (password.invalid && password.dirty) ||
+                      (basicInfoForm.submitted && password.invalid)
                     "
                   >
-                    Leaving Date must be before Admission Date
-                  </div>
-                  <form #basicInfoForm="ngForm">
-                    <div class="row">
-                      <div class="col-md-6">
-                        <div
-                          class="form-group"
-                          [class.has-error]="
-                            username_en.invalid && basicInfoForm.submitted
-                          "
-                        >
-                          <label for="">Name</label>
-                          <input
-                            #username_en="ngModel"
-                            type="text"
-                            class="s-control"
-                            name="name"
-                            ngModel
-                            required
-                          />
-                          <span
-                            class="text-error size-small validator"
-                            *ngIf="username_en.invalid && basicInfoForm.submitted"
-                          >
-                            name is required.
-                          </span>
-                        </div>
-                      </div>
-  
-  
-                      <div class="col-md-6">
-                        <div class="form-group" [class.has-error]="
-                        email.invalid && basicInfoForm.submitted
-                      ">
-                          <label for="">email</label>
-                          <input
-                            type="string"
-                            class="s-control"
-                            name="email"
-                            #email ="ngModel"
-                            ngModel
-                            required
-                          />
-                          <span
-                          class="text-error size-small validator"
-                          *ngIf="email.invalid && basicInfoForm.submitted"
-                        >
-                          this is required.
-                        </span>
-                        </div>
-                      </div>
-                
-  
-  
-                      <div class="col-md-6">
-                        <div
-                          class="form-group"
-                          [class.has-error]="
-                            role.invalid && basicInfoForm.submitted
-                          "
-                        >
-                          <label for="">Role</label>
-                          <div class="input-with-icon bg-white">
-                            <ng-select
-                              class="s-control s-select"
-                              placeholder="{{ 'tr_select' | translate }}"
-                    
-                              [clearable]="false"
-                              ngModel
-                              #role="ngModel"
-                              name="role"
-                              [items]="roles"
-                              required
-                            >
-                            </ng-select>
-                            <i class="fa fa-caret-down input-icon"></i>
-                          </div>
-  
-                          <span
-                            class="text-error size-small validator"
-                            *ngIf="
-                              role.invalid && basicInfoForm.submitted
-                            "
-                          >
-                            this is required.
-                          </span>
-                        </div>
-                      </div>
-  
-  
+                    <label class="login-label">Password</label>
+                    <div class="flex flex-middle">
+                      <input
+                        class="s-control"
+                        [type]="show ? 'text' : 'password'"
+                        name="password"
+                        placeholder="Password"
+                        autocomplete="password"
+                        #password="ngModel"
+                        ngModel
+                        required
+                      />
+                      <i
+                        class="fa fa-eye eye-icon text-orange"
+                        *ngIf="!show"
+                        (click)="show = true"
+                      ></i>
+                      <i
+                        class="fa fa-eye-slash eye-icon text-orange"
+                        *ngIf="show"
+                        (click)="show = false"
+                      >
+                      </i>
                     </div>
-  
-                  </form>
+
+                    <span class="text-error size-small mt-2 validator">
+                      Password is required.
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </form>
+            </div>
           </div>
         </div>
-        <div class="modal-footer mt-3 text-right">
-          <button class="s-btn btn-secondary mr-3" (click)="closeModal()">Cancel</button>
-          <button
-            (click)="submitForm()"
-            class="s-btn btn-primary"
-            type="submit"
-          >
-            Save
-          </button>
-        </div>
+      </div>
+      <div class="modal-footer mt-3 text-right">
+        <button class="s-btn btn-secondary mr-3" (click)="closeModal(false)">
+          Cancel
+        </button>
+        <button (click)="submitForm()" class="s-btn btn-primary" type="submit">
+          Save
+        </button>
       </div>
     </div>
   </div>
-  
+</div>

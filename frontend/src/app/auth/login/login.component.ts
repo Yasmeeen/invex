@@ -47,22 +47,15 @@ export class LoginComponent implements OnInit {
           email: this.user.email ,
           password: this.user.password
         }
+        console.log("user",user);
+        
         this.authenticationService.login(user).subscribe(() => {
-          const currentUser = this.authenticationService.currentUser;
-          // this.redirectUserAfterLogin(currentUser);
+          this.router.navigate(['home']);
           });
     }
 
 
-    // redirectUserAfterLogin(user:User){
-    //   if(!user.isNewUser || this.getIsSuperInnovationAdmin(user) ){
-    //     this.router.navigate(['home']);
-    //   }
-    //   else {
-    //     this.router.navigate(['login/update-password']);
-    //   }
 
-    // }
 
     getIsSuperInnovationAdmin(user:User){
       return user.name == "superInnovation"

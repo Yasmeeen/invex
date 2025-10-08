@@ -23,7 +23,7 @@
 // main mixin
 @mixin biDirectional($start, $end) {
     .main-container {
-        padding-#{$start}: 300px;
+        padding-#{$start}: 285px;
     }
 }
 

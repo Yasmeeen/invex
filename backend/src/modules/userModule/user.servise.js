@@ -1,4 +1,7 @@
-import User from '../../DB/models/user.model.js'; // adjust path if needed
+import User from '../../DB/models/user.model.js';
+import Branch from '../../DB/models/branch.model.js';
+
+import bcrypt from 'bcryptjs';
 
 // Get all users (with pagination and optional search)
 export const getUsers = async (req, res) => {
@@ -10,27 +13,35 @@ export const getUsers = async (req, res) => {
       ? {
           $or: [
             { name: { $regex: search, $options: 'i' } },
-            { email: { $regex: search, $options: 'i' } }
-          ]
+            { email: { $regex: search, $options: 'i' } },
+          ],
         }
       : {};
 
     const [users, total] = await Promise.all([
-      User.find(query).skip(skip).limit(Number(limit)),
-      User.countDocuments(query)
+      User.find(query)
+        .populate('branch', 'name -_id')
+        .skip(skip)
+        .limit(Number(limit)),
+      User.countDocuments(query),
     ]);
+
+    // Convert branch object to plain name
+    const usersWithBranchName = users.map((u) => ({
+      ...u.toObject()
+    }));
 
     const totalPages = Math.ceil(total / limit);
 
     res.json({
-      users,
+      users: usersWithBranchName,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
         prevPage: page > 1 ? Number(page) - 1 : null,
         totalCount: total,
-        totalPages
-      }
+        totalPages,
+      },
     });
   } catch (error) {
     console.error('❌ Error fetching users:', error.message);
@@ -41,13 +52,18 @@ export const getUsers = async (req, res) => {
 // Get user by ID
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).populate('branch', 'name -_id');
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    const formattedUser = {
+      ...user.toObject(),
+      branch: user.branch?.name || null,
+    };
+
+    res.json(formattedUser);
   } catch (error) {
     console.error('❌ Error fetching user by ID:', error.message);
     res.status(500).json({ error: 'Failed to fetch user' });
@@ -57,9 +73,11 @@ export const getUserById = async (req, res) => {
 // Create a new user
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    console.log(req.body);
+    
+    const { name, email, password, role, branchId } = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password || !role || !branchId ) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -68,9 +86,34 @@ export const createUser = async (req, res) => {
       return res.status(409).json({ error: 'Email already in use' });
     }
 
-    const user = await User.create({ name, email, password, role });
+    let branch = null;
+    if (branchId) {
+      branch = await Branch.findById(branchId);
 
-    res.status(201).json({ message: '✅ User created', user });
+      console.log("branchId",branch);
+      
+      if (!branch) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+    }
+
+    const createdUser = await User.create({
+      name,
+      email,
+      password,
+      role,
+      branch: branch ? branch._id : null,
+    });
+
+    console.log("createdUser",createdUser);
+    
+    const populatedUser = await createdUser.populate('branch', 'name -_id');
+    const formattedUser = {
+      ...populatedUser.toObject(),
+      branch: populatedUser.branch?.name || null,
+    };
+
+    res.status(201).json({ message: '✅ User created', user: formattedUser });
   } catch (error) {
     console.error('❌ Error creating user:', error.message);
     res.status(500).json({ error: 'Failed to create user' });
@@ -80,28 +123,38 @@ export const createUser = async (req, res) => {
 // Update user
 export const updateUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, branchId, locale } = req.body;
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ error: 'All fields are required' });
+    const updates = { name, email, password, role, locale };
+
+    if (branchId) {
+      const branch = await Branch.findById(branchId);
+      if (!branch) {
+        return res.status(404).json({ error: 'Branch not found' });
+      }
+      updates.branch = branch._id;
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email, password, role },
-      { new: true }
-    );
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+    }).populate('branch', 'name -_id');
 
-    if (!user) {
+    if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ message: '✅ User updated', user });
+    const formattedUser = {
+      ...updatedUser.toObject(),
+      branch: updatedUser.branch?.name || null,
+    };
+
+    res.json({ message: '✅ User updated', user: formattedUser });
   } catch (error) {
     console.error('❌ Error updating user:', error.message);
     res.status(500).json({ error: 'Failed to update user' });
   }
 };
+
 
 // Delete user
 export const deleteUser = async (req, res) => {
@@ -118,3 +171,48 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete user' });
   }
 };
+// Login user
+export const loginUser = async (req, res) => {
+
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Just for debugging
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // (await bcrypt.compare(password,user.password))
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    res.json({ message: "Login successful", user });
+  } catch (error) {
+    console.error("❌ Login error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Logout user
+export const logoutUser = async (req, res) => {
+  try {
+    // With JWT, logout is handled client-side (by deleting the token)
+    // But you can still send a confirmation response
+    res.json({ message: '✅ Logout successful' });
+  } catch (error) {
+    console.error('❌ Error during logout:', error.message);
+    res.status(500).json({ error: 'Failed to logout' });
+  }
+};
+
+
+
+
+

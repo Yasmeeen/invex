@@ -1,3 +1,4 @@
+import { Branch } from "./products.model";
 
 export interface PaginationData {
   currentPage: number;
@@ -15,7 +16,8 @@ export class User{
   role?: number;
   password?: string;
   created_at: string;
-  local: string
+  local: string;
+  branch?: Branch;
 }
 export class Employee extends User {
 
@@ -35,40 +37,13 @@ export class UserDetailsLogin  {
 }
 
 export interface CurrentUser {
-  id: number;
-  actable_id: number;
-  actable_type: string;
-  actions: [];
-  avatar_url: string
-  child_id?: number;
-  children?: null;
-  city?: string;
-  country?: string;
-  dateofbirth?: Date;
-  email?: string
-  firstname: string;
-  gender: string;
-  hide_grades?: boolean;
-  home_address?: string;
-  is_active?: boolean;
-  last_sign_in_at?: Date;
-  lastname: string;
-  locale: string;
-  middlename?: string;
-  name: string;
-  role: {};
-  parent_id?: number;
-  password: string;
-  phone?: string;
-  realtime_ip?: string;
-  school_name?: string;
-  secondary_address?: string;
-  secondary_phone?: string;
-  show_school_fees?: string;
-  thumb_url?: string;
-  unseen_notifications?: number;
-  user_type?: string;
-  username: string;
-  themeType?: string;
+  _id: string;
+  branch: string;
+  createdAt?:string;
+  email: string
+  locale?: string
+  password: string
+  role: string
+
 }
 

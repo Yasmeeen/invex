@@ -101,14 +101,14 @@
         <table class="s-table table layout-fixed branches-list">
             <thead>
               <tr>
-                <th>ID</th>
+                <th></th>
                 <th>branch Name</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let branch of branchesList">
-                <td>{{ branch._id }}</td>
+              <tr *ngFor="let branch of branchesList; let i= index">
+                <td>{{ i+1}}</td>
                 <td>{{ branch.name }}</td>
                 
                 <td>

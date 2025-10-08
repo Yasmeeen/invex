@@ -121,12 +121,7 @@
                           <!-- Product Inputs -->
                   <div class="col-12" *ngFor="let product of orderProducts; let i = index">
                     <div class="row ">
-                        <div class="col-md-2">
-                       <label>delete</label>
-                            <button class="s-btn btn-sm btn-danger" type="button" (click)="removeProduct(i)">
-                              <i class="fa fa-trash"></i>
-                            </button>
-                          </div>
+               
                         <div class="col-md-4">
                             <div
                               class="form-group"
@@ -163,28 +158,45 @@
                             </div>
                           </div>
   
-                      <div class="col-md-3">
+                      <div class="col-md-2" *ngIf="product.selectedProduct?.code">
                         <div class="form-group">
                           <label for="">Quantity</label>
                           <input
                             type="number"
                             class="s-control"
                             [(ngModel)]="product.quantity"
-                            name="quantity{{ i }}"
-                            (input)="calculateTotalPrice()"
+                            name="quantity{{i}}"
+            
                             required
                             min="1"
                           />
                         </div>
                       </div>
-  
-                      <div class="col-md-3">
+                      <div class="col-md-2" *ngIf="product.selectedProduct.code">
                         <div class="form-group">
-                          <label >Price</label>
-                         <div class="mt-3">{{product.selectedProduct.price}}</div>
+                          <label>{{'tr_discount' | translate}}</label>
+
                         </div>
+                        <div class="s-checkbox size-small mb-2">
+                          <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount" >
+                          <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
+                      </div>
+                    
                       </div>
   
+                      <div class="col-md-2" *ngIf="product.selectedProduct.code">
+                        <div class="form-group">
+                          <label >Price</label>
+                         <div class="mt-3">{{getOrderProductPrice(product)}} </div>
+                        </div>
+                      </div>
+                  
+                      <div class="col-md-2">
+                        <label>delete</label>
+                             <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
+                               <i class="fa fa-trash"></i>
+                             </button>
+                           </div>
                
                     </div>
                   </div>
@@ -222,15 +234,15 @@
       
         <table>
           <tr>
-            <td>العميل:</td>
+            <td>{{'tr_client' | translate}}:</td>
             <td>{{order.clientName}}</td>
           </tr>
           <tr>
-            <td>الهاتف:</td>
+            <td>{{'tr_phone_number' | translate}}:</td>
             <td>{{order.clientPhoneNumber}}</td>
           </tr>
           <tr>
-            <td>العنوان:</td>
+            <td>{{'tr_address' | translate}}:</td>
             <td>{{order.clientAddress}}</td>
           </tr>
         </table>
@@ -239,14 +251,14 @@
       
         <table>
           <tr>
-            <td>رقم الفاتورة:</td>
-            <td>4431</td>
-            <td>عدد المواد:</td>
-            <td>{{order.products?.length}}</td>
+            <td> {{'tr_invoice_number' | translate}}: </td>
+            <td>{{createdOrder?.orderNumber}}</td>
+            <td> {{'tr_number_of_items' | translate}}:</td>
+            <td>{{createdOrder?.numberOfProducts}}</td>
           </tr>
           <tr>
-            <td>التاريخ:</td>
-            <td colspan="3">{{todayDate}}</td>
+            <td>{{'tr_date' | translate}}:</td>
+            <td colspan="3">{{todayDate | date: 'dd, MMM, Y' }}</td>
           </tr>
         </table>
       
@@ -254,64 +266,46 @@
       
         <table>
           <tr class="bold">
-            <td>المجموع</td>
-            <td>الكمية</td>
-            <td>السعر</td>
-            <td>الاسم</td>
+            <td>{{ 'tr_total' | translate }}</td>
+            <td>{{ 'tr_quantity' | translate }}</td>
+            <td>{{ 'tr_discount' | translate }}</td>
+            <td>{{ 'tr_price' | translate }}</td>
+            <td>{{ 'tr_name' | translate }}</td>
           </tr>
-          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ZARA QUARTER ZIPPER</td></tr>
-          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>moncler</td></tr>
-          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>ae reflect</td></tr>
-          <tr><td>1300.00</td><td>2.00</td><td>650.00</td><td>kenzo</td></tr>
-          <tr><td>2400.00</td><td>3.00</td><td>800.00</td><td>p&amp;b</td></tr>
-          <tr><td>700.00</td><td>1.00</td><td>700.00</td><td>phlip plein</td></tr>
-          <tr><td>650.00</td><td>1.00</td><td>650.00</td><td>one piece</td></tr>
+
+          <tr *ngFor="let item of orderProducts">
+            <td>{{item.totalPrice}}</td>
+            <td>{{item.quantity}}</td>
+            <td>{{item.selectedProduct.discount}} %</td>
+            <td>{{item.selectedProduct.price}}</td>
+            <td>{{item.selectedProduct.name}}</td>
+          </tr>
+
         </table>
       
         <div class="dashed"></div>
       
         <table>
           <tr class="total">
-            <td>إجمالي الفاتورة:</td>
-            <td>7,150.00</td>
+            <td>{{ 'tr_total_invoice' | translate }}</td>
+            <td>{{createdOrder?.totalPrice}}</td>
           </tr>
           <tr>
-            <td>% الخصم:</td>
+            <td>{{ 'tr_discount_percent' | translate }}</td>
             <td>0</td>
           </tr>
           <tr>
-            <td>مبلغ الخصم:</td>
-            <td>2,350.00</td>
-          </tr>
-          <tr>
-            <td>% الضريبة:</td>
+            <td>{{ 'tr_discount_amount' | translate }}</td>
             <td>0</td>
           </tr>
-          <tr>
-            <td>مبلغ الضريبة:</td>
-            <td>0.00</td>
-          </tr>
-        </table>
       
-        <div class="dashed"></div>
-      
-        <table>
-          <tr>
-            <td>المبلغ المدفوع:</td>
-            <td>4,800.00</td>
-          </tr>
-          <tr>
-            <td>المبلغ المتبقي مرتجع:</td>
-            <td>0.00</td>
-          </tr>
-          <tr>
-            <td>مبلغ ذمم الفاتورة:</td>
-            <td>0.00</td>
-          </tr>
+    
         </table>
+    
+        
       
         <div class="double-border"></div>
-        <div class="final-total">صافي قيمة الفاتورة<br />4,800.00</div>
+        <div class="final-total"> {{'tr_final_invoice_value' |translate}}<br />{{createdOrder?.totalPrice}}</div>
         <div class="double-border"></div>
       
         <div class="center">

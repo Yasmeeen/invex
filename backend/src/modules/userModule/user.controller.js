@@ -6,10 +6,14 @@ import {
   getUserById,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  loginUser,
+  logoutUser
 } from './user.servise.js';
 
 router.get('/', getUsers);                  // GET all with pagination/search
+router.post('/login', loginUser);   
+router.post('/logout', logoutUser);   
 router.get('/:id', getUserById);            // GET one by ID
 router.post('/createUser', createUser);     // POST create
 router.put('/:id', updateUser);             // PUT update

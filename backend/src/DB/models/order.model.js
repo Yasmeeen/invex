@@ -49,6 +49,11 @@ const orderSchema = new mongoose.Schema(
       default: 'pending',
       required: true,
     },
+    orderNumber: {
+      type: Number,
+      unique: true,
+      required: true,
+    },
   },
   {
     timestamps: true,

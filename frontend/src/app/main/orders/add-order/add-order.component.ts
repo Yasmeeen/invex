@@ -6,6 +6,7 @@ import { MatDialogRef } from "@angular/material/dialog";
 import { Order, Product, productOrder } from "@core/models/products.model";
 import { ProductsSerivce } from "@shared/services/products.service copy";
 import { OrdersSerivce } from "@shared/services/orders.service";
+import { AppNotificationService } from "@shared/services/app-notification.service";
 
 @Component({
   selector: "app-add-order",
@@ -15,6 +16,7 @@ import { OrdersSerivce } from "@shared/services/orders.service";
 export class AddOrderComponent implements OnInit {
 
   todayDate = new Date();
+  createdOrder:any;
   order: Order = {
     clientName: '',
     clientPhoneNumber: '',
@@ -24,7 +26,7 @@ export class AddOrderComponent implements OnInit {
 
   // 🔹 Order products
   orderProducts: productOrder []= [
-    { _id: "", code: "", name: "", quantity: 1, price: 0, discount: 0, selectedProduct: {} }
+    {  quantity: 1, totalPrice: 0, selectedProduct: {} }
   ];
 
   // 🔹 Totals
@@ -37,7 +39,8 @@ export class AddOrderComponent implements OnInit {
     private http: HttpClient,
     private dialogRef: MatDialogRef<AddOrderComponent>,
     private productsSerivce: ProductsSerivce,
-    private ordersSerivce: OrdersSerivce
+    private ordersSerivce: OrdersSerivce,
+    private appNotificationService: AppNotificationService
   ) {}
 
   ngOnInit(): void {
@@ -51,69 +54,71 @@ export class AddOrderComponent implements OnInit {
     });
   }
 
-  // Fetch product details by code (when user selects product)
-  fetchProductDetails(index: number): void {
-    const code = this.orderProducts[index].code;
-    if (!code) return;
 
-    this.http.get<any>(`/api/products/code/${code}`).subscribe((product) => {
-      this.orderProducts[index]._id = product._id;
-      this.orderProducts[index].name = product.name;
-      this.orderProducts[index].price = product.price; // assign backend price
-      this.calculateTotalPrice();
-    });
-  }
 
-  // Calculate total price with discount applied
-  calculateTotalPrice(): void {
-    this.totalPrice = this.orderProducts.reduce((sum, p) => {
-      const discountedPrice = p.price - (p.price * (p.discount || 0) / 100);
-      return sum + discountedPrice * p.quantity;
-    }, 0);
+
+  getOrderProductPrice(product:productOrder){
+    const discountPercentage = product.selectedProduct.discount 
+    const totalPrice = product.selectedProduct.price
+    if(product.selectedProduct.isApplyDiscount){
+      const discountedPrice = totalPrice - (totalPrice * discountPercentage / 100);
+      product.totalPrice = discountedPrice * product.quantity 
+      return discountedPrice * product.quantity 
+    }
+    else {
+      product.totalPrice = totalPrice * product.quantity 
+      return totalPrice * product.quantity 
+    }
+
   }
 
   // Add / Remove product rows
   addProductRow(): void {
     this.orderProducts.push({
       _id: "",
-      code: "",
-      name: "",
       quantity: 1,
-      price: 0,
-      discount: 0,
+      totalPrice: 0,
       selectedProduct:{}
     });
   }
 
   removeProduct(index: number): void {
     this.orderProducts.splice(index, 1);
-    this.calculateTotalPrice();
   }
 
   // Submit form to backend
   submitForm(): void {
+    console.log("orderProducts",this.orderProducts);
+    
     const product_ids: string[] = ([] as string[]).concat(
       ...this.orderProducts.map((p) => Array(p.quantity).fill(p._id))
     );
-
-    console.log("this.orderProducts",this.orderProducts);
-    
+ 
 
     const orderPayload = {
       clientName: this.order.clientName,
       clientPhoneNumber: this.order.clientPhoneNumber,
       clientAddress: this.order.clientAddress,
       sellerName: this.order.sellerName,
-      products: this.orderProducts.map((p) => p.selectedProduct._id),
+      products: this.orderProducts,
       branch: this.order.branch?._id
     };
 
-    this.ordersSerivce.createOrder(orderPayload).subscribe((response) => {
-      console.log("Order submitted", response);
-      this.closeModal(true)
+    console.log("orderPayload",orderPayload);
+    
+    this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {
+
+      this.createdOrder = response.newOrder[0];    
+        console.log("response",this.createdOrder);
+      this.appNotificationService.push('Created Successfully', 'success');
+      // this.closeModal(true)
       this.printInvoice(); // auto print after submit
+    }, error=> {
+      console.log(error.error);
+      this.appNotificationService.push(error.error.error, 'error');
     });
   }
+
 
   // Close modal
   closeModal(isSubmit?: boolean) {
@@ -122,13 +127,6 @@ export class AddOrderComponent implements OnInit {
 
   // Print invoice
   printInvoice() {
-    // const printContents = document.getElementById('print-container')?.innerHTML;
-    // if (printContents) {
-    //   const win = window.open('', '', 'width=800,height=600');
-    //   win!.document.write(printContents);
-    //   win!.document.close();
-    //   win!.print();
-    // }
     window.print()
   }
 }

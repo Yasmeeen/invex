@@ -62,21 +62,30 @@ export const getProductById = async (req, res) => {
 
 // Create a new product
 export const createProduct = async (req, res) => {
+  console.log("eq.body",req.body);
+  
   try {
-    const { name, code, price, category, branch } = req.body;
+    const { name, code, price, category, branch,stock,discount } = req.body;
 
-    if (!name || !code || !price || !category._id || !branch._id) {
+    if (!name || !code || !price || !category._id || !branch._id || !stock) {
       return res.status(400).json({ error: 'All fields are required' });
     }
-    const product = await Product.create({
+    const isProductCodeExist = await Product.findOne({ code });
+    if (isProductCodeExist) {
+      return res.status(409).json({ error: 'product code already exist' });
+    }
+    const createdProduct = await Product.create({
       name,
       code,
       price,
+      stock,
+      discount,
       category: category._id,
       branch: branch._id
     });
 
-    res.status(201).json({ message: '✅ Product created', product });
+
+    res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
     console.error('❌ Error creating product:', error.message);
     res.status(500).json({ error: 'Failed to create product' });

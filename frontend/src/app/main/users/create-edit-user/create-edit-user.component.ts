@@ -9,6 +9,7 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dial
 import { NgForm } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { User } from '@core/models/users-interfaces.model';
+import { Branch } from '@core/models/products.model';
 
 @Component({
   selector: 'app-create-edit-user',
@@ -18,8 +19,10 @@ import { User } from '@core/models/users-interfaces.model';
 export class CreateEditUserComponent implements OnInit {
 
   userId: string;
+  show: boolean;
   isSubmitting: boolean;
   isEdit: boolean = false;
+  branches: Branch [] = [];
   user: User
   roles= [
     'Super Admin',
@@ -39,17 +42,33 @@ export class CreateEditUserComponent implements OnInit {
     private appNotificationService: AppNotificationService,
     private userSerivce: UserSerivce,
     @Inject(MAT_DIALOG_DATA) public data: any,
+    private branchesServce: BranchesServce,
+    private translateService: TranslateService
 
   ) {}
 
   ngOnInit() {
     this.userId = this.data.userId
     this.isEdit = this.data.isEdit
+    this.getBranches();
     if(this.isEdit){
     this.getUserData()
      
     }
 
+  }
+
+  getBranches() {
+    let params = {
+      'page': 1,
+     'per_page': 1000
+    }
+    this.subscriptions.push(this.branchesServce.getBranchs(params).subscribe((response: any) => {
+      this.branches = response.branches
+    },(error:any)=> {
+
+      this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
+    }))
   }
 
 
@@ -64,6 +83,8 @@ export class CreateEditUserComponent implements OnInit {
 
   createUser() {
     this.user = this.basicInfoForm.value;
+    console.log("    this.user ",    this.user );
+    
     if (!this.basicInfoForm.valid) {
       return;
     }
@@ -71,6 +92,9 @@ export class CreateEditUserComponent implements OnInit {
     this.userSerivce.createUser(this.user).subscribe(() => {
       this.appNotificationService.push('user created successfully', 'sucess');
       this.closeModal(true);
+    }, error=> {
+      console.log(error.error);
+      this.appNotificationService.push(error.error.error, 'error');
     });
 
   }
@@ -81,9 +105,12 @@ export class CreateEditUserComponent implements OnInit {
       return;
     }
 
-    this.userSerivce.updateUser(this.user,this.userId).subscribe(() => {
+    this.userSerivce.updateUser(this.userId,this.user).subscribe(() => {
       this.appNotificationService.push('user updated successfully', 'sucess');
       this.closeModal(true);
+    }, error=> {
+      console.log(error.error);
+      this.appNotificationService.push(error.error.error, 'error');
     });
 
   }

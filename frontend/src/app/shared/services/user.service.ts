@@ -21,8 +21,6 @@ export class UserSerivce {
   ) {}
 
   getUsers(params: any): Observable<any> {
-    console.log("start");
-    
     return this.http.get(USERS_URL, { params: params });
   }
 
@@ -40,8 +38,8 @@ export class UserSerivce {
     );
   }
 
-  updateUser(user: User, userId: string): Observable<User> {
-    return this.http.put<User>(`${USER_UPDATE_URL}/${userId}`, user).pipe(
+  updateUser( userId: string,params: any): Observable<User> {
+    return this.http.put<User>(`${USER_UPDATE_URL}/${userId}`, params).pipe(
       tap({
         error: () => {
           this.appNotificationService.push('Update User Failed', 'error');

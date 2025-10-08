@@ -116,7 +116,7 @@
 
                     <div class="col-md-2" *ngIf="product.selectedProduct?.code">
                       <label>{{ 'tr_discount' | translate }}</label>
-                      <div class="s-checkbox size-small mb-2">
+                      <div class="s-checkbox size-small mtb-2">
                         <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount">
                         <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
                       </div>
@@ -151,14 +151,13 @@
       <div class="modal-footer mt-3 text-right">
         <button class="s-btn btn-secondary mr-3" (click)="closeModal()">{{ 'tr_cancel' | translate }}</button>
         <button class="s-btn btn-primary mr-3" (click)="submitForm()">{{ 'tr_save_print' | translate }}</button>
-        <button class="s-btn btn-primary" (click)="printInvoice()">{{ 'tr_print' | translate }}</button>
       </div>
     </div>
 
     <!-- Invoice -->
     <div class="invoice-container" id="print-container">
       <div class="center">
-        <div class="bold">solddoutt store</div>
+        <div class="bold">{{storeName}}</div>
       </div>
 
       <table>
@@ -204,7 +203,7 @@
         <tr *ngFor="let item of orderProducts">
           <td>{{item.totalPrice}}</td>
           <td>{{item.quantity}}</td>
-          <td>{{item.selectedProduct.discount}} %</td>
+          <td>{{item.selectedProduct.isApplyDiscount? item.selectedProduct.discount : 0}} %</td>
           <td>{{item.selectedProduct.price}}</td>
           <td>{{item.selectedProduct.name}}</td>
         </tr>
@@ -232,9 +231,9 @@
       <div class="double-border"></div>
 
       <div class="center">
-        <div class="bold">solddoutt store</div>
-        <div>مدينة نصر، شارع الطاقة بجوار النادي الأهلي</div>
-        <div>01150564880</div>
+        <div class="bold">{{storeName}}</div>
+        <div>  {{createdOrder.branch.storeAddress}}</div>
+        <div>{{storePhoneNumber}}</div>
       </div>
     </div>
   </div>

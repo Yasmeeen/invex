@@ -95,15 +95,15 @@ export const createProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, category, branch } = req.body;
+    const { name, code, price, category, branch,stock,discount } = req.body;
 
-    if (!name || !code || !price || !category || !branch) {
+    if (!name || !code || !price || !category || !branch || !stock || !discount) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, code, price, category, branch },
+      { name, code, price, category, branch, stock, discount },
       { new: true }
     );
 

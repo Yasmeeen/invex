@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { AdminSidebar } from '@shared/resources';
+import { AuthenticationService } from '@core/services/authentication.service';
+import { AdminSidebar,Employee } from '@shared/resources';
 import { Globals } from 'src/app/core/globals';
 
 @Component({
@@ -14,9 +15,18 @@ export class SidebarComponent implements OnInit {
   levelName = '';
   user: any = [{}];
   constructor(
-      public globals: Globals
+      public globals: Globals,
+      private authenticationService: AuthenticationService
   ) {
+    globals.currentUser = this.authenticationService.getUserFromLocalStorage();
+    if(globals.currentUser.role == 'Employee'){
+      this.appSidebar = Employee;
+      
+    }
+    else{
       this.appSidebar = AdminSidebar;
+    }
+
   }
 
   ngOnInit() {

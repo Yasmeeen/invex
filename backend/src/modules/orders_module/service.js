@@ -19,7 +19,8 @@ export const getOrders = async (req, res) => {
 
     const [orders, total] = await Promise.all([
       Order.find(query)
-        .select('orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt')
+        .select('orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch')
+        .populate('branch', 'name') 
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -76,7 +77,7 @@ export const createOrder = async (req, res) => {
       status,
     } = req.body;
 
-    if (!clientName || !clientPhoneNumber || !sellerName || !clientAddress) {
+    if (!clientName || !clientPhoneNumber || !sellerName || !clientAddress ) {
       return res.status(400).json({
         error:
           'clientName, clientPhoneNumber, sellerName, and clientAddress are required',
@@ -93,7 +94,7 @@ export const createOrder = async (req, res) => {
     let numberOfProducts = 0;
     const productIds = [];
 
-    // ✅ Calculate totals & prepare stock updates
+    // ✅ Calculate totals & update stock
     for (const item of products) {
       const selected = item.selectedProduct;
       if (!selected || !selected._id) continue;
@@ -109,10 +110,8 @@ export const createOrder = async (req, res) => {
       totalPrice += price * quantity;
       productIds.push(selected._id);
 
-      // ✅ Reduce product stock
       const productDoc = await Product.findById(selected._id).session(session);
-      if (!productDoc)
-        throw new Error(`Product not found: ${selected._id}`);
+      if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
 
       if (productDoc.stock < quantity) {
         throw new Error(`Not enough stock for ${productDoc.name}`);
@@ -145,10 +144,18 @@ export const createOrder = async (req, res) => {
       { session }
     );
 
+    // ✅ Populate branch details
+    const populatedOrder = await Order.findById(newOrder[0]._id)
+      .populate({
+        path: 'branch',
+        select: 'name storeAddress', // return only name & address
+      })
+      .lean();
+
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({ message: '✅ Order created', newOrder });
+    res.status(201).json({ message: '✅ Order created', newOrder: populatedOrder });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -156,6 +163,7 @@ export const createOrder = async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 };
+
 
 
 

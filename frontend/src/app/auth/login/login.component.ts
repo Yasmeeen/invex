@@ -47,10 +47,14 @@ export class LoginComponent implements OnInit {
           email: this.user.email ,
           password: this.user.password
         }
-        console.log("user",user);
-        
         this.authenticationService.login(user).subscribe(() => {
-          this.router.navigate(['home']);
+          if(this.globals.currentUser.role == 'Employee'){
+            this.router.navigate(['orders']);
+          }
+          else {
+            this.router.navigate(['home']);
+          }
+ 
           });
     }
 

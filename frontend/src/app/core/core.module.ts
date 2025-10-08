@@ -5,6 +5,7 @@ import {HTTP_INTERCEPTORS, HttpClientModule} from '@angular/common/http';
 import { AuthenticationService } from './services/authentication.service';
 import { ModuleWithProviders } from '@angular/compiler/src/core';
 import { HttpConfigInterceptor } from './interceptors/httpconfig.interceptor';
+import { RoleGuard } from './guards/role.guard';
 
 
 @NgModule({
@@ -21,6 +22,7 @@ export class CoreModule {
       providers: [
         AuthenticationService,
         AuthenticationGuard,
+        RoleGuard,
         {
           provide: HTTP_INTERCEPTORS,
           useClass: HttpConfigInterceptor,

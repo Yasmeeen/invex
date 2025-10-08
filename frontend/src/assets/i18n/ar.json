@@ -302,7 +302,6 @@
   "tr_order_number": "رقم الطلب",
   "tr_client_name": "اسم العميل",
   "tr_new_order": "طلب جديد",
-  "tr_client_name": "اسم العميل",
   "tr_client_name_required": "اسم العميل مطلوب.",
   "tr_client_phone": "رقم الهاتف",
   "tr_client_phone_required": "رقم الهاتف مطلوب.",
@@ -314,5 +313,10 @@
   "tr_delete": "حذف",
   "tr_save_print": "حفظ و طباعة",
   "tr_print": "طباعة",
-  "tr_number_of_items": "عدد العناصر"
+  "tr_number_of_items": "عدد المواد",
+  "tr_branch_address": "عنوان الفرع",
+  "tr_rent": "الإيجار",
+  "tr_employees_salary": "رواتب الموظفين",
+  "tr_branch_invoices": "فواتير الفرع",
+  "tr_expenses": "المصروفات"
 }

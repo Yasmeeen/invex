@@ -7,6 +7,8 @@ import { Order, Product, productOrder } from "@core/models/products.model";
 import { ProductsSerivce } from "@shared/services/products.service copy";
 import { OrdersSerivce } from "@shared/services/orders.service";
 import { AppNotificationService } from "@shared/services/app-notification.service";
+import { Globals } from "@core/globals";
+import { environment } from "src/environments/environment";
 
 @Component({
   selector: "app-add-order",
@@ -17,6 +19,8 @@ export class AddOrderComponent implements OnInit {
 
   todayDate = new Date();
   createdOrder:any;
+  storeName = environment.storeName
+  storePhoneNumber =  environment.storePhoneNumber
   order: Order = {
     clientName: '',
     clientPhoneNumber: '',
@@ -40,10 +44,13 @@ export class AddOrderComponent implements OnInit {
     private dialogRef: MatDialogRef<AddOrderComponent>,
     private productsSerivce: ProductsSerivce,
     private ordersSerivce: OrdersSerivce,
-    private appNotificationService: AppNotificationService
+    private appNotificationService: AppNotificationService,
+    private globals:Globals
   ) {}
 
   ngOnInit(): void {
+    console.log(this.globals.currentUser.branch);
+    
     this.getProducts();
   }
 
@@ -101,21 +108,18 @@ export class AddOrderComponent implements OnInit {
       clientAddress: this.order.clientAddress,
       sellerName: this.order.sellerName,
       products: this.orderProducts,
-      branch: this.order.branch?._id
+      branch: this.globals.currentUser.branch
     };
 
-    console.log("orderPayload",orderPayload);
-    
     this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {
 
       this.createdOrder = response.newOrder[0];    
-        console.log("response",this.createdOrder);
       this.appNotificationService.push('Created Successfully', 'success');
       // this.closeModal(true)
       this.printInvoice(); // auto print after submit
     }, error=> {
       console.log(error.error);
-      this.appNotificationService.push(error.error.error, 'error');
+      this.appNotificationService.push(error.error.details, 'error');
     });
   }
 

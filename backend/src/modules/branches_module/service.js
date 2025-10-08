@@ -46,13 +46,33 @@ export const getBranchById = async (req, res) => {
 
 export const createBranch = async (req, res) => {
   try {
-    const { name } = req.body;
+    const {
+      name,
+      storeAddress,
+      rent,
+      employeesSalary,
+      branchInvoices,
+      expenses,
+    } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
+    // ✅ Required validation
+    if (!name || !storeAddress) {
+      return res.status(400).json({
+        error: 'Name and storeAddress are required',
+      });
     }
 
-    const newBranch = await Branch.create({ name });
+    // ✅ Default values if not provided
+    const newBranchData = {
+      name,
+      storeAddress,
+      rent: Number(rent) || 0,
+      employeesSalary: Number(employeesSalary) || 0,
+      branchInvoices,
+      expenses,
+    };
+
+    const newBranch = await Branch.create(newBranchData);
 
     res.status(201).json({
       message: '✅ Branch created',
@@ -63,6 +83,7 @@ export const createBranch = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 export const updateBranch = async (req, res) => {
   try {

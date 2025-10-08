@@ -33,6 +33,7 @@
           </div>
         </div>
       </div>
+      
     </div>
   </div>
 
@@ -43,43 +44,51 @@
         id="table-container"
         *ngIf="branchesList.length > 0"
       >
-        <table class="s-table table layout-fixed branches-list">
-          <thead>
-            <tr>
-              <th></th>
-              <th>{{ 'tr_branch_name' | translate }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let branch of branchesList; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>{{ branch.name }}</td>
-              <td>
-                <span class="options-menu">
-                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                  <div class="options-menu-container p-0">
-                    <div
-                      class="single-option"
-                      (click)="createOrEditbranch(true, branch)"
-                    >
-                      {{ "tr_action.edit" | translate }}
-                    </div>
-                    <div class="border-bottom"></div>
-                    <div
-                      class="single-option"
-                      (click)="deleteBranch(branch._id)"
-                    >
-                      <div class="text-error">
-                        {{ "tr_action.delete" | translate }}
-                      </div>
+      <table class="s-table table layout-fixed branches-list">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>{{ 'tr_branch_name' | translate }}</th>
+            <th>{{ 'tr_branch_address' | translate }}</th>
+            <th>{{ 'tr_rent' | translate }}</th>
+            <th>{{ 'tr_employees_salary' | translate }}</th>
+            <th>{{ 'tr_branch_invoices' | translate }}</th>
+            <th>{{ 'tr_expenses' | translate }}</th>
+            <th>{{ 'tr_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let branch of branchesList; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td>{{ branch.name }}</td>
+            <td>{{ branch.storeAddress }}</td>
+            <td>{{ branch.rent | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ branch.employeesSalary | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ branch.branchInvoices | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ branch.expenses | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>
+              <span class="options-menu">
+                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                <div class="options-menu-container p-0">
+                  <div
+                    class="single-option"
+                    (click)="createOrEditbranch(true, branch)"
+                  >
+                    {{ "tr_action.edit" | translate }}
+                  </div>
+                  <div class="border-bottom"></div>
+                  <div class="single-option" (click)="deleteBranch(branch._id)">
+                    <div class="text-error">
+                      {{ "tr_action.delete" | translate }}
                     </div>
                   </div>
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                </div>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
       </div>
 
       <div

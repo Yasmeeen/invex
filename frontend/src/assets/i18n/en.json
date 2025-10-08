@@ -319,7 +319,13 @@
     "tr_product_code": "Product Code",
     "tr_delete": "Delete",
     "tr_save_print": "Save & Print",
-    "tr_print": "Print"
+    "tr_print": "Print",
+    "tr_branch_address": "Branch Address",
+    "tr_rent": "Rent",
+    "tr_employees_salary": "Employees Salary",
+    "tr_branch_invoices": "Branch Invoices",
+    "tr_expenses": "Expenses",
+    "tr_new_branch": "New Branch"
 
 
 }

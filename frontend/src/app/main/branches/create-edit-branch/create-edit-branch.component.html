@@ -18,14 +18,13 @@
   
                 <form #branchForm="ngForm">
                   <div class="row">
-                    <div class="col-md-6">
+                    <!-- Branch Name -->
+                    <div class="col-md-4">
                       <div
                         class="form-group"
-                        [class.has-error]="
-                          branchName.invalid && branchForm.submitted
-                        "
+                        [class.has-error]="branchName.invalid && branchForm.submitted"
                       >
-                        <label for="">{{'tr_branch_name' | translate}}</label>
+                        <label for="">{{ 'tr_branch_name' | translate }}</label>
                         <input
                           #branchName="ngModel"
                           type="text"
@@ -42,8 +41,89 @@
                         </span>
                       </div>
                     </div>
+                
+                    <!-- Store Address -->
+                    <div class="col-md-4">
+                      <div
+                        class="form-group"
+                        [class.has-error]="storeAddress.invalid && branchForm.submitted"
+                      >
+                        <label for="">{{ 'tr_branch_address' | translate }}</label>
+                        <input
+                          #storeAddress="ngModel"
+                          type="text"
+                          class="s-control"
+                          name="storeAddress"
+                          ngModel
+                          required
+                        />
+                        <span
+                          class="text-error size-small validator"
+                          *ngIf="storeAddress.invalid && branchForm.submitted"
+                        >
+                          Store address is required.
+                        </span>
+                      </div>
+                    </div>
+                
+                    <!-- Rent -->
+                    <div class="col-md-4">
+                      <div class="form-group">
+                        <label for="">{{ 'tr_rent' | translate }}</label>
+                        <input
+                          type="number"
+                          class="s-control"
+                          name="rent"
+                          ngModel
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                
+                    <!-- Employees Salary -->
+                    <div class="col-md-4 mt-3">
+                      <div class="form-group">
+                        <label for="">{{ 'tr_employees_salary' | translate }}</label>
+                        <input
+                          type="number"
+                          class="s-control"
+                          name="employeesSalary"
+                          ngModel
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                
+                    <!-- Branch Invoices -->
+                    <div class="col-md-4 mt-3">
+                      <div class="form-group">
+                        <label for="">{{ 'tr_branch_invoices' | translate }}</label>
+                        <input
+                          type="text"
+                          class="s-control"
+                          name="branchInvoices"
+                          ngModel
+                          placeholder="Comma separated invoice IDs"
+                        />
+                      </div>
+                    </div>
+                
+                    <!-- Expenses -->
+                    <div class="col-md-4 mt-3">
+                      <div class="form-group">
+                        <label for="">{{ 'tr_expenses' | translate }}</label>
+                        <input
+                          type="text"
+                          class="s-control"
+                          name="expenses"
+                          ngModel
+                          placeholder="Comma separated expense IDs"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </form>
+                
   
               </div>
             </div>

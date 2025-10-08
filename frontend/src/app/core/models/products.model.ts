@@ -14,11 +14,16 @@ export interface Category {
   _id: string;
   name: string;
   productsCount: number
-}
-export interface Branch {
+}export interface Branch {
   _id: string;
   name: string;
+  storeAddress: string;
+  rent: number;
+  employeesSalary: number;
+  branchInvoices: number;
+  expenses: number;
 }
+
 export interface Order {
   _id?: string;
   clientName: string;

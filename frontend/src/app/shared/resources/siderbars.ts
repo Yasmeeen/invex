@@ -37,3 +37,14 @@ export const  AdminSidebar = [
 
 
 ];
+export const  Employee = [
+
+  {
+    name: 'tr_orders',
+    routerLink: '/orders',
+    icon: 'fa fa-ticket icon',
+  },
+
+
+];
+

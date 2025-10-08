@@ -5,6 +5,8 @@
 export const environment = {
     production: false,
     env: 'development',
+    storeName:"solddoutt store",
+    storePhoneNumber: "01150564880"
 };
 
 

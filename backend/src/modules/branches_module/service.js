@@ -87,13 +87,24 @@ export const createBranch = async (req, res) => {
 
 export const updateBranch = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name,
+      storeAddress,
+      rent,
+      employeesSalary,
+      branchInvoices,
+      expenses, } = req.body;
 
     const updatedBranch = await Branch.findByIdAndUpdate(
       req.params.id,
-      { name },
+      { name,
+        storeAddress,
+        rent,
+        employeesSalary,
+        branchInvoices,
+        expenses, },
       { new: true }
     );
+
 
     if (!updatedBranch) {
       return res.status(404).json({ error: 'Branch not found' });

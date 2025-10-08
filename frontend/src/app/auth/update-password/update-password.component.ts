@@ -60,7 +60,7 @@ export class UpdatePasswordComponent implements OnInit {
       }
 
         const user:IUserLogin = {
-          id: this.authenticationService.currentUser?.id,
+          id: this.authenticationService.currentUser?._id,
           email: this.authenticationService.currentUser?.email,
           password: this.user.password,
           confirmPassword: this.user.confirmPassword,

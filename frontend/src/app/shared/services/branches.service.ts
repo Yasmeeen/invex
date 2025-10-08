@@ -26,8 +26,8 @@ getBranch(branchId: any) {
 createBranch(params: any) {
   return this.http.post(BRANCH_CREATE_BRANCH_URL, params);
 }
-updateBranch(branch: Branch): Observable<Branch> {
-  return this.http.put<Branch>(BRANCH_UPDATE_BRANCH_URL, branch).pipe(
+updateBranch(branchId: string,branch: Branch): Observable<Branch> {
+  return this.http.put<Branch>(BRANCH_UPDATE_BRANCH_URL+`/${branchId}`, branch).pipe(
     tap({
       error: (errorResponse: Error) => {
         this.appNotificationService.push('Update Branch Failed', 'error');

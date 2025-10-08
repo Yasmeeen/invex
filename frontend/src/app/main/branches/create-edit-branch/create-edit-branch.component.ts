@@ -13,12 +13,16 @@ import { NgForm } from '@angular/forms';
 })
 export class CreateEditBranchComponent implements OnInit {
   branch: Branch ;
+  branchId: string;
+  isEdit: boolean;
   @ViewChild('branchForm') branchForm: NgForm;
+
   constructor(
     private dialogRef: MatDialogRef<CreateEditBranchComponent>,
     private branchesService: BranchesServce,
     private appNotificationService: AppNotificationService,
-    private translateService: TranslateService
+    private translateService: TranslateService,
+    @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
   closeModal(): void {
@@ -26,18 +30,29 @@ export class CreateEditBranchComponent implements OnInit {
   }
   ngOnInit() {
 
+    this.branchId = this.data.branchId
+    this.isEdit = this.data.isEdit
+    console.log("this.data.branch",this.data);
+    
+    if(this.isEdit){
+      this.getBranchData();
+    }
+
   }
 
-  submitForm(): void {
+  getBranchData(){
+    this.branchesService.getBranch(this.branchId).subscribe((response:any)=> {
+      this.branchId = response._id
+      this.branchForm.form.patchValue(response);
+    })
+  }
 
+  createBranch(){
     this.branch = this.branchForm.value;
     if (!this.branchForm.valid) {
-      this.appNotificationService.push('Branch name is required.', 'error');
+      this.appNotificationService.push('Branch data is required.', 'error');
       return;
     }
-console.log("this.branch",this.branch);
-
-
     this.branchesService.createBranch(this.branch).subscribe({
       next: () => {
         this.appNotificationService.push('Branch created successfully!', 'success');
@@ -51,4 +66,38 @@ console.log("this.branch",this.branch);
       }
     });
   }
+  updateBranch(){
+    this.branch = this.branchForm.value;
+    if (!this.branchForm.valid) {
+      this.appNotificationService.push('Branch data is required.', 'error');
+      return;
+    }
+    console.log("this.branch",this.branch);
+    
+    this.branchesService.updateBranch(this.branchId, this.branch).subscribe({
+      next: () => {
+        this.appNotificationService.push('Branch updated successfully!', 'success');
+        this.dialogRef.close(true);
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      }
+    });
+  }
+
+  submitForm(): void {
+
+    if(this.isEdit){
+      this.updateBranch();
+    }
+    else{
+      this.createBranch();
+    }
+
+  
+  }
+
 }

@@ -1,0 +1,29 @@
+.branches-list{
+    td, th {
+        &:nth-child(1){
+            width: 3rem;
+        }
+        &:nth-child(2){
+            width: 8rem;
+        }
+        &:nth-child(3){
+            width: 14rem;
+        }
+        &:nth-child(4){
+          width: 7rem;
+      }
+        &:nth-child(5){
+            width: 7rem;
+        }
+        &:nth-child(6){
+          width: 7rem;
+      }
+      &:nth-child(7){
+        width: 7rem;
+    }
+      &:nth-child(8){
+        width: 2rem;
+    }
+ 
+     }
+  }

@@ -53,8 +53,6 @@ export class CreateEditProductComponent implements OnInit {
 
   ngOnInit() {
     this.productId = this.data.productId
-    console.log("this.data.productId",this.data);
-    
     this.isEdit = this.data.isEdit
     this.getCategories();
     this.getBranches();
@@ -121,8 +119,6 @@ export class CreateEditProductComponent implements OnInit {
       return;
     }
 
-    console.log("his.productId",this.productId);
-    
     this.productsSerivce.updateProduct(this.product,this.productId).subscribe(() => {
       this.appNotificationService.push('product updated successfully', 'sucess');
       this.closeModal(true);

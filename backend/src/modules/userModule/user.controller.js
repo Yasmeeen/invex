@@ -17,6 +17,6 @@ router.post('/logout', logoutUser);
 router.get('/:id', getUserById);            // GET one by ID
 router.post('/createUser', createUser);     // POST create
 router.put('/:id', updateUser);             // PUT update
-router.delete('/deleteUser/:id', deleteUser); // DELETE user
+router.delete('/:id', deleteUser); // DELETE user
 
 export default router;

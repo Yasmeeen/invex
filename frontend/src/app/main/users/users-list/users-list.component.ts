@@ -83,7 +83,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
   createOrEditUser(isEdit: boolean, user?: User): void {
     const dialogRef = this.dialog.open(CreateEditUserComponent, {
       width: '750px',
-      data: { isEdit, user, userId: user?.id },
+      data: { isEdit, user, userId: user?._id },
       disableClose: true
     });
 

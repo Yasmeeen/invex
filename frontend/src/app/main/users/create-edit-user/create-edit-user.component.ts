@@ -53,7 +53,6 @@ export class CreateEditUserComponent implements OnInit {
     this.getBranches();
     if(this.isEdit){
     this.getUserData()
-     
     }
 
   }
@@ -74,7 +73,8 @@ export class CreateEditUserComponent implements OnInit {
 
   getUserData() {
     this.userSerivce.getUser(this.userId).subscribe((response:any)=> {
-      this.userId = response.id
+      this.userId = response._id
+      response.branchId = response.branch;
       this.basicInfoForm.form.patchValue(response);
     })
   }
@@ -83,8 +83,6 @@ export class CreateEditUserComponent implements OnInit {
 
   createUser() {
     this.user = this.basicInfoForm.value;
-    console.log("    this.user ",    this.user );
-    
     if (!this.basicInfoForm.valid) {
       return;
     }
@@ -93,7 +91,6 @@ export class CreateEditUserComponent implements OnInit {
       this.appNotificationService.push('user created successfully', 'sucess');
       this.closeModal(true);
     }, error=> {
-      console.log(error.error);
       this.appNotificationService.push(error.error.error, 'error');
     });
 
@@ -104,12 +101,12 @@ export class CreateEditUserComponent implements OnInit {
     if (!this.basicInfoForm.valid) {
       return;
     }
-
+      console.log("this.userId",this.userId);
+      
     this.userSerivce.updateUser(this.userId,this.user).subscribe(() => {
       this.appNotificationService.push('user updated successfully', 'sucess');
       this.closeModal(true);
     }, error=> {
-      console.log(error.error);
       this.appNotificationService.push(error.error.error, 'error');
     });
 

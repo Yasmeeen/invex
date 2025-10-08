@@ -52,15 +52,13 @@ export const getUsers = async (req, res) => {
 // Get user by ID
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate('branch', 'name -_id');
-
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     const formattedUser = {
-      ...user.toObject(),
-      branch: user.branch?.name || null,
+      ...user.toObject()
     };
 
     res.json(formattedUser);
@@ -73,8 +71,6 @@ export const getUserById = async (req, res) => {
 // Create a new user
 export const createUser = async (req, res) => {
   try {
-    console.log(req.body);
-    
     const { name, email, password, role, branchId } = req.body;
 
     if (!name || !email || !password || !role || !branchId ) {
@@ -88,10 +84,7 @@ export const createUser = async (req, res) => {
 
     let branch = null;
     if (branchId) {
-      branch = await Branch.findById(branchId);
-
-      console.log("branchId",branch);
-      
+      branch = await Branch.findById(branchId); 
       if (!branch) {
         return res.status(404).json({ error: 'Branch not found' });
       }

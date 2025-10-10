@@ -1,7 +1,7 @@
-import { environment } from "src/environments/environment";
+import { environment } from "src/environments/environment.prod";
 
 // export const BASE_URL = environment.production? '' : 'http://localhost:3000';
-export const BASE_URL = environment.production? '' : 'http://ec2-16-171-200-140.eu-north-1.compute.amazonaws.com:3000';
+export const BASE_URL = environment.apiUrl ? '' : 'http://ec2-16-171-200-140.eu-north-1.compute.amazonaws.com:3000';
 
 
 

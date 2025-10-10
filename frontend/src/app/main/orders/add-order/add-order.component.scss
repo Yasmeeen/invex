@@ -44,8 +44,11 @@
   }
   /* Only show invoice and hide everything else when printing */
 @media print {
-    body *, .modal-wrapper {
+    body *, .modal-wrapper,.app-notification, #app-notifications-container {
       visibility: hidden;
+    }
+    .app-notification, #app-notifications-container {
+      display: none;
     }
   
     #print-container, #print-container * {

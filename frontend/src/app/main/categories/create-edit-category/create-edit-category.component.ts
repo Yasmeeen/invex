@@ -14,24 +14,31 @@ import { CategoriesServce } from '@shared/services/categories.service';
 })
 export class CreateEditCategoryComponent implements OnInit {
   category: Category ;
+  categoryId: string;
+  isEdit: boolean;
   @ViewChild('categoryForm') categoryForm: NgForm;
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
     private categoriesServce: CategoriesServce,
     private appNotificationService: AppNotificationService,
-    private translateService: TranslateService
+    private translateService: TranslateService,
+    @Inject(MAT_DIALOG_DATA) public data: any,
   ) {}
 
   closeModal(): void {
     this.dialogRef.close();
   }
   ngOnInit() {
-
+    this.categoryId = this.data.productId
+    this.isEdit = this.data.isEdit
+    if(this.isEdit){
+      console.log("this.data.category",this.data.category);
+      
+      this.categoryForm.form.patchValue(this.data.category);
+    }
   }
 
   submitForm(): void {
-console.log("this.categoryForm.",this.categoryForm);
-
     this.category = this.categoryForm.value;
     if (!this.categoryForm.valid) {
       this.appNotificationService.push('Category name is required.', 'error');

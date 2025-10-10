@@ -13,7 +13,8 @@ export interface Product {
 export interface Category {
   _id: string;
   name: string;
-  productsCount: number
+  productsCount: number;
+  totalItems: number
 }export interface Branch {
   _id: string;
   name: string;

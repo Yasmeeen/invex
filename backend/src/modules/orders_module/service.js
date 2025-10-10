@@ -2,25 +2,39 @@ import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 
 import mongoose from 'mongoose';
+
 export const getOrders = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
+    const searchRegex = new RegExp(search, 'i');
 
-    const query = search
-      ? {
-          $or: [
-            { clientName: { $regex: search, $options: 'i' } },
-            { clientPhoneNumber: { $regex: search, $options: 'i' } },
-            { orderNumber: { $regex: search, $options: 'i' } },
-          ],
-        }
-      : {};
+    let query = {};
+
+    if (search) {
+      query.$or = [
+        { clientName: { $regex: searchRegex } },
+        { clientPhoneNumber: { $regex: searchRegex } },
+        { orderNumber: { $regex: searchRegex } },
+      ];
+
+      // ✅ Search branches by name
+      const matchedBranches = await Branch.find({
+        name: { $regex: searchRegex },
+      }).select('_id');
+
+      if (matchedBranches.length > 0) {
+        const branchIds = matchedBranches.map((b) => b._id);
+        query.$or.push({ branch: { $in: branchIds } });
+      }
+    }
 
     const [orders, total] = await Promise.all([
       Order.find(query)
-        .select('orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch')
-        .populate('branch', 'name') 
+        .select(
+          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch'
+        )
+        .populate('branch', 'name storeAddress')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -40,10 +54,12 @@ export const getOrders = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ Error fetching orders:', error.message);
-    res.status(500).json({ error: 'Failed to fetch orders' });
+    console.error('❌ Error fetching orders:', error);
+    res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
   }
 };
+
+
 
 
 
@@ -144,18 +160,11 @@ export const createOrder = async (req, res) => {
       { session }
     );
 
-    // ✅ Populate branch details
-    const populatedOrder = await Order.findById(newOrder[0]._id)
-      .populate({
-        path: 'branch',
-        select: 'name storeAddress', // return only name & address
-      })
-      .lean();
 
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({ message: '✅ Order created', newOrder: populatedOrder });
+    res.status(201).json({ message: '✅ Order created',newOrder});
   } catch (err) {
     await session.abortTransaction();
     session.endSession();

@@ -49,6 +49,7 @@
               <th></th>
               <th>{{ "tr_category_name" | translate }}</th>
               <th>{{ "tr_number_of_products" | translate }}</th>
+              <th>{{ "tr_number_of_items" | translate }}</th>
               <th></th>
             </tr>
           </thead>
@@ -57,16 +58,17 @@
               <td>{{ i + 1 }}</td>
               <td>{{ category.name }}</td>
               <td>{{ category.productsCount }}</td>
+              <td>{{ category.totalItems}}</td>
               <td>
                 <span class="options-menu">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
-                    <div
+                    <!-- <div
                       class="single-option"
                       (click)="createOrEditcategory(true, category)"
                     >
                       {{ "tr_action.edit" | translate }}
-                    </div>
+                    </div> -->
                     <div class="border-bottom"></div>
                     <div
                       class="single-option"

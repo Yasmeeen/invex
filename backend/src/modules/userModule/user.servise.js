@@ -89,17 +89,19 @@ export const createUser = async (req, res) => {
         return res.status(404).json({ error: 'Branch not found' });
       }
     }
-
+  
     const createdUser = await User.create({
       name,
       email,
       password,
       role,
-      branch: branch ? branch._id : null,
+      branch: {
+        _id: branch._id,
+        name: branch.name,
+        storeAddress: branch.storeAddress
+      },
     });
 
-    console.log("createdUser",createdUser);
-    
     const populatedUser = await createdUser.populate('branch', 'name -_id');
     const formattedUser = {
       ...populatedUser.toObject(),
@@ -166,7 +168,6 @@ export const deleteUser = async (req, res) => {
 };
 // Login user
 export const loginUser = async (req, res) => {
-
   try {
     const { email, password } = req.body;
 
@@ -174,24 +175,44 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // Just for debugging
-    const user = await User.findOne({ email });
+    // ✅ Include storeAddress in populated fields
+    const user = await User.findOne({ email }).populate("branch", "name _id storeAddress");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // (await bcrypt.compare(password,user.password))
+    // ⚠️ Replace with bcrypt.compare in production
     if (user.password !== password) {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    res.json({ message: "Login successful", user });
+    // ✅ Format response with branch details
+    const formattedUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      locale: user.locale,
+      branch: user.branch
+        ? {
+            _id: user.branch._id,
+            name: user.branch.name,
+            storeAddress: user.branch.storeAddress,
+          }
+        : null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    res.json({ message: "✅ Login successful", user: formattedUser });
   } catch (error) {
     console.error("❌ Login error:", error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Server error", details: error.message });
   }
 };
+
+
 
 // Logout user
 export const logoutUser = async (req, res) => {

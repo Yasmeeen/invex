@@ -45,12 +45,10 @@ export class AddOrderComponent implements OnInit {
     private productsSerivce: ProductsSerivce,
     private ordersSerivce: OrdersSerivce,
     private appNotificationService: AppNotificationService,
-    private globals:Globals
+    public globals:Globals
   ) {}
 
   ngOnInit(): void {
-    console.log(this.globals.currentUser.branch);
-    
     this.getProducts();
   }
 
@@ -95,8 +93,6 @@ export class AddOrderComponent implements OnInit {
 
   // Submit form to backend
   submitForm(): void {
-    console.log("orderProducts",this.orderProducts);
-    
     const product_ids: string[] = ([] as string[]).concat(
       ...this.orderProducts.map((p) => Array(p.quantity).fill(p._id))
     );
@@ -108,15 +104,18 @@ export class AddOrderComponent implements OnInit {
       clientAddress: this.order.clientAddress,
       sellerName: this.order.sellerName,
       products: this.orderProducts,
-      branch: this.globals.currentUser.branch
+      branch: this.globals.currentUser.branch._id
     };
 
     this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {
 
       this.createdOrder = response.newOrder[0];    
+      setTimeout(() => {
+        this.printInvoice();
+      }, 0);
       this.appNotificationService.push('Created Successfully', 'success');
-      // this.closeModal(true)
-      this.printInvoice(); // auto print after submit
+   
+
     }, error=> {
       console.log(error.error);
       this.appNotificationService.push(error.error.details, 'error');
@@ -131,6 +130,7 @@ export class AddOrderComponent implements OnInit {
 
   // Print invoice
   printInvoice() {
-    window.print()
+    window.print();
+    this.closeModal(true)
   }
 }

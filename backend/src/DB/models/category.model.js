@@ -4,6 +4,9 @@ const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   productsCount: {
     type: Number, required: true
+  },
+  totalItems: {
+    type: Number, required: true
   }
 }, { timestamps: true });
 

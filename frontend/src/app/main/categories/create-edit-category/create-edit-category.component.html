@@ -24,14 +24,14 @@
                     <div
                       class="form-group"
                       [class.has-error]="
-                        branchName.invalid && categoryForm.submitted
+                        categoryName.invalid && categoryForm.submitted
                       "
                     >
                       <label for="">
                         {{ "tr_category_name" | translate }}
                       </label>
                       <input
-                        #branchName="ngModel"
+                        #categoryName="ngModel"
                         type="text"
                         class="s-control"
                         name="name"
@@ -40,7 +40,7 @@
                       />
                       <span
                         class="text-error size-small validator"
-                        *ngIf="branchName.invalid && categoryForm.submitted"
+                        *ngIf="categoryName.invalid && categoryForm.submitted"
                       >
                         {{ "tr_category_name_required" | translate }}
                       </span>

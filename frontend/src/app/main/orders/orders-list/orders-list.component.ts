@@ -64,6 +64,7 @@ export class OrdersListComponent implements OnInit {
   ngOnInit(): void {
     this.getOrders();
   }
+
   getOrders() {
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
@@ -80,7 +81,6 @@ export class OrdersListComponent implements OnInit {
       }
     }))
   }
-
 
 
   filterorders(term: any, searchKey: string) {

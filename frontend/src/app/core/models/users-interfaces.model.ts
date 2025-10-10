@@ -38,7 +38,7 @@ export class UserDetailsLogin  {
 
 export interface CurrentUser {
   _id: string;
-  branch: string;
+  branch: Branch;
   createdAt?:string;
   email: string
   locale?: string

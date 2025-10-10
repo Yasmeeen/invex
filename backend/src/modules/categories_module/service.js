@@ -3,7 +3,6 @@ import Product from '../../DB/models/product.model.js';
 // Get all categories with pagination and search
 
 export const getCategories = async (req, res) => {
-  
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const skip = (page - 1) * limit;
@@ -18,13 +17,20 @@ export const getCategories = async (req, res) => {
 
     const total = await Category.countDocuments(query);
 
-    // ✅ Add product count for each category
+    // ✅ Add product count and total items for each category
     const categoriesWithCount = await Promise.all(
       categories.map(async (category) => {
-        const count = await Product.countDocuments({ category: category._id });
+        const products = await Product.find({ category: category._id });
+
+        const productsCount = products.length;
+
+        // Total items = sum of stock of all products in this category
+        const totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
+
         return {
           ...category.toObject(),
-          productsCount: count,
+          productsCount,
+          totalItems,
         };
       })
     );
@@ -43,6 +49,7 @@ export const getCategories = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 
 // Get category by ID

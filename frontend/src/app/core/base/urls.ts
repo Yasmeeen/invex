@@ -1,6 +1,8 @@
 import { environment } from "src/environments/environment";
 
-export const BASE_URL = environment.production? '' : 'http://localhost:3000';
+// export const BASE_URL = environment.production? '' : 'http://localhost:3000';
+export const BASE_URL = environment.production? '' : 'http://ec2-16-171-200-140.eu-north-1.compute.amazonaws.com:3000';
+
 
 
 export const USER_LOGIN_URL = BASE_URL + '/api/users/login';

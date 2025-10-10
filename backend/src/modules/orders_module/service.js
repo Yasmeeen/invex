@@ -8,52 +8,59 @@ export const getOrders = async (req, res) => {
     const { page = 1, limit = 10, search = '', searchBranch = '' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    // build query safely
     const query = {};
+
+    // ✅ 1. Search by order number, client name, or phone number
     if (search) {
       const isNumber = !isNaN(search);
       query.$or = [
         { clientName: { $regex: search, $options: 'i' } },
         { clientPhoneNumber: { $regex: search, $options: 'i' } },
       ];
-      if (isNumber) {
-        // only include orderNumber if search is numeric
-        query.$or.push({ orderNumber: Number(search) });
-      }
 
-      if (searchBranch) {
-        const branch = await Branch.findOne({
-          name: { $regex: searchBranch, $options: 'i' },
-        });
-  
-        if (branch) {
-          query.branch = branch._id;
-        } else {
-          // No branch matches → return empty
-          return res.json({
-            orders: [],
-            meta: {
-              currentPage: Number(page),
-              totalCount: 0,
-              totalPages: 0,
-            },
-          });
-        }
+      if (isNumber) {
+        query.$or.push({ orderNumber: Number(search) });
       }
     }
 
+    // ✅ 2. Search by branch name (works independently)
+    if (searchBranch) {
+      const branch = await Branch.findOne({
+        name: { $regex: searchBranch, $options: 'i' },
+      });
+
+      if (branch) {
+        query.branch = branch._id;
+      } else {
+        // No branch found → return empty
+        return res.json({
+          orders: [],
+          meta: {
+            currentPage: Number(page),
+            totalCount: 0,
+            totalPages: 0,
+          },
+        });
+      }
+    }
+
+    // ✅ 3. Fetch orders
     const [orders, total] = await Promise.all([
       Order.find(query)
-        .select('orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch')
+        .select(
+          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch'
+        )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
+
       Order.countDocuments(query),
     ]);
 
     const totalPages = Math.ceil(total / limit);
 
+    // ✅ 4. Respond
     res.json({
       orders,
       meta: {

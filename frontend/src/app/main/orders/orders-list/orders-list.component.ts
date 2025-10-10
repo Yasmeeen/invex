@@ -84,10 +84,12 @@ export class OrdersListComponent implements OnInit {
 
 
   filterorders(term: any, searchKey: string) {
+    console.log("term",term, );
+    
     clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
       term = (searchKey == 'by_category_id') ? term : term.target.value.trim()
-      this.params['search'] = term;
+      this.params[searchKey] = term;
       this.params.page = 1;
       this.getOrders();
     }, 500);

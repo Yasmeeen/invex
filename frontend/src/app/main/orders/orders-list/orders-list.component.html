@@ -22,13 +22,25 @@
     <div class="row">
       <div class="col-md-3">
         <div class="form-group mb-0">
-          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+          <label>{{ "tr_order_number" | translate }}/{{ "tr_phone_number" | translate }}</label>
           <div class="input-with-icon bg-white width-100">
             <input
               class="s-control"
-              (keyup)="filterorders($event, 'searchTerm')"
+              (keyup)="filterorders($event, 'search')"
               placeholder="{{ 'tr_search' | translate }}"
               [(ngModel)]="nameSearchTerm"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ "tr_branch" | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              (keyup)="filterorders($event, 'searchBranch')"
+              placeholder="{{ 'tr_search' | translate }}"
             />
           </div>
         </div>
@@ -48,6 +60,7 @@
             <tr>
               <th>{{ "tr_order_number" | translate }}</th>
               <th>{{ "tr_client_name" | translate }}</th>
+              <th> {{"tr_phone_number" | translate}}</th>
               <th>{{ "tr_branch" | translate }}</th>
               <th>{{ "tr_number_of_products" | translate }}</th>
               <th>{{ "tr_price" | translate }}</th>
@@ -58,6 +71,7 @@
             <tr *ngFor="let order of ordersList">
               <td>{{ order.orderNumber }}</td>
               <td>{{ order.clientName }}</td>
+              <td>{{ order.clientPhoneNumber}}</td>
               <td>{{ order.branch?.name }}</td>
               <td>{{ order.numberOfProducts }}</td>
               <td>{{ order.totalPrice }}</td>

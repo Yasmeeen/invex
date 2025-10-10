@@ -1,40 +1,51 @@
 import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
-
+import Branch from '../../DB/models/branch.model.js';
 import mongoose from 'mongoose';
 
 export const getOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = '', searchBranch = '' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    const searchRegex = new RegExp(search, 'i');
 
-    let query = {};
-
+    // build query safely
+    const query = {};
     if (search) {
+      const isNumber = !isNaN(search);
       query.$or = [
-        { clientName: { $regex: searchRegex } },
-        { clientPhoneNumber: { $regex: searchRegex } },
-        { orderNumber: { $regex: searchRegex } },
+        { clientName: { $regex: search, $options: 'i' } },
+        { clientPhoneNumber: { $regex: search, $options: 'i' } },
       ];
+      if (isNumber) {
+        // only include orderNumber if search is numeric
+        query.$or.push({ orderNumber: Number(search) });
+      }
 
-      // ✅ Search branches by name
-      const matchedBranches = await Branch.find({
-        name: { $regex: searchRegex },
-      }).select('_id');
-
-      if (matchedBranches.length > 0) {
-        const branchIds = matchedBranches.map((b) => b._id);
-        query.$or.push({ branch: { $in: branchIds } });
+      if (searchBranch) {
+        const branch = await Branch.findOne({
+          name: { $regex: searchBranch, $options: 'i' },
+        });
+  
+        if (branch) {
+          query.branch = branch._id;
+        } else {
+          // No branch matches → return empty
+          return res.json({
+            orders: [],
+            meta: {
+              currentPage: Number(page),
+              totalCount: 0,
+              totalPages: 0,
+            },
+          });
+        }
       }
     }
 
     const [orders, total] = await Promise.all([
       Order.find(query)
-        .select(
-          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch'
-        )
-        .populate('branch', 'name storeAddress')
+        .select('orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch')
+        .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -55,7 +66,7 @@ export const getOrders = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching orders:', error);
-    res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch orders' });
   }
 };
 

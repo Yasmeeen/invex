@@ -33,7 +33,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-3" *ngIf="curentUser.role == 'Super Admin'">
         <div class="form-group mb-0">
           <label>{{ "tr_branch" | translate }}</label>
           <div class="input-with-icon bg-white width-100">
@@ -103,14 +103,6 @@
           alt=""
         />
         <p>{{ "tr_empty_state" | translate }}</p>
-      </div>
-
-      <div
-        class="empty-state-here text-center ptb-8"
-        *ngIf="ordersList.length == 0"
-      >
-        <i class="fas fa-box-open empty-icon"></i>
-        <p class="empty-text">{{ "tr_no_items_found" | translate }}</p>
       </div>
 
       <div class="plr-4 ptb-4">

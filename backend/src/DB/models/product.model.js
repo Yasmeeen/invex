@@ -18,6 +18,11 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    netPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
     stock: {
       type: Number,
       required: true,

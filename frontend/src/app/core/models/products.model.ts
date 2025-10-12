@@ -8,6 +8,7 @@ export interface Product {
   code: string;
   stock: number;
   price: number;
+  netPrice: number;
   discount: number;
 }
 export interface Category {

@@ -83,7 +83,7 @@
                       class="form-group"
                       [class.has-error]="price.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ 'tr_price' | translate }}</label>
+                      <label>{{ 'tr_sell_price' | translate }}</label>
                       <input
                         type="number"
                         class="s-control"
@@ -95,6 +95,29 @@
                       <span
                         class="text-error size-small validator"
                         *ngIf="price.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_price_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_net_price' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="netPrice"
+                        #netPrice="ngModel"
+                        ngModel
+                        required
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="netPrice.invalid && basicInfoForm.submitted"
                       >
                         {{ 'tr_price_required' | translate }}
                       </span>

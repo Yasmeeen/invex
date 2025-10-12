@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AdminSidebar,Employee } from '@shared/resources';
 import { Globals } from 'src/app/core/globals';
+import { environment } from 'src/environments/environment.prod';
 
 @Component({
   selector: 'app-sidebar',
@@ -14,6 +15,7 @@ export class SidebarComponent implements OnInit {
   currentUserType:any;
   levelName = '';
   user: any = [{}];
+  storeName = environment.storeName;
   constructor(
       public globals: Globals,
       private authenticationService: AuthenticationService

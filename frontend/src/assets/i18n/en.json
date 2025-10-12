@@ -325,7 +325,9 @@
     "tr_employees_salary": "Employees Salary",
     "tr_branch_invoices": "Branch Invoices",
     "tr_expenses": "Expenses",
-    "tr_new_branch": "New Branch"
+    "tr_new_branch": "New Branch",
+    "tr_sell_price": "Selling Price",
+    "tr_net_price": "Net Price"
 
 
 }

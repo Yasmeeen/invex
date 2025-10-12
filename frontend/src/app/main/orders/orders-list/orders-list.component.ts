@@ -13,6 +13,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { Order } from '@core/models/products.model';
 import { AddOrderComponent } from '../add-order/add-order.component';
+import { AuthenticationService } from '@core/services/authentication.service';
 
 @Component({
   selector: 'app-orders-list',
@@ -48,6 +49,7 @@ export class OrdersListComponent implements OnInit {
   nameSearchTerm: string
   numberSearchTerm: string
   nationalId: string
+  curentUser:any;
 
   private subscriptions: Subscription[] = [];
 
@@ -57,7 +59,8 @@ export class OrdersListComponent implements OnInit {
     private translateService: TranslateService,
     private globals: Globals,
     private dialog: MatDialog,
-    private CategoriesServce: CategoriesServce
+    private CategoriesServce: CategoriesServce,
+    private authenticationService: AuthenticationService
   ) { }
 
 
@@ -66,6 +69,10 @@ export class OrdersListComponent implements OnInit {
   }
 
   getOrders() {
+   this.curentUser = this.authenticationService.getUserFromLocalStorage();
+   if( this.curentUser.role == 'Employee'){
+    this.params.searchBranch = this.curentUser.branch?.name
+   }
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
       this.ordersList = response.orders
@@ -84,8 +91,6 @@ export class OrdersListComponent implements OnInit {
 
 
   filterorders(term: any, searchKey: string) {
-    console.log("term",term, );
-    
     clearTimeout(this.searchTimeout);
     this.searchTimeout = setTimeout(() => {
       term = (searchKey == 'by_category_id') ? term : term.target.value.trim()

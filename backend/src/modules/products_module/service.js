@@ -62,12 +62,10 @@ export const getProductById = async (req, res) => {
 
 // Create a new product
 export const createProduct = async (req, res) => {
-  console.log("eq.body",req.body);
-  
   try {
-    const { name, code, price, category, branch,stock,discount } = req.body;
+    const { name, code, price,netPrice, category, branch,stock,discount } = req.body;
 
-    if (!name || !code || !price || !category._id || !branch._id || !stock) {
+    if (!name || !code || !price || !netPrice || !category._id || !branch._id || !stock) {
       return res.status(400).json({ error: 'All fields are required' });
     }
     const isProductCodeExist = await Product.findOne({ code });
@@ -78,6 +76,7 @@ export const createProduct = async (req, res) => {
       name,
       code,
       price,
+      netPrice,
       stock,
       discount,
       category: category._id,
@@ -95,15 +94,15 @@ export const createProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, category, branch,stock,discount } = req.body;
+    const { name, code, price, netPrice, category, branch,stock,discount } = req.body;
 
-    if (!name || !code || !price || !category || !branch || !stock || !discount) {
+    if (!name || !code || !price || !netPrice, !category || !branch || !stock || !discount) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, code, price, category, branch, stock, discount },
+      { name, code, price, netPrice, category, branch, stock, discount },
       { new: true }
     );
 

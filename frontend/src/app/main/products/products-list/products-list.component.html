@@ -52,7 +52,8 @@
               <th>{{ "tr_code" | translate }}</th>
               <th>{{ "tr_category" | translate }}</th>
               <th>{{ "tr_stock" | translate }}</th>
-              <th>{{ "tr_price" | translate }}</th>
+              <th>{{ "tr_sell_price" | translate }}</th>
+              <th>{{ "tr_net_price" | translate }}</th>
               <th>{{ "tr_discount" | translate }}</th>
               <th></th>
             </tr>
@@ -66,6 +67,7 @@
               <td>{{ product.category?.name }}</td>
               <td>{{ product.stock }}</td>
               <td>{{ product.price }}</td>
+              <td>{{ product.netPrice }}</td>
               <td>{{ product.discount }}</td>
               <td>
                 <span class="options-menu">

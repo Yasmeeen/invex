@@ -42,7 +42,7 @@ export class LanguageSwitcherComponent implements OnInit {
         this.userService.updateUser(this.currentUser._id, params).subscribe((response: any) => {
             this.translate.use(this.selectedLanguage);
             this.globals.updateUserLanguage.next(this.selectedLanguage);
-            this.globals.currentUser = response.user; // ✅ changed from [0] to direct object
+            this.globals.currentUser.locale = this.selectedLanguage; // ✅ changed from [0] to direct object
             localStorage.setItem('currentUser', JSON.stringify(this.globals.currentUser));
             document.querySelector('body')?.setAttribute('dir', this.selectedLanguage === 'ar' ? 'rtl' : 'ltr');
             location.reload();

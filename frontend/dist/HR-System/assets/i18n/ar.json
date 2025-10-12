@@ -318,5 +318,7 @@
   "tr_rent": "الإيجار",
   "tr_employees_salary": "رواتب الموظفين",
   "tr_branch_invoices": "فواتير الفرع",
-  "tr_expenses": "المصروفات"
+  "tr_expenses": "المصروفات",
+  "tr_sell_price": "سعر البيع",
+  "tr_net_price": "السعر الصافي"
 }

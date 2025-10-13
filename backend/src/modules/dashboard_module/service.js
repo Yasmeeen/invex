@@ -1,18 +1,23 @@
 import Order from '../../DB/models/order.model.js';
+import Category from "../../DB/models/category.model.js";
 import mongoose from 'mongoose';
+import Product from '../../DB/models/product.model.js';
+
 
 export const getOrdersStatstics = async (req, res) => {
   try {
     const { from, to, branch } = req.query;
-
-    // 1️⃣ Build query filters
     const filters = {};
 
-    // Date filter
+    // ✅ Convert query strings to Date objects
     if (from || to) {
       filters.createdAt = {};
       if (from) filters.createdAt.$gte = new Date(from);
-      if (to) filters.createdAt.$lte = new Date(to);
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999); // include whole day
+        filters.createdAt.$lte = toDate;
+      }
     }
 
     // Branch filter (optional)
@@ -20,10 +25,9 @@ export const getOrdersStatstics = async (req, res) => {
       filters.branch = branch;
     }
 
-    // 2️⃣ Get all matching orders
+    // 2️⃣ Fetch matching orders
     const orders = await Order.find(filters).populate('products');
 
-    // 3️⃣ Calculate totals
     let totalSales = 0;
     let totalNetCost = 0;
 
@@ -37,17 +41,146 @@ export const getOrdersStatstics = async (req, res) => {
     const netProfit = totalSales - totalNetCost;
     const totalInvoices = orders.length;
 
-    // 4️⃣ Response
     return res.json({
-      totalSales,      // إجمالي المبيعات
-      netProfit,       // صافي الأرباح
-      totalInvoices,   // عدد الفواتير
+      totalSales,
+      netProfit,
+      totalInvoices,
       branch: branch || 'All Branches',
       from: from || null,
       to: to || null,
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching order stats:', error);
     res.status(500).json({ error: 'Failed to load dashboard stats' });
   }
 };
+
+export const getInvoicesPerMonth = async (req, res) => {
+  try {
+    const { branchId, year } = req.query;
+
+    // Default to current year if not provided
+    const selectedYear = year ? Number(year) : new Date().getFullYear();
+
+    // Build filter
+    const filter = {
+      createdAt: {
+        $gte: new Date(`${selectedYear}-01-01T00:00:00Z`),
+        $lte: new Date(`${selectedYear}-12-31T23:59:59Z`)
+      }
+    };
+
+    if (branchId) {
+      filter.branch = branchId;
+    }
+
+    // Aggregate invoices per month
+    const stats = await Order.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          totalInvoices: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id": 1 } }
+    ]);
+
+    // Initialize all 12 months (in case some months have 0 invoices)
+    const monthlyCounts = Array(12).fill(0);
+    stats.forEach(item => {
+      monthlyCounts[item._id - 1] = item.totalInvoices;
+    });
+
+    res.status(200).json({
+      year: selectedYear,
+      monthlyCounts, // array of 12 values
+    });
+
+  } catch (error) {
+    console.error("Error fetching invoices per month:", error);
+    res.status(500).json({ error: "Failed to fetch invoices per month" });
+  }
+};
+
+
+export const getCategoriesStatistics = async (req, res) => {
+  try {
+    const categories = await Category.find()
+      .select("name productsCount totalItems")
+      .sort({ name: 1 });
+
+    const stats = await Promise.all(
+      categories.map(async (category) => {
+        // if totalItems and productsCount already stored in DB, use them
+        // otherwise, calculate from Product model
+        let productsCount = category.productsCount || 0;
+        let totalItems = category.totalItems || 0;
+
+        // If the stored values are missing, calculate dynamically
+        if (!productsCount || !totalItems) {
+          const products = await Product.find({ category: category._id });
+          productsCount = products.length;
+          totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
+        }
+
+        return {
+          categoryName: category.name,
+          productsCount,
+          totalItems,
+        };
+      })
+    );
+
+    res.status(200).json({ stats });
+  } catch (error) {
+    console.error("❌ Error fetching category stats:", error);
+    res.status(500).json({ error: "Failed to fetch category stats" });
+  }
+};
+
+export const getOrdersStatisticsByStatus = async (req, res) => {
+  try {
+    const { branch } = req.query;
+    const filters = {};
+
+    // Optional filter by branch
+    if (branch && mongoose.Types.ObjectId.isValid(branch)) {
+      filters.branch = branch;
+    }
+
+    // Group by status
+    const stats = await Order.aggregate([
+      { $match: filters },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Format for Highcharts
+    const formatted = [
+      { name: "Completed", y: 0 },
+      { name: "Restored", y: 0 },
+    ];
+
+    stats.forEach((item) => {
+      const key = item._id.charAt(0).toUpperCase() + item._id.slice(1);
+      const target = formatted.find((f) => f.name === key);
+      if (target) target.y = item.count;
+    });
+
+    res.status(200).json({ stats: formatted });
+  } catch (error) {
+    console.error("❌ Error fetching order stats:", error);
+    res.status(500).json({ error: "Failed to fetch order stats" });
+  }
+};
+
+
+
+
+
+

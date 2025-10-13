@@ -26,6 +26,12 @@ getOrder(orderId: any) {
 createOrder(params: any) {
   return this.http.post(ORDER_CREATE_URL, params);
 }
+
+restoreOrder(params: any, order:Order){
+  return this.http.put(ORDERS_URL+`/restore`,params);
+} 
+
+
 updateOrder(order:any): Observable<Order> {
   return this.http.put<Order>(ORDER_UPDATE_URL, order).pipe(
     tap({

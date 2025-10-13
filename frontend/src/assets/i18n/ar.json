@@ -106,7 +106,8 @@
     "assign_to_classes": "تعيين للفصول",
     "hide-grades": "اخفاء الدرجات",
     "copy": "Copy*",
-    "create_album": "إنشاء ألبوم"
+    "create_album": "إنشاء ألبوم",
+    "restore":"استرجاع"
   },
   "tr_no_items_found": "لا يوجد ملف",
   "tr_select": "اختر",
@@ -259,7 +260,7 @@
   "tr_inventory": "المخزون",
   "tr_active_inactive_users": "المستخدمون النشطون مقابل غير النشطين",
   "tr_stock_status": "متوفر مقابل غير متوفر",
-  "tr_order_status": "قيد الانتظار / مكتمل / ملغي",
+  "tr_order_status": "مكتمل / مسترجع",
   "tr_invoice_stats": "الفواتير اليومية / الشهرية",
   "tr_category_distribution": "توزيع الفئات",
   "tr_stock_distribution": "توزيع المخزون",
@@ -325,6 +326,11 @@
   "tr_today": "اليوم",
   "tr_total_amount": "إجمالي المبيعات",
   "tr_net_profit": "صافي الأرباح",
-  "sales_summary": "ملخص المبيعات"
+  "sales_summary": "ملخص المبيعات",
+  "tr_payment_method": "طريقة الدفع",
+  "tr_payment_method_required": "طريقة الدفع مطلوبة",
+  "tr_cash": "نقدي",
+  "tr_online": "إلكتروني",
+  "tr_optional": "خياري"
 
 }

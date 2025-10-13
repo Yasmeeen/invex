@@ -48,7 +48,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status createdAt branch'
+          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status paymentMethod createdAt branch'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -106,15 +106,16 @@ export const createOrder = async (req, res) => {
       clientPhoneNumber,
       sellerName,
       clientAddress,
+      paymentMethod,
       branch,
       products,
       status,
     } = req.body;
 
-    if (!clientName || !clientPhoneNumber || !sellerName || !clientAddress ) {
+    if (!clientName || !clientPhoneNumber || !paymentMethod || !clientAddress ) {
       return res.status(400).json({
         error:
-          'clientName, clientPhoneNumber, sellerName, and clientAddress are required',
+          'clientName, clientPhoneNumber, paymentMethod, sellerName, and clientAddress are required',
       });
     }
 
@@ -167,6 +168,7 @@ export const createOrder = async (req, res) => {
           clientName,
           clientPhoneNumber,
           sellerName,
+          paymentMethod,
           clientAddress,
           branch,
           products: productIds,
@@ -245,6 +247,54 @@ export const updateOrder = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+export const restoreOrder = async (req, res) => {
+  try {
+    console.log('🧾 req.body:', req.body);
+    const { orderId } = req.body; // instead of req.params
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' });
+    }
+
+    const deletedOrder = await DeletedOrder.findById(orderId);
+    if (!deletedOrder) {
+      return res.status(404).json({ error: 'Deleted order not found' });
+    }
+
+    const totalAmount = deletedOrder.products.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+    const restoredOrder = new Order({
+      clientName: deletedOrder.clientName,
+      branchId: deletedOrder.branchId,
+      paymentMethod: deletedOrder.paymentMethod,
+      products: deletedOrder.products.map((p) => ({
+        productId: p.productId,
+        quantity: p.quantity,
+        price: p.price,
+        subtotal: p.price * p.quantity,
+      })),
+      totalAmount,
+      createdAt: deletedOrder.createdAt || new Date(),
+    });
+
+    await restoredOrder.save();
+    await DeletedOrder.findByIdAndDelete(orderId);
+
+    res.status(200).json({
+      message: 'Order restored successfully',
+      restoredOrder,
+    });
+  } catch (error) {
+    console.error('Error restoring order:', error);
+    res.status(500).json({ error: 'Failed to restore order' });
+  }
+};
+
+
+
 
 export const deleteOrder = async (req, res) => {
   try {
@@ -259,4 +309,6 @@ export const deleteOrder = async (req, res) => {
     console.error('❌ Error deleting order:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
+
+  
 };

@@ -105,7 +105,7 @@
       "hide-grades":"Hide-Grades",
       "copy": "Copy",
       "create_album": "Create Album",
-      "Restore":"Restore"
+      "restore":"Restore"
     },
     "tr_no_items_found":"No Items Found",
     "tr_select":"Select"   ,
@@ -277,7 +277,7 @@
     "tr_last_7_days": "Last 7 days",
     "tr_active_inactive_users": "Active vs Inactive Users",
     "tr_stock_status": "In Stock vs Out of Stock",
-    "tr_order_status": "Pending / Completed / Cancelled",
+    "tr_order_status": "Completed / Restored",
     "tr_invoice_stats": "Daily / Monthly Invoices",
     "tr_category_distribution": "Category Distribution",
     "tr_stock_distribution": "Stock Distribution",
@@ -332,6 +332,12 @@
     "tr_today": "Today",
     "tr_total_amount": "Total Amount",
     "tr_net_profit": "Net Profit",
-    "sales_summary": "Sales Summary"
+    "sales_summary": "Sales Summary",
+    "tr_payment_method": "Payment Method",
+    "tr_payment_method_required": "Payment method is required",
+    "tr_cash": "Cash",
+    "tr_online": "Online",
+    "tr_optional": "Optional",
+    "tr_invoices":"Invoices"
 
 }

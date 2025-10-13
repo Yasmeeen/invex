@@ -3,12 +3,16 @@ import { OnInit } from "@angular/core";
 import { Component } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { MatDialogRef } from "@angular/material/dialog";
-import { Order, Product, productOrder } from "@core/models/products.model";
+import { Branch, Order, Product, productOrder } from "@core/models/products.model";
 import { ProductsSerivce } from "@shared/services/products.service copy";
 import { OrdersSerivce } from "@shared/services/orders.service";
 import { AppNotificationService } from "@shared/services/app-notification.service";
 import { Globals } from "@core/globals";
 import { environment } from "src/environments/environment";
+import { BranchesServce } from "@shared/services/branches.service";
+import { Subscription } from "rxjs";
+import { TranslateService } from "@ngx-translate/core";
+import { AuthenticationService } from "@core/services/authentication.service";
 
 @Component({
   selector: "app-add-order",
@@ -19,13 +23,27 @@ export class AddOrderComponent implements OnInit {
 
   todayDate = new Date();
   createdOrder:any;
+  branches: Branch [] = [];
+  adminSelectedBranchId: string;
   storeName = environment.storeName
   storePhoneNumber =  environment.storePhoneNumber
+  paymentMethods = [
+    {
+     name: this.translateService.instant('tr_cash'),
+     value: 'cash' 
+    },
+    {
+      name: this.translateService.instant('tr_online'),
+      value: 'online' 
+     }
+  ]
+  curentUser: any;
   order: Order = {
     clientName: '',
     clientPhoneNumber: '',
     clientAddress:'',
-    sellerName:''
+    sellerName:'',
+    paymentMethod:''
   } 
 
   // 🔹 Order products
@@ -38,6 +56,7 @@ export class AddOrderComponent implements OnInit {
 
   // 🔹 Product list for select
   products: Product[] = [];
+  private subscriptions: Subscription[] = [];
 
   constructor(
     private http: HttpClient,
@@ -45,10 +64,18 @@ export class AddOrderComponent implements OnInit {
     private productsSerivce: ProductsSerivce,
     private ordersSerivce: OrdersSerivce,
     private appNotificationService: AppNotificationService,
-    public globals:Globals
+    private branchesServce: BranchesServce,
+    private translateService: TranslateService,
+    public globals:Globals,
+    private authenticationService: AuthenticationService
   ) {}
 
   ngOnInit(): void {
+    this.curentUser = this.authenticationService.getUserFromLocalStorage();
+    if( this.curentUser.role == 'Super Admin'){
+      this.getBranches();
+    }
+
     this.getProducts();
   }
 
@@ -59,7 +86,18 @@ export class AddOrderComponent implements OnInit {
     });
   }
 
+  getBranches() {
+    let params = {
+      'page': 1,
+     'per_page': 1000
+    }
+    this.subscriptions.push(this.branchesServce.getBranchs(params).subscribe((response: any) => {
+      this.branches = response.branches
+    },(error:any)=> {
 
+      this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
+    }))
+  }
 
 
   getOrderProductPrice(product:productOrder){
@@ -96,6 +134,10 @@ export class AddOrderComponent implements OnInit {
     const product_ids: string[] = ([] as string[]).concat(
       ...this.orderProducts.map((p) => Array(p.quantity).fill(p._id))
     );
+    console.log(this.order.paymentMethod,"AdminSelectedBranch",this.adminSelectedBranchId);
+    
+
+    let selectedBranchId = this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id
  
 
     const orderPayload = {
@@ -104,7 +146,8 @@ export class AddOrderComponent implements OnInit {
       clientAddress: this.order.clientAddress,
       sellerName: this.order.sellerName,
       products: this.orderProducts,
-      branch: this.globals.currentUser.branch._id
+      paymentMethod: this.order.paymentMethod,
+      branch: selectedBranchId
     };
 
     this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {

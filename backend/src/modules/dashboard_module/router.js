@@ -1,11 +1,17 @@
 import express from 'express';
 const router = express.Router();
 import {
-    getOrdersStatstics
+    getOrdersStatstics,
+    getInvoicesPerMonth,
+    getCategoriesStatistics,
+    getOrdersStatisticsByStatus
   } from './service.js';
   
 
-router.get('/getOrdersStatstics', getOrdersStatstics);              // GET all with pagination/search
+router.get('/getOrdersStatstics', getOrdersStatstics);  
+router.get('/invoicesPerMonth', getInvoicesPerMonth);  // GET all with pagination/search
+router.get('/categoriesStats', getCategoriesStatistics);  // GET all with pagination/search
+router.get('/getOrdersStatusStats', getOrdersStatisticsByStatus);
 
 
 export default router; 

@@ -3,6 +3,8 @@
   not-authorized
   [notAuthorized]="isNotAuthorized"
 >
+
+
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ "tr_orders" | translate }}</span>
     <div class="btn-group">
@@ -17,6 +19,90 @@
       </button>
     </div>
   </h2>
+
+  <div class="filters-card bg-secondary mtb-2 plr-4 ptb-4" *ngIf="isFilterOpen">
+    <div >
+  
+      <div class="row">
+        <div class="form-group col-md-3">
+          <label for="">{{'tr_from' | translate}}</label>
+          <div class="input-with-icon">
+              <input [(ngModel)]="fromDate"  (dateChange)="getOrderStatistics()"
+                  placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId" class="s-control bg-white">
+              <mat-datepicker #pickId></mat-datepicker>
+              <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
+              </mat-datepicker-toggle>
+          </div>
+      </div>
+      <div class="form-group col-md-3">
+          <label for="">{{'tr_to' | translate}}</label>
+          <div class="input-with-icon">
+              <input [(ngModel)]="toDate"
+                  placeholder="{{'tr_pick_date' | translate}}" [matDatepicker]="pickId2" class="s-control bg-white" (dateChange)="getOrderStatistics()">
+              <mat-datepicker #pickId2></mat-datepicker>
+              <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId2">
+              </mat-datepicker-toggle>
+          </div>
+      </div>
+      <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin'">
+        <div
+          class="form-group"
+        >
+          <label>{{ 'tr_branches' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="false"
+              [(ngModel)]= "selectedBranchId"
+              #branch="ngModel"
+              name="branchId"
+              [items]="branches"
+              (change)="getOrderStatistics()"
+              required
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="flex flex-middle mt-4">
+          <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
+            <i class="fa fa-users"></i>
+          </div>
+          <div class="ml-2">
+            <a class="hover-link pointer weight-bold" >
+              <span class="text-primary">   {{orderStatistics?.totalInvoices}} </span>
+           
+              {{ 'tr_total_number_of_invoices' | translate }} </a>
+            <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+
+        <div class="flex flex-middle mt-4">
+          <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
+            <i class="fa fa-calendar"></i>
+          </div>
+          <div class="ml-2">
+            <a class="hover-link pointer weight-bold" >
+              <span class="text-primary">   {{orderStatistics?.totalSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }} </span>
+              {{ 'tr_total_amount' | translate}}
+             </a>
+            <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+          </div>
+        </div>
+      </div>
+    
+      </div>
+
+    </div>
+  </div>
 
   <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
     <div class="row">
@@ -64,7 +150,9 @@
               <th>{{ "tr_branch" | translate }}</th>
               <th>{{ "tr_number_of_products" | translate }}</th>
               <th>{{ "tr_price" | translate }}</th>
-              <!-- <th></th> -->
+              <th>{{ "tr_payment_method" | translate}}</th>
+              <th>{{ "tr_status" | translate}}</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -75,19 +163,21 @@
               <td>{{ order.branch?.name }}</td>
               <td>{{ order.numberOfProducts }}</td>
               <td>{{ order.totalPrice }}</td>
-              <!-- <td>
+              <td>{{ order.paymentMethod }}</td>
+              <td>{{ order.status }}</td>
+              <td>
                 <span class="options-menu">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div
                       class="single-option"
-                      (click)="createOrEditOrder(true, order)"
+                      (click)="restoreOrder( order._id!,order)"
                     >
-                      {{ "tr_action.edit" | translate }}
+                      {{ "tr_action.restore" | translate }}
                     </div>
                   </div>
                 </span>
-              </td> -->
+              </td>
             </tr>
           </tbody>
         </table>

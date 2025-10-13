@@ -47,17 +47,77 @@
 
                 <div class="col-md-4">
                   <div class="form-group" [class.has-error]="sellerName.invalid && orderForm.submitted">
-                    <label>{{ 'tr_seller_name' | translate }}</label>
+                    <label>{{ 'tr_seller_name' | translate }} <span class="size_tiny">{{'tr_optional' | translate}}</span> </label>
                     <input
                       type="text"
                       class="s-control"
                       name="sellerName"
                       [(ngModel)]="order.sellerName"
                       #sellerName="ngModel"
-                      required
+          
                     />
                     <span class="text-error size-small validator" *ngIf="sellerName.invalid && orderForm.submitted">
                       {{ 'tr_seller_name_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="paymentMethod.invalid && orderForm.submitted">
+                    <label>{{ 'tr_payment_method' | translate }}</label>
+                    <div class="input-with-icon bg-white">
+                      <ng-select
+                        class="s-control s-select"
+                        placeholder="{{ 'tr_select' | translate }}"
+                        bindLabel="name"
+                        bindValue="value"
+                        [clearable]="false"
+                        [(ngModel)]="order.paymentMethod"
+                        #paymentMethod="ngModel"
+                        name="paymentMethod"
+                        [items]="paymentMethods"
+                        required
+                      >
+                      </ng-select>
+                      <i class="fa fa-caret-down input-icon"></i>
+                    </div>
+
+                    <span class="text-error size-small validator" *ngIf="paymentMethod.invalid && orderForm.submitted">
+                      {{ 'tr_payment_method_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin'">
+                  <div
+                    class="form-group"
+                    [class.has-error]="
+                      branch.invalid && orderForm.submitted
+                    "
+                  >
+                    <label>{{ 'tr_branches' | translate }}</label>
+                    <div class="input-with-icon bg-white">
+                      <ng-select
+                        class="s-control s-select"
+                        placeholder="{{ 'tr_select' | translate }}"
+                        bindLabel="name"
+                        bindValue="_id"
+                        [clearable]="false"
+                        [(ngModel)]= "adminSelectedBranchId"
+                        #branch="ngModel"
+                        name="branchId"
+                        [items]="branches"
+                        required
+                      >
+                      </ng-select>
+                      <i class="fa fa-caret-down input-icon"></i>
+                    </div>
+
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="branch.invalid && orderForm.submitted"
+                    >
+                      {{ 'tr_branch_required' | translate }}
                     </span>
                   </div>
                 </div>

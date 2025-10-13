@@ -14,6 +14,11 @@ const orderSchema = new mongoose.Schema(
     },
     sellerName: {
       type: String,
+      required: false,
+      trim: true,
+    },
+    paymentMethod: {
+      type: String,
       required: true,
       trim: true,
     },
@@ -45,8 +50,8 @@ const orderSchema = new mongoose.Schema(
     ],
     status: {
       type: String,
-      enum: ['pending', 'processing', 'completed', 'cancelled'],
-      default: 'pending',
+      enum: [ 'completed', 'restored'],
+      default: 'completed',
       required: true,
     },
     orderNumber: {

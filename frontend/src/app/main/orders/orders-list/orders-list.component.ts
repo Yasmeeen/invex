@@ -11,9 +11,12 @@ import { Globals } from '@core/globals';
 import { UserSerivce } from '@shared/services/user.service';
 // import { Category, Order } from '@core/models/orders.model';
 import { OrdersSerivce } from '@shared/services/orders.service';
-import { Order } from '@core/models/products.model';
+import { Branch, Order } from '@core/models/products.model';
 import { AddOrderComponent } from '../add-order/add-order.component';
 import { AuthenticationService } from '@core/services/authentication.service';
+import { DashboardService } from '@shared/services/dashboard.service';
+import { orderStatistics } from '@core/models/dashboard.model';
+import { BranchesServce } from '@shared/services/branches.service';
 
 @Component({
   selector: 'app-orders-list',
@@ -50,6 +53,12 @@ export class OrdersListComponent implements OnInit {
   numberSearchTerm: string
   nationalId: string
   curentUser:any;
+  orderStatistics: orderStatistics
+  today:Date = new Date();
+  fromDate: Date =new Date();
+  toDate: Date = new Date();
+  selectedBranchId: string ;
+  branches:Branch[] =[]
 
   private subscriptions: Subscription[] = [];
 
@@ -60,12 +69,25 @@ export class OrdersListComponent implements OnInit {
     private globals: Globals,
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
-    private authenticationService: AuthenticationService
+    private authenticationService: AuthenticationService,
+    private dashboardService: DashboardService,
+    private branchesServce: BranchesServce
   ) { }
 
 
   ngOnInit(): void {
     this.getOrders();
+    this.getOrderStatistics();
+    this.getBranches();
+  }
+  getBranches() {
+    let params = {
+      'page': 1,
+     'per_page': 1000
+    }
+  this.branchesServce.getBranchs(params).subscribe((response: any) => {
+      this.branches = response.branches
+    })
   }
 
   getOrders() {
@@ -113,8 +135,35 @@ export class OrdersListComponent implements OnInit {
   dialogRef.afterClosed().subscribe(event => {
     if(event){
        this.getOrders();
+       this.getOrderStatistics();
     }
   })
+  }
+
+  getOrderStatistics(){
+    let params ={
+      from:  this.fromDate.toLocaleDateString('en-CA'),
+      to:   this.toDate.toLocaleDateString('en-CA'),
+      branch: this.selectedBranchId
+    }
+    if( this.curentUser.role == 'Employee'){
+      this.params.branch = this.curentUser.branch?._id
+     }
+
+    this.dashboardService.getDashboardStats(params).subscribe(res=> {
+      this.orderStatistics = res;  
+    })
+  }
+
+  restoreOrder(orderId: string, order:Order){
+    let params = {
+      orderId: orderId
+    }
+    this.subscriptions.push(this.ordersService.restoreOrder(params,order).subscribe((response: any) => {
+           this.getOrders();
+    },(error:any)=> {
+      this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
+    }))
   }
 
 

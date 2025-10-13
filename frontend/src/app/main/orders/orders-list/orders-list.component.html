@@ -151,6 +151,7 @@
               <th>{{ "tr_number_of_products" | translate }}</th>
               <th>{{ "tr_price" | translate }}</th>
               <th>{{ "tr_payment_method" | translate}}</th>
+              <th>{{ "tr_created_at" | translate}}</th>
               <th>{{ "tr_status" | translate}}</th>
               <th></th>
             </tr>
@@ -164,6 +165,7 @@
               <td>{{ order.numberOfProducts }}</td>
               <td>{{ order.totalPrice }}</td>
               <td>{{ order.paymentMethod }}</td>
+              <td>{{ order.createdAt  | date: 'dd/M/YYYY'}}</td>
               <td>{{ order.status }}</td>
               <td>
                 <span class="options-menu">

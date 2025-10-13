@@ -39,6 +39,7 @@ export interface Order {
   orderNumber?: number;
   paymentMethod?: string;
   status?: string;
+  createdAt?: string;
 }
 export interface productOrder{
   _id?: string;

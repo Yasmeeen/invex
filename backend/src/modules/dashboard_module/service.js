@@ -2,32 +2,38 @@ import Order from '../../DB/models/order.model.js';
 import Category from "../../DB/models/category.model.js";
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
-
+import moment from 'moment-timezone';
 
 export const getOrdersStatstics = async (req, res) => {
   try {
     const { from, to, branch } = req.query;
     const filters = {};
+    const timezone = 'Africa/Cairo';
 
-    // ✅ Convert query strings to Date objects
+    // 🕒 Convert date filters using Egypt local time
     if (from || to) {
       filters.createdAt = {};
-      if (from) filters.createdAt.$gte = new Date(from);
+
+      if (from) {
+        const fromDate = moment.tz(from, 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
+        filters.createdAt.$gte = fromDate;
+      }
+
       if (to) {
-        const toDate = new Date(to);
-        toDate.setHours(23, 59, 59, 999); // include whole day
+        const toDate = moment.tz(to, 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
         filters.createdAt.$lte = toDate;
       }
     }
 
-    // Branch filter (optional)
+    // 🏢 Branch filter (optional)
     if (branch && mongoose.Types.ObjectId.isValid(branch)) {
       filters.branch = branch;
     }
 
-    // 2️⃣ Fetch matching orders
+    // 📦 Fetch matching orders
     const orders = await Order.find(filters).populate('products');
 
+    // 💰 Calculate totals
     let totalSales = 0;
     let totalNetCost = 0;
 
@@ -41,6 +47,7 @@ export const getOrdersStatstics = async (req, res) => {
     const netProfit = totalSales - totalNetCost;
     const totalInvoices = orders.length;
 
+    // ✅ Response
     return res.json({
       totalSales,
       netProfit,
@@ -54,6 +61,7 @@ export const getOrdersStatstics = async (req, res) => {
     res.status(500).json({ error: 'Failed to load dashboard stats' });
   }
 };
+
 
 export const getInvoicesPerMonth = async (req, res) => {
   try {

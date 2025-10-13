@@ -9,11 +9,11 @@ export const  AdminSidebar = [
     routerLink: '/products',
     icon: 'fa fa-list-ul  icon',
   },
-  {
-    name: 'tr_inventory',
-    routerLink: '/inventory',
-    icon: 'fa fa-list-ul  icon',
-  },
+  // {
+  //   name: 'tr_inventory',
+  //   routerLink: '/inventory',
+  //   icon: 'fa fa-list-ul  icon',
+  // },
   {
     name: 'tr_users',
     routerLink: '/users',

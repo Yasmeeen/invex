@@ -327,6 +327,11 @@
     "tr_expenses": "Expenses",
     "tr_sell_price": "Selling Price",
     "tr_net_price": "Net Price",
-    "tr_new_branch": "New Branch"
+    "tr_new_branch": "New Branch",
+    "tr_total_number_of_invoices": "Total Number of Invoices",
+    "tr_today": "Today",
+    "tr_total_amount": "Total Amount",
+    "tr_net_profit": "Net Profit",
+    "sales_summary": "Sales Summary"
 
 }

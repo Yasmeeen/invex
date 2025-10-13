@@ -132,3 +132,28 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete product' });
   }
 };
+
+export const getProductStats = async (req, res) => {
+  try {
+    const { branchId } = req.query;
+    console.log("req.query",req.query);
+ 
+    // Filter only if branchId is provided
+    const filter = branchId ? { branch: branchId } : {};
+
+    // Count stats
+    const totalProducts = await Product.countDocuments(filter);
+    const inStock = await Product.countDocuments({ ...filter, stock: { $gt: 0 } });
+    const outOfStock = await Product.countDocuments({ ...filter, stock: { $lte: 0 } });
+
+    res.status(200).json({
+      totalProducts,
+      inStock,
+      outOfStock,
+      branch: branchId || 'All Branches',
+    });
+  } catch (error) {
+    console.error('Error fetching product stats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

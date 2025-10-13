@@ -1,7 +1,7 @@
 import { environment } from "src/environments/environment.prod";
 
 // export const BASE_URL = environment.production? '' : 'http://localhost:3000';
-export const BASE_URL = environment.apiUrl ? '' : 'http://ec2-16-171-200-140.eu-north-1.compute.amazonaws.com:3000';
+export const BASE_URL = 'http://localhost:3000'
 
 
 
@@ -14,11 +14,16 @@ export const USER_CREATE_URL = USERS_URL + '/createUser';
 export const USER_UPDATE_URL = USERS_URL;
 export const USER_DELETE_URL = USERS_URL;
 
+//dashboard
+export const ORDER_STATISTICS = BASE_URL + '/api/dashboard/getOrdersStatstics';
+
+
 
 export const PRODUCTS_URL = BASE_URL + '/api/products';
 export const PRODUCT_CREATE_PRODUCT_URL = PRODUCTS_URL+ '/createProduct';
 export const PRODUCT_UPDATE_PRODUCT_URL = PRODUCTS_URL ;
 export const PRODUCT_DELETE_PRODUCT_URL = PRODUCTS_URL + '/deleteProduct';
+export const PRODUCT_STATS =  PRODUCTS_URL +'/getProductsStats'
 
 export const CATEGORYS_URL = BASE_URL + '/api/categories';
 export const CATEGORY_CREATE_CATEGORY_URL = CATEGORYS_URL+ '/createCategory';
@@ -37,3 +42,5 @@ export const ORDER_UPDATE_URL = ORDERS_URL + '/updateOrder';
 
 export const ORDER_PAY_URL = ORDERS_URL + '/pay';
 export const ORDER_TRACK_URL = ORDERS_URL + '/track/';
+
+

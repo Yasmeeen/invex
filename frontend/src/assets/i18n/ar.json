@@ -320,5 +320,11 @@
   "tr_branch_invoices": "فواتير الفرع",
   "tr_expenses": "المصروفات",
   "tr_sell_price": "سعر البيع",
-  "tr_net_price": "السعر الصافي"
+  "tr_net_price": "السعر الصافي",
+  "tr_total_number_of_invoices": "إجمالي عدد الفواتير",
+  "tr_today": "اليوم",
+  "tr_total_amount": "إجمالي المبيعات",
+  "tr_net_profit": "صافي الأرباح",
+  "sales_summary": "ملخص المبيعات"
+
 }

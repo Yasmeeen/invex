@@ -101,9 +101,10 @@ export class CreateEditUserComponent implements OnInit {
     if (!this.basicInfoForm.valid) {
       return;
     }
-      console.log("this.userId",this.userId);
-      
+
     this.userSerivce.updateUser(this.userId,this.user).subscribe(() => {
+      // localStorage.setItem('currentUser', JSON.stringify(this.user));
+
       this.appNotificationService.push('user updated successfully', 'sucess');
       this.closeModal(true);
     }, error=> {

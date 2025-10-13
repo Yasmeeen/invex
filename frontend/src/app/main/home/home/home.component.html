@@ -5,8 +5,8 @@
       <div class="mb-4 border-bottom pb-3">
         <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
           <div>
-            <a class="hover-link pointer weight-bold">{{ 'tr_congratulations_name' | translate:{name:''} }}</a>
-            <div class="size-small mtb-1 plr-1">{{ 'tr_sales_increase' | translate:{percent:38} }}</div>
+            <a class="hover-link pointer weight-bold">{{ 'sales_summary' | translate }}</a>
+            <!-- <div class="size-small mtb-1 plr-1">{{ 'tr_sales_increase' | translate:{percent:38} }}</div> -->
           </div>
         </div>
         <div class="flex flex-middle width-100 flex-wrap">
@@ -16,8 +16,8 @@
                 <i class="fa fa-users"></i>
               </div>
               <div class="ml-3">
-                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_users' | translate:{count:60} }}</a>
-                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
+                <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalInvoices}} {{ 'tr_total_number_of_invoices' | translate }} </a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_today' | translate }}</div>
               </div>
             </div>
 
@@ -26,8 +26,8 @@
                 <i class="fa fa-link"></i>
               </div>
               <div class="ml-3">
-                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_products' | translate:{count:54} }}</a>
-                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
+                <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalSales}} {{ 'tr_total_amount' | translate}} </a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_today' | translate }}</div>
               </div>
             </div>
 
@@ -36,8 +36,8 @@
                 <i class="fa fa-calendar"></i>
               </div>
               <div class="ml-3">
-                <a class="hover-link pointer weight-bold" href="/employees">{{ 'tr_new_invoices' | translate:{count:87} }}</a>
-                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_last_7_days' | translate }}</div>
+                <a class="hover-link pointer weight-bold" >{{orderStatistics?.netProfit}} {{ 'tr_net_profit' | translate }} </a>
+                <div class="size-small mtb-1 steel weight-bold">{{ 'tr_today' | translate }}</div>
               </div>
             </div>
           </div>
@@ -49,24 +49,14 @@
     </div>
   </div>
 
-  <!-- Users -->
-  <div class="col-md-4">
-    <div class="container-card" (click)="openUsersDetails()">
-      <div class="dashboard-card-header">
-        <span class="title">{{ 'tr_users' | translate }}</span>
-        <span class="count">{{ totalUsers }}</span>
-      </div>
-      <div id="users-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">{{ 'tr_active_inactive_users' | translate }}</div>
-    </div>
-  </div>
+
 
   <!-- Products -->
   <div class="col-md-4">
     <div class="container-card" (click)="openProductsDetails()">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_products' | translate }}</span>
-        <span class="count">{{ totalProducts }}</span>
+        <span class="count">{{ this.productsStats?.totalProducts }}</span>
       </div>
       <div id="products-chart" style="width: 100%; height: 200px;"></div>
       <div class="text-center steel">{{ 'tr_stock_status' | translate }}</div>

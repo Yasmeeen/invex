@@ -1,7 +1,10 @@
+import { ProductsSerivce } from './../../../shared/services/products.service';
 import { Component, OnInit } from '@angular/core';
 import * as Highcharts from 'highcharts';
 import HC_treemap from 'highcharts/modules/treemap';
 import HC_solidGauge from 'highcharts/modules/solid-gauge';
+import { DashboardService } from '@shared/services/dashboard.service';
+import { orderStatistics } from '@core/models/dashboard.model';
 
 // ✅ Initialize extra modules
 HC_treemap(Highcharts);
@@ -13,15 +16,21 @@ HC_solidGauge(Highcharts);
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit {
-  totalUsers = 1200;
-  totalProducts = 540;
+
   totalOrders = 320;
   totalInvoices = 280;
   totalCategories = 25;
+  orderStatistics: orderStatistics;
+  productsStats:any;
+  constructor(
+    private dashboardService: DashboardService,
+    private productsSerivce: ProductsSerivce
+  ) { }
 
   ngOnInit(): void {
-    this.usersChart();
-    this.productsChart();
+    this.getOrderStatistics();
+    this.getProductsStats();
+
     this.ordersChart();
     this.invoicesChart();
     this.categoriesChart();
@@ -29,24 +38,32 @@ export class HomeComponent implements OnInit {
     this.clientsChart();
   }
 
-  // 🧑‍🤝‍🧑 Users
-  usersChart(): void {
-    Highcharts.chart('users-chart', {
-      chart: { type: 'pie' },
-      title: { text: '' },
-      series: [{
-        name: 'Users',
-        type: 'pie',
-        data: [
-          { name: 'Active', y: 950 },
-          { name: 'Inactive', y: 250 }
-        ]
-      }]
-    } as Highcharts.Options);
+  getProductsStats(){
+    let params = {}
+    this.productsSerivce.getProductsStats(params).subscribe(res=> {
+      this.productsStats = res
+      this.productsChart(this.productsStats)
+    })
   }
 
+
+  getOrderStatistics(){
+    this.dashboardService.getDashboardStats().subscribe(res=> {
+      console.log(res);
+      this.orderStatistics = res;
+
+      
+    })
+  }
+
+
+
+
+
   // 📦 Products
-  productsChart(): void {
+  productsChart(productsStats:any): void {
+    console.log("productsStats",productsStats);
+    
     Highcharts.chart('products-chart', {
       chart: { type: 'pie' },
       title: { text: '' },
@@ -54,8 +71,8 @@ export class HomeComponent implements OnInit {
         name: 'Products',
         type: 'pie',
         data: [
-          { name: 'In Stock', y: 400 },
-          { name: 'Out of Stock', y: 140 }
+          { name: 'In Stock', y: productsStats?.inStock },
+          { name: 'Out of Stock', y: productsStats?.outOfStock  }
         ]
       }]
     } as Highcharts.Options);

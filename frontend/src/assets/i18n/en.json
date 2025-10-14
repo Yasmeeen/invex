@@ -338,6 +338,7 @@
     "tr_cash": "Cash",
     "tr_online": "Online",
     "tr_optional": "Optional",
-    "tr_invoices":"Invoices"
+    "tr_invoices":"Invoices",
+    "tr_items":"items"
 
 }

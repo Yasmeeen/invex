@@ -33,6 +33,7 @@ export class OrdersListComponent implements OnInit {
   searchTerm: string;
   isNotAuthorized: boolean = false;
   iscategoryNotAuthorized: boolean = false;
+  isToday: boolean = true;
 
   currentOrder: any = {
     name: '',
@@ -141,6 +142,13 @@ export class OrdersListComponent implements OnInit {
   }
 
   getOrderStatistics(){
+    const today = new Date();
+    this.isToday = 
+      [this.fromDate, this.toDate].every(d =>
+        new Date(d).toDateString() === today.toDateString()
+      );
+
+
     let params ={
       from:  this.fromDate.toLocaleDateString('en-CA'),
       to:   this.toDate.toLocaleDateString('en-CA'),
@@ -162,6 +170,7 @@ export class OrdersListComponent implements OnInit {
         this.appNotificationService.push( this.translateService.instant('Order restored successfully!'), 'success');
         // refresh orders list
      this.getOrders();
+     this.getOrderStatistics();
       },
       error: (err) => {
         this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');

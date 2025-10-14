@@ -331,6 +331,7 @@
   "tr_payment_method_required": "طريقة الدفع مطلوبة",
   "tr_cash": "نقدي",
   "tr_online": "إلكتروني",
-  "tr_optional": "خياري"
+  "tr_optional": "خياري",
+  "tr_items":"عناصر"
 
 }

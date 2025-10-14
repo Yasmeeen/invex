@@ -1,10 +1,10 @@
 .orders-table{
     td, th {
         &:nth-child(1){
-            width: 8rem;
+            width: 6rem;
         }
         &:nth-child(2){
-            width: 10rem;
+            width: 9rem;
         }
         &:nth-child(3){
             width: 9rem;
@@ -13,21 +13,22 @@
             width: 6rem;
         }
         &:nth-child(5){
-            width: 10rem;
-        }
-        &:nth-child(6){
             width: 6rem;
         }
+        &:nth-child(6){
+            width: 10rem;
+        }
         &:nth-child(7){
-          width: 9rem;
+          width: 8rem;
       }
         &:nth-child(8){
             width: 7rem;
         }
         &:nth-child(9){
-            width: 6rem;
+            width: 12rem;
         }
-        &:nth-child(10){
+
+        &:nth-child(11){
             width: 2rem;
         }
   

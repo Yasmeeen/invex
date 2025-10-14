@@ -139,8 +139,6 @@ export class AddOrderComponent implements OnInit {
     const product_ids: string[] = ([] as string[]).concat(
       ...this.orderProducts.map((p) => Array(p.quantity).fill(p._id))
     );
-    console.log(this.order.paymentMethod,"AdminSelectedBranch",this.adminSelectedBranchId);
-    
 
     let selectedBranchId = this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id
  
@@ -157,7 +155,9 @@ export class AddOrderComponent implements OnInit {
 
     this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {
 
-      this.createdOrder = response.newOrder[0];    
+      this.createdOrder = response.newOrder;   
+      console.log("   this.createdOrder ",   this.createdOrder );
+       
       setTimeout(() => {
         this.printInvoice();
       }, 0);
@@ -166,7 +166,7 @@ export class AddOrderComponent implements OnInit {
 
     }, error=> {
       console.log(error.error);
-      this.appNotificationService.push(error.error.details, 'error');
+      this.appNotificationService.push(error.error, 'error');
     });
   }
 

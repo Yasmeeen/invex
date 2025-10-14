@@ -10,6 +10,8 @@ export interface Product {
   price: number;
   netPrice: number;
   discount: number;
+  quantity?: number;
+  isApplyDiscount?: boolean
 }
 export interface Category {
   _id: string;

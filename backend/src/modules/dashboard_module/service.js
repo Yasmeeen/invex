@@ -7,51 +7,69 @@ import moment from 'moment-timezone';
 export const getOrdersStatstics = async (req, res) => {
   try {
     const { from, to, branch } = req.query;
-    const filters = {};
     const timezone = 'Africa/Cairo';
 
-    // 🕒 Convert date filters using Egypt local time
+    // 🕒 Date range filters
+    const dateFilter = {};
     if (from || to) {
-      filters.createdAt = {};
-
       if (from) {
-        const fromDate = moment.tz(from, 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
-        filters.createdAt.$gte = fromDate;
+        dateFilter.$gte = moment.tz(from, 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
       }
-
       if (to) {
-        const toDate = moment.tz(to, 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
-        filters.createdAt.$lte = toDate;
+        dateFilter.$lte = moment.tz(to, 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
       }
     }
 
-    // 🏢 Branch filter (optional)
-    if (branch && mongoose.Types.ObjectId.isValid(branch)) {
-      filters.branch = branch;
-    }
+    // 🏢 Optional branch filter
+    const branchFilter = branch && mongoose.Types.ObjectId.isValid(branch)
+      ? { branch }
+      : {};
 
-    // 📦 Fetch matching orders
-    const orders = await Order.find(filters).populate('products');
+    // ✅ Filters for completed orders
+    const completedFilters = {
+      status: 'completed',
+      ...branchFilter,
+      ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+    };
+
+    // ✅ Filters for total invoices (completed + restored)
+    const allInvoicesFilters = {
+      status: { $in: ['completed', 'restored'] },
+      ...branchFilter,
+      ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
+    };
+
+    // 📦 Fetch completed and all invoices
+    const [completedOrders, totalInvoicesCount] = await Promise.all([
+      Order.find(completedFilters),
+      Order.countDocuments(allInvoicesFilters),
+    ]);
 
     // 💰 Calculate totals
     let totalSales = 0;
     let totalNetCost = 0;
 
-    orders.forEach(order => {
+    for (const order of completedOrders) {
       totalSales += order.totalPrice || 0;
-      order.products.forEach(product => {
-        totalNetCost += product.netPrice || 0;
-      });
-    });
+
+      for (const productItem of order.products) {
+        const productId = productItem.productId || productItem._id || productItem;
+        const quantity = productItem.quantity || 1;
+
+        const realProduct = await Product.findById(productId).select('netPrice');
+        if (realProduct && realProduct.netPrice) {
+          totalNetCost += realProduct.netPrice * quantity;
+        }
+      }
+    }
 
     const netProfit = totalSales - totalNetCost;
-    const totalInvoices = orders.length;
 
     // ✅ Response
     return res.json({
       totalSales,
       netProfit,
-      totalInvoices,
+      totalInvoices: totalInvoicesCount, // ✅ includes completed + restored
       branch: branch || 'All Branches',
       from: from || null,
       to: to || null,
@@ -61,6 +79,8 @@ export const getOrdersStatstics = async (req, res) => {
     res.status(500).json({ error: 'Failed to load dashboard stats' });
   }
 };
+
+
 
 
 export const getInvoicesPerMonth = async (req, res) => {

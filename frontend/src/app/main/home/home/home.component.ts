@@ -23,6 +23,9 @@ export class HomeComponent implements OnInit {
   toDate: Date = new Date();
   selectedBranch: any;
   branches: Branch [] = [];
+  isToday: boolean = true;
+
+  
 
   totalInvoices = 280;
   totalCategories = 25;
@@ -70,6 +73,11 @@ export class HomeComponent implements OnInit {
   }
 
   getOrderStatistics(){
+    const today = new Date();
+    this.isToday = 
+      [this.fromDate, this.toDate].every(d =>
+        new Date(d).toDateString() === today.toDateString()
+      );
 
     let params ={
       from: this.fromDate.toLocaleDateString('en-CA'),

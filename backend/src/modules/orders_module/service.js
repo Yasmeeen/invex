@@ -17,7 +17,6 @@ export const getOrders = async (req, res) => {
         { clientName: { $regex: search, $options: 'i' } },
         { clientPhoneNumber: { $regex: search, $options: 'i' } },
       ];
-
       if (isNumber) {
         query.$or.push({ orderNumber: Number(search) });
       }
@@ -32,7 +31,6 @@ export const getOrders = async (req, res) => {
       if (branch) {
         query.branch = branch._id;
       } else {
-        // No branch found → return empty
         return res.json({
           orders: [],
           meta: {
@@ -44,11 +42,11 @@ export const getOrders = async (req, res) => {
       }
     }
 
-    // ✅ 3. Fetch orders
+    // ✅ 3. Fetch orders (include products in selection)
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber clientName clientPhoneNumber totalPrice numberOfProducts status paymentMethod createdAt branch'
+          'orderNumber clientName clientPhoneNumber clientAddress sellerName paymentMethod totalPrice numberOfProducts status createdAt branch products'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -60,7 +58,7 @@ export const getOrders = async (req, res) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    // ✅ 4. Respond
+    // ✅ 4. Respond with products included
     res.json({
       orders,
       meta: {
@@ -78,9 +76,6 @@ export const getOrders = async (req, res) => {
 };
 
 
-
-
-
 export const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -95,6 +90,7 @@ export const getOrderById = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 export const createOrder = async (req, res) => {
   const session = await mongoose.startSession();
@@ -112,24 +108,20 @@ export const createOrder = async (req, res) => {
       status,
     } = req.body;
 
-    if (!clientName || !clientPhoneNumber || !paymentMethod || !clientAddress ) {
+    if (!clientName || !clientPhoneNumber || !paymentMethod || !clientAddress) {
       return res.status(400).json({
-        error:
-          'clientName, clientPhoneNumber, paymentMethod, sellerName, and clientAddress are required',
+        error: 'clientName, clientPhoneNumber, paymentMethod, and clientAddress are required',
       });
     }
 
     if (!products || products.length === 0) {
-      return res
-        .status(400)
-        .json({ error: 'Order must contain at least one product' });
+      return res.status(400).json({ error: 'Order must contain at least one product' });
     }
 
     let totalPrice = 0;
     let numberOfProducts = 0;
-    const productIds = [];
+    const orderProducts = [];
 
-    // ✅ Calculate totals & update stock
     for (const item of products) {
       const selected = item.selectedProduct;
       if (!selected || !selected._id) continue;
@@ -137,31 +129,41 @@ export const createOrder = async (req, res) => {
       const quantity = Number(item.quantity) || 1;
       numberOfProducts += quantity;
 
+      // ✅ Use price and discount info from frontend payload
       let price = Number(selected.price) || 0;
-      if (selected.isApplyDiscount && selected.discount > 0) {
-        price -= price * (selected.discount / 100);
+      const isApplyDiscount = !!selected.isApplyDiscount;
+
+      if (isApplyDiscount && selected.discount > 0) {
+        price = price - (price * selected.discount) / 100;
       }
 
       totalPrice += price * quantity;
-      productIds.push(selected._id);
 
+      // 🛠 Update stock
       const productDoc = await Product.findById(selected._id).session(session);
       if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
-
-      if (productDoc.stock < quantity) {
-        throw new Error(`Not enough stock for ${productDoc.name}`);
-      }
+      if (productDoc.stock < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
 
       productDoc.stock -= quantity;
       await productDoc.save({ session });
+
+      // ✅ Add to order’s products array
+      orderProducts.push({
+        productId: selected._id,
+        name: selected.name,
+        code: selected.code,
+        quantity,
+        price,
+        isApplyDiscount,
+      });
     }
 
-    // ✅ Generate next order number
+    // 🧮 Generate next order number
     const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean();
     const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
 
-    // ✅ Create order
-    const newOrder = await Order.create(
+    // 🧾 Create order
+    const [newOrder] = await Order.create(
       [
         {
           orderNumber: nextOrderNumber,
@@ -171,7 +173,7 @@ export const createOrder = async (req, res) => {
           paymentMethod,
           clientAddress,
           branch,
-          products: productIds,
+          products: orderProducts,
           numberOfProducts,
           totalPrice,
           status,
@@ -180,11 +182,10 @@ export const createOrder = async (req, res) => {
       { session }
     );
 
-
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({ message: '✅ Order created',newOrder});
+    res.status(201).json({ message: '✅ Order created successfully', newOrder });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -192,8 +193,6 @@ export const createOrder = async (req, res) => {
     res.status(500).json({ error: 'Server error', details: err.message });
   }
 };
-
-
 
 
 
@@ -252,8 +251,9 @@ export const updateOrder = async (req, res) => {
 export const restoreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    // ✅ populate products (since your field is called 'products')
-    const order = await Order.findById(orderId).populate('products');
+
+    // ✅ Get order directly (no populate)
+    const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
@@ -263,12 +263,18 @@ export const restoreOrder = async (req, res) => {
       return res.status(400).json({ error: 'Order is already restored' });
     }
 
-    // ✅ Restore product stock
+    // ✅ Restore stock for each product
     for (const item of order.products) {
-      const product = await Product.findById(item.product); // item.product is ObjectId
+      if (!item.productId) continue; // skip malformed data
+
+      const product = await Product.findById(item.productId);
       if (product) {
-        product.stock += item.quantity; // 👈 add back the quantity
+        product.stock += item.quantity;
         await product.save();
+
+        console.log(`✅ Restored ${item.quantity} to ${product.name} (new stock: ${product.stock})`);
+      } else {
+        console.warn(`⚠️ Product not found for ID: ${item.productId}`);
       }
     }
 
@@ -277,11 +283,12 @@ export const restoreOrder = async (req, res) => {
     await order.save();
 
     res.json({
-      message: 'Order restored successfully',
+      message: '✅ Order restored successfully',
       restoredOrder: order,
     });
   } catch (error) {
-    res.status(500).json({ error: 'Server error restoring order' });
+    console.error('❌ Error restoring order:', error);
+    res.status(500).json({ error: 'Server error restoring order', details: error.message });
   }
 };
 

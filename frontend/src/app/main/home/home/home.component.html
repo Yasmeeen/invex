@@ -83,7 +83,8 @@
               </div>
               <div class="ml-3">
                 <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalInvoices}} {{ 'tr_total_number_of_invoices' | translate }} </a>
-                <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
               </div>
             </div>
 
@@ -93,7 +94,8 @@
               </div>
               <div class="ml-3">
                 <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalSales}} {{ 'tr_total_amount' | translate}} </a>
-                <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
               </div>
             </div>
 
@@ -103,7 +105,8 @@
               </div>
               <div class="ml-3">
                 <a class="hover-link pointer weight-bold" >{{orderStatistics?.netProfit}} {{ 'tr_net_profit' | translate }} </a>
-                <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
               </div>
             </div>
           </div>

@@ -79,7 +79,8 @@
               <span class="text-primary">   {{orderStatistics?.totalInvoices}} </span>
            
               {{ 'tr_total_number_of_invoices' | translate }} </a>
-            <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
           </div>
         </div>
       </div>
@@ -92,9 +93,10 @@
           <div class="ml-2">
             <a class="hover-link pointer weight-bold" >
               <span class="text-primary">   {{orderStatistics?.totalSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }} </span>
-              {{ 'tr_total_amount' | translate}}
+               {{ 'tr_total_amount' | translate}}
              </a>
-            <div class="size-small mtb-1 steel weight-bold">{{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
           </div>
         </div>
       </div>
@@ -144,15 +146,15 @@
         <table class="s-table table orders-table layout-fixed orders-list">
           <thead>
             <tr>
-              <th>{{ "tr_order_number" | translate }}</th>
+              <th>{{ "tr_number" | translate }}</th>
               <th>{{ "tr_client_name" | translate }}</th>
               <th> {{"tr_phone_number" | translate}}</th>
               <th>{{ "tr_branch" | translate }}</th>
-              <th>{{ "tr_number_of_products" | translate }}</th>
               <th>{{ "tr_price" | translate }}</th>
               <th>{{ "tr_payment_method" | translate}}</th>
               <th>{{ "tr_created_at" | translate}}</th>
               <th>{{ "tr_status" | translate}}</th>
+              <th>{{ "tr_products" | translate}}</th>
               <th></th>
             </tr>
           </thead>
@@ -162,13 +164,21 @@
               <td>{{ order.clientName }}</td>
               <td>{{ order.clientPhoneNumber}}</td>
               <td>{{ order.branch?.name }}</td>
-              <td>{{ order.numberOfProducts }}</td>
+   
               <td>{{ order.totalPrice }}</td>
               <td>{{ order.paymentMethod }}</td>
               <td>{{ order.createdAt  | date: 'dd/M/YYYY'}}</td>
               <td>{{ order.status }}</td>
               <td>
-                <span class="options-menu">
+                <div >{{'tr_number_of_products' | translate}}: 
+                  <span class="text-primary weight-bold">  {{order.numberOfProducts}}  </span>
+                 </div>
+                <div *ngFor="let product of order.products">
+                  <span>{{product.quantity}} {{'tr_items'| translate}} {{'tr_from' | translate}} {{product.code}}</span>
+                </div>
+              </td>
+              <td>
+                <span class="options-menu" *ngIf="order.status != 'restored'">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div

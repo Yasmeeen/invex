@@ -28,8 +28,10 @@ export class DashboardService {
   
     return this.http.get(`${BASE_URL}/api/dashboard/invoicesPerMonth`, { params });
   }
-  getCategoriesStats(): Observable<any> {
-    return this.http.get(`${BASE_URL}/api/dashboard/categoriesStats`);
+  getCategoriesStats(branchId?:string): Observable<any> {
+    let params: any = {};
+    if (branchId) params.branch = branchId;
+    return this.http.get(`${BASE_URL}/api/dashboard/categoriesStats`,{ params });
   }
   getOrdersStatusStats(branchId?: string) {
     let params: any = {};

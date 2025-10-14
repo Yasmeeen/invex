@@ -155,15 +155,18 @@ export class OrdersListComponent implements OnInit {
     })
   }
 
-  restoreOrder(orderId: string, order:Order){
-    let params = {
-      orderId: orderId
-    }
-    this.subscriptions.push(this.ordersService.restoreOrder(params,order).subscribe((response: any) => {
-           this.getOrders();
-    },(error:any)=> {
-      this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
-    }))
+  restoreOrder(orderId: string): void {
+
+    this.ordersService.restoreOrder(orderId).subscribe({
+      next: (res) => {
+        this.appNotificationService.push( this.translateService.instant('Order restored successfully!'), 'success');
+        // refresh orders list
+     this.getOrders();
+      },
+      error: (err) => {
+        this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
+      }
+    });
   }
 
 

@@ -15,7 +15,7 @@
                 placeholder="{{ 'tr_select' | translate }}"
                 bindLabel="name"
                 bindValue="_id"
-                [clearable]="false"
+          
                 [(ngModel)]= "selectedBranch"
                 #branch="ngModel"
                 name="branchId"
@@ -143,7 +143,7 @@
     <div class="container-card" (click)="openInvoicesDetails()">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_invoices' | translate }}</span>
-        <span class="count">{{ totalInvoices }}</span>
+        <!-- <span class="count">{{ totalInvoices }}</span> -->
       </div>
       <div id="invoices-chart" style="width: 100%; height: 250px;"></div>
       <div class="text-center steel">{{ 'tr_invoice_stats' | translate }}</div>
@@ -155,7 +155,7 @@
     <div class="container-card" (click)="openCategoriesDetails()">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_categories' | translate }}</span>
-        <span class="count">{{ totalCategories }}</span>
+        <!-- <span class="count">{{ totalCategories }}</span> -->
       </div>
       <div id="categories-chart" style="width: 100%; height: 250px;"></div>
       <div class="text-center steel">{{ 'tr_category_distribution' | translate }}</div>

@@ -66,71 +66,73 @@ export const getOrdersStatstics = async (req, res) => {
 export const getInvoicesPerMonth = async (req, res) => {
   try {
     const { branchId, year } = req.query;
-
-    // Default to current year if not provided
     const selectedYear = year ? Number(year) : new Date().getFullYear();
 
-    // Build filter
+    const timezone = 'Africa/Cairo';
+
+    // Define start and end of year using Cairo timezone
+    const startOfYear = moment.tz(`${selectedYear}-01-01`, timezone).startOf('day').utc().toDate();
+    const endOfYear = moment.tz(`${selectedYear}-12-31`, timezone).endOf('day').utc().toDate();
+
     const filter = {
-      createdAt: {
-        $gte: new Date(`${selectedYear}-01-01T00:00:00Z`),
-        $lte: new Date(`${selectedYear}-12-31T23:59:59Z`)
-      }
+      createdAt: { $gte: startOfYear, $lte: endOfYear },
     };
 
-    if (branchId) {
-      filter.branch = branchId;
+    // Optional branch filter
+    if (branchId && mongoose.Types.ObjectId.isValid(branchId)) {
+      filter.branch = new mongoose.Types.ObjectId(branchId);
     }
 
-    // Aggregate invoices per month
     const stats = await Order.aggregate([
       { $match: filter },
       {
         $group: {
           _id: { $month: "$createdAt" },
-          totalInvoices: { $sum: 1 }
-        }
+          totalInvoices: { $sum: 1 },
+        },
       },
-      { $sort: { "_id": 1 } }
+      { $sort: { "_id": 1 } },
     ]);
 
-    // Initialize all 12 months (in case some months have 0 invoices)
+    // Fill missing months with 0
     const monthlyCounts = Array(12).fill(0);
-    stats.forEach(item => {
+    stats.forEach((item) => {
       monthlyCounts[item._id - 1] = item.totalInvoices;
     });
 
     res.status(200).json({
       year: selectedYear,
-      monthlyCounts, // array of 12 values
+      branch: branchId || "All Branches",
+      monthlyCounts,
     });
-
   } catch (error) {
-    console.error("Error fetching invoices per month:", error);
+    console.error("❌ Error fetching invoices per month:", error);
     res.status(500).json({ error: "Failed to fetch invoices per month" });
   }
 };
 
-
+/**
+ * 🏷️ 2. Get Category Statistics (filtered by branch if provided)
+ */
 export const getCategoriesStatistics = async (req, res) => {
   try {
-    const categories = await Category.find()
-      .select("name productsCount totalItems")
-      .sort({ name: 1 });
+    const { branch } = req.query;
+    const branchFilter = branch && mongoose.Types.ObjectId.isValid(branch)
+      ? { branch: new mongoose.Types.ObjectId(branch) }
+      : {};
+
+    const categories = await Category.find().select("name").sort({ name: 1 });
 
     const stats = await Promise.all(
       categories.map(async (category) => {
-        // if totalItems and productsCount already stored in DB, use them
-        // otherwise, calculate from Product model
-        let productsCount = category.productsCount || 0;
-        let totalItems = category.totalItems || 0;
+        // Count products and total stock for that category
+        const products = await Product.find({
+          category: category._id,
+          ...branchFilter, // optional branch filter
+        });
 
-        // If the stored values are missing, calculate dynamically
-        if (!productsCount || !totalItems) {
-          const products = await Product.find({ category: category._id });
-          productsCount = products.length;
-          totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
-        }
+        const productsCount = products.length;
+        const totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
 
         return {
           categoryName: category.name,
@@ -140,13 +142,19 @@ export const getCategoriesStatistics = async (req, res) => {
       })
     );
 
-    res.status(200).json({ stats });
+    res.status(200).json({
+      branch: branch || "All Branches",
+      stats,
+    });
   } catch (error) {
     console.error("❌ Error fetching category stats:", error);
     res.status(500).json({ error: "Failed to fetch category stats" });
   }
 };
 
+/**
+ * 🛒 3. Get Orders Statistics by Status
+ */
 export const getOrdersStatisticsByStatus = async (req, res) => {
   try {
     const { branch } = req.query;
@@ -154,10 +162,9 @@ export const getOrdersStatisticsByStatus = async (req, res) => {
 
     // Optional filter by branch
     if (branch && mongoose.Types.ObjectId.isValid(branch)) {
-      filters.branch = branch;
+      filters.branch = new mongoose.Types.ObjectId(branch);
     }
 
-    // Group by status
     const stats = await Order.aggregate([
       { $match: filters },
       {
@@ -168,7 +175,7 @@ export const getOrdersStatisticsByStatus = async (req, res) => {
       },
     ]);
 
-    // Format for Highcharts
+    // Initialize chart structure
     const formatted = [
       { name: "Completed", y: 0 },
       { name: "Restored", y: 0 },
@@ -180,13 +187,15 @@ export const getOrdersStatisticsByStatus = async (req, res) => {
       if (target) target.y = item.count;
     });
 
-    res.status(200).json({ stats: formatted });
+    res.status(200).json({
+      branch: branch || "All Branches",
+      stats: formatted,
+    });
   } catch (error) {
     console.error("❌ Error fetching order stats:", error);
     res.status(500).json({ error: "Failed to fetch order stats" });
   }
 };
-
 
 
 

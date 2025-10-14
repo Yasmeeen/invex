@@ -45,8 +45,7 @@ export class HomeComponent implements OnInit {
   }
 
   getProductsStats(){
-    let params = {}
-    this.productsSerivce.getProductsStats(params).subscribe(res=> {
+    this.productsSerivce.getProductsStats(this.selectedBranch).subscribe(res=> {
       this.productsStats = res
       this.productsChart(this.productsStats)
     })
@@ -63,6 +62,11 @@ export class HomeComponent implements OnInit {
 
   changeBranch(){
     this.getOrderStatistics();
+    this.invoicesChart();
+    this.getProductsStats();
+    this.ordersChart();
+    this.invoicesChart();
+    this.categoriesChart();
   }
 
   getOrderStatistics(){
@@ -84,8 +88,6 @@ export class HomeComponent implements OnInit {
 
   // 📦 Products
   productsChart(productsStats:any): void {
-    console.log("productsStats",productsStats);
-    
     Highcharts.chart('products-chart', {
       chart: { type: 'pie' },
       title: { text: '' },
@@ -102,7 +104,7 @@ export class HomeComponent implements OnInit {
 
   // 🛒 Orders
   ordersChart(): void {
-    this.dashboardService.getOrdersStatusStats().subscribe((res: any) => {
+    this.dashboardService.getOrdersStatusStats(this.selectedBranch).subscribe((res: any) => {
       Highcharts.chart('orders-chart', {
         chart: { type: 'pie' },
         title: { text: '' },
@@ -117,7 +119,7 @@ export class HomeComponent implements OnInit {
 
   // 🧾 Invoices
   invoicesChart(): void {
-    this.dashboardService.getInvoicesPerMonth().subscribe((res: any) => {
+    this.dashboardService.getInvoicesPerMonth(this.selectedBranch).subscribe((res: any) => {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       
       Highcharts.chart('invoices-chart', {
@@ -137,7 +139,7 @@ export class HomeComponent implements OnInit {
 
   // 🏷️ Categories
   categoriesChart(): void {
-    this.dashboardService.getCategoriesStats().subscribe((res: any) => {
+    this.dashboardService.getCategoriesStats(this.selectedBranch).subscribe((res: any) => {
       const categories = res.stats.map((c: any) => c.categoryName);
       const totalItems = res.stats.map((c: any) => c.totalItems);
     

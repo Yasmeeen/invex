@@ -247,51 +247,45 @@ export const updateOrder = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
+
 export const restoreOrder = async (req, res) => {
   try {
-    console.log('🧾 req.body:', req.body);
-    const { orderId } = req.body; // instead of req.params
+    const { orderId } = req.params;
+    // ✅ populate products (since your field is called 'products')
+    const order = await Order.findById(orderId).populate('products');
 
-    if (!orderId) {
-      return res.status(400).json({ error: 'orderId is required' });
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
     }
 
-    const deletedOrder = await DeletedOrder.findById(orderId);
-    if (!deletedOrder) {
-      return res.status(404).json({ error: 'Deleted order not found' });
+    if (order.status === 'restored') {
+      return res.status(400).json({ error: 'Order is already restored' });
     }
 
-    const totalAmount = deletedOrder.products.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    // ✅ Restore product stock
+    for (const item of order.products) {
+      const product = await Product.findById(item.product); // item.product is ObjectId
+      if (product) {
+        product.stock += item.quantity; // 👈 add back the quantity
+        await product.save();
+      }
+    }
 
-    const restoredOrder = new Order({
-      clientName: deletedOrder.clientName,
-      branchId: deletedOrder.branchId,
-      paymentMethod: deletedOrder.paymentMethod,
-      products: deletedOrder.products.map((p) => ({
-        productId: p.productId,
-        quantity: p.quantity,
-        price: p.price,
-        subtotal: p.price * p.quantity,
-      })),
-      totalAmount,
-      createdAt: deletedOrder.createdAt || new Date(),
-    });
+    // ✅ Update order status
+    order.status = 'restored';
+    await order.save();
 
-    await restoredOrder.save();
-    await DeletedOrder.findByIdAndDelete(orderId);
-
-    res.status(200).json({
+    res.json({
       message: 'Order restored successfully',
-      restoredOrder,
+      restoredOrder: order,
     });
   } catch (error) {
-    console.error('Error restoring order:', error);
-    res.status(500).json({ error: 'Failed to restore order' });
+    res.status(500).json({ error: 'Server error restoring order' });
   }
 };
+
+
 
 
 

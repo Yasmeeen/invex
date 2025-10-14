@@ -136,8 +136,6 @@ export const deleteProduct = async (req, res) => {
 export const getProductStats = async (req, res) => {
   try {
     const { branchId } = req.query;
-    console.log("req.query",req.query);
- 
     // Filter only if branchId is provided
     const filter = branchId ? { branch: branchId } : {};
 

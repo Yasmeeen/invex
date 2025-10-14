@@ -45,7 +45,9 @@ deleteProduct(productId: string) {
     })
   );
 }
-getProductsStats(params: any) {
-  return this.http.get(PRODUCT_STATS, { params: params });
+getProductsStats(branchId?: any) {
+  let params: any = {};
+  if (branchId) params.branchId = branchId;
+  return this.http.get(PRODUCT_STATS, {params });
 }
 }

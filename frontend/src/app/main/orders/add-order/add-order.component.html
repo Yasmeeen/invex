@@ -104,6 +104,7 @@
                         bindValue="_id"
                         [clearable]="false"
                         [(ngModel)]= "adminSelectedBranchId"
+                        (change)="getProducts()"
                         #branch="ngModel"
                         name="branchId"
                         [items]="branches"

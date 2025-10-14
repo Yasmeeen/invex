@@ -9,9 +9,10 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { UserSerivce } from '@shared/services/user.service';
-import { Category, Product } from '@core/models/products.model';
+import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { BranchesServce } from '@shared/services/branches.service';
 
 @Component({
   selector: 'app-products-list',
@@ -30,6 +31,9 @@ export class ProductsListComponent implements OnInit {
   searchTerm: string;
   isNotAuthorized: boolean = false;
   iscategoryNotAuthorized: boolean = false;
+  selectedBranch: string ;
+  branches: Branch [] = [];
+  totalNumberOfProducts: number;
 
   currentOrder: any = {
     name: '',
@@ -58,18 +62,25 @@ export class ProductsListComponent implements OnInit {
     private translateService: TranslateService,
     private globals: Globals,
     private dialog: MatDialog,
-    private CategoriesServce: CategoriesServce
+    private CategoriesServce: CategoriesServce,
+    private branchesServce: BranchesServce
   ) { }
 
   ngOnInit(): void {
     this.getproducts();
     this.getcategorys();
+    this.getBranches();
   }
   getproducts() {
     this.productsLoading = true;
+    if(this.selectedBranch){
+      this.params['branchId'] = this.selectedBranch;
+    }
+
     this.subscriptions.push(this.productsService.getProducts(this.params).subscribe((response: any) => {
       this.productsList = response.products
       this.paginationData = response.meta
+      this.totalNumberOfProducts = response.meta.totalCount
       this.productsLoading = false;
     },(error:any)=> {
       if(error.status == 403) {
@@ -81,6 +92,17 @@ export class ProductsListComponent implements OnInit {
       }
     }))
   }
+
+  getBranches() {
+    let params = {
+      'page': 1,
+     'per_page': 1000
+    }
+  this.branchesServce.getBranchs(params).subscribe((response: any) => {
+      this.branches = response.branches
+    })
+  }
+
   getcategorys() {
     this.categorysLoading = true
     this.subscriptions.push(this.CategoriesServce.getCategorys(this.categorysParams).subscribe((response: any) => {

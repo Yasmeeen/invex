@@ -24,7 +24,7 @@ export class AddOrderComponent implements OnInit {
   todayDate = new Date();
   createdOrder:any;
   branches: Branch [] = [];
-  adminSelectedBranchId: string;
+  adminSelectedBranchId: string ='';
   storeName = environment.storeName
   storePhoneNumber =  environment.storePhoneNumber
   paymentMethods = [
@@ -81,7 +81,12 @@ export class AddOrderComponent implements OnInit {
 
   // Fetch all products for dropdown
   getProducts() {
-    this.productsSerivce.getProducts({}).subscribe((res: any) => {
+    let params ={
+      branchId: this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id,
+      'page': 1,
+      'per_page': 1000
+    }
+    this.productsSerivce.getProducts(params).subscribe((res: any) => {
       this.products = res.products;
     });
   }

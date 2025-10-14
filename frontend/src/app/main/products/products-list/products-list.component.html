@@ -4,7 +4,9 @@
   [notAuthorized]="isNotAuthorized"
 >
   <h2 class="size-body title-with-btn plr-4 ptb-4">
-    <span class="page-title">{{ "tr_products" | translate }}</span>
+    <span class="page-title">
+      <span class="text-primary">{{totalNumberOfProducts}}-</span>
+      {{ "tr_products" | translate }}</span>
     <div class="btn-group">
       <button class="s-btn btn-primary" (click)="createOrEditproduct(false)">
         {{ "tr_add_product" | translate }}
@@ -30,6 +32,29 @@
               placeholder="{{ 'tr_search' | translate }}"
               [(ngModel)]="nameSearchTerm"
             />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4" >
+        <div
+          class="form-group"
+        >
+          <label>{{ 'tr_branches' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [(ngModel)]= "selectedBranch"
+              #branch="ngModel"
+              name="branchId"
+              [items]="branches"
+              (change)="getproducts()"
+              required
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
           </div>
         </div>
       </div>

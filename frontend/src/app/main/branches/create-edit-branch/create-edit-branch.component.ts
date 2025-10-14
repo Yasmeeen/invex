@@ -32,7 +32,7 @@ export class CreateEditBranchComponent implements OnInit {
 
     this.branchId = this.data.branchId
     this.isEdit = this.data.isEdit
-    console.log("this.data.branch",this.data);
+
     
     if(this.isEdit){
       this.getBranchData();
@@ -72,8 +72,6 @@ export class CreateEditBranchComponent implements OnInit {
       this.appNotificationService.push('Branch data is required.', 'error');
       return;
     }
-    console.log("this.branch",this.branch);
-    
     this.branchesService.updateBranch(this.branchId, this.branch).subscribe({
       next: () => {
         this.appNotificationService.push('Branch updated successfully!', 'success');

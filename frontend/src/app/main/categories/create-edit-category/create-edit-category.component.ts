@@ -32,8 +32,6 @@ export class CreateEditCategoryComponent implements OnInit {
     this.categoryId = this.data.productId
     this.isEdit = this.data.isEdit
     if(this.isEdit){
-      console.log("this.data.category",this.data.category);
-      
       this.categoryForm.form.patchValue(this.data.category);
     }
   }

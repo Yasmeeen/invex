@@ -336,6 +336,8 @@
     "tr_cash": "Bar",
     "tr_online": "Online",
     "tr_optional": "Optional",
-    "tr_invoices": "Rechnungen"
+    "tr_invoices": "Rechnungen",
+    "tr_items": "Artikel",
+    "tr_contact_us": "Kontaktieren Sie uns"
   }
   

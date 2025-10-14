@@ -55,7 +55,7 @@
               placeholder="{{ 'tr_select' | translate }}"
               bindLabel="name"
               bindValue="_id"
-              [clearable]="false"
+   
               [(ngModel)]= "selectedBranchId"
               #branch="ngModel"
               name="branchId"
@@ -68,6 +68,7 @@
           </div>
         </div>
       </div>
+   
 
       <div class="col-md-3">
         <div class="flex flex-middle mt-4">
@@ -130,6 +131,28 @@
               (keyup)="filterorders($event, 'searchBranch')"
               placeholder="{{ 'tr_search' | translate }}"
             />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div
+          class="form-group"
+        >
+          <label>{{ 'tr_status' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              [clearable]="false"
+              [(ngModel)]= "selectedStatus"
+              #branch="ngModel"
+              name="branchId"
+              [items]="status"
+              (change)="getOrders()"
+              required
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
           </div>
         </div>
       </div>

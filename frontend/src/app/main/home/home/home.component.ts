@@ -95,62 +95,82 @@ export class HomeComponent implements OnInit {
 
 
   // 📦 Products
-  productsChart(productsStats:any): void {
+  productsChart(productsStats: any): void {
     Highcharts.chart('products-chart', {
       chart: { type: 'pie' },
       title: { text: '' },
+      plotOptions: {
+        pie: {
+          colors: ['#7dc46f', '#f44b4b'], // 🟢 In Stock, 🔴 Out of Stock
+          dataLabels: {
+            enabled: true,
+            format: '{point.name}: {point.y}'
+          }
+        }
+      },
       series: [{
         name: 'Products',
         type: 'pie',
         data: [
           { name: 'In Stock', y: productsStats?.inStock },
-          { name: 'Out of Stock', y: productsStats?.outOfStock  }
+          { name: 'Out of Stock', y: productsStats?.outOfStock }
         ]
       }]
     } as Highcharts.Options);
   }
+  
 
-  // 🛒 Orders
-  ordersChart(): void {
-    this.dashboardService.getOrdersStatusStats(this.selectedBranch).subscribe((res: any) => {
-      Highcharts.chart('orders-chart', {
-        chart: { type: 'pie' },
-        title: { text: '' },
-        series: [{
-          name: 'Orders',
-          type: 'pie',
-          data: res.stats  // dynamically loaded data
-        }]
-      } as Highcharts.Options);
-    });
-  }
+// 🛒 Orders
+ordersChart(): void {
+  this.dashboardService.getOrdersStatusStats(this.selectedBranch).subscribe((res: any) => {
+    Highcharts.chart('orders-chart', {
+      chart: { type: 'pie' },
+      title: { text: '' },
+      plotOptions: {
+        pie: {
+          colors: ['#7dc46f', '#f44b4b'], // ✅ Completed = Green, Restored = Red
+          dataLabels: {
+            enabled: true,
+            format: '{point.name}: {point.y}'
+          }
+        }
+      },
+      series: [{
+        name: 'Orders',
+        type: 'pie',
+        data: res.stats // [{ name: 'Completed', y: 40 }, { name: 'Restored', y: 10 }]
+      }]
+    } as Highcharts.Options);
+  });
+}
 
-  // 🧾 Invoices
-  invoicesChart(): void {
-    this.dashboardService.getInvoicesPerMonth(this.selectedBranch).subscribe((res: any) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      
-      Highcharts.chart('invoices-chart', {
-        chart: { type: 'column' },
-        title: { text: `Invoices in ${res.year}` },
-        xAxis: { categories: months },
-        yAxis: { title: { text: 'Number of Invoices' } },
-        series: [{
-          name: 'Invoices',
-          type: 'column',
-          data: res.monthlyCounts
-        }]
-      } as Highcharts.Options);
-    });
 
-  }
+// 🧾 Invoices
+invoicesChart(): void {
+  this.dashboardService.getInvoicesPerMonth(this.selectedBranch).subscribe((res: any) => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    Highcharts.chart('invoices-chart', {
+      chart: { type: 'column' },
+      title: { text: `Invoices in ${res.year}` },
+      xAxis: { categories: months },
+      yAxis: { title: { text: 'Number of Invoices' } },
+      series: [{
+        name: 'Invoices',
+        type: 'column',
+        data: res.monthlyCounts,
+        color: '#6f42c1' // ✅ Green color
+      }]
+    } as Highcharts.Options);
+  });
+}
 
-  // 🏷️ Categories
+
   categoriesChart(): void {
     this.dashboardService.getCategoriesStats(this.selectedBranch).subscribe((res: any) => {
       const categories = res.stats.map((c: any) => c.categoryName);
       const totalItems = res.stats.map((c: any) => c.totalItems);
-    
+  
       Highcharts.chart('categories-chart', {
         chart: { type: 'bar' },
         title: { text: 'Items per Category' },
@@ -159,21 +179,13 @@ export class HomeComponent implements OnInit {
         series: [{
           name: 'Total Items',
           type: 'bar',
-          data: totalItems
+          data: totalItems,
+          color: '#ff7f0e' // 🟠 Change this to any color you like (e.g. orange)
         }]
       } as Highcharts.Options);
     });
-
-
   }
+  
 
- 
 
-  // 🔗 Click actions
-  openUsersDetails() { console.log('Open Users details modal'); }
-  openProductsDetails() { console.log('Open Products details modal'); }
-  openOrdersDetails() { console.log('Open Orders details modal'); }
-  openInvoicesDetails() { console.log('Open Invoices details modal'); }
-  openCategoriesDetails() { console.log('Open Categories details modal'); }
-  openInventoryDetails() { console.log('Open Inventory details modal'); }
 }

@@ -336,5 +336,7 @@
   "tr_cash": "Espèces",
   "tr_online": "En ligne",
   "tr_optional": "Optionnel",
-  "tr_invoices": "Factures"
+  "tr_invoices": "Factures",
+  "tr_items": "Articles",
+  "tr_contact_us": "Contactez-nous"
 }

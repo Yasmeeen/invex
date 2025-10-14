@@ -5,12 +5,17 @@ import mongoose from 'mongoose';
 
 export const getOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', searchBranch = '' } = req.query;
+    const { page = 1, limit = 10, search = '', searchBranch = '', status } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const query = {};
 
-    // ✅ 1. Search by order number, client name, or phone number
+    // ✅ 1. Optional status filter
+    if (status && status.trim() !== '') {
+      query.status = status;
+    }
+
+    // ✅ 2. Search by order number, client name, or phone number
     if (search) {
       const isNumber = !isNaN(search);
       query.$or = [
@@ -22,7 +27,7 @@ export const getOrders = async (req, res) => {
       }
     }
 
-    // ✅ 2. Search by branch name (works independently)
+    // ✅ 3. Search by branch name (works independently)
     if (searchBranch) {
       const branch = await Branch.findOne({
         name: { $regex: searchBranch, $options: 'i' },
@@ -42,7 +47,7 @@ export const getOrders = async (req, res) => {
       }
     }
 
-    // ✅ 3. Fetch orders (include products in selection)
+    // ✅ 4. Fetch orders (with branch populated)
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
@@ -58,7 +63,7 @@ export const getOrders = async (req, res) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    // ✅ 4. Respond with products included
+    // ✅ 5. Respond
     res.json({
       orders,
       meta: {
@@ -74,6 +79,7 @@ export const getOrders = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 };
+
 
 
 export const getOrderById = async (req, res) => {

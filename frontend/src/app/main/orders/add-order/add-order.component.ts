@@ -154,10 +154,7 @@ export class AddOrderComponent implements OnInit {
     };
 
     this.ordersSerivce.createOrder(orderPayload).subscribe((response:any) => {
-
       this.createdOrder = response.newOrder;   
-      console.log("   this.createdOrder ",   this.createdOrder );
-       
       setTimeout(() => {
         this.printInvoice();
       }, 0);
@@ -165,7 +162,6 @@ export class AddOrderComponent implements OnInit {
    
 
     }, error=> {
-      console.log(error.error);
       this.appNotificationService.push(error.error, 'error');
     });
   }

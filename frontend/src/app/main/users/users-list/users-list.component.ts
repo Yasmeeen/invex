@@ -54,11 +54,7 @@ export class UsersListComponent implements OnInit, OnDestroy {
         (error:any) => {
           this.usersLoading = false;
           this.isNotAuthorized = error.status === 403;
-          console.log("error",error);
-          
           if (!this.isNotAuthorized) {
-            console.log("here");
-            
             this.notificationService.push(this.translate.instant('tr_unexpected_error_message'), 'error');
           }
         }

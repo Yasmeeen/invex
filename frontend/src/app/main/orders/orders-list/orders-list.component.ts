@@ -34,6 +34,8 @@ export class OrdersListComponent implements OnInit {
   isNotAuthorized: boolean = false;
   iscategoryNotAuthorized: boolean = false;
   isToday: boolean = true;
+  status = ['restored','completed']
+  selectedStatus: string;
 
   currentOrder: any = {
     name: '',
@@ -96,6 +98,10 @@ export class OrdersListComponent implements OnInit {
    if( this.curentUser.role == 'Employee'){
     this.params.searchBranch = this.curentUser.branch?.name
    }
+   if(this.selectedStatus){
+    this.params['status'] = this.selectedStatus
+   }
+
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
       this.ordersList = response.orders

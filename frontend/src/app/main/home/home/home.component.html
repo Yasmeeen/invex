@@ -37,7 +37,7 @@
 
   <div class="col-md-12">
     <div class="container-card">
-      <div class="mb-4 border-bottom pb-3">
+      <div class="pb-3">
         <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
           <div>
             <a class="hover-link pointer weight-bold">{{ 'sales_summary' | translate }}</a>
@@ -119,8 +119,8 @@
   </div>
 
   <!-- Products -->
-  <div class="col-md-4">
-    <div class="container-card" (click)="openProductsDetails()">
+  <div class="col-md-6">
+    <div class="container-card">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_products' | translate }}</span>
         <span class="count">{{ this.productsStats?.totalProducts }}</span>
@@ -131,8 +131,8 @@
   </div>
 
   <!-- Orders -->
-  <div class="col-md-4">
-    <div class="container-card" (click)="openOrdersDetails()">
+  <div class="col-md-6">
+    <div class="container-card">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_orders' | translate }}</span>
       </div>
@@ -143,7 +143,7 @@
 
   <!-- Invoices -->
   <div class="col-md-6 mt-4">
-    <div class="container-card" (click)="openInvoicesDetails()">
+    <div class="container-card">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_invoices' | translate }}</span>
         <!-- <span class="count">{{ totalInvoices }}</span> -->
@@ -155,7 +155,7 @@
 
   <!-- Categories -->
   <div class="col-md-6 mt-4">
-    <div class="container-card" (click)="openCategoriesDetails()">
+    <div class="container-card">
       <div class="dashboard-card-header">
         <span class="title">{{ 'tr_categories' | translate }}</span>
         <!-- <span class="count">{{ totalCategories }}</span> -->

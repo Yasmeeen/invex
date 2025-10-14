@@ -339,6 +339,7 @@
     "tr_online": "Online",
     "tr_optional": "Optional",
     "tr_invoices":"Invoices",
-    "tr_items":"items"
+    "tr_items":"items",
+    "tr_contact_us": "Contact Us"
 
 }

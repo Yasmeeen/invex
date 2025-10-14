@@ -107,7 +107,6 @@ export class CreateEditProductComponent implements OnInit {
       this.appNotificationService.push('product created successfully', 'sucess');
       this.closeModal(true);
     }, error=> {
-      console.log(error.error);
       this.appNotificationService.push(error.error.error, 'error');
     });
 
@@ -123,7 +122,6 @@ export class CreateEditProductComponent implements OnInit {
       this.appNotificationService.push('product updated successfully', 'sucess');
       this.closeModal(true);
     }, error=> {
-      console.log(error.error);
       this.appNotificationService.push(error.error.error, 'error');
     });
 

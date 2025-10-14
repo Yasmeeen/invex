@@ -1,19 +1,27 @@
 import Product from '../../DB/models/product.model.js';
 
 // Get all products (with pagination and optional search)
+// Get all products (with pagination, optional search, optional branch filter)
 export const getProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
+    const { page = 1, limit = 10, search = '', branchId } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const query = search
-      ? {
-          $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { code: { $regex: search, $options: 'i' } },
-          ],
-        }
-      : {};
+    // Build query
+    const query = {};
+
+    // Optional search
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { code: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Optional branch filter
+    if (branchId) {
+      query.branch = branchId; // only filter if branchId is provided
+    }
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -41,6 +49,7 @@ export const getProducts = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch products' });
   }
 };
+
 
 // Get product by ID
 export const getProductById = async (req, res) => {

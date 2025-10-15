@@ -47,7 +47,7 @@
 
                 <div class="col-md-4">
                   <div class="form-group" [class.has-error]="sellerName.invalid && orderForm.submitted">
-                    <label>{{ 'tr_seller_name' | translate }} <span class="size_tiny">{{'tr_optional' | translate}}</span> </label>
+                    <label>{{ 'tr_seller_name' | translate }} <span class="size_tiny">( {{'tr_optional' | translate}})</span> </label>
                     <input
                       type="text"
                       class="s-control"
@@ -104,7 +104,7 @@
                         bindValue="_id"
                         [clearable]="false"
                         [(ngModel)]= "adminSelectedBranchId"
-                        (change)="getProducts()"
+                        (change)="changeBranch()"
                         #branch="ngModel"
                         name="branchId"
                         [items]="branches"

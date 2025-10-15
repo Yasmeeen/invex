@@ -165,6 +165,12 @@ export class AddOrderComponent implements OnInit {
       this.appNotificationService.push(error.error, 'error');
     });
   }
+  changeBranch(){
+     this.orderProducts = [
+      {  quantity: 1, totalPrice: 0, selectedProduct: {} }
+    ];
+    this.getProducts();
+  }
 
 
   // Close modal

@@ -76,6 +76,9 @@ export class ProductsListComponent implements OnInit {
     if(this.selectedBranch){
       this.params['branchId'] = this.selectedBranch;
     }
+    else {
+      delete this.params['branchId']
+    }
 
     this.subscriptions.push(this.productsService.getProducts(this.params).subscribe((response: any) => {
       this.productsList = response.products

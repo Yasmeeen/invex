@@ -101,7 +101,7 @@ export class HomeComponent implements OnInit {
       title: { text: '' },
       plotOptions: {
         pie: {
-          colors: ['#7dc46f', '#f44b4b'], // 🟢 In Stock, 🔴 Out of Stock
+          colors: ['#7dc46f', '#ea379f'], // 🟢 In Stock, 🔴 Out of Stock
           dataLabels: {
             enabled: true,
             format: '{point.name}: {point.y}'
@@ -128,7 +128,7 @@ ordersChart(): void {
       title: { text: '' },
       plotOptions: {
         pie: {
-          colors: ['#7dc46f', '#f44b4b'], // ✅ Completed = Green, Restored = Red
+          colors: ['#7dc46f', '#ea379f'], // ✅ Completed = Green, Restored = Red
           dataLabels: {
             enabled: true,
             format: '{point.name}: {point.y}'

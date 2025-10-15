@@ -101,6 +101,9 @@ export class OrdersListComponent implements OnInit {
    if(this.selectedStatus){
     this.params['status'] = this.selectedStatus
    }
+   else {
+    delete  this.params['status'] 
+   }
 
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
@@ -158,7 +161,7 @@ export class OrdersListComponent implements OnInit {
     let params ={
       from:  this.fromDate.toLocaleDateString('en-CA'),
       to:   this.toDate.toLocaleDateString('en-CA'),
-      branch: this.selectedBranchId
+      branch: this.curentUser.role == 'Super Admin' ? this.selectedBranchId :this.globals.currentUser.branch._id,
     }
     if( this.curentUser.role == 'Employee'){
       this.params.branch = this.curentUser.branch?._id

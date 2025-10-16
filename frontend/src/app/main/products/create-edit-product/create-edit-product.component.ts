@@ -66,7 +66,7 @@ export class CreateEditProductComponent implements OnInit {
   getCategories() {
     let params = {
       'page': 1,
-      'per_page': 1000
+      'limit': 1000
     }
     this.subscriptions.push(this.categoriesServce.getCategorys(params).subscribe((response: any) => {
       this.categories = response.categories
@@ -78,7 +78,7 @@ export class CreateEditProductComponent implements OnInit {
   getBranches() {
     let params = {
       'page': 1,
-     'per_page': 1000
+     'limit': 1000
     }
     this.subscriptions.push(this.branchesServce.getBranchs(params).subscribe((response: any) => {
       this.branches = response.branches

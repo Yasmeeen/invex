@@ -72,15 +72,18 @@ export const getProductById = async (req, res) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, code, price,netPrice, category, branch,stock,discount } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount } = req.body;
 
     if (!name || !code || !price || !netPrice || !category._id || !branch._id || !stock) {
       return res.status(400).json({ error: 'All fields are required' });
     }
-    const isProductCodeExist = await Product.findOne({ code });
-    if (isProductCodeExist) {
-      return res.status(409).json({ error: 'product code already exist' });
+
+    // ✅ Check if a product with the same code exists in the same branch
+    const existingProduct = await Product.findOne({ code, branch: branch._id });
+    if (existingProduct) {
+      return res.status(409).json({ error: 'Product code already exists in this branch' });
     }
+
     const createdProduct = await Product.create({
       name,
       code,
@@ -89,9 +92,8 @@ export const createProduct = async (req, res) => {
       stock,
       discount,
       category: category._id,
-      branch: branch._id
+      branch: branch._id,
     });
-
 
     res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
@@ -100,18 +102,40 @@ export const createProduct = async (req, res) => {
   }
 };
 
+
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch,stock,discount } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount } = req.body;
 
-    if (!name || !code || !price || !netPrice, !category || !branch || !stock || !discount) {
+    // ✅ Fix validation (used || instead of comma)
+    if (!name || !code || !price || !netPrice || !category?._id || !branch?._id || !stock) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // ✅ Prevent duplicate product code in the same branch (excluding itself)
+    const existingProduct = await Product.findOne({
+      code,
+      branch: branch._id,
+      _id: { $ne: req.params.id },
+    });
+
+    if (existingProduct) {
+      return res.status(409).json({ error: 'Product code already exists in this branch' });
     }
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { name, code, price, netPrice, category, branch, stock, discount },
+      {
+        name,
+        code,
+        price,
+        netPrice,
+        category: category._id,
+        branch: branch._id,
+        stock,
+        discount,
+      },
       { new: true }
     );
 
@@ -125,6 +149,7 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ error: 'Failed to update product' });
   }
 };
+
 
 // Delete product
 export const deleteProduct = async (req, res) => {

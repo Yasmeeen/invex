@@ -84,7 +84,7 @@ export class AddOrderComponent implements OnInit {
     let params ={
       branchId: this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id,
       'page': 1,
-      'per_page': 1000
+      'limit': 1000
     }
     this.productsSerivce.getProducts(params).subscribe((res: any) => {
       this.products = res.products;
@@ -94,7 +94,7 @@ export class AddOrderComponent implements OnInit {
   getBranches() {
     let params = {
       'page': 1,
-     'per_page': 1000
+     'limit': 1000
     }
     this.subscriptions.push(this.branchesServce.getBranchs(params).subscribe((response: any) => {
       this.branches = response.branches

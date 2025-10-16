@@ -86,7 +86,7 @@ export class OrdersListComponent implements OnInit {
   getBranches() {
     let params = {
       'page': 1,
-     'per_page': 1000
+     'limit': 1000
     }
   this.branchesServce.getBranchs(params).subscribe((response: any) => {
       this.branches = response.branches

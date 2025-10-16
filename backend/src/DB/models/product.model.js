@@ -10,8 +10,7 @@ const productSchema = new mongoose.Schema(
     code: {
       type: String,
       required: true,
-      unique: true,
-      trim: true,
+      trim: true, // removed "unique" from here
     },
     price: {
       type: Number,
@@ -30,7 +29,6 @@ const productSchema = new mongoose.Schema(
     },
     discount: {
       type: Number,
-      required: false,
       default: 0,
       min: 0,
     },
@@ -46,10 +44,12 @@ const productSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // adds createdAt and updatedAt
+    timestamps: true,
   }
 );
 
+// ✅ Compound unique index: code + branch combination must be unique
+productSchema.index({ code: 1, branch: 1 }, { unique: true });
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;

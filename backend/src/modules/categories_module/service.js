@@ -5,26 +5,24 @@ import Product from '../../DB/models/product.model.js';
 export const getCategories = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
-    const skip = (page - 1) * limit;
+    const skip = (Number(page) - 1) * Number(limit);
     const searchRegex = new RegExp(search, 'i');
 
-    const query = { name: { $regex: searchRegex } };
+    const query = search ? { name: { $regex: searchRegex } } : {};
 
-    // Fetch categories with pagination
-    const categories = await Category.find(query)
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Fetch categories and total count in parallel
+    const [categories, total] = await Promise.all([
+      Category.find(query)
+        .skip(skip)
+        .limit(Number(limit)),
+      Category.countDocuments(query),
+    ]);
 
-    const total = await Category.countDocuments(query);
-
-    // ✅ Add product count and total items for each category
+    // Add product count and total stock per category
     const categoriesWithCount = await Promise.all(
       categories.map(async (category) => {
         const products = await Product.find({ category: category._id });
-
         const productsCount = products.length;
-
-        // Total items = sum of stock of all products in this category
         const totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
 
         return {
@@ -35,13 +33,17 @@ export const getCategories = async (req, res) => {
       })
     );
 
+    const totalPages = Math.ceil(total / limit);
+
     res.json({
       categories: categoriesWithCount,
       meta: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / limit),
+        currentPage: Number(page),
+        limit: Number(limit), // ✅ same naming as getProducts
+        nextPage: page < totalPages ? Number(page) + 1 : null,
+        prevPage: page > 1 ? Number(page) - 1 : null,
+        totalCount: total,
+        totalPages,
       },
     });
   } catch (err) {
@@ -49,6 +51,7 @@ export const getCategories = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
 
 
 

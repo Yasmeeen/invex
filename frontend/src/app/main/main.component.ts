@@ -1,10 +1,11 @@
+import { AuthenticationService } from './../core/services/authentication.service';
 import { Component, OnInit } from '@angular/core';
 import { NavigationEnd, Router, RouterEvent } from '@angular/router';
 import { CurrentUser } from '@core/models/users-interfaces.model';
 import { TranslateService } from '@ngx-translate/core';
 import { UserSerivce } from '@shared/services/user.service';
 import { Globals } from '../core/globals';
-import { AuthenticationService } from '../core/services/authentication.service';
+// import { AuthenticationService } from '../core/services/authentication.service';
 
 @Component({
   selector: 'app-main',
@@ -18,10 +19,11 @@ export class MainComponent implements OnInit {
   englishSelected: boolean = false;
   constructor(
       private router:Router,
-      private translate: TranslateService
+      private translate: TranslateService,
+      private authenticationService:AuthenticationService
   ) {
-      // this.currentUser = this.authenticationService.getCurrentUser();
-      // globals.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      this.currentUser = this.authenticationService.getUserFromLocalStorage();
+    //   globals.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       document.body.classList.add('admin_theme');
 
 

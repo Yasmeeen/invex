@@ -49,3 +49,13 @@ quantity: number;
 totalPrice: number;    // changed to number
 selectedProduct: any
 }  
+
+export interface Vendor {
+  _id: string;
+  name: string;
+  storeAddress: string;
+  rent: number;
+  employeesSalary: number;
+  branchInvoices: number;
+  expenses: number;
+}

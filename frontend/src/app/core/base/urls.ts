@@ -40,6 +40,9 @@ export const ORDERS_URL = BASE_URL + '/api/orders';
 export const ORDER_CREATE_URL = ORDERS_URL + '/createOrder';
 export const ORDER_UPDATE_URL = ORDERS_URL + '/updateOrder';
 
+
+export const VENDORS_URL = BASE_URL + '/api/vendors';
+
 export const ORDER_PAY_URL = ORDERS_URL + '/pay';
 export const ORDER_TRACK_URL = ORDERS_URL + '/track/';
 

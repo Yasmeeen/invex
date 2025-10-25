@@ -4,7 +4,7 @@ import { Component } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Branch, Order, Product, productOrder } from "@core/models/products.model";
-import { ProductsSerivce } from "@shared/services/products.service copy";
+// import { ProductsSerivce } from "@shared/services/products.service copy";
 import { OrdersSerivce } from "@shared/services/orders.service";
 import { AppNotificationService } from "@shared/services/app-notification.service";
 import { Globals } from "@core/globals";
@@ -13,6 +13,7 @@ import { BranchesServce } from "@shared/services/branches.service";
 import { Subscription } from "rxjs";
 import { TranslateService } from "@ngx-translate/core";
 import { AuthenticationService } from "@core/services/authentication.service";
+import { ProductsSerivce } from "@shared/services/products.service";
 
 @Component({
   selector: "app-add-order",

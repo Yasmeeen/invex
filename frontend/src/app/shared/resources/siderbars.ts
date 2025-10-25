@@ -30,6 +30,23 @@ export const  AdminSidebar = [
     icon: 'fa fa-list-ul  icon',
   },
   {
+    name: 'tr_purchases',
+    routerLink: 'null',
+    icon: 'icon-mycourses-selected-ico icon orange-icon',
+    children: [
+      {
+        name: 'tr_suppliers',
+        routerLink: '/suppliers',
+        icon: 'fa fa-ticket icon',
+      },
+      {
+        name: 'tr_purchases',
+        routerLink: '/purchases',
+        icon: 'fa fa-ticket icon',
+      }
+    ]
+  },
+  {
     name: 'tr_orders',
     routerLink: '/orders',
     icon: 'fa fa-ticket icon',

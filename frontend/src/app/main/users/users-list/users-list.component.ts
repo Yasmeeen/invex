@@ -9,6 +9,7 @@ import { Subscription } from 'rxjs';
 import { CreateEditUserComponent } from '../create-edit-user/create-edit-user.component';
 import { User, PaginationData } from '@core/models/users-interfaces.model';
 import { UserSerivce } from '@shared/services/user.service';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 
 
@@ -89,10 +90,39 @@ export class UsersListComponent implements OnInit, OnDestroy {
   }
 
   deleteUser(userId: string): void {
-    this.userSerivce.deleteUser(userId).subscribe(() => {
-      this.params.page = 1;
-      this.getUsers();
+    let confirmationData = {
+      title: this.translate.instant('tr_confirmation_message'),
+      buttons: [
+        {
+          label: this.translate.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary'
+        },
+        {
+          label: this.translate.instant('tr_action.delete'),
+          actionCallback: 'delete',
+          type: 'btn-danger'
+        },
+      ]
+    };
+    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
     });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result != 'delete') {
+        return;
+      }
+      
+      
+      this.userSerivce.deleteUser(userId).subscribe(() => {
+        this.params.page = 1;
+        this.getUsers();
+      });
+    });
+
+
   }
 
   ngOnDestroy(): void {

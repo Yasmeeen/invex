@@ -41,7 +41,7 @@ export const  AdminSidebar = [
       },
       {
         name: 'tr_purchases',
-        routerLink: '/purchases',
+        routerLink: '/purchasing',
         icon: 'fa fa-ticket icon',
       }
     ]

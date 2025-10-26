@@ -1,1 +1,177 @@
-<p>create-edit-vendor works!</p>
+<div class="complex-modal">
+    <div class="modal-wrapper">
+      <div class="close-modal-icon" (click)="closeModal()"></div>
+      <div class="modal-content" #modalContent>
+        <div class="modal-header border-bottom">
+          <h3 class="steel weight-medium size-default m-0">
+            {{ isEdit ? ('tr_edit_suplier' | translate) : ('tr_new_suplier' | translate) }}
+          </h3>
+        </div>
+  
+        <div class="modal-body weight-medium steel">
+          <div class="content-container plr-4 ptb-3">
+            <div
+              class="alert alert-error mb-3"
+              *ngIf="vendorForm.invalid && vendorForm.submitted"
+            >
+              {{ 'tr_fill_required_fields' | translate }}
+            </div>
+  
+            <form #vendorForm="ngForm">
+              <div class="row">
+  
+                <!-- Legal Company Name -->
+                <div class="col-md-6">
+                  <div class="form-group" [class.has-error]="nameOfcompany.invalid && vendorForm.submitted">
+                    <label>{{ 'tr_legal_name' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="nameOfcompany"
+                      ngModel
+                      #nameOfcompany="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="nameOfcompany.invalid && vendorForm.submitted">
+                      {{ 'tr_company_name_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+  
+                <!-- Contact Name -->
+                <div class="col-md-6">
+                  <div class="form-group" [class.has-error]="name.invalid && vendorForm.submitted">
+                    <label>{{ 'tr_name' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="name"
+                      ngModel
+                      #name="ngModel"
+                      required
+                    />
+                    <span class="text-error size-small validator" *ngIf="name.invalid && vendorForm.submitted">
+                      {{ 'tr_contact_name_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                        <!-- Payment Terms -->
+                        <div class="col-md-6">
+                            <div class="form-group" [class.has-error]="paymentTerms.invalid && vendorForm.submitted">
+                              <label>{{ 'tr_payment_terms' | translate }}</label>
+                              <div class="input-with-icon bg-white">
+                                <ng-select
+                                  class="s-control s-select"
+                                  name="paymentTerms"
+                                  ngModel
+                                  #paymentTerms="ngModel"
+                                  [items]="paymentOptions"
+                                  bindLabel="label"
+                                  bindValue="value"
+                                  [multiple]="true"
+                                  required
+                                ></ng-select>
+                                <i class="fa fa-caret-down input-icon"></i>
+                              </div>
+                            </div>
+                          </div>
+            
+                          <!-- Categories -->
+                          <div class="col-md-6">
+                            <div class="form-group" [class.has-error]="categories.invalid && vendorForm.submitted">
+                              <label>{{ 'tr_categories' | translate }}</label>
+                              <div class="input-with-icon bg-white">
+                                <ng-select
+                                  class="s-control s-select"
+                                  name="categories"
+                                  ngModel
+                                  #categories="ngModel"
+                                  [items]="categoriesList"
+                                  bindLabel="name"
+                                  bindValue="_id"
+                                  [multiple]="true"
+                                  required
+                                ></ng-select>
+                                <i class="fa fa-caret-down input-icon"></i>
+                              </div>
+                            </div>
+                          </div>
+  
+                <!-- Email -->
+                <div class="col-md-6">
+                  <div class="form-group" >
+                    <label>{{ 'tr_email' | translate }} ({{'tr_optional' | translate}})</label>
+                    <input
+                      type="email"
+                      class="s-control"
+                      name="email"
+                      ngModel
+                      #email="ngModel"
+                
+                    />
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-group">
+                      <label>{{ 'tr_address' | translate }} ({{'tr_optional' | translate}})</label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="address"
+                        ngModel
+                        #address="ngModel"
+                      />
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group" [class.has-error]="phone.invalid && vendorForm.submitted">
+                      <label>{{ 'tr_phone_number' | translate }} </label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="phone"
+                        ngModel
+                        #phone="ngModel"
+                        required="true"
+                      />
+                      <span class="text-error size-small validator" *ngIf="phone.invalid && vendorForm.submitted">
+                        {{ 'tr_phone_number_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+  
+                <!-- Transaction Currency -->
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label>{{ 'tr_transaction_currency' | translate }} ({{'tr_optional' | translate}}) </label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="transactionCurrency"
+                      ngModel
+                      #transactionCurrency="ngModel"
+            
+                    />
+                  </div>
+                </div>
+  
+
+              </div>
+            </form>
+          </div>
+        </div>
+  
+        <div class="modal-footer mt-3 text-right">
+          <button class="s-btn btn-secondary mr-3" (click)="closeModal()">
+            {{ 'tr_cancel' | translate }}
+          </button>
+          <button class="s-btn btn-primary" type="submit" (click)="submitForm()">
+            {{ 'tr_save' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  

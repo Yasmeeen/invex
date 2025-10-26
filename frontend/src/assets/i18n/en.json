@@ -340,6 +340,28 @@
     "tr_optional": "Optional",
     "tr_invoices":"Invoices",
     "tr_items":"items",
-     "tr_purchases":"Purchasing"
+    "tr_contact_us": "Contact Us",
+    "tr_purchases":"Purchasing",
+    "tr_suppliers":"Suppliers",
+    "tr_legal_name":"Legal Name of the Company",
+    "tr_new_suplier": "New Suplier",
+    "tr_edit_suplier": "Edit Suplier",
+    "tr_suplier_name": "Suplier Name",
+    "tr_suplier_code": "Suplier Code",
+    "tr_phone": "Phone",
+    "tr_payment_terms": "Payment Terms",
+    "tr_installments": "Installments",
+    "tr_installment_date": "Installment Date",
+    "tr_paid": "Paid",
+    "tr_unpaid": "Unpaid",
+    "tr_add_installment": "Add Installment",
+    "tr_remove_installment": "Remove",
+    "tr_suplier_created_successfully": "Suplier created successfully",
+    "tr_suplier_updated_successfully": "Suplier updated successfully",
+    "tr_suplier_required": "Suplier name is required",
+    "tr_add_supplier":"Add Supplier",
+    "tr_transaction_currency":"Transaction Currency",
+    "tr_confirmation_message":"Sure about that?"
+  
 
 }

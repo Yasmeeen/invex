@@ -333,5 +333,21 @@
   "tr_online": "إلكتروني",
   "tr_optional": "خياري",
   "tr_items":"عناصر",
-  "tr_purchases":"مشتريات"
+  "tr_contact_us": "اتصل بنا",
+  "tr_new_vendor": "مورد جديد",
+  "tr_edit_vendor": "تعديل المورد",
+  "tr_vendor_name": "اسم المورد",
+  "tr_vendor_code": "كود المورد",
+  "tr_phone": "رقم الهاتف",
+  "tr_payment_terms": "شروط الدفع",
+  "tr_installments": "دفعات",
+  "tr_installment_date": "تاريخ الدفعة",
+  "tr_paid": "مدفوع",
+  "tr_unpaid": "غير مدفوع",
+  "tr_add_installment": "إضافة دفعة",
+  "tr_remove_installment": "إزالة",
+  "tr_vendor_created_successfully": "تم إنشاء المورد بنجاح",
+  "tr_vendor_updated_successfully": "تم تحديث المورد بنجاح",
+  "tr_vendor_required": "اسم المورد مطلوب"
+
 }

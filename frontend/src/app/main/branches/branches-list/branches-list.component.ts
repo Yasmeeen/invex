@@ -8,6 +8,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { BranchesServce } from '@shared/services/branches.service';
 import { Subscription } from 'rxjs';
 import { CreateEditBranchComponent } from '../create-edit-branch/create-edit-branch.component';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-branches-list',
@@ -127,11 +128,39 @@ export class BranchesListComponent implements OnInit {
   }
 
   deleteBranch(branchId: string){
-    this.branchesService.deleteBranch(branchId).subscribe(() => {
-      this.params.page = 1;
-        this.getbranches()
+    let confirmationData = {
+      title: this.translateService.instant('tr_confirmation_message'),
+      buttons: [
+        {
+          label: this.translateService.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary'
+        },
+        {
+          label: this.translateService.instant('tr_action.delete'),
+          actionCallback: 'delete',
+          type: 'btn-danger'
+        },
+      ]
+    };
+    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result != 'delete') {
+        return;
+      }
+      this.branchesService.deleteBranch(branchId).subscribe(() => {
+        this.params.page = 1;
+          this.getbranches()
+  
+      })
+    });
 
-    })
+
+  
   }
 
   ngOnDestroy() {

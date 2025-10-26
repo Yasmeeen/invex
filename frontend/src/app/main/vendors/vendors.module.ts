@@ -1,9 +1,11 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { VendorsRoutingModule } from './vendors-routing.module';
-import { VendorsListComponent } from './vendors-list/vendors-list.component';
 import { CreateEditVendorComponent } from './create-edit-vendor/create-edit-vendor.component';
+import { VendorsListComponent } from './vendors-list/vendors-list.component';
+import { SharedModule } from '@shared/shared.module';
+import { VendorsRoutingModule } from './vendors-routing.module';
+import { VendorsSerivce } from '@shared/services/vendors.service';
 
 
 @NgModule({
@@ -13,7 +15,11 @@ import { CreateEditVendorComponent } from './create-edit-vendor/create-edit-vend
   ],
   imports: [
     CommonModule,
-    VendorsRoutingModule
+    VendorsRoutingModule,
+    SharedModule
+  ],
+  providers: [
+    VendorsSerivce
   ]
 })
 export class VendorsModule { }

@@ -17,6 +17,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { BranchesServce } from '@shared/services/branches.service';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-orders-list',
@@ -173,18 +174,45 @@ export class OrdersListComponent implements OnInit {
   }
 
   restoreOrder(orderId: string): void {
-
-    this.ordersService.restoreOrder(orderId).subscribe({
-      next: (res) => {
-        this.appNotificationService.push( this.translateService.instant('Order restored successfully!'), 'success');
-        // refresh orders list
-     this.getOrders();
-     this.getOrderStatistics();
-      },
-      error: (err) => {
-        this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
-      }
+    let confirmationData = {
+      title: this.translateService.instant('tr_confirmation_message'),
+      buttons: [
+        {
+          label: this.translateService.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary'
+        },
+        {
+          label: this.translateService.instant('tr_action.restore'),
+          actionCallback: 'restore',
+          type: 'btn-danger'
+        },
+      ]
+    };
+    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
     });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result != 'restore') {
+        return;
+      }
+      this.ordersService.restoreOrder(orderId).subscribe({
+        next: (res) => {
+          this.appNotificationService.push( this.translateService.instant('Order restored successfully!'), 'success');
+          // refresh orders list
+       this.getOrders();
+       this.getOrderStatistics();
+        },
+        error: (err) => {
+          this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
+        }
+      });
+    });
+
+
+
   }
 
 

@@ -50,12 +50,22 @@ totalPrice: number;    // changed to number
 selectedProduct: any
 }  
 
-export interface Vendor {
-  _id: string;
-  name: string;
-  storeAddress: string;
-  rent: number;
-  employeesSalary: number;
-  branchInvoices: number;
-  expenses: number;
+export interface Installment {
+  date: string;       // ISO date string (e.g. "2025-10-25")
+  paid: boolean;      // true if paid, false if not
 }
+
+export interface Vendor {
+  _id?: string;
+  nameOfcompany: string;
+  name: string;
+  email?: string;
+  phone: string;
+  address?: string;
+  transactionCurrency?: string;
+  paymentTerms: 'cash' | 'Installments';
+  categories: Category[];         // Array of Category IDs
+  createdAt?: string;
+  updatedAt?: string;
+}
+

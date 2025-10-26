@@ -338,6 +338,21 @@
     "tr_optional": "Optional",
     "tr_invoices": "Rechnungen",
     "tr_items": "Artikel",
-    "tr_contact_us": "Kontaktieren Sie uns"
+    "tr_contact_us": "Kontaktieren Sie uns",
+    "tr_new_vendor": "Neuer Lieferant",
+    "tr_edit_vendor": "Lieferant bearbeiten",
+    "tr_vendor_name": "Lieferantenname",
+    "tr_vendor_code": "Lieferantencode",
+    "tr_phone": "Telefon",
+    "tr_payment_terms": "Zahlungsbedingungen",
+    "tr_installments": "Ratenzahlung",
+    "tr_installment_date": "Ratenzahlungsdatum",
+    "tr_paid": "Bezahlt",
+    "tr_unpaid": "Unbezahlt",
+    "tr_add_installment": "Rate hinzufügen",
+    "tr_remove_installment": "Entfernen",
+    "tr_vendor_created_successfully": "Lieferant erfolgreich erstellt",
+    "tr_vendor_updated_successfully": "Lieferant erfolgreich aktualisiert",
+    "tr_vendor_required": "Lieferantenname ist erforderlich",
   }
   

@@ -13,6 +13,7 @@ import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-products-list',
@@ -143,11 +144,38 @@ export class ProductsListComponent implements OnInit {
 
 
   deleteProduct(productId: string){
-    this.productsService.deleteProduct(productId).subscribe(() => {
-      this.params.page = 1;
-        this.getproducts()
+    let confirmationData = {
+      title: this.translateService.instant('tr_confirmation_message'),
+      buttons: [
+        {
+          label: this.translateService.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary'
+        },
+        {
+          label: this.translateService.instant('tr_action.delete'),
+          actionCallback: 'delete',
+          type: 'btn-danger'
+        },
+      ]
+    };
+    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result != 'delete') {
+        return;
+      }
+      this.productsService.deleteProduct(productId).subscribe(() => {
+        this.params.page = 1;
+          this.getproducts()
+  
+      })
+    });
 
-    })
+
   }
   createOrEditproduct(isEdit: boolean, product?: Product){
     let dialogRef = this.dialog.open(CreateEditProductComponent, {

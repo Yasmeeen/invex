@@ -52,6 +52,21 @@ const routes: Routes = [
         canActivate: [RoleGuard],
         data: { allowedRoles: ['Super Admin'] }
       },
+      {
+        path: 'purchasing',
+        loadChildren:() => import('./purchasing/purchasing.module').then(m => m.PurchasingModule),
+        canActivate: [RoleGuard],
+        data: { allowedRoles: ['Super Admin'] }
+      },
+      {
+        path: 'suppliers',
+        loadChildren:() => import('./vendors/vendors.module').then(m => m.VendorsModule),
+        canActivate: [RoleGuard],
+        data: { allowedRoles: ['Super Admin'] }
+      },
+
+
+      
 
       {
         path: '**',  loadChildren: () => import('./home/home.module').then(m => m.HomeModule),

@@ -8,6 +8,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { Category } from '@core/models/products.model';
 import { CreateEditCategoryComponent } from '../create-edit-category/create-edit-category.component';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 
 
@@ -108,11 +109,39 @@ export class CategoryListComponent implements OnInit {
   }
 
   deleteCategory(categoryId: string){
-    this.categoriesService.deleteCategory(categoryId).subscribe(() => {
-      this.params.page = 1;
-        this.getcategories()
+    let confirmationData = {
+      title: this.translateService.instant('tr_confirmation_message'),
+      buttons: [
+        {
+          label: this.translateService.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary'
+        },
+        {
+          label: this.translateService.instant('tr_action.delete'),
+          actionCallback: 'delete',
+          type: 'btn-danger'
+        },
+      ]
+    };
+    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result != 'delete') {
+        return;
+      }
+      
+      this.categoriesService.deleteCategory(categoryId).subscribe(() => {
+        this.params.page = 1;
+          this.getcategories()
+  
+      })
+    });
 
-    })
+
   }
 
   ngOnDestroy() {

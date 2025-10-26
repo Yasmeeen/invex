@@ -5,11 +5,11 @@
 >
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">
-      <span class="text-primary">{{totalNumberOfProducts}}-</span>
-      {{ "tr_vendors" | translate }}</span>
+      <span class="text-primary">{{totalNumberOfVendors}}-</span>
+      {{ "tr_suppliers" | translate }}</span>
     <div class="btn-group">
-      <button class="s-btn btn-primary" (click)="createOrEditproduct(false)">
-        {{ "tr_add_vendor" | translate }}
+      <button class="s-btn btn-primary" (click)="createOrEditvendor(false)">
+        {{ "tr_add_supplier" | translate }}
       </button>
       <button
         class="s-btn btn-secondary size-body"
@@ -24,76 +24,55 @@
     <div class="row">
       <div class="col-md-3">
         <div class="form-group mb-0">
-          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+          <label>{{ "tr_name" | translate }}/{{ "tr_phone" | translate }}</label>
           <div class="input-with-icon bg-white width-100">
             <input
               class="s-control"
-              (keyup)="filterproducts($event, 'searchTerm')"
+              (keyup)="filterVendors($event, 'searchTerm')"
               placeholder="{{ 'tr_search' | translate }}"
               [(ngModel)]="nameSearchTerm"
             />
           </div>
         </div>
       </div>
-      <div class="col-md-4" >
-        <div
-          class="form-group"
-        >
-          <label>{{ 'tr_branches' | translate }}</label>
-          <div class="input-with-icon bg-white">
-            <ng-select
-              class="s-control s-select"
-              placeholder="{{ 'tr_select' | translate }}"
-              bindLabel="name"
-              bindValue="_id"
-              [(ngModel)]= "selectedBranch"
-              #branch="ngModel"
-              name="branchId"
-              [items]="branches"
-              (change)="getproducts()"
-              required
-            >
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
-          </div>
-        </div>
-      </div>
+    
     </div>
   </div>
 
   <div>
-    <div class="plr-4 mt-4" *ngIf="!productsLoading">
+    <div class="plr-4 mt-4" *ngIf="!vendorsLoading">
       <div
         class="table-container vendors-list"
         id="table-container"
-        *ngIf="productsList.length > 0"
+        *ngIf="vendorsList.length > 0"
       >
         <table class="s-table table layout-fixed vendors-list">
           <thead>
             <tr>
               <th></th>
-              <th>{{ "tr_product_name" | translate }}</th>
-              <th>{{ "tr_branch" | translate }}</th>
-              <th>{{ "tr_code" | translate }}</th>
+              <th>{{ "tr_name" | translate }}</th>
+              <th>{{ "tr_legal_name" | translate }}</th>
+              <th>{{ "tr_email" | translate }}</th>
+              <th>{{ "tr_phone" | translate }}</th>
+              <th>{{ "tr_address" | translate }}</th>
               <th>{{ "tr_category" | translate }}</th>
-              <th>{{ "tr_stock" | translate }}</th>
-              <th>{{ "tr_sell_price" | translate }}</th>
-              <th>{{ "tr_net_price" | translate }}</th>
-              <th>{{ "tr_discount" | translate }}</th>
+              <th>{{ "tr_payment_terms" | translate }}</th>
+
               <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let vendor of productsList; let i = index">
+            <tr *ngFor="let vendor of vendorsList; let i = index">
               <td>{{ i + 1 }}</td>
               <td>{{ vendor.name }}</td>
-              <td>{{ vendor.branch?.name }}</td>
-              <td>{{ vendor.code }}</td>
-              <td>{{ vendor.category?.name }}</td>
-              <td>{{ vendor.stock }}</td>
-              <td>{{ vendor.price }}</td>
-              <td>{{ vendor.netPrice }}</td>
-              <td>{{ vendor.discount }}</td>
+              <td>{{ vendor.nameOfcompany }}</td>
+              <td>{{ vendor.email }}</td>
+              <td>{{ vendor.phone }}</td>
+              <td>{{ vendor.address }}</td>
+              <td><div *ngFor="let category of vendor.categories">
+                 <span>{{category.name}}</span>
+              </div></td>
+              <td>{{ vendor.paymentTerms }}</td>
               <td>
                 <span class="options-menu">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
@@ -101,7 +80,7 @@
                     <div class="border-bottom"></div>
                     <div
                       class="single-option"
-                      (click)="deleteProduct(vendor._id)"
+                      (click)="deleteVendor(vendor._id!)"
                     >
                       <div class="text-error">
                         {{ "tr_action.delete" | translate }}
@@ -109,7 +88,7 @@
                     </div>
                     <div
                       class="single-option"
-                      (click)="createOrEditproduct(true, vendor)"
+                      (click)="createOrEditvendor(true, vendor)"
                     >
                       {{ "tr_action.edit" | translate }}
                     </div>
@@ -123,7 +102,7 @@
 
       <div
         class="empty-state-here text-center ptb-8"
-        *ngIf="productsList.length == 0"
+        *ngIf="vendorsList.length == 0"
       >
         <i class="fa fa-folder-open empty-icon text-primary"></i>
         <p>{{ "tr_empty_state" | translate }}</p>
@@ -138,7 +117,7 @@
       </div>
     </div>
 
-    <div *ngIf="productsLoading">
+    <div *ngIf="vendorsLoading">
       <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
     </div>
   </div>

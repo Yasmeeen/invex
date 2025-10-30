@@ -7,6 +7,7 @@ import userRoutes from './modules/userModule/user.controller.js';
 import vendorRoutes from './modules/vendors_module/router.js';
 import dashboardRoutes from './modules/dashboard_module/router.js';
 import connectToMongoDB from './DB/connection.js';
+import purchasingRoutes from './modules/purchasing_module/router.js'
 
 
 const PORT = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ const bootstrap = (app, express) => {
   app.use('/api/orders', ordersRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/vendors', vendorRoutes);
+  app.use('/api/purchasing', purchasingRoutes);
   app.use('/api/dashboard', dashboardRoutes);
 
   // Start server

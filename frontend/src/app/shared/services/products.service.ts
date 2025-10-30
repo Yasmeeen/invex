@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_URL } from '@core/base/urls';
+import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
 import { Product } from '@core/models/products.model';
 import { Observable } from 'rxjs';
@@ -18,6 +18,10 @@ constructor(
 ) {}
 getProducts(params: any) {
   return this.http.get(PRODUCTS_URL, { params: params });
+}
+getPurchasingRequests(params: any) {
+    
+  return this.http.get(PURCHASING_URL, { params:params });
 }
 getProduct(productId: any) {
   return this.http.get(PRODUCTS_URL+ `/${productId}`);
@@ -50,4 +54,6 @@ getProductsStats(branchId?: any) {
   if (branchId) params.branchId = branchId;
   return this.http.get(PRODUCT_STATS, {params });
 }
+
+
 }

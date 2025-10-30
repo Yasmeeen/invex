@@ -63,9 +63,30 @@ export interface Vendor {
   phone: string;
   address?: string;
   transactionCurrency?: string;
-  paymentTerms: 'cash' | 'Installments';
+  paymentTerms: string[] ;
   categories: Category[];         // Array of Category IDs
   createdAt?: string;
   updatedAt?: string;
 }
+
+
+export interface PurchasingRequest {
+  _id?: string;
+  supplier: Vendor; // vendor ID
+  purchasingDate: Date;
+  status: 'Received' | 'Pending' | 'Ordered';
+  paymentTerms: string[];
+  installments?: {
+    dueDate: Date;
+    amount: number;
+    paid: boolean;
+  }[];
+  purchasingDetails?: string;
+  paymentStatus: 'Paid' | 'Due';
+  totalAmount: number;
+  products?: string[]; // array of product IDs
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 

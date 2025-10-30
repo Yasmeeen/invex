@@ -1,0 +1,139 @@
+import { Component, OnInit, ViewChild, Inject, Output, EventEmitter } from '@angular/core';
+import { NgForm } from '@angular/forms';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { Subscription } from 'rxjs';
+import { AppNotificationService } from '@shared/services/app-notification.service';
+import { TranslateService } from '@ngx-translate/core';
+import { VendorsSerivce } from '@shared/services/vendors.service';
+import { PurchasingRequestsService } from '@shared/services/purchasing.service';
+import { Vendor } from '@core/models/products.model';
+
+
+@Component({
+  selector: 'app-create-edit-purchasing-request',
+  templateUrl: './create-edit-purchasing-request.component.html',
+  styleUrls: ['./create-edit-purchasing-request.component.scss']
+})
+export class CreateEditPurchasingRequestComponent implements OnInit {
+  @ViewChild('purchasingForm') purchasingForm: NgForm;
+  @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
+
+  purchasingRequestId: string;
+  isEdit = false;
+  vendorsList: any[] = [];
+  installments: any[] = [];
+  selectedPaymentTerm: string;
+  private subscriptions: Subscription[] = [];
+  selectedVendor:Vendor;
+
+  purchasingStatusList = [
+    { label: this.translateService.instant('tr_received'), value: 'Received' },
+    { label: this.translateService.instant('tr_pending'), value: 'Pending' },
+    { label: this.translateService.instant('tr_ordered'), value: 'Ordered' },
+  ];
+  paymentStatusList = [
+    { label: this.translateService.instant('tr_paid'), value: 'Paid' },
+    { label: this.translateService.instant('tr_due'), value: 'Due' },
+  ];
+  
+
+  constructor(
+    private dialogRef: MatDialogRef<CreateEditPurchasingRequestComponent>,
+    private purchasingService: PurchasingRequestsService,
+    private vendorsService: VendorsSerivce,
+    private appNotificationService: AppNotificationService,
+    private translateService: TranslateService,
+    @Inject(MAT_DIALOG_DATA) public data: any
+  ) {}
+
+  ngOnInit(): void {
+    this.purchasingRequestId = this.data?.purchasingRequestId;
+    this.isEdit = this.data?.isEdit || false;
+    this.getVendors();
+
+    if (this.isEdit) {
+      this.getPurchasingRequest();
+    }
+  }
+
+  getVendors() {
+    const params = { page: 1, limit: 1000 };
+    this.subscriptions.push(
+      this.vendorsService.getVendors(params).subscribe({
+        next: (res: any) => (this.vendorsList = res.vendors),
+        error: () =>
+          this.appNotificationService.push(
+            this.translateService.instant('tr_unexpected_error_message'),
+            'error'
+          ),
+      })
+    );
+  }
+
+  getPurchasingRequest() {
+    this.purchasingService.getPurchasingRequest(this.purchasingRequestId).subscribe({
+      next: (response: any) => {
+        this.purchasingForm.form.patchValue(response);
+      },
+      error: () =>
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        ),
+    });
+  }
+
+  createPurchasingRequest() {
+    console.log("this.purchasingForm",this.purchasingForm);
+    
+    if (!this.purchasingForm.valid) return;
+
+    this.purchasingService.createPurchasingRequest(this.purchasingForm.value).subscribe({
+      next: () => {
+        this.appNotificationService.push('Purchasing request created successfully', 'success');
+        this.closeModal(true);
+      },
+      error: (error) =>
+        this.appNotificationService.push(
+          error?.error?.error || this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        ),
+    });
+  }
+
+  updatePurchasingRequest() {
+    if (!this.purchasingForm.valid) return;
+
+    this.purchasingService.updatePurchasingRequest( this.purchasingRequestId,this.purchasingForm.value).subscribe({
+      next: () => {
+        this.appNotificationService.push('Purchasing request updated successfully', 'success');
+        this.closeModal(true);
+      },
+      error: (error) =>
+        this.appNotificationService.push(
+          error?.error?.error || this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        ),
+    });
+  }
+  
+  addInstallment() {
+    this.installments.push({ dueDate: '', amount: '', paid: false });
+  }
+  
+  removeInstallment(index: number) {
+    this.installments.splice(index, 1);
+  }
+
+  submitForm() {
+    this.isEdit ? this.updatePurchasingRequest() : this.createPurchasingRequest();
+  }
+
+  closeModal(isSubmit?: boolean) {
+    this.dialogRef.close(isSubmit);
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
+}

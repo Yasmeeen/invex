@@ -118,6 +118,74 @@
     </div>
   </div>
 
+   <div class="col-md-12">
+    <div class="container-card">
+      <h5 class="card-header weight-bold mb-4">{{'tr_upcoming_unpaid_installments' | translate}}</h5>
+      <div class="card-body" *ngIf="installments.length; else noInstallments">
+        <table class="table s-table">
+          <thead>
+            <tr>
+              <th>{{'tr_supplier' | translate}}</th>
+              <th> {{'tr_due_date' | translate}}</th>
+              <th> {{'tr_amount' | translate}}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let inst of installments">
+              <td>{{ inst.vendor?.name }}</td>
+              <td>{{ inst.dueDate | date }}</td>
+              <td>{{ inst.amount | currency:'EGP ':'symbol':'1.2-2' }}</td>
+              <td>
+                <button class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id,inst)" >Mark Paid</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noInstallments>
+        <p class="text-muted">No upcoming unpaid installments.</p>
+      </ng-template>
+    </div>
+   </div>
+  
+   <div class="col-md-12">
+    <div class="container-card">
+      <h5 class="card-header weight-bold mb-4">{{'tr_past_unpaid_installments' | translate}}</h5>
+  
+      <div class="card-body" *ngIf="pastInstallments.length; else noPastInstallments">
+        <table class="table s-table">
+          <thead>
+            <tr>
+              <th>{{'tr_supplier' | translate}}</th>
+              <th>{{'tr_due_date' | translate}}</th>
+              <th>{{'tr_amount' | translate}}</th>
+              <th></th>
+            </tr>
+          </thead>
+  
+          <tbody>
+            <tr *ngFor="let inst of pastInstallments">
+              <td>{{ inst.vendor?.name }}</td>
+              <td>{{ inst.dueDate | date }}</td>
+              <td>{{ inst.amount | currency:'EGP ':'symbol':'1.2-2' }}</td>
+              <td>
+                <button class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id,inst)">
+                  {{'tr_mark_paid' | translate}}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+  
+      <ng-template #noPastInstallments>
+        <p class="text-muted">{{'tr_no_past_unpaid_installments' | translate}}</p>
+      </ng-template>
+    </div>
+  </div>
+  
+
   <!-- Products -->
   <div class="col-md-6">
     <div class="container-card">

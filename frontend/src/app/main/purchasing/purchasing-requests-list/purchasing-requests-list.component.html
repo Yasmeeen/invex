@@ -35,7 +35,7 @@
     <div>
       <div class="plr-4 mt-4" *ngIf="!isLoading">
         <div
-          class="table-container"
+          class="table-container purchasing-request-list"
           *ngIf="purchasingRequestsList.length > 0"
         >
           <table class="s-table table layout-fixed">
@@ -43,11 +43,11 @@
               <tr>
                 <th>#</th>
                 <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_purchasing_date' | translate }}</th>
+                <th>{{ 'tr_request_date' | translate }}</th>
                 <th>{{ 'tr_status' | translate }}</th>
                 <th>{{ 'tr_payment_terms' | translate }}</th>
-                <th>{{ 'tr_payment_status' | translate }}</th>
                 <th>{{ 'tr_total_amount' | translate }}</th>
+                <th>{{ 'tr_installments' | translate }}</th>
                 <th></th>
               </tr>
             </thead>
@@ -55,11 +55,20 @@
               <tr *ngFor="let request of purchasingRequestsList; let i = index">
                 <td>{{ i + 1 }}</td>
                 <td>{{ request.supplier?.name }}</td>
-                <td>{{ request.purchasingDate | date }}</td>
+                <td>{{ request.requestDate | date: 'dd/M/YYYY' }}</td>
                 <td>{{ request.status }}</td>
-                <td>{{ request.paymentTerms.join(', ') }}</td>
-                <td>{{ request.paymentStatus }}</td>
+                <td>{{ request.paymentStatus}}</td>
                 <td>{{ request.totalAmount }}</td>
+                <td>
+                  <div *ngFor="let installment of request.installments">
+
+                    {{installment.dueDate | date: 'dd/M/YYYY'}} 
+                    <i class="fa fa-check text-success" aria-hidden="true" *ngIf="installment.paid"></i>
+                    <i class="fa fa-times-circle text-error" aria-hidden="true" *ngIf="!installment.paid"></i>
+                    <span>  {{installment.amount | currency:'EGP'}} </span>
+         
+                  </div>
+                </td>
                 <td>
                   <span class="options-menu">
                     <i class="fa fa-ellipsis-v" aria-hidden="true"></i>

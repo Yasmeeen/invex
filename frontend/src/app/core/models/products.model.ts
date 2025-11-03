@@ -73,7 +73,7 @@ export interface Vendor {
 export interface PurchasingRequest {
   _id?: string;
   supplier: Vendor; // vendor ID
-  purchasingDate: Date;
+  requestDate: Date;
   status: 'Received' | 'Pending' | 'Ordered';
   paymentTerms: string[];
   installments?: {

@@ -8,7 +8,6 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
 import { PurchasingRequestsService } from '@shared/services/purchasing.service';
 import { Vendor } from '@core/models/products.model';
 
-
 @Component({
   selector: 'app-create-edit-purchasing-request',
   templateUrl: './create-edit-purchasing-request.component.html',
@@ -24,18 +23,13 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
   installments: any[] = [];
   selectedPaymentTerm: string;
   private subscriptions: Subscription[] = [];
-  selectedVendor:Vendor;
+  selectedVendor: Vendor;
 
   purchasingStatusList = [
     { label: this.translateService.instant('tr_received'), value: 'Received' },
     { label: this.translateService.instant('tr_pending'), value: 'Pending' },
     { label: this.translateService.instant('tr_ordered'), value: 'Ordered' },
   ];
-  paymentStatusList = [
-    { label: this.translateService.instant('tr_paid'), value: 'Paid' },
-    { label: this.translateService.instant('tr_due'), value: 'Due' },
-  ];
-  
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditPurchasingRequestComponent>,
@@ -47,7 +41,9 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.purchasingRequestId = this.data?.purchasingRequestId;
+    this.purchasingRequestId = this.data?.requestId;
+    console.log(" this.purchasingRequestId ", this.purchasingRequestId );
+    
     this.isEdit = this.data?.isEdit || false;
     this.getVendors();
 
@@ -74,6 +70,9 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
     this.purchasingService.getPurchasingRequest(this.purchasingRequestId).subscribe({
       next: (response: any) => {
         this.purchasingForm.form.patchValue(response);
+        if (response.installments) this.installments = response.installments;
+        this.selectedPaymentTerm = response.paymentStatus;
+        this.selectedVendor = response.supplier;
       },
       error: () =>
         this.appNotificationService.push(
@@ -83,19 +82,42 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
     });
   }
 
+  buildPayload() {
+    const formValue = this.purchasingForm.value;
+    const payload: any = {
+      supplier: this.selectedVendor?._id,
+      paymentStatus: this.selectedPaymentTerm,
+      requestDate: formValue.requestDate,
+      requestedBy: formValue.requestedBy,
+      totalAmount: formValue.totalAmount,
+      status: formValue.status,
+      notes: formValue.notes || '',
+    };
+
+    if (this.selectedPaymentTerm === 'Installments') {
+      payload.installments = this.installments.map(inst => ({
+        dueDate: inst.dueDate,
+        amount: inst.amount,
+        paid: inst.paid || false,
+      }));
+    }
+
+    return payload;
+  }
+
   createPurchasingRequest() {
-    console.log("this.purchasingForm",this.purchasingForm);
-    
     if (!this.purchasingForm.valid) return;
 
-    this.purchasingService.createPurchasingRequest(this.purchasingForm.value).subscribe({
+    const payload = this.buildPayload();
+
+    this.purchasingService.createPurchasingRequest(payload).subscribe({
       next: () => {
         this.appNotificationService.push('Purchasing request created successfully', 'success');
         this.closeModal(true);
       },
       error: (error) =>
         this.appNotificationService.push(
-          error?.error?.error || this.translateService.instant('tr_unexpected_error_message'),
+          error?.error?.message || this.translateService.instant('tr_unexpected_error_message'),
           'error'
         ),
     });
@@ -104,23 +126,25 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
   updatePurchasingRequest() {
     if (!this.purchasingForm.valid) return;
 
-    this.purchasingService.updatePurchasingRequest( this.purchasingRequestId,this.purchasingForm.value).subscribe({
+    const payload = this.buildPayload();
+
+    this.purchasingService.updatePurchasingRequest(this.purchasingRequestId, payload).subscribe({
       next: () => {
         this.appNotificationService.push('Purchasing request updated successfully', 'success');
         this.closeModal(true);
       },
       error: (error) =>
         this.appNotificationService.push(
-          error?.error?.error || this.translateService.instant('tr_unexpected_error_message'),
+          error?.error?.message || this.translateService.instant('tr_unexpected_error_message'),
           'error'
         ),
     });
   }
-  
+
   addInstallment() {
     this.installments.push({ dueDate: '', amount: '', paid: false });
   }
-  
+
   removeInstallment(index: number) {
     this.installments.splice(index, 1);
   }

@@ -378,5 +378,13 @@
   "tr_purchasing_status": "Statut d'achat",
   "tr_received": "Reçu",
   "tr_pending": "En attente",
-  "tr_ordered": "Commandé"
+  "tr_ordered": "Commandé",
+  "tr_upcoming_unpaid_installments": "Échéances impayées à venir",
+  "tr_supplier": "Fournisseur",
+  "tr_amount": "Montant",
+  "tr_mark_paid": "Marquer comme payé",
+  "tr_no_upcoming_unpaid_installments": "Pas d’échéances impayées à venir.",
+  "tr_past_unpaid_installments": "Échéances impayées en retard",
+  "tr_no_past_unpaid_installments": "Aucune échéance impayée en retard."
+
 }

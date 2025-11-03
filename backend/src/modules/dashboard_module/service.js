@@ -2,6 +2,8 @@ import Order from '../../DB/models/order.model.js';
 import Category from "../../DB/models/category.model.js";
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
+import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
+import Installment from '../../DB/models/purchasingRequest.model.js';
 import moment from 'moment-timezone';
 
 export const getOrdersStatstics = async (req, res) => {
@@ -219,5 +221,101 @@ export const getOrdersStatisticsByStatus = async (req, res) => {
 
 
 
+export const getUpcomingUnpaidInstallments = async (req, res) => {
+  try {
+    const today = new Date();
+    const nextMonth = new Date();
+    nextMonth.setDate(today.getDate() + 30);
 
+    // Find all purchasing requests with unpaid installments
+    const requests = await PurchasingRequest.find({
+      'installments.paid': false
+    })
+      .populate('supplier', 'name')
+      .select('number totalAmount installments');
+
+    // Extract and flatten unpaid installments
+    const unpaidInstallments = [];
+
+    requests.forEach(req => {
+      req.installments.forEach(inst => {
+        if (!inst.paid && inst.dueDate >= today && inst.dueDate <= nextMonth ) {
+          unpaidInstallments.push({
+            _id: inst._id,
+            dueDate: inst.dueDate,
+            amount: inst.amount,
+            vendor: req.supplier,
+            purchasingRequest: { number: req.number, totalAmount: req.totalAmount },
+          });
+        }
+      });
+    });
+
+    res.status(200).json(unpaidInstallments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getPastUnpaidInstallments = async (req, res) => {
+  try {
+    const today = new Date();
+
+    const requests = await PurchasingRequest.find({
+      'installments.paid': false
+    })
+      .populate('supplier', 'name')
+      .select('number totalAmount installments');
+
+    const pastUnpaidInstallments = [];
+
+    requests.forEach(req => {
+      req.installments.forEach(inst => {
+        if (!inst.paid && inst.dueDate < today) {
+          pastUnpaidInstallments.push({
+            _id: inst._id,
+            dueDate: inst.dueDate,
+            amount: inst.amount,
+            vendor: req.supplier,
+            purchasingRequest: { number: req.number, totalAmount: req.totalAmount },
+          });
+        }
+      });
+    });
+
+    res.status(200).json(pastUnpaidInstallments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const markInstallmentPaid = async (req, res) => {
+  try {
+    const { id } = req.params; // installment _id
+    const objectId = new mongoose.Types.ObjectId(id);
+
+    const request = await PurchasingRequest.findOne({ 
+      'installments._id': objectId 
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: 'Purchasing request not found for this installment' });
+    }
+
+    const installment = request.installments.id(objectId);
+    if (!installment) {
+      return res.status(404).json({ message: 'Installment not found' });
+    }
+
+    installment.paid = true;
+    await request.save();
+
+    res.status(200).json({ message: 'Installment marked as paid', installment });
+
+  } catch (error) {
+    console.error('Error marking installment paid:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
 

@@ -47,7 +47,7 @@ export const getPurchasingRequests = async (req, res) => {
 export const getPurchasingRequestById = async (req, res) => {
   try {
     const purchasingRequest = await PurchasingRequest.findById(req.params.id)
-      .populate('supplier', 'nameOfcompany name')
+      .populate('supplier', 'nameOfcompany name paymentTerms' )
       .populate('products', 'name code price');
 
     if (!purchasingRequest) {

@@ -38,5 +38,16 @@ export class DashboardService {
     if (branchId) params.branch = branchId;
     return this.http.get(`${BASE_URL}/api/dashboard/getOrdersStatusStats`, { params });
   }
+  getUpcomingUnpaidInstallments() {
+    return this.http.get(`${BASE_URL}/api/dashboard/upcoming-unpaid`);
+  }
+  getPastUnpaidInstallments() {
+    return this.http.get(`${BASE_URL}/api/dashboard/past-unpaid`);
+  }
+  markAsPaid(id: string) {
+    return this.http.put(`${BASE_URL}/api/dashboard/${id}/pay`, {});
+  }
+  
+  
   
 }

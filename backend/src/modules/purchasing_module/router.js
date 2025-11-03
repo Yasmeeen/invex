@@ -18,9 +18,9 @@ router.get('/:id', getPurchasingRequestById);
 router.post('/createPurchasingRequest', createPurchasingRequest);
 
 // PUT update
-router.put('/:id', updatePurchasingRequest);
+router.put('/update/:id', updatePurchasingRequest);
 
 // DELETE
-router.delete('/deletePurchasingRequest/:id', deletePurchasingRequest);
+router.delete('/delete/:id', deletePurchasingRequest);
 
 export default router;

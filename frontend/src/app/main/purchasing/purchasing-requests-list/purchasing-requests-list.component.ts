@@ -76,10 +76,12 @@ export class PurchasingRequestsListComponent implements OnInit, OnDestroy {
     this.getPurchasingRequests();
   }
 
-  createOrEditPurchasing(isEdit: boolean, request?: PurchasingRequest) {
+  createOrEditPurchasing(isEditForm: boolean, request?: PurchasingRequest) {
+    console.log("request",request?._id);
+    
     const dialogRef = this.dialog.open(CreateEditPurchasingRequestComponent, {
       width: '850px',
-      data: { isEdit, request, requestId: request?._id },
+      data: { isEdit: isEditForm, requestId: request?._id },
       disableClose: true
     });
     dialogRef.afterClosed().subscribe((event) => {

@@ -31,6 +31,8 @@ export class HomeComponent implements OnInit {
   totalCategories = 25;
   orderStatistics: orderStatistics;
   productsStats:any;
+  installments: any[] = [];
+  pastInstallments:any[] =[]
   constructor(
     private dashboardService: DashboardService,
     private productsSerivce: ProductsSerivce,
@@ -44,7 +46,30 @@ export class HomeComponent implements OnInit {
     this.ordersChart();
     this.invoicesChart();
     this.categoriesChart();
+    this.loadUpcomingInstallments();
+    this.loadPastUpcomingInstallments();
 
+  }
+  loadUpcomingInstallments() {
+    this.dashboardService.getUpcomingUnpaidInstallments().subscribe({
+      next: (res:any) => this.installments = res,
+      error: (err) => console.error(err)
+    });
+  }
+
+  loadPastUpcomingInstallments(){
+    
+    this.dashboardService.getPastUnpaidInstallments().subscribe({
+      next: (res:any) => this.pastInstallments = res,
+      error: (err) => console.error(err)
+    });
+  }
+  markAsPaid(id: string,inst:any) {
+    console.log("inst",inst);
+    
+    this.dashboardService.markAsPaid(id).subscribe(() => {
+      this.installments = this.installments.filter(i => i._id !== id);
+    });
   }
 
   getProductsStats(){

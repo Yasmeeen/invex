@@ -373,6 +373,14 @@
   "tr_purchasing_status": "حالة الشراء",
   "tr_received": "تم الاستلام",
   "tr_pending": "في الانتظار",
-  "tr_ordered": "تم الطلب"
+  "tr_ordered": "تم الطلب",
+  "tr_upcoming_unpaid_installments": "الأقساط غير المدفوعة القادمة",
+  "tr_supplier": "المورّد",
+  "tr_amount": "المبلغ",
+  "tr_mark_paid": "تم الدفع",
+  "tr_no_upcoming_unpaid_installments": "لا توجد أقساط غير مدفوعة قادمة.",
+  "tr_past_unpaid_installments": "الأقساط المتأخرة غير المدفوعة",
+  "tr_no_past_unpaid_installments": "لا توجد أقساط متأخرة غير مدفوعة."
+
 
 }

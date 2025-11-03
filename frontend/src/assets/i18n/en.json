@@ -388,6 +388,13 @@
     "tr_received": "Received",
     "tr_pending": "Pending",
     "tr_ordered": "Ordered",
-    "tr_amount":"Amount"
+    "tr_amount":"Amount",
+    "tr_upcoming_unpaid_installments": "Upcoming Unpaid Installments",
+    "tr_mark_paid": "Mark Paid",
+    "tr_no_upcoming_unpaid_installments": "No upcoming unpaid installments.",
+    "tr_past_unpaid_installments": "Past Unpaid Installments",
+    "tr_no_past_unpaid_installments": "No past unpaid installments."
+
+  
 
 }

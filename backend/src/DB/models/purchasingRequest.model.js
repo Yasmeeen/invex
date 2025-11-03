@@ -1,3 +1,4 @@
+// DB/models/purchasingRequest.model.js
 import mongoose from 'mongoose';
 
 // 🔹 Sub-schema for installments
@@ -6,8 +7,7 @@ const installmentSchema = new mongoose.Schema(
     dueDate: { type: Date, required: true },
     amount: { type: Number, required: true },
     paid: { type: Boolean, default: false },
-  },
-  { _id: false }
+  }
 );
 
 const purchasingRequestSchema = new mongoose.Schema(
@@ -17,43 +17,41 @@ const purchasingRequestSchema = new mongoose.Schema(
       ref: 'Vendor',
       required: true,
     },
-    purchasingDate: {
+    requestDate: {
       type: Date,
       required: true,
       default: Date.now,
     },
-    status: {
-        type: String,
-        enum: ['Received', 'Pending', 'Ordered'],
-        required: true,
-      },
-    paymentTerms: [
-      {
-        type: String,
-        enum: ['cash', 'Installments'],
-        required: true,
-      },
-    ],
-    installments: [installmentSchema],
-    purchasingDetails: {
+    requestedBy: {
       type: String,
+      required: false,
       trim: true,
     },
+    status: {
+      type: String,
+      enum: ['Received', 'Pending', 'Ordered'],
+      required: true,
+    },
     paymentStatus: {
-        type: String,
-        enum: ['Paid', 'Due'],
-        default: 'Due',
-      },
+      type: String,
+      enum: ['cash', 'Installments'],
+      required: true,
+    },
+    installments: [installmentSchema],
     totalAmount: {
       type: Number,
       required: true,
       min: 0,
     },
+    notes: {
+      type: String,
+      trim: true,
+      required: false,
+    },
     products: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Product',
-        required: false,
       },
     ],
   },

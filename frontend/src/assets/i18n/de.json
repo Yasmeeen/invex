@@ -378,6 +378,14 @@
   "tr_purchasing_status": "Kaufstatus",
   "tr_received": "Erhalten",
   "tr_pending": "Ausstehend",
-  "tr_ordered": "Bestellt"
+  "tr_ordered": "Bestellt",
+  "tr_upcoming_unpaid_installments": "Bevorstehende unbezahlte Raten",
+  "tr_supplier": "Lieferant",
+  "tr_amount": "Betrag",
+  "tr_mark_paid": "Als bezahlt markieren",
+  "tr_no_upcoming_unpaid_installments": "Keine bevorstehenden unbezahlten Raten.",
+  "tr_past_unpaid_installments": "Überfällige unbezahlte Raten",
+  "tr_no_past_unpaid_installments": "Keine überfälligen unbezahlten Raten."
+
   }
   

@@ -7,7 +7,7 @@ export const environment = {
     env: 'development',
     storeName:"OX Muscle store",
     storePhoneNumber: "010 90990378",
-    apiUrl: 'http://localhost:3000'
+    apiUrl: 'http://ec2-16-171-67-19.eu-north-1.compute.amazonaws.com' 
 };
 
 

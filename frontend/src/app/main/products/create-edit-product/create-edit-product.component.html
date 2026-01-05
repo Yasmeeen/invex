@@ -38,23 +38,23 @@
                       <div class="code-scan-container">
                         <input
                           type="text"
-                          class="s-control"
                           name="code"
-                          #code="ngModel"
-                          ngModel
-                          required
+                          [(ngModel)]="codeValue"
                           placeholder="Scan or enter code"
-                          autofocus
+                          #code="ngModel"
+                          required
                         />
                         <button type="button" class="scan-btn" (click)="toggleCamera()">
-                          <i class="fa fa-camera"></i>
+                          <i class="fa fa-camera"></i> Scan QR
                         </button>
                       </div>
-
+                      
+                      <!-- Overlay الكاميرا -->
                       <div *ngIf="isCameraActive" class="camera-overlay">
                         <video id="video" width="300" height="300"></video>
-                        <button class="close-camera" (click)="toggleCamera()">✖</button>
                       </div>
+
+                   
                       
                       
                       <span

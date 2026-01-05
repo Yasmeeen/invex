@@ -145,28 +145,32 @@
               <div class="row mt-6">
                 <div class="col-12" *ngFor="let product of orderProducts; let i = index">
                   <div class="row">
-                    <div class="col-md-4">
-                      <div class="form-group" [class.has-error]="productCodes.invalid && orderForm.submitted">
+                    <div class="col-md-5">
+                      <div class="form-group">
                         <label>{{ 'tr_product_code' | translate }}</label>
-                        <div class="input-with-icon bg-white">
-                          <ng-select
-                            class="s-control s-select"
-                            placeholder="{{ 'tr_select' | translate }}"
-                            bindLabel="code"
-                            [clearable]="false"
-                            [(ngModel)]="product.selectedProduct"
-                            #productCodes="ngModel"
-                            name="product{{i}}"
-                            [items]="products"
-                            required
-                          ></ng-select>
-                          <i class="fa fa-search input-icon"></i>
+                        <div class="code-scan-container">
+                          <div class="input-with-icon bg-white width-100">
+                            <ng-select
+                              class="s-control s-select"
+                              placeholder="{{ 'tr_select' | translate }}"
+                              bindLabel="code"
+                              [clearable]="false"
+                              [(ngModel)]="product.selectedProduct"
+                              name="product{{i}}"
+                              [items]="products"
+                              required
+                            ></ng-select>
+                            <i class="fa fa-search input-icon"></i>
+                          </div>
+                      
+                          <button type="button" class="s-btn btn-sm  scan-btn mt-1" (click)="startProductScan(i)">
+                            <i class="fa fa-qrcode"></i> Scan
+                          </button>
                         </div>
-                        <span class="text-error size-small validator" *ngIf="productCodes.invalid && orderForm.submitted">
-                          {{ 'tr_product_code_required' | translate }}
-                        </span>
+                    
                       </div>
                     </div>
+                    
 
                     <div class="col-md-2" *ngIf="product.selectedProduct?.code">
                       <div class="form-group">
@@ -188,7 +192,7 @@
                       <div class="mt-3">{{ getOrderProductPrice(product) }}</div>
                     </div>
 
-                    <div class="col-md-2">
+                    <div class="col-md-1">
                       <label>{{ 'tr_delete' | translate }}</label>
                       <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
                         <i class="fa fa-trash"></i>
@@ -297,4 +301,7 @@
       </div>
     </div>
   </div>
+</div>
+<div *ngIf="isCameraActive" class="camera-overlay">
+  <video id="video" width="300" height="300"></video>
 </div>

@@ -30,6 +30,8 @@ export class CreateEditProductComponent implements OnInit {
   branches: Branch [];
   codeReader = new BrowserMultiFormatReader();
   isCameraActive = false;
+  codeValue: string;
+
   product:Product
   productId: string;
   isSubmitting: boolean;
@@ -138,45 +140,43 @@ export class CreateEditProductComponent implements OnInit {
       this.createProduct();
     }
   }
-  onCodeScanned(code: string) {
-    if (!code) return;
-  
-    // Optional validation
-    if (code.length < 3) {
-      this.appNotificationService.push('Invalid code', 'error');
-      return;
-    }
-  
-
-    this.basicInfoForm.form.patchValue({
-      code: code
-    });
-  
-    this.appNotificationService.push('Code scanned successfully', 'sucess');
-  }
-
-  startCameraScan() {
-    this.codeReader.decodeFromVideoDevice(
-      undefined,
-      'video',
-      (result, error) => {
-        if (result) {
-          this.onCodeScanned(result.getText());
-         this.codeReader.decodeOnceFromVideoDevice();
-        }
-      }
-    );
-  }
-  
 
   toggleCamera() {
     this.isCameraActive = !this.isCameraActive;
     if (this.isCameraActive) {
       this.startCameraScan();
-    } else {
-      this.codeReader.decodeOnceFromVideoDevice(); 
     }
   }
+
+  startCameraScan() {
+    this.codeReader
+      .decodeOnceFromVideoDevice(undefined, 'video')
+      .then(result => {
+        if (result) {
+          this.onCodeScanned(result.getText());
+          // أقفل الكاميرا بعد أول Scan
+          this.isCameraActive = false;
+        }
+      })
+      .catch(err => {
+        console.error('Scan error', err);
+        this.appNotificationService.push('Unable to scan code', 'error');
+        this.isCameraActive = false;
+      });
+  }
+
+  onCodeScanned(code: string) {
+    if (!code) return;
+
+    if (code.length < 3) {
+      this.appNotificationService.push('Invalid code', 'error');
+      return;
+    }
+
+    this.basicInfoForm.form.patchValue({ code: code });
+    this.appNotificationService.push('Code scanned successfully', 'success');
+  }
+
   ngOnDestroy() {
     this.codeReader.decodeOnceFromVideoDevice();
     this.subscriptions.forEach(s => s.unsubscribe());

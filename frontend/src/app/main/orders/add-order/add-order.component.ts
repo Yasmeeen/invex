@@ -14,6 +14,7 @@ import { Subscription } from "rxjs";
 import { TranslateService } from "@ngx-translate/core";
 import { AuthenticationService } from "@core/services/authentication.service";
 import { ProductsSerivce } from "@shared/services/products.service";
+import { BrowserMultiFormatReader } from '@zxing/browser';
 
 @Component({
   selector: "app-add-order",
@@ -28,6 +29,9 @@ export class AddOrderComponent implements OnInit {
   adminSelectedBranchId: string ='';
   storeName = environment.storeName
   storePhoneNumber =  environment.storePhoneNumber
+  codeReader = new BrowserMultiFormatReader();
+  isCameraActive = false;
+  currentScanIndex: number ; 
   paymentMethods = [
     {
      name: this.translateService.instant('tr_cash'),
@@ -172,6 +176,43 @@ export class AddOrderComponent implements OnInit {
     ];
     this.getProducts();
   }
+  startProductScan(index: number) {
+    this.isCameraActive = true;
+    this.currentScanIndex = index;
+  
+    // Scan مرة واحدة فقط
+    this.codeReader
+      .decodeOnceFromVideoDevice(undefined, 'video')
+      .then(result => {
+        if (result) {
+          this.onProductScanned(result.getText());
+          this.isCameraActive = false;
+        }
+      })
+      .catch(err => {
+        console.error('Scan error', err);
+        this.appNotificationService.push('Unable to scan code', 'error');
+        this.isCameraActive = false;
+      });
+  }
+  
+  onProductScanned(code: string) {
+    if (!code) return;
+  
+    const foundProduct = this.products.find(p => p.code === code);
+    if (!foundProduct) {
+      this.appNotificationService.push('Product not found', 'error');
+      return;
+    }
+  
+    // Patch the selected product to the correct row
+    this.orderProducts[this.currentScanIndex].selectedProduct = foundProduct;
+    this.orderProducts[this.currentScanIndex].quantity = 1;
+    this.getOrderProductPrice(this.orderProducts[this.currentScanIndex]);
+  
+    this.appNotificationService.push('Product added successfully', 'success');
+  }
+  
 
 
   // Close modal

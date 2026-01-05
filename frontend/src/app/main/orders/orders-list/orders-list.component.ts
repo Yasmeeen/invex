@@ -139,7 +139,7 @@ export class OrdersListComponent implements OnInit {
 
   createOrEditOrder(isEdit: boolean, order?: Order){
     let dialogRef = this.dialog.open(AddOrderComponent, {
-      width: '850px',
+      width: '1000px',
       data: {isEdit:isEdit,order:order, orderId: order?._id},
       disableClose: true,
   });

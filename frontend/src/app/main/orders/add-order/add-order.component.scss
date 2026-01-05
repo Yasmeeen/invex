@@ -70,3 +70,52 @@
     }
   }
   
+  .camera-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    background: #000;
+    border-radius: 8px;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  
+    video {
+      border-radius: 8px;
+    }
+  }
+  .code-scan-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  
+    input {
+      flex: 1;
+      padding: 8px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+  
+    .scan-btn {
+      background-color: #4caf50;
+      width:80px;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+  
+      &:hover {
+        background-color: #45a049;
+      }
+    }
+  }
+  

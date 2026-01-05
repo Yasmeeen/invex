@@ -28,6 +28,44 @@
 
               <form #basicInfoForm="ngForm">
                 <div class="row">
+                        <!-- Code -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="code.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_code' | translate }}</label>
+                      <div class="code-scan-container">
+                        <input
+                          type="text"
+                          class="s-control"
+                          name="code"
+                          #code="ngModel"
+                          ngModel
+                          required
+                          placeholder="Scan or enter code"
+                          autofocus
+                        />
+                        <button type="button" class="scan-btn" (click)="toggleCamera()">
+                          <i class="fa fa-camera"></i>
+                        </button>
+                      </div>
+
+                      <div *ngIf="isCameraActive" class="camera-overlay">
+                        <video id="video" width="300" height="300"></video>
+                        <button class="close-camera" (click)="toggleCamera()">✖</button>
+                      </div>
+                      
+                      
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="code.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_code_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
 
                   <!-- Name -->
                   <div class="col-md-6">
@@ -53,30 +91,7 @@
                     </div>
                   </div>
 
-                  <!-- Code -->
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="code.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_code' | translate }}</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        name="code"
-                        #code="ngModel"
-                        ngModel
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="code.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_code_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-
+            
                   <!-- Price -->
                   <div class="col-md-6">
                     <div

@@ -6,6 +6,7 @@ import productRoutes from './modules/products_module/router.js';
 import userRoutes from './modules/userModule/user.controller.js';
 import vendorRoutes from './modules/vendors_module/router.js';
 import dashboardRoutes from './modules/dashboard_module/router.js';
+import clientsRoutes from './modules/clients_module/router.js';
 import connectToMongoDB from './DB/connection.js';
 import purchasingRoutes from './modules/purchasing_module/router.js'
 
@@ -39,6 +40,7 @@ const bootstrap = (app, express) => {
   app.use('/api/vendors', vendorRoutes);
   app.use('/api/purchasing', purchasingRoutes);
   app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/clients', clientsRoutes);
 
   // Start server
   app.listen(PORT, () => {

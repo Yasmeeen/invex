@@ -5,9 +5,10 @@ import {
   USER_CREATE_URL,
   USER_UPDATE_URL,
   USER_DELETE_URL,
+  CLIENTS_URL,
 } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import { User } from '@core/models/users-interfaces.model';
+import { Client, User } from '@core/models/users-interfaces.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -26,6 +27,9 @@ export class UserSerivce {
 
   getUser(userId: string): Observable<User> {
     return this.http.get<User>(`${USERS_URL}/${userId}`);
+  }
+  getClients(params: any): Observable<any> {
+    return this.http.get(CLIENTS_URL, { params: params });
   }
 
   createUser(user: User): Observable<User> {

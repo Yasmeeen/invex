@@ -14,6 +14,8 @@ export const USER_CREATE_URL = USERS_URL + '/createUser';
 export const USER_UPDATE_URL = USERS_URL;
 export const USER_DELETE_URL = USERS_URL;
 
+export const CLIENTS_URL=  BASE_URL +'/clients'
+
 //dashboard
 export const ORDER_STATISTICS = BASE_URL + '/dashboard/getOrdersStatstics';
 

@@ -19,6 +19,15 @@ export class User{
   local: string;
   branch?: Branch;
 }
+export class Client{
+  _id:string;
+  name?:string;
+  address?:string;
+  numberOfOrders: number;
+  totalOrdersPrice: number;
+  created_at: string;
+  branchs?: Branch[];
+}
 export class Employee extends User {
 
 

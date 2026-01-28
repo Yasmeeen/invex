@@ -18,6 +18,7 @@ import { Subscription } from 'rxjs';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { DomSanitizer } from '@angular/platform-browser';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -38,7 +39,8 @@ export class CreateEditProductComponent implements OnInit {
   isEdit: boolean = false;
   categories: Category [];
   private subscriptions: Subscription[] = [];
-
+  isCodeGenerated = false; 
+  imageSrc: any;
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
   @ViewChild('modalContainer') modalContainer: ElementRef;
   @ViewChild('modalContent') modalContent: ElementRef;
@@ -53,6 +55,7 @@ export class CreateEditProductComponent implements OnInit {
     private translateService: TranslateService,
     private branchesServce:BranchesServce ,
     @Inject(MAT_DIALOG_DATA) public data: any,
+    private sanitizer: DomSanitizer
 
   ) {}
 
@@ -100,37 +103,130 @@ export class CreateEditProductComponent implements OnInit {
     })
   }
 
-  basicInfoFormSubmitted() {}
 
-  createProduct() {
-    this.product = this.basicInfoForm.value;
-    if (!this.basicInfoForm.valid) {
-      return;
+
+
+
+
+generateBarcode() {
+  this.productsSerivce.generateBarcode().subscribe({
+    next: (res: any) => {
+      this.codeValue = res.code; // ضع الكود في الحقل
+      this.isCodeGenerated = true;  // قفل الحقل
+      this.basicInfoForm.form.patchValue({ code: res.code });
+      this.appNotificationService.push('✅ الكود تم توليده تلقائياً', 'success');
+    },
+    error: (err:any) => {
+      console.error(err);
+      this.appNotificationService.push('❌ خطأ في توليد الكود', 'error');
     }
+  });
+}
 
-    this.productsSerivce.createProduct(this.product).subscribe(() => {
-      this.appNotificationService.push('product created successfully', 'sucess');
-      this.closeModal(true);
-    }, error=> {
+createProduct() {
+  if (!this.basicInfoForm.valid) return;
+
+  const payload = {
+    ...this.basicInfoForm.value,
+    code: this.codeValue
+  };
+
+  this.productsSerivce.createProduct(payload).subscribe(
+    (res: any) => {
+      this.appNotificationService.push('✅ المنتج تم إضافته', 'success');
+
+      this.productsSerivce
+        .getBarcodeImage(res.createdProduct.code, payload.name)
+        .subscribe((html: any) => {
+          this.printHtml(html);
+          this.closeModal();
+
+        });
+    },
+    (error) => {
       this.appNotificationService.push(error.error.error, 'error');
-    });
-
-  }
-
-  updateProduct() {
-    this.product = this.basicInfoForm.value;
-    if (!this.basicInfoForm.valid) {
-      return;
     }
+  );
+}
 
-    this.productsSerivce.updateProduct(this.product,this.productId).subscribe(() => {
-      this.appNotificationService.push('product updated successfully', 'sucess');
+printHtml(html: string) {
+  const printWindow = window.open('', '_blank', 'width=600,height=400');
+  
+  if (!printWindow) return;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+
+
+  printWindow.document.write(`
+    <script>
+      window.onload = function() {
+        window.print();
+      };
+      window.onafterprint = function() {
+        window.close();
+      };
+    </script>
+  `);
+
+  printWindow.document.close();
+}
+
+
+
+
+updateProduct() {
+  this.product = this.basicInfoForm.value;
+  if (!this.basicInfoForm.valid) return;
+  this.product = this.basicInfoForm.value;
+  const payload = {
+    ...this.basicInfoForm.value,
+    code: this.codeValue   // ✅ لازم يتضاف يدوي
+  };
+
+  this.productsSerivce.updateProduct(payload, this.productId).subscribe(
+    (res: any) => {
+      this.appNotificationService.push('✅ المنتج تم تحديثه', 'success');
+      // فتح نافذة الطباعة تلقائيًا لو الكود اتولد تلقائي
+  
       this.closeModal(true);
-    }, error=> {
+    },
+    (error) => {
       this.appNotificationService.push(error.error.error, 'error');
-    });
+    }
+  );
+}
 
-  }
+
+  // createProduct() {
+  //   this.product = this.basicInfoForm.value;
+  //   if (!this.basicInfoForm.valid) {
+  //     return;
+  //   }
+
+  //   this.productsSerivce.createProduct(this.product).subscribe(() => {
+  //     this.appNotificationService.push('product created successfully', 'sucess');
+  //     this.closeModal(true);
+  //   }, error=> {
+  //     this.appNotificationService.push(error.error.error, 'error');
+  //   });
+
+  // }
+
+  // updateProduct() {
+  //   this.product = this.basicInfoForm.value;
+  //   if (!this.basicInfoForm.valid) {
+  //     return;
+  //   }
+
+  //   this.productsSerivce.updateProduct(this.product,this.productId).subscribe(() => {
+  //     this.appNotificationService.push('product updated successfully', 'sucess');
+  //     this.closeModal(true);
+  //   }, error=> {
+  //     this.appNotificationService.push(error.error.error, 'error');
+  //   });
+
+  // }
 
   submitForm(){
     if(this.isEdit){

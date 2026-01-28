@@ -1,10 +1,9 @@
 .invoice-container {
     font-family: "Courier New", Courier, monospace;
     // direction: rtl;
+    width: 100%;
+    box-sizing: border-box;
     text-align: right;
-    padding: 10px;
-    width: 400px;
-    margin: auto;
     background-color: white;
     color: black;
   }
@@ -19,7 +18,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 10px;
   }
   td, th {
     padding: 4px;
@@ -34,7 +33,7 @@
     margin: 10px 0;
   }
   .final-total {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
     text-align: center;
   }
@@ -44,8 +43,15 @@
   }
   /* Only show invoice and hide everything else when printing */
 @media print {
+  @page {
+    margin: 0;         /* Remove default page margin */
+}
     body *, .modal-wrapper,.app-notification, #app-notifications-container {
       visibility: hidden;
+      margin: 0;
+      padding: 0;
+      width: 58mm;
+      margin: 0;
     }
     .app-notification, #app-notifications-container {
       display: none;
@@ -53,11 +59,11 @@
   
     #print-container, #print-container * {
         visibility: visible;
-        width: 400px;
         margin: 0 auto; /* Center horizontally */
         position: relative; /* Allow centering in normal flow */
         top: 0;
         left: 0;
+        right: 0;
         
       }
    
@@ -66,9 +72,14 @@
       position: absolute;
       top: 0;
       left: 0;
+      right: 0;
       width: 100%;
     }
   }
+
+
+
+
   
   .camera-overlay {
     position: fixed;

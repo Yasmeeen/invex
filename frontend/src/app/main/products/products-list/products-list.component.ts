@@ -189,8 +189,38 @@ export class ProductsListComponent implements OnInit {
     }
   })
   }
+  printbarCode(code:string,name:string){
+    this.productsService
+    .getBarcodeImage(code, name)
+    .subscribe((html: any) => {
+      this.printHtml(html);
 
- 
+    });
+  }
+  printHtml(html: string) {
+    const printWindow = window.open('', '_blank', 'width=600,height=400');
+    
+    if (!printWindow) return;
+  
+    printWindow.document.open();
+    printWindow.document.write(html);
+  
+
+    printWindow.document.write(`
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+        window.onafterprint = function() {
+          window.close();
+        };
+      </script>
+    `);
+  
+    printWindow.document.close();
+  }
+  
+  
 
   ngOnDestroy() {
     this.subscriptions.forEach(s => s && s.unsubscribe())

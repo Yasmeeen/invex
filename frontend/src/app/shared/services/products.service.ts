@@ -19,6 +19,21 @@ constructor(
 getProducts(params: any) {
   return this.http.get(PRODUCTS_URL, { params: params });
 }
+  // Generate automatic barcode
+  generateBarcode(): Observable<{ code: string }> {
+    return this.http.get<{ code: string }>(`${PRODUCTS_URL}/generate-barcode`);
+  }
+
+  getBarcodeImage(code: string,productName: string){
+    // return this.http.get(`${PRODUCTS_URL}/barcode/${code}`, {
+    //   responseType: 'text' as 'json'
+    // });
+    return this.http.get(
+      `${PRODUCTS_URL}/barcode/${code}?name=${encodeURIComponent(productName)}`,
+      { responseType: 'text' as 'json' }
+    )
+  }
+
 getPurchasingRequests(params: any) {
     
   return this.http.get(PURCHASING_URL, { params:params });

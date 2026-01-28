@@ -29,42 +29,47 @@
               <form #basicInfoForm="ngForm">
                 <div class="row">
                         <!-- Code -->
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="code.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_code' | translate }}</label>
-                      <div class="code-scan-container">
-                        <input
-                          type="text"
-                          name="code"
-                          [(ngModel)]="codeValue"
-                          placeholder="Scan or enter code"
-                          #code="ngModel"
-                          required
-                        />
-                        <button type="button" class="scan-btn" (click)="toggleCamera()">
-                          <i class="fa fa-camera"></i> Scan QR
-                        </button>
-                      </div>
-                      
-                      <!-- Overlay الكاميرا -->
-                      <div *ngIf="isCameraActive" class="camera-overlay">
-                        <video id="video" width="300" height="300"></video>
-                      </div>
+           <!-- Code -->
+<div class="col-md-12">
+  <div
+    class="form-group"
+    [class.has-error]="code.invalid && basicInfoForm.submitted"
+  >
+    <label>{{ 'tr_code' | translate }}</label>
+    <div class="code-scan-container">
+      <input
+        type="text"
+        name="code"
+        [(ngModel)]="codeValue"
+        placeholder="Scan or enter code"
+        #code="ngModel"
+        required
+        [disabled]="isCodeGenerated"  
+      />
+      <button type="button" class="scan-btn" (click)="toggleCamera()">
+        <i class="fa fa-camera"></i> Scan QR
+      </button>
 
-                   
-                      
-                      
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="code.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_code_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
+      <!-- زر توليد كود تلقائي -->
+      <button type="button" class="s-btn btn-secondary ml-2" (click)="generateBarcode()">
+        Generate Automatic Barcode
+      </button>
+    </div>
+
+    <!-- Overlay الكاميرا -->
+    <div *ngIf="isCameraActive" class="camera-overlay">
+      <video id="video" width="300" height="300"></video>
+    </div>
+
+    <span
+      class="text-error size-small validator"
+      *ngIf="code.invalid && basicInfoForm.submitted"
+    >
+      {{ 'tr_code_required' | translate }}
+    </span>
+  </div>
+</div>
+
 
 
                   <!-- Name -->
@@ -91,9 +96,38 @@
                     </div>
                   </div>
 
-            
+                  <!-- Category -->
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="category.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_category' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          [clearable]="false"
+                          ngModel
+                          #category="ngModel"
+                          name="category"
+                          [items]="categories"
+                          required
+                        ></ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="category.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_category_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
                   <!-- Price -->
                   <div class="col-md-6">
+        
                     <div
                       class="form-group"
                       [class.has-error]="price.invalid && basicInfoForm.submitted"
@@ -169,35 +203,7 @@
                     </div>
                   </div>
 
-                  <!-- Category -->
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="category.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_category' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          [clearable]="false"
-                          ngModel
-                          #category="ngModel"
-                          name="category"
-                          [items]="categories"
-                          required
-                        ></ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="category.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_category_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
+            
 
                   <!-- Stock -->
                   <div class="col-md-6">
@@ -222,6 +228,7 @@
                       </span>
                     </div>
                   </div>
+             
 
                   <!-- Discount -->
                   <div class="col-md-6">

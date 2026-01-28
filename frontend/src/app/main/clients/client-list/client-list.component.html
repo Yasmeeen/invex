@@ -2,9 +2,6 @@
     <h2 class="size-body title-with-btn plr-4 ptb-4">
       <span class="page-title">{{ 'tr_clients' | translate }}</span>
       <div class="btn-group">
-        <button class="s-btn btn-primary" >
-          {{ 'tr_add_client' | translate }}
-        </button>
         <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
           <i class="fa fa-filter text-primary"></i>
         </button>
@@ -57,7 +54,7 @@
   
       <div class="empty-state-here text-center ptb-8" *ngIf="clientsList.length === 0">
         <i class="fas fa-client-slash empty-icon"></i>
-        <p>{{ 'tr_no_clients_found' | translate }}</p>
+        <p>{{ 'tr_no_items_found' | translate }}</p>
       </div>
   
       <div class="plr-4 ptb-4">

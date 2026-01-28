@@ -2,6 +2,191 @@ import Product from '../../DB/models/product.model.js';
 
 // Get all products (with pagination and optional search)
 // Get all products (with pagination, optional search, optional branch filter)
+
+import bwipjs from "bwip-js";
+import PDFDocument from "pdfkit";
+
+
+export const generateBarcodePDF = async (req, res) => {
+  try {
+    const products = await Product.find().sort({ createdAt: 1 });
+
+    const doc = new PDFDocument({ size: "A4", margin: 20 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=barcodes.pdf");
+    doc.pipe(res);
+
+    const xStart = 20; // بداية الأعمدة
+    const yStart = 20; // بداية الصفوف
+    const cardWidth = 150;
+    const cardHeight = 80;
+    const marginX = 10;
+    const marginY = 10;
+
+    let x = xStart;
+    let y = yStart;
+    let itemsPerRow = Math.floor((doc.page.width - xStart) / (cardWidth + marginX));
+
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+
+      // توليد باركود كـ Buffer
+      const pngBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: product.code,
+        scale: 2,
+        height: 40,
+        includetext: true,
+        textxalign: "center",
+      });
+
+      // رسم مستطيل ستكر
+      doc.rect(x, y, cardWidth, cardHeight).stroke();
+
+      // إضافة الباركود
+      doc.image(pngBuffer, x + 10, y + 10, { width: cardWidth - 20, height: 40 });
+
+      // إضافة اسم المنتج
+      doc.fontSize(10).text(product.name, x + 5, y + 55, { width: cardWidth - 10, align: "center" });
+
+      // إضافة السعر
+      doc.fontSize(10).text(`${product.price} EGP`, x + 5, y + 70, { width: cardWidth - 10, align: "center" });
+
+      // تحريك الكارد للمنتج التالي
+      if ((i + 1) % itemsPerRow === 0) {
+        x = xStart;
+        y += cardHeight + marginY;
+        // إذا وصلنا لأسفل الصفحة، اضف صفحة جديدة
+        if (y + cardHeight > doc.page.height) {
+          doc.addPage();
+          y = yStart;
+        }
+      } else {
+        x += cardWidth + marginX;
+      }
+    }
+
+    doc.end();
+  } catch (error) {
+    console.error("❌ Error generating barcode PDF:", error);
+    res.status(500).json({ error: "Failed to generate barcode PDF" });
+  }
+};
+
+// توليد كود تلقائي
+export const generateBarcode = async (req, res) => {
+  try {
+    const uniqueCode = `PRD-${Date.now()}`; // فورمات فريد
+    res.json({ code: uniqueCode });
+  } catch (error) {
+    console.error('❌ Error generating barcode:', error);
+    res.status(500).json({ error: 'Failed to generate barcode' });
+  }
+};
+
+export const generateBarcodeImage = async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { name } = req.query; // اسم المنتج
+
+    if (!code) {
+      return res.status(400).json({ error: 'Code is required' });
+    }
+
+    bwipjs.toBuffer(
+      {
+        bcid: 'code128',
+        text: code,
+        scale: 3,
+        height: 10,
+        includetext: false, // هنكتب الكود لوحدنا لو حابة
+      },
+      (err, png) => {
+        if (err) {
+          return res.status(500).send(err);
+        }
+
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <style>
+           @page {
+          size: 38mm 25mm;
+          margin: 0; 
+        }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center; /* يضع الاستيكر في منتصف الصفحة عرضياً */
+        align-items: center;     /* يضع الاستيكر في منتصف الصفحة طولياً */
+      }
+
+      .sticker {
+        width: 38mm;   /* نفس عرض الاستيكر */
+        height: 25mm;  /* نفس طول الاستيكر */
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* يوسّط المحتوى طولياً داخل الاستيكر */
+        align-items: center;     /* يوسّط المحتوى عرضياً داخل الاستيكر */
+        box-sizing: border-box;
+      }
+
+      .product-name {
+        font-size: 8px;
+        font-weight: bold;
+        line-height: 1.1;
+        margin-bottom: 1mm;
+        max-width: 95%;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      img {
+        max-width: 90%;
+        max-height: 60%; 
+        height: auto;
+        display: block;
+      }
+
+      .code-name {
+        margin-top: 1mm;
+        text-align: center;
+           font-size: 12px;
+        font-weight: bold;
+      }
+
+</style>
+
+            </head>
+
+            <body>
+            <div class="sticker-name">
+               <div class="product-name">${name || ''}</div>
+               <img src="data:image/png;base64,${png.toString('base64')}" />
+               <div class="code-name">${code || ''}</div>
+            </div>
+           
+            </body>
+          </html>
+        `);
+      }
+    );
+  } catch (error) {
+    console.error('❌ Error in generateBarcodeImage:', error);
+    res.status(500).json({ error: 'Failed to generate barcode image' });
+  }
+};
+
+
+
 export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', branchId } = req.query;

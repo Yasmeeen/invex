@@ -3,6 +3,7 @@
   not-authorized
   [notAuthorized]="isNotAuthorized"
 >
+        
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">
       <span class="text-primary">{{totalNumberOfProducts}}-</span>
@@ -113,6 +114,12 @@
                     >
                       {{ "tr_action.edit" | translate }}
                     </div>
+                    <div
+                    class="single-option"
+                    (click)="printbarCode(product.code, product.name)"
+                  >
+                    {{ "print_barcode" | translate }}
+                  </div>
                   </div>
                 </span>
               </td>

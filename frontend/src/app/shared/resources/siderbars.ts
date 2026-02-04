@@ -30,6 +30,12 @@ export const  AdminSidebar = [
     icon: 'fa fa-list-ul  icon',
   },
   {
+    name: 'tr_cashier.TITLE',
+    routerLink: '/cashier',
+    icon: 'fa fa-money  icon',
+  },
+  
+  {
     name: 'tr_purchases',
     routerLink: 'null',
     icon: 'icon-mycourses-selected-ico icon orange-icon',

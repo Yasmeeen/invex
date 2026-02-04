@@ -10,11 +10,10 @@ export const getClients = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = "" } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    
 
     const matchStage = search
       ? {
-          name: { $regex: search, $options: "i" },
+          phoneNumber: { $regex: search, $options: "i" },
         }
       : {};
 
@@ -31,11 +30,22 @@ export const getClients = async (req, res) => {
         },
       },
 
-      // Calculate stats
+      // Calculate stats + last order date
       {
         $addFields: {
           numberOfOrders: { $size: "$orders" },
           totalOrdersPrice: { $sum: "$orders.totalPrice" },
+          lastOrderDate: { $max: "$orders.createdAt" },
+        },
+      },
+
+      // Join branches to get branch name
+      {
+        $lookup: {
+          from: "branches",          // collection name in DB
+          localField: "branches",    // array of ObjectId in Client
+          foreignField: "_id",
+          as: "branchDetails",       // new field with branch info
         },
       },
 
@@ -47,11 +57,13 @@ export const getClients = async (req, res) => {
       {
         $project: {
           name: 1,
+          phoneNumber: 1,
           address: 1,
-          branchs: 1,
           createdAt: 1,
           numberOfOrders: 1,
           totalOrdersPrice: 1,
+          lastOrderDate: 1,
+          branches: "$branchDetails.name", // return only branch names
         },
       },
     ];
@@ -78,6 +90,7 @@ export const getClients = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch clients" });
   }
 };
+
 
 /**
  * GET client by ID (with stats)

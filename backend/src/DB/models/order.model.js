@@ -2,16 +2,21 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema(
   {
-    clientName: { type: String, required: true, trim: true },
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Client",
+    },
+
+    clientName: { type: String, required: false, trim: true },
     clientPhoneNumber: { type: String, required: true, trim: true },
+    clientAddress: { type: String, required: false, trim: true },
+
     sellerName: { type: String, trim: true },
-    paymentMethod: { type: String, required: true, trim: true },
-    clientAddress: { type: String, required: true, trim: true },
+    paymentMethod: { type: String, required: false, trim: true ,  default: "cash"},
 
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
-      required: false,
     },
 
     numberOfProducts: { type: Number, min: 0 },
@@ -36,7 +41,6 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ["completed", "restored"],
       default: "completed",
-      required: true,
     },
 
     orderNumber: { type: Number, unique: true, required: true },

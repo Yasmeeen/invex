@@ -12,7 +12,7 @@
       <div class="row">
         <div class="col-md-3">
           <div class="form-group mb-0">
-            <label>{{ 'tr_name' | translate }}/{{ 'tr_email' | translate }}</label>
+            <label>{{ 'tr_phone_number' | translate }}</label>
             <div class="input-with-icon bg-white width-100">
               <input
                 class="s-control"
@@ -32,18 +32,24 @@
           <thead>
             <tr>
               <th>ID</th>
+              <th>{{ 'tr_phone_number' | translate }}</th>
               <th>{{ 'tr_name' | translate }}</th>
-              <th>{{ 'tr_email' | translate }}</th>
-              <th>{{ 'tr_role' | translate }}</th>
+              <th>{{ 'tr_address' | translate }}</th>
               <th>{{ 'tr_branch' | translate }}</th>
+              <th>{{ 'tr_number_of_orders' | translate }}</th>
+              <th>{{ 'tr_total_orders_price' | translate }}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let client of clientsList; let i = index">
               <td>{{ i + 1 }}</td>
+              <td>{{ client.phoneNumber }}</td>
               <td>{{ client.name }}</td>
               <td>{{ client.address }}</td>
+              <td><div *ngFor="let branch of  client.branches ">
+                {{branch}}
+              </div></td>
               <td>{{ client.numberOfOrders }}</td>
               <td>{{ client.totalOrdersPrice }}</td>
           

@@ -70,6 +70,12 @@ const routes: Routes = [
         canActivate: [RoleGuard],
         data: { allowedRoles: ['Super Admin'] }
       },
+      {
+        path: 'cashier',
+        loadChildren:() => import('./cashier/cashier.module').then(m => m.CashierModule),
+        canActivate: [RoleGuard],
+        data: { allowedRoles: ['Super Admin','Employee','Cashier'] }
+      },
 
 
       

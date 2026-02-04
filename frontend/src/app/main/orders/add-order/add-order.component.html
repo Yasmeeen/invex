@@ -9,25 +9,75 @@
         <div class="add-student-modal-container">
           <div class="content-container plr-4 ptb-3">
             <form #orderForm="ngForm">
-              <div class="row">
-                <!-- Client Name -->
-                <div class="col-md-4">
-                  <div class="form-group" [class.has-error]="clientName.invalid && orderForm.submitted">
-                    <label>{{ 'tr_client_name' | translate }}</label>
-                    <input
-                      type="text"
-                      class="s-control"
-                      name="clientName"
-                      [(ngModel)]="order.clientName"
-                      #clientName="ngModel"
-                      required
-                    />
-                    <span class="text-error size-small validator" *ngIf="clientName.invalid && orderForm.submitted">
-                      {{ 'tr_client_name_required' | translate }}
-                    </span>
-                  </div>
-                </div>
+                    <!-- Products Section -->
+                    <div class="row mt-6 mb-8 pb-8">
+                      <div class="col-12 mt-2 flex flex-end">
+                        <button type="button" class="s-btn btn-primary" (click)="addProductRow()">
+                          <i class="fa fa-plus mr-1"></i> {{ 'tr_add_product' | translate }}
+                        </button>
+                      </div>
+                      <div class="col-12" *ngFor="let product of orderProducts; let i = index">
+                        <div class="row">
+                          <div class="col-md-5">
+                            <div class="form-group">
+                              <label>{{ 'tr_product_code' | translate }}</label>
+                              <div class="code-scan-container">
+                                <div class="input-with-icon bg-white width-100">
+                                  <ng-select
+                                    class="s-control s-select"
+                                    placeholder="{{ 'tr_select' | translate }}"
+                                    bindLabel="code"
+                                    [clearable]="false"
+                                    [(ngModel)]="product.selectedProduct"
+                                    name="product{{i}}"
+                                    [items]="products"
+                                    required
+                                  ></ng-select>
+                                  <i class="fa fa-search input-icon"></i>
+                                </div>
+                            
+                                <button type="button" class="s-btn btn-sm  scan-btn mt-1" (click)="startProductScan(i)">
+                                  <i class="fa fa-qrcode"></i> Scan
+                                </button>
+                              </div>
+                          
+                            </div>
+                          </div>
+                          
+      
+                          <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                            <div class="form-group">
+                              <label>{{ 'tr_quantity' | translate }}</label>
+                              <input type="number" class="s-control" [(ngModel)]="product.quantity" name="quantity{{i}}" required min="1"/>
+                            </div>
+                          </div>
+      
+                          <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                            <label>{{ 'tr_discount' | translate }}</label>
+                            <div class="s-checkbox size-small mtb-2">
+                              <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount">
+                              <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
+                            </div>
+                          </div>
+      
+                          <div class="col-md-2" *ngIf="product.selectedProduct?.code">
+                            <label>{{ 'tr_price' | translate }}</label>
+                            <div class="mt-3">{{ getOrderProductPrice(product) }}</div>
+                          </div>
+      
+                          <div class="col-md-1">
+                            <label>{{ 'tr_delete' | translate }}</label>
+                            <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
+                              <i class="fa fa-trash"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+      
+                 
+                    </div>
 
+              <div class="row">
                 <div class="col-md-4">
                   <div class="form-group" [class.has-error]="clientPhone.invalid && orderForm.submitted">
                     <label>{{ 'tr_client_phone' | translate }}</label>
@@ -45,6 +95,22 @@
                   </div>
                 </div>
 
+                <!-- Client Name -->
+                <div class="col-md-4">
+                  <div class="form-group" [class.has-error]="clientName.invalid && orderForm.submitted">
+                    <label>{{ 'tr_client_name' | translate }}</label>
+                    <input
+                      type="text"
+                      class="s-control"
+                      name="clientName"
+                      [(ngModel)]="order.clientName"
+                      #clientName="ngModel"
+                    />
+                  </div>
+                </div>
+
+      
+
                 <div class="col-md-4">
                   <div class="form-group" [class.has-error]="sellerName.invalid && orderForm.submitted">
                     <label>{{ 'tr_seller_name' | translate }} <span class="size_tiny">( {{'tr_optional' | translate}})</span> </label>
@@ -53,12 +119,8 @@
                       class="s-control"
                       name="sellerName"
                       [(ngModel)]="order.sellerName"
-                      #sellerName="ngModel"
-          
+                      #sellerName="ngModel"        
                     />
-                    <span class="text-error size-small validator" *ngIf="sellerName.invalid && orderForm.submitted">
-                      {{ 'tr_seller_name_required' | translate }}
-                    </span>
                   </div>
                 </div>
 
@@ -76,15 +138,10 @@
                         #paymentMethod="ngModel"
                         name="paymentMethod"
                         [items]="paymentMethods"
-                        required
                       >
                       </ng-select>
                       <i class="fa fa-caret-down input-icon"></i>
                     </div>
-
-                    <span class="text-error size-small validator" *ngIf="paymentMethod.invalid && orderForm.submitted">
-                      {{ 'tr_payment_method_required' | translate }}
-                    </span>
                   </div>
                 </div>
 
@@ -132,81 +189,13 @@
                       name="clientAddress"
                       [(ngModel)]="order.clientAddress"
                       #clientAddress="ngModel"
-                      required
+                    
                     />
-                    <span class="text-error size-small validator" *ngIf="clientAddress.invalid && orderForm.submitted">
-                      {{ 'tr_client_address_required' | translate }}
-                    </span>
                   </div>
                 </div>
               </div>
 
-              <!-- Products Section -->
-              <div class="row mt-6">
-                <div class="col-12" *ngFor="let product of orderProducts; let i = index">
-                  <div class="row">
-                    <div class="col-md-5">
-                      <div class="form-group">
-                        <label>{{ 'tr_product_code' | translate }}</label>
-                        <div class="code-scan-container">
-                          <div class="input-with-icon bg-white width-100">
-                            <ng-select
-                              class="s-control s-select"
-                              placeholder="{{ 'tr_select' | translate }}"
-                              bindLabel="code"
-                              [clearable]="false"
-                              [(ngModel)]="product.selectedProduct"
-                              name="product{{i}}"
-                              [items]="products"
-                              required
-                            ></ng-select>
-                            <i class="fa fa-search input-icon"></i>
-                          </div>
-                      
-                          <button type="button" class="s-btn btn-sm  scan-btn mt-1" (click)="startProductScan(i)">
-                            <i class="fa fa-qrcode"></i> Scan
-                          </button>
-                        </div>
-                    
-                      </div>
-                    </div>
-                    
-
-                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
-                      <div class="form-group">
-                        <label>{{ 'tr_quantity' | translate }}</label>
-                        <input type="number" class="s-control" [(ngModel)]="product.quantity" name="quantity{{i}}" required min="1"/>
-                      </div>
-                    </div>
-
-                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
-                      <label>{{ 'tr_discount' | translate }}</label>
-                      <div class="s-checkbox size-small mtb-2">
-                        <input type="checkbox" id="discount{{i}}" name="discount{{i}}" [(ngModel)]="product.selectedProduct.isApplyDiscount">
-                        <label for="discount{{i}}"> {{product.selectedProduct.discount}}% </label>
-                      </div>
-                    </div>
-
-                    <div class="col-md-2" *ngIf="product.selectedProduct?.code">
-                      <label>{{ 'tr_price' | translate }}</label>
-                      <div class="mt-3">{{ getOrderProductPrice(product) }}</div>
-                    </div>
-
-                    <div class="col-md-1">
-                      <label>{{ 'tr_delete' | translate }}</label>
-                      <button class="s-btn btn-sm btn-danger mt-1" type="button" (click)="removeProduct(i)">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-12 mt-2 flex flex-end">
-                  <button type="button" class="s-btn btn-primary" (click)="addProductRow()">
-                    <i class="fa fa-plus mr-1"></i> {{ 'tr_add_product' | translate }}
-                  </button>
-                </div>
-              </div>
+        
             </form>
           </div>
         </div>

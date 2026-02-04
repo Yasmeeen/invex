@@ -253,7 +253,7 @@
     "tr_discount":"Discount",
     "tr_number_of_items":"Number Of Items",
     "tr_total": "Total",
-    "tr_quantity": "Quantity",
+    "tr_quantity": "Qty",
     "tr_price": "Price",
     "tr_total_invoice": "Invoice Total:",
     "tr_discount_percent": "Discount %",
@@ -396,7 +396,25 @@
     "tr_past_unpaid_installments": "Past Unpaid Installments",
     "tr_no_past_unpaid_installments": "No past unpaid installments.",
     "print_barcode":"print barcode",
-    "tr_clients":"Clients"
+    "tr_clients":"Clients",
+    "tr_number_of_orders":"Number of orders",
+    "tr_total_orders_price":"total Orders price",
+    "tr_open_cashier":"Open Cashier",
+    "tr_close_cashier":"Close Cashier",
+    "tr_cashier": {
+        "TITLE": "Cashier",
+        "SCAN_PRODUCT": "Scan product...",
+        "CURRENT_ORDER": "Current Order",
+        "PRODUCT": "Product",
+        "QTY": "Qty",
+        "PRICE": "Price",
+        "TOTAL": "Total",
+        "REMOVE": "Remove",
+        "PAY": "Pay"
+    }
+    
+
+
 
   
 

@@ -1,6 +1,8 @@
 import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import Client from "../../DB/models/client.model.js";
+
 import mongoose from 'mongoose';
 
 export const getOrders = async (req, res) => {
@@ -97,13 +99,14 @@ export const getOrderById = async (req, res) => {
   }
 };
 
-
 export const createOrder = async (req, res) => {
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const {
+      clientId, // optional
       clientName,
       clientPhoneNumber,
       sellerName,
@@ -112,18 +115,49 @@ export const createOrder = async (req, res) => {
       branch,
       products,
       status,
+      userId
     } = req.body;
 
-    if (!clientName || !clientPhoneNumber || !paymentMethod || !clientAddress) {
+    // validation
+    if ( !clientPhoneNumber ) {
       return res.status(400).json({
-        error: 'clientName, clientPhoneNumber, paymentMethod, and clientAddress are required',
+        error: "clientPhoneNumber is required",
       });
     }
 
     if (!products || products.length === 0) {
-      return res.status(400).json({ error: 'Order must contain at least one product' });
+      return res.status(400).json({ error: "Order must contain at least one product" });
     }
 
+    // ======================
+    // 1️⃣ GET OR CREATE CLIENT
+    // ======================
+    let finalClientId = clientId;
+
+    if (!finalClientId) {
+      let client = await Client.findOne({ phoneNumber: clientPhoneNumber }).session(session);
+
+      if (!client) {
+        const [newClient] = await Client.create(
+          [
+            {
+              name: clientName,
+              phoneNumber: clientPhoneNumber,
+              address: clientAddress,
+              branches: branch ? [branch] : [],
+            },
+          ],
+          { session }
+        );
+        client = newClient;
+      }
+
+      finalClientId = client._id;
+    }
+
+    // ======================
+    // 2️⃣ CALCULATE TOTALS + UPDATE STOCK
+    // ======================
     let totalPrice = 0;
     let numberOfProducts = 0;
     const orderProducts = [];
@@ -135,7 +169,6 @@ export const createOrder = async (req, res) => {
       const quantity = Number(item.quantity) || 1;
       numberOfProducts += quantity;
 
-      // ✅ Use price and discount info from frontend payload
       let price = Number(selected.price) || 0;
       const isApplyDiscount = !!selected.isApplyDiscount;
 
@@ -145,7 +178,6 @@ export const createOrder = async (req, res) => {
 
       totalPrice += price * quantity;
 
-      // 🛠 Update stock
       const productDoc = await Product.findById(selected._id).session(session);
       if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
       if (productDoc.stock < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
@@ -153,7 +185,6 @@ export const createOrder = async (req, res) => {
       productDoc.stock -= quantity;
       await productDoc.save({ session });
 
-      // ✅ Add to order’s products array
       orderProducts.push({
         productId: selected._id,
         name: selected.name,
@@ -164,26 +195,32 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // 🧮 Generate next order number
+    // ======================
+    // 3️⃣ GENERATE ORDER NUMBER
+    // ======================
     const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean();
     const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
 
-    // 🧾 Create order
+    // ======================
+    // 4️⃣ CREATE ORDER WITH CASHIER
+    // ======================
     const [newOrder] = await Order.create(
       [
         {
           orderNumber: nextOrderNumber,
+          clientId: finalClientId,
           clientName,
           clientPhoneNumber,
+          clientAddress,
           sellerName,
           paymentMethod,
-          clientAddress,
           branch,
           products: orderProducts,
           numberOfProducts,
           totalPrice,
           status,
-        },
+          cashierId: userId, 
+          },
       ],
       { session }
     );
@@ -191,14 +228,18 @@ export const createOrder = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(201).json({ message: '✅ Order created successfully', newOrder });
+    res.status(201).json({
+      message: "✅ Order created successfully",
+      newOrder,
+    });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    console.error('❌ Error creating order:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
+    console.error("❌ Error creating order:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 };
+
 
 
 

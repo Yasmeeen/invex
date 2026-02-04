@@ -2,11 +2,25 @@ import mongoose from "mongoose";
 
 const clientSchema = new mongoose.Schema(
   {
-    name: { type: String, trim: true },
-    address: { type: String, trim: true },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-    // Client may belong to one or more branches
-    branchs: [
+    phoneNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
+    address: {
+      type: String,
+      trim: true,
+    },
+
+    branches: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Branch",
@@ -14,16 +28,13 @@ const clientSchema = new mongoose.Schema(
     ],
   },
   {
-    timestamps: true, // creates createdAt & updatedAt
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-/**
- * Virtual fields (NOT stored in DB)
- * These match frontend model exactly
- */
+// Virtuals (filled via aggregation)
 clientSchema.virtual("numberOfOrders").get(function () {
   return this._doc.numberOfOrders || 0;
 });
@@ -32,5 +43,4 @@ clientSchema.virtual("totalOrdersPrice").get(function () {
   return this._doc.totalOrdersPrice || 0;
 });
 
-const Client = mongoose.model("Client", clientSchema);
-export default Client;
+export default mongoose.model("Client", clientSchema);

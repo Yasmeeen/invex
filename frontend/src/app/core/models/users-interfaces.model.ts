@@ -22,11 +22,12 @@ export class User{
 export class Client{
   _id:string;
   name?:string;
+  phoneNumber: string;
   address?:string;
   numberOfOrders: number;
   totalOrdersPrice: number;
   created_at: string;
-  branchs?: Branch[];
+  branches?: Branch[];
 }
 export class Employee extends User {
 

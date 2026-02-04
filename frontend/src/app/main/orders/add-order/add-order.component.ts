@@ -167,7 +167,7 @@ export class AddOrderComponent implements OnInit {
    
 
     }, error=> {
-      this.appNotificationService.push(error.error, 'error');
+      this.appNotificationService.push(error.error.details, 'error');
     });
   }
   changeBranch(){

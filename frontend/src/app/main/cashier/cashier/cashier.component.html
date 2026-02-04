@@ -1,0 +1,183 @@
+<div class="cashier"   [ngClass]="{'cashier-overlay': isCashierFullScreen}" [class.open]="isCashierFullScreen">
+  <!-- Header + Close -->
+  <div class="cashier-header bg-primary flex flex-middle">
+    <div class="flex flex-middle width-100">
+      <span class="text-white  mr-4">{{ "tr_cashier.TITLE" | translate }}</span>
+      <!-- Branch Selection (Super Admin only) -->
+      <div *ngIf="curentUser.role === 'Super Admin'" class="branch-selection max-300 width-100">
+        <div class="form-group mb-0">
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_branches' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="false"
+              [(ngModel)]="adminSelectedBranchId"
+              #branch="ngModel"
+              name="branchId"
+              (change)="loadProducts()"
+              [items]="branches"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="close-btn" *ngIf="isCashierFullScreen" (click)="closeCashier()">✖</button>
+
+    <i class="fa fa-arrows-alt pointer" *ngIf="!isCashierFullScreen" (click) = "isCashierFullScreen = true" aria-hidden="true"></i>
+  </div>
+
+  <!-- Body -->
+  <div class="cashier-body">
+    <!-- Products Panel -->
+    <div class="products-panel">
+      <input
+        type="text"
+        placeholder="{{ 'tr_cashier.SCAN_PRODUCT' | translate }}"
+        [(ngModel)]="barcode"
+        #barcodeInput
+        (keyup.enter)="scanProduct(barcode); barcode = ''"
+        autofocus
+      />
+      <div class="products-grid">
+        <div [class.disabled-container]="product.stock == 0"
+          class="product-card"
+          *ngFor="let product of filteredProducts()"
+          (click)="addProduct(product)"
+        >
+          <!-- <img [src]="product.image" alt="{{ product.name }}" /> -->
+           <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
+          <div class="product-name">{{ product.name }}</div>
+          <div class="product-price">{{ product.price |  currency:'EGP ':'symbol':'1.2-2' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Panel -->
+    <div class="order-panel">
+      <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
+      <table class="products-table ">
+        <thead>
+          <tr>
+            <th>{{ "tr_cashier.PRODUCT" | translate }}</th>
+            <th>{{ "tr_cashier.QTY" | translate }}</th>
+            <th>{{ "tr_cashier.PRICE" | translate }}</th>
+            <th>{{ "tr_cashier.TOTAL" | translate }}</th>
+            <th>{{ "tr_cashier.REMOVE" | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of orderItems; let i = index">
+            <td>{{ item.name }}</td>
+            <td>
+              <button (click)="decreaseQty(i)">-</button>
+              {{ item.quantity }}
+              <button (click)="increaseQty(i)">+</button>
+            </td>
+            <td>{{ item.price | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ item.price * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
+            <td><button (click)="removeItem(i)">x</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="order-summary">
+        <div>
+          {{ "tr_cashier.TOTAL" | translate }}: {{ getTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+        </div>
+        <button class="pay-btn" (click)="checkout()">
+          {{ "tr_cashier.PAY" | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+<!-- Invoice -->
+<div class="invoice-container" id="print-container">
+
+  <!-- Store Name -->
+  <div class="store-name center mtb-4 bold">
+    {{ storeName }}
+  </div>
+
+  <!-- Invoice Meta -->
+  <table class="invoice-table meta-table">
+    <tr>
+      <td>{{ 'tr_invoice_number' | translate }}</td>
+      <td>{{ createdOrder?.orderNumber }}</td>
+    </tr>
+    <tr>
+      <td>{{ 'tr_number_of_items' | translate }}</td>
+      <td>{{ createdOrder?.numberOfProducts }}</td>
+    </tr>
+    <tr>
+      <td>{{ 'tr_date' | translate }}</td>
+      <td>{{ todayDate | date: 'dd MMM y' }}</td>
+    </tr>
+  </table>
+
+  <div class="separator dashed"></div>
+
+  <!-- Products Table -->
+  <table class="invoice-table products-table">
+    <tr class="header bold">
+      <td>{{ 'tr_name' | translate }}</td>
+      <td>{{ 'tr_cashier.QTY' | translate }}</td>
+      <td>{{ 'tr_price' | translate }}</td>
+      <td>{{ 'tr_total' | translate }}</td>
+    </tr>
+
+    <tr *ngFor="let item of createdOrder?.products">
+      <td class="item-name">{{ item.name }}</td>
+      <td>{{ item.quantity }}</td>
+      <td>{{ item.price | number:'1.2-2' }}</td>
+      <td>{{ (item.price * item.quantity )  | number:'1.2-2' }} </td>
+    </tr>
+  </table>
+
+  <div class="separator dashed"></div>
+
+  <!-- Totals -->
+  <table class="invoice-table totals-table">
+    <tr class="bold">
+      <td>{{ 'tr_total_invoice' | translate }}</td>
+      <td>{{ getTotal() | number:'1.2-2' }}</td>
+    </tr>
+    <tr>
+      <td>{{ 'tr_discount_percent' | translate }}</td>
+      <td>{{ getAverageDiscountPercent() | number:'1.2-2' }}%</td>
+    </tr>
+    <tr>
+      <td>{{ 'tr_discount_amount' | translate }}</td>
+      <td>{{ getDiscountAmount() | number:'1.2-2' }}</td>
+    </tr>
+    <tr class="bold">
+      <td>{{ 'tr_final_invoice_value' | translate }}</td>
+      <td>{{ getTotalAfterDiscount() | number:'1.2-2' }}</td>
+    </tr>
+  </table>
+
+  <div class="separator double-border"></div>
+
+  <!-- Final Total -->
+  <div class="final-total center bold">
+    {{ 'tr_final_invoice_value' | translate }} <br />
+    {{ getTotalAfterDiscount() | number:'1.2-2' }}
+  </div>
+
+  <div class="separator double-border"></div>
+
+  <!-- Footer -->
+  <div class="footer center">
+    <div class="bold">{{ storeName }}</div>
+    <div>{{ storePhoneNumber }}</div>
+  </div>
+
+</div>
+

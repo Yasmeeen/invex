@@ -7,7 +7,14 @@ import mongoose from 'mongoose';
 
 export const getOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', searchBranch = '', status } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      searchBranch = '',
+      status,
+      paymentMethod,
+    } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const query = {};
@@ -15,6 +22,11 @@ export const getOrders = async (req, res) => {
     // ✅ 1. Optional status filter
     if (status && status.trim() !== '') {
       query.status = status;
+    }
+
+    // ✅ 1b. Optional payment method filter (cash, visa, valu, …)
+    if (paymentMethod && String(paymentMethod).trim() !== '') {
+      query.paymentMethod = String(paymentMethod).trim();
     }
 
     // ✅ 2. Search by order number, client name, or phone number

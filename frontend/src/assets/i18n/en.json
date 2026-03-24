@@ -317,6 +317,7 @@
     "tr_client_address": "Client Address",
     "tr_client_address_required": "Client address is required.",
     "tr_client_info": "Client Information",
+    "tr_all_payment_methods": "All payment methods",
     "tr_payment_method": "Payment method",
     "tr_pay_cash": "Cash",
     "tr_pay_visa": "Visa",

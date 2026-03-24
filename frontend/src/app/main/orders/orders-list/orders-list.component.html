@@ -154,6 +154,31 @@
           </div>
         </div>
       </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_payment_method' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="paymentMethodOptions"
+              bindValue="id"
+              [clearable]="true"
+              [(ngModel)]="selectedPaymentMethod"
+              name="orderPaymentMethodFilter"
+              placeholder="{{ 'tr_all_payment_methods' | translate }}"
+              (change)="onPaymentMethodFilterChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">
+                <span *ngIf="item">{{ item.labelKey | translate }}</span>
+              </ng-template>
+              <ng-template ng-option-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -187,7 +212,7 @@
               <td>{{ order.branch?.name }}</td>
    
               <td>{{ order.totalPrice }}</td>
-              <td>{{ order.paymentMethod }}</td>
+              <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
               <td>{{ order.createdAt  | date: 'dd/M/YYYY'}}</td>
               <td>{{ order.status }}</td>
               <td>

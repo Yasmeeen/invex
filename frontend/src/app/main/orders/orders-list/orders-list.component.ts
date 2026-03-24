@@ -18,6 +18,10 @@ import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
+import {
+  PAYMENT_METHOD_OPTIONS,
+  PaymentMethodOption,
+} from '@shared/constants/payment-method-options';
 
 @Component({
   selector: 'app-orders-list',
@@ -63,6 +67,9 @@ export class OrdersListComponent implements OnInit {
   toDate: Date = new Date();
   selectedBranchId: string ;
   branches:Branch[] =[]
+  /** null = no filter (all payment methods) */
+  selectedPaymentMethod: string | null = null;
+  readonly paymentMethodOptions: PaymentMethodOption[] = PAYMENT_METHOD_OPTIONS;
 
   private subscriptions: Subscription[] = [];
 
@@ -106,6 +113,12 @@ export class OrdersListComponent implements OnInit {
     delete  this.params['status'] 
    }
 
+    if (this.selectedPaymentMethod) {
+      this.params['paymentMethod'] = this.selectedPaymentMethod;
+    } else {
+      delete this.params['paymentMethod'];
+    }
+
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
       this.ordersList = response.orders
@@ -135,6 +148,22 @@ export class OrdersListComponent implements OnInit {
   paginationUpdate(page: number) {
     this.params.page = page;
     this.getOrders();
+  }
+
+  onPaymentMethodFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  /** Translate stored order.paymentMethod id for display. */
+  paymentMethodLabel(method: string | undefined): string {
+    if (!method) {
+      return '—';
+    }
+    const opt = this.paymentMethodOptions.find((o) => o.id === method);
+    return opt
+      ? this.translateService.instant(opt.labelKey)
+      : method;
   }
 
   createOrEditOrder(isEdit: boolean, order?: Order){

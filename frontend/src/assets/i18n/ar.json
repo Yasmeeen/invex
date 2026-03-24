@@ -312,6 +312,7 @@
   "tr_client_address_required": "عنوان العميل مطلوب.",
   "tr_client_info": "معلومات العميل",
   "tr_payment_method": "طريقة الدفع",
+  "tr_all_payment_methods": "كل طرق الدفع",
   "tr_pay_cash": "نقدي",
   "tr_pay_visa": "فيزا",
   "tr_pay_mastercard": "ماستركارد",

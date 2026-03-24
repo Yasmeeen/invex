@@ -316,6 +316,7 @@
   "tr_client_address_required": "L’adresse du client est requise.",
   "tr_client_info": "Informations client",
   "tr_payment_method": "Mode de paiement",
+  "tr_all_payment_methods": "Tous les modes de paiement",
   "tr_pay_cash": "Espèces",
   "tr_pay_visa": "Visa",
   "tr_pay_mastercard": "Mastercard",

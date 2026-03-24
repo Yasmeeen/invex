@@ -3,6 +3,72 @@ import Order from "../../DB/models/order.model.js";
 import Branch from "../../DB/models/branch.model.js";
 import mongoose from "mongoose";
 
+/** Digits only (for comparing Egyptian mobile formats). */
+function digitsOnly(s) {
+  return String(s || "").replace(/\D/g, "");
+}
+
+/**
+ * Build possible DB values for the same logical phone (0XX…, +20…, 20…, 10 digits).
+ */
+function buildPhoneSearchCandidates(raw) {
+  const decoded = decodeURIComponent(String(raw || "").trim());
+  const d = digitsOnly(decoded);
+  const set = new Set([decoded, d].filter(Boolean));
+  if (d.length >= 10) {
+    const last10 = d.slice(-10);
+    set.add(last10);
+    set.add(`0${last10}`);
+    set.add(`20${last10}`);
+    set.add(`+20${last10}`);
+    set.add(`0020${last10}`);
+    if (d.startsWith("20") && d.length >= 12) {
+      set.add(`0${d.slice(2)}`);
+    }
+  }
+  return [...set].filter(Boolean);
+}
+
+/**
+ * GET client by phone (cashier / lookup). Must match stored phoneNumber flexibly.
+ */
+export const getClientByPhone = async (req, res) => {
+  try {
+    const param = req.params.phone;
+    if (!param) {
+      return res.status(400).json({ error: "Phone is required" });
+    }
+
+    const candidates = buildPhoneSearchCandidates(param);
+    const last10 = digitsOnly(param).slice(-10);
+
+    let client = await Client.findOne({
+      phoneNumber: { $in: candidates },
+    });
+
+    // Fallback: last 10 digits match (handles spacing/format differences)
+    if (!client && last10 && last10.length === 10) {
+      client = await Client.findOne({
+        phoneNumber: { $regex: new RegExp(`${last10}$`) },
+      });
+    }
+
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    res.json({
+      _id: client._id,
+      name: client.name,
+      address: client.address,
+      phoneNumber: client.phoneNumber,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching client by phone:", error.message);
+    res.status(500).json({ error: "Failed to fetch client" });
+  }
+};
+
 /**
  * GET all clients (pagination + search + order stats)
  */

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_UPDATE_PRODUCT_URL, ORDERS_URL, ORDER_CREATE_URL, ORDER_UPDATE_URL } from '@core/base/urls';
+import { CLIENTS_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_UPDATE_PRODUCT_URL, ORDERS_URL, ORDER_CREATE_URL, ORDER_UPDATE_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -42,8 +42,8 @@ updateOrder(order:any): Observable<Order> {
 }
 
 getClientByPhone(phone: string): Observable<any> {
-  const url = `${BASE_URL}clients/by-phone/${phone}`;
-  return this.http.get<any>(url);
+  const encoded = encodeURIComponent(String(phone).trim());
+  return this.http.get<any>(`${CLIENTS_URL}/by-phone/${encoded}`);
 }
 
 }

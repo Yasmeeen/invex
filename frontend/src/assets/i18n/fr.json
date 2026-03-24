@@ -314,6 +314,23 @@
   "tr_seller_name_required": "Le nom du vendeur est requis.",
   "tr_client_address": "Adresse du client",
   "tr_client_address_required": "L’adresse du client est requise.",
+  "tr_client_info": "Informations client",
+  "tr_payment_method": "Mode de paiement",
+  "tr_pay_cash": "Espèces",
+  "tr_pay_visa": "Visa",
+  "tr_pay_mastercard": "Mastercard",
+  "tr_pay_meeza": "Meeza",
+  "tr_pay_valu": "valU",
+  "tr_pay_aman": "Aman",
+  "tr_pay_halan": "Halan",
+  "tr_pay_tru": "tru",
+  "tr_pay_sohoula": "Sohoula",
+  "tr_pay_maylo_seven": "Maylo Seven",
+  "tr_pay_fawry": "Fawry",
+  "tr_pay_vodafone_cash": "Vodafone Cash",
+  "tr_pay_instapay": "InstaPay",
+  "tr_invalid_cashier_client": "Veuillez compléter les informations client avant de payer.",
+  "tr_cashier_client_registered": "Ce client est déjà enregistré. Le nom et l’adresse ont été remplis automatiquement.",
   "tr_product_code": "Code du produit",
   "tr_delete": "Supprimer",
   "tr_save_print": "Enregistrer et imprimer",
@@ -403,8 +420,7 @@
     "PRICE": "Prix",
     "TOTAL": "Total",
     "REMOVE": "Supprimer",
-    "PAY": "Payer"
+    "PAY": "Payer",
+    "NO_ITEMS": "Aucun produit dans la commande."
   }
-}
-
 }

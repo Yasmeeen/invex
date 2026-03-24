@@ -54,6 +54,63 @@
     flex: 1;
     overflow: hidden;
   }
+
+  /* Client info & generic card blocks (Bootstrap-like names, local styles) */
+  .card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+
+  }
+
+  .card-header {
+    padding: 0.75rem 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    align-items: center;
+
+    &:hover {
+      background: #eef1f3;
+    }
+
+    h5,
+    h6 {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+  }
+
+  .card-body {
+    padding: 1rem;
+    background: #fff;
+  }
+
+  /* Payment row inside client-info card (above phone/name/address) */
+  .card-body--payment {
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .payment-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .payment-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  ::ng-deep .cashier-payment-select .ng-dropdown-panel .ng-option {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
   
   /* Products Panel */
   .products-panel {

@@ -310,6 +310,23 @@
   "tr_seller_name_required": "اسم البائع مطلوب.",
   "tr_client_address": "عنوان العميل",
   "tr_client_address_required": "عنوان العميل مطلوب.",
+  "tr_client_info": "معلومات العميل",
+  "tr_payment_method": "طريقة الدفع",
+  "tr_pay_cash": "نقدي",
+  "tr_pay_visa": "فيزا",
+  "tr_pay_mastercard": "ماستركارد",
+  "tr_pay_meeza": "ميزة",
+  "tr_pay_valu": "فاليو",
+  "tr_pay_aman": "أمان",
+  "tr_pay_halan": "هالان",
+  "tr_pay_tru": "tru",
+  "tr_pay_sohoula": "سهولة",
+  "tr_pay_maylo_seven": "مايلو سفن",
+  "tr_pay_fawry": "فوري",
+  "tr_pay_vodafone_cash": "فودافون كاش",
+  "tr_pay_instapay": "إنستاباي",
+  "tr_invalid_cashier_client": "يرجى إكمال بيانات العميل بشكل صحيح قبل الدفع.",
+  "tr_cashier_client_registered": "هذا العميل مسجّل مسبقاً. تم تعبئة الاسم والعنوان تلقائياً.",
   "tr_product_code": "رمز المنتج",
   "tr_delete": "حذف",
   "tr_save_print": "حفظ و طباعة",
@@ -398,7 +415,8 @@
     "PRICE": "السعر",
     "TOTAL": "الإجمالي",
     "REMOVE": "إزالة",
-    "PAY": "ادفع"
+    "PAY": "ادفع",
+    "NO_ITEMS": "لا يوجد منتجات في الطلب."
   }
 
 

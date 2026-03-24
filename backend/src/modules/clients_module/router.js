@@ -4,6 +4,7 @@ const router = express.Router();
 import {
   getClients,
   getClientById,
+  getClientByPhone,
   createClient,
   updateClient,
   deleteClient,
@@ -11,6 +12,7 @@ import {
 
 // GET all clients (pagination + search)
 router.get("/", getClients);
+
 
 // GET client by ID
 router.get("/:id", getClientById);
@@ -23,5 +25,8 @@ router.put("/update/:id", updateClient);
 
 // DELETE client
 router.delete("/delete/:id", deleteClient);
+
+// GET client by phone — must be before "/:id" or "by-phone" is parsed as an ObjectId
+router.get("/by-phone/:phone", getClientByPhone);
 
 export default router;

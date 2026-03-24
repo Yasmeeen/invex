@@ -1,8 +1,15 @@
 import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { TranslateService } from '@ngx-translate/core';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { Globals } from '@core/globals';
+
+export interface CashierPaymentMethod {
+  id: string;
+  labelKey: string;
+  logo: string;
+}
 import { Branch, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -38,6 +45,24 @@ export class CashierComponent implements AfterViewInit {
   isClientInfoOpen = false;
   clientForm: FormGroup;
   isExistingClient = false;
+  /** Avoid repeating the same “registered” toast for the same client lookup. */
+  private lastNotifiedClientId: string | null = null;
+
+  readonly paymentMethods: CashierPaymentMethod[] = [
+    { id: 'cash', labelKey: 'tr_pay_cash', logo: 'assets/images/payment/cash.svg' },
+    { id: 'visa', labelKey: 'tr_pay_visa', logo: 'assets/images/payment/visa.svg' },
+    { id: 'mastercard', labelKey: 'tr_pay_mastercard', logo: 'assets/images/payment/mastercard.svg' },
+    { id: 'meeza', labelKey: 'tr_pay_meeza', logo: 'assets/images/payment/meeza.svg' },
+    { id: 'valu', labelKey: 'tr_pay_valu', logo: 'assets/images/payment/valu.svg' },
+    { id: 'aman', labelKey: 'tr_pay_aman', logo: 'assets/images/payment/aman.svg' },
+    { id: 'halan', labelKey: 'tr_pay_halan', logo: 'assets/images/payment/halan.svg' },
+    { id: 'tru', labelKey: 'tr_pay_tru', logo: 'assets/images/payment/tru.svg' },
+    { id: 'sohoula', labelKey: 'tr_pay_sohoula', logo: 'assets/images/payment/sohoula.svg' },
+    { id: 'maylo_seven', labelKey: 'tr_pay_maylo_seven', logo: 'assets/images/payment/maylo-seven.svg' },
+    { id: 'fawry', labelKey: 'tr_pay_fawry', logo: 'assets/images/payment/fawry.svg' },
+    { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash', logo: 'assets/images/payment/vodafone-cash.svg' },
+    { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
+  ];
 
   constructor(
     private productsSerivce: ProductsSerivce, 
@@ -46,7 +71,8 @@ export class CashierComponent implements AfterViewInit {
     private branchesServce: BranchesServce,
     private globals: Globals,
     private appNotificationService: AppNotificationService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private translate: TranslateService
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
     if (this.curentUser.role === 'Super Admin') {
@@ -70,6 +96,7 @@ export class CashierComponent implements AfterViewInit {
 
   private initClientForm() {
     this.clientForm = this.fb.group({
+      paymentMethod: ['cash'],
       phone: ['', [Validators.required]],
       name: [''],
       address: ['']
@@ -115,6 +142,17 @@ export class CashierComponent implements AfterViewInit {
       )
       .subscribe((client: any) => {
         if (client) {
+          const dedupeKey =
+            client._id != null
+              ? String(client._id)
+              : String(client.phoneNumber || '');
+          if (dedupeKey && dedupeKey !== this.lastNotifiedClientId) {
+            this.lastNotifiedClientId = dedupeKey;
+            this.translate
+              .get('tr_cashier_client_registered')
+              .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+          }
+
           this.isExistingClient = true;
           nameControl?.setValue(client.name, { emitEvent: false });
           addressControl?.setValue(client.address, { emitEvent: false });
@@ -124,6 +162,8 @@ export class CashierComponent implements AfterViewInit {
           addressControl?.clearValidators();
           nameControl?.updateValueAndValidity({ emitEvent: false });
           addressControl?.updateValueAndValidity({ emitEvent: false });
+        } else {
+          this.lastNotifiedClientId = null;
         }
       });
   }
@@ -131,9 +171,28 @@ export class CashierComponent implements AfterViewInit {
   toggleClientInfo() {
     this.isClientInfoOpen = !this.isClientInfoOpen;
     if (!this.isClientInfoOpen) {
-      this.clientForm.reset();
-      this.isExistingClient = false;
+      this.resetClientFormFields();
     }
+  }
+
+  /** Reset phone, name, address, payment to defaults and re-enable disabled controls. */
+  private resetClientFormFields(): void {
+    this.lastNotifiedClientId = null;
+    this.clientForm.reset({
+      paymentMethod: 'cash',
+      phone: '',
+      name: '',
+      address: ''
+    });
+    this.clientForm.get('name')?.enable({ emitEvent: false });
+    this.clientForm.get('address')?.enable({ emitEvent: false });
+    this.isExistingClient = false;
+  }
+
+  /** After successful pay + print: collapse client section and clear form. */
+  private clearClientInformationAfterCheckout(): void {
+    this.isClientInfoOpen = false;
+    this.resetClientFormFields();
   }
 
   ngAfterViewInit() {
@@ -179,7 +238,7 @@ export class CashierComponent implements AfterViewInit {
     if (index > -1) this.orderItems[index].quantity++;
     else this.orderItems.push({ ...product, quantity: 1, productId: product._id });
 
-    this.focusBarcodeInput(); // focus دايمًا بعد أي إضافة
+    this.focusBarcodeInput(); 
   }
 
   scanProduct(code: string) {
@@ -215,16 +274,46 @@ export class CashierComponent implements AfterViewInit {
   }
 
   checkout() {
-    if (!this.orderItems.length) return alert('No products in order');
+    if (!this.orderItems.length) {
+      this.translate.get('tr_cashier.NO_ITEMS').subscribe((msg) => alert(msg));
+      return;
+    }
 
-    let selectedBranchId = this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id
- 
+    if (this.isClientInfoOpen) {
+      this.clientForm.markAllAsTouched();
+      if (!this.clientForm.valid) {
+        this.translate.get('tr_invalid_cashier_client').subscribe((msg) =>
+          this.appNotificationService.push(msg, 'error')
+        );
+        return;
+      }
+    }
+
+    const selectedBranchId =
+      this.curentUser.role === 'Super Admin'
+        ? this.adminSelectedBranchId
+        : this.globals.currentUser.branch._id;
+
+    let clientName = 'Walk-in';
+    let clientPhoneNumber = '00';
+    let clientAddress = '-';
+
+    if (this.isClientInfoOpen) {
+      const raw = this.clientForm.getRawValue();
+      clientName = (raw.name || '').trim() || 'Walk-in';
+      clientPhoneNumber = (raw.phone || '').trim() || '00';
+      clientAddress = (raw.address || '').trim() || '-';
+    }
+
+    const paymentMethod =
+      this.clientForm.get('paymentMethod')?.value || 'cash';
+
     const orderData = {
-      products: this.orderItems.map(i => ({ selectedProduct: i, quantity: i.quantity })),
-      clientName: 'Walk-in',
-      clientPhoneNumber: '00',
-      clientAddress: '-',
-      paymentMethod: 'cash',
+      products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
+      clientName,
+      clientPhoneNumber,
+      clientAddress,
+      paymentMethod,
       branch: selectedBranchId,
       status: 'completed',
       userId: this.curentUser._id
@@ -248,6 +337,7 @@ export class CashierComponent implements AfterViewInit {
     setTimeout(() => {
       window.print();
       this.orderItems = [];
+      this.clearClientInformationAfterCheckout();
     }, 300);
   }
 

@@ -184,9 +184,11 @@
       }
       .logo{
         width: 52px;
+        height: 52px;
         margin: 0 8px;
         border-radius: 28px;
         flex-shrink: 0;
+        object-fit: contain;
       }
       .logo-container__text {
         min-width: 0;

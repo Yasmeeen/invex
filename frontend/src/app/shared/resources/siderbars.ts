@@ -30,6 +30,11 @@ export const  AdminSidebar = [
     icon: 'fa fa-list-ul  icon',
   },
   {
+    name: 'tr_store_settings_menu',
+    routerLink: '/settings',
+    icon: 'fa fa-cog icon',
+  },
+  {
     name: 'tr_cashier.TITLE',
     routerLink: '/cashier',
     icon: 'fa fa-money  icon',

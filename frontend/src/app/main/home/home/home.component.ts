@@ -143,6 +143,7 @@ export class HomeComponent implements OnInit {
       backgroundColor: 'transparent',
       style: { fontFamily: 'inherit' },
       spacing: [12, 12, 12, 12],
+      reflow: true,
     };
   }
 
@@ -347,7 +348,13 @@ export class HomeComponent implements OnInit {
         xAxis: {
           categories,
           lineColor: DASH_MUTE,
-          labels: { style: { color: '#6b7280' } },
+          labels: {
+            style: { color: '#6b7280' },
+            formatter: function () {
+              const v = String((this as any).value ?? '');
+              return v.length > 22 ? v.slice(0, 20) + '…' : v;
+            },
+          },
         },
         yAxis: {
           title: { text: 'Total Items', style: { color: '#6b7280' } },

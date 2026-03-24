@@ -211,7 +211,7 @@
     <!-- Invoice -->
     <div class="invoice-container" id="print-container">
       <div class="center">
-        <div class="bold">{{storeName}}</div>
+        <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
       </div>
 
       <table>
@@ -285,8 +285,8 @@
       <div class="double-border"></div>
 
       <div class="center">
-        <div class="bold">{{storeName}}</div>
-        <div>{{storePhoneNumber}}</div>
+        <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
+        <div>{{ (storeSettings.settings$ | async)?.storePhoneNumber }}</div>
       </div>
     </div>
   </div>

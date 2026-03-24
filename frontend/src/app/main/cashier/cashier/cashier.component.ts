@@ -17,7 +17,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
-import { environment } from 'src/environments/environment.prod';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-cashier-order',
@@ -29,8 +29,6 @@ export class CashierComponent implements AfterViewInit {
 
   products: Product[] = [];
   orderItems: any[] = [];
-  storeName = environment.storeName
-  storePhoneNumber =  environment.storePhoneNumber
   todayDate = new Date();
   createdOrder:any;
 
@@ -72,7 +70,8 @@ export class CashierComponent implements AfterViewInit {
     private globals: Globals,
     private appNotificationService: AppNotificationService,
     private fb: FormBuilder,
-    private translate: TranslateService
+    private translate: TranslateService,
+    public storeSettings: StoreSettingsService
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
     if (this.curentUser.role === 'Super Admin') {

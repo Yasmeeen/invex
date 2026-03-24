@@ -1,0 +1,69 @@
+<div class="store-settings-page">
+  <header class="store-settings-page__head">
+    <h1 class="store-settings-page__title">{{ 'tr_store_settings_menu' | translate }}</h1>
+    <p class="store-settings-page__lead">{{ 'tr_settings_lead' | translate }}</p>
+  </header>
+
+  <div class="store-settings-card">
+    <div class="store-settings-card__field">
+      <label class="store-settings-card__label">{{ 'tr_store_name' | translate }}</label>
+      <input
+        type="text"
+        class="s-control"
+        name="storeName"
+        [(ngModel)]="form.storeName"
+        maxlength="200"
+        autocomplete="organization"
+      />
+    </div>
+
+    <div class="store-settings-card__field">
+      <label class="store-settings-card__label">{{ 'tr_store_phone' | translate }}</label>
+      <input
+        type="text"
+        class="s-control"
+        name="storePhone"
+        [(ngModel)]="form.storePhoneNumber"
+        maxlength="50"
+        autocomplete="tel"
+      />
+    </div>
+
+    <div class="store-settings-card__field">
+      <label class="store-settings-card__label">{{ 'tr_store_logo' | translate }}</label>
+      <p class="store-settings-card__hint">{{ 'tr_logo_hint' | translate }}</p>
+      <div class="store-settings-card__logo-row">
+        <div class="store-settings-card__preview">
+          <img *ngIf="logoPreview" [src]="logoPreview" alt="" />
+          <div
+            *ngIf="!logoPreview"
+            class="store-settings-card__preview-placeholder"
+            aria-hidden="true"
+          >
+            <i class="fa fa-store"></i>
+          </div>
+        </div>
+        <div class="store-settings-card__logo-actions">
+          <label class="s-btn btn-secondary btn-sm store-settings-card__file-btn">
+            <input type="file" accept="image/*" (change)="onLogoSelected($event)" />
+            {{ 'tr_choose_image' | translate }}
+          </label>
+          <button type="button" class="s-btn btn-secondary btn-sm" (click)="clearLogo()">
+            {{ 'tr_remove_logo' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="store-settings-card__actions">
+      <button
+        type="button"
+        class="s-btn btn-primary"
+        (click)="save()"
+        [disabled]="saving"
+      >
+        {{ 'tr_save_settings' | translate }}
+      </button>
+    </div>
+  </div>
+</div>

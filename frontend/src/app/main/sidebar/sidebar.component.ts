@@ -2,7 +2,7 @@ import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AdminSidebar,Cashier,Employee, OperationManager } from '@shared/resources';
 import { Globals } from 'src/app/core/globals';
-import { environment } from 'src/environments/environment.prod';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -15,8 +15,6 @@ export class SidebarComponent implements OnInit {
   currentUserType:any;
   levelName = '';
   user: any = [{}];
-  storeName = environment.storeName;
-
   /** Desktop-only narrow sidebar */
   isCollapsed = false;
   @Output() collapsedChange = new EventEmitter<boolean>();
@@ -24,6 +22,7 @@ export class SidebarComponent implements OnInit {
   private readonly collapseStorageKey = 'appSidebarCollapsed';
   constructor(
       public globals: Globals,
+      public storeSettings: StoreSettingsService,
       private authenticationService: AuthenticationService
   ) {
     globals.currentUser = this.authenticationService.getUserFromLocalStorage();

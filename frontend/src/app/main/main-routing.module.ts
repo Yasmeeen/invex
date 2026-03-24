@@ -35,6 +35,12 @@ const routes: Routes = [
         data: { allowedRoles: ['Super Admin'] }
       },
       {
+        path: 'settings',
+        loadChildren: () => import('./settings/settings.module').then(m => m.SettingsModule),
+        canActivate: [RoleGuard],
+        data: { allowedRoles: ['Super Admin'] }
+      },
+      {
         path: 'orders',
         loadChildren: () => import('./orders/orders.module').then(m => m.OrdersModule),
         canActivate: [RoleGuard],

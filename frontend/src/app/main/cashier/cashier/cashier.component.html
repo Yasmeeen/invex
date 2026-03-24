@@ -193,7 +193,7 @@
 
   <!-- Store Name -->
   <div class="store-name center mtb-4 bold">
-    {{ storeName }}
+    {{ (storeSettings.settings$ | async)?.storeName }}
   </div>
 
   <!-- Invoice Meta -->
@@ -265,8 +265,8 @@
 
   <!-- Footer -->
   <div class="footer center">
-    <div class="bold">{{ storeName }}</div>
-    <div>{{ storePhoneNumber }}</div>
+    <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
+    <div>{{ (storeSettings.settings$ | async)?.storePhoneNumber }}</div>
   </div>
 
 </div>

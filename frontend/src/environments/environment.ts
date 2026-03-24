@@ -5,8 +5,6 @@
 export const environment = {
     production: false,
     env: 'development',
-    storeName:"OX Muscle store",
-    storePhoneNumber: "010 90990378",
     apiUrl: '/api'
 };
 

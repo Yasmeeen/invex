@@ -50,4 +50,6 @@ export const PURCHASING_URL = BASE_URL + '/purchasing';
 export const ORDER_PAY_URL = ORDERS_URL + '/pay';
 export const ORDER_TRACK_URL = ORDERS_URL + '/track/';
 
+export const STORE_SETTINGS_URL = BASE_URL + '/settings/store';
+
 

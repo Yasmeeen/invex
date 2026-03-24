@@ -17,10 +17,13 @@
 
 .dashboard-page {
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 1rem 1.25rem 2.5rem;
   background: var(--dash-surface);
   border-radius: var(--dash-radius);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .dashboard-page__hero {
@@ -131,8 +134,10 @@
 
 .dashboard-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 1rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .dashboard-kpi-card {
@@ -204,15 +209,21 @@
 
 .dashboard-charts__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0,1fr) يمنع تمدد الأعمدة بسبب محتوى Highcharts أعرض من الخلية */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
+  width: 100%;
+  min-width: 0;
 
   @media (max-width: 991px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 .dashboard-chart-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 1.25rem 1.35rem 1.5rem;
   background: var(--dash-card);
   border-radius: var(--dash-radius);
@@ -257,7 +268,17 @@
 
 .dashboard-chart-card__plot {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 220px;
+  overflow: hidden;
+  position: relative;
+
+  /* Highcharts قد يضبط عرضاً بالبكسل أعرض من الحاوية */
+  ::ng-deep .highcharts-container,
+  ::ng-deep .highcharts-root {
+    max-width: 100% !important;
+  }
 
   &--tall {
     min-height: 280px;

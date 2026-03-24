@@ -11,18 +11,20 @@
 
     <a routerLink="/home" class="app-topbar__brand">
       <span class="app-topbar__brand-name">INVEX</span>
-      <span class="app-topbar__brand-sub" *ngIf="storeName">{{ storeName }}</span>
+      <ng-container *ngIf="storeSettings.settings$ | async as store">
+        <span class="app-topbar__brand-sub" *ngIf="store?.storeName">{{ store.storeName }}</span>
+      </ng-container>
     </a>
   </div>
 
   <div class="app-topbar__right">
-    <button
+    <!-- <button
       type="button"
       class="app-topbar__icon-btn"
       [attr.aria-label]="'Notifications'"
     >
       <i class="fa fa-bell-o" aria-hidden="true"></i>
-    </button>
+    </button> -->
 
     <button
       type="button"

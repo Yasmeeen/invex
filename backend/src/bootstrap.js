@@ -8,14 +8,15 @@ import vendorRoutes from './modules/vendors_module/router.js';
 import dashboardRoutes from './modules/dashboard_module/router.js';
 import clientsRoutes from './modules/clients_module/router.js';
 import connectToMongoDB from './DB/connection.js';
-import purchasingRoutes from './modules/purchasing_module/router.js'
+import purchasingRoutes from './modules/purchasing_module/router.js';
+import settingsRoutes from './modules/settings_module/router.js';
 
 
 const PORT = process.env.PORT || 3000;
 
 const bootstrap = (app, express) => {
   // Middleware
-  app.use(express.json());
+  app.use(express.json({ limit: '2mb' }));
 
   // Health check route
   app.get('/', (req, res) => {
@@ -41,6 +42,7 @@ const bootstrap = (app, express) => {
   app.use('/api/purchasing', purchasingRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/clients', clientsRoutes);
+  app.use('/api/settings', settingsRoutes);
 
   // Start server
   app.listen(PORT, () => {

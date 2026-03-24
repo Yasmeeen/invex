@@ -4,7 +4,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { LanguageSwitcherComponent } from '@shared/components/language-switcher/language-switcher.component';
 import { Globals } from 'src/app/core/globals';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
-import { environment } from 'src/environments/environment.prod';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-header',
@@ -18,7 +18,6 @@ export class HeaderComponent implements OnInit {
   avatarURL: any;
   userInfo: any;
 
-  storeName = environment.storeName;
   userMenuOpen = false;
 
   constructor(
@@ -26,7 +25,8 @@ export class HeaderComponent implements OnInit {
     private translate: TranslateService,
     private authenticationService: AuthenticationService,
     private dialog: MatDialog,
-    private hostEl: ElementRef<HTMLElement>
+    private hostEl: ElementRef<HTMLElement>,
+    public storeSettings: StoreSettingsService
   ) { }
 
   get userDisplayName(): string {

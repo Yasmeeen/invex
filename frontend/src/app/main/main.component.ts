@@ -5,6 +5,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { UserSerivce } from '@shared/services/user.service';
 import { Globals } from '../core/globals';
 import { AuthenticationService } from '../core/services/authentication.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-main',
@@ -22,7 +23,8 @@ export class MainComponent implements OnInit {
 
   constructor(
       private router:Router,
-      private translate: TranslateService
+      private translate: TranslateService,
+      private storeSettingsService: StoreSettingsService
   ) {
       // this.currentUser = this.authenticationService.getCurrentUser();
       // globals.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -31,6 +33,7 @@ export class MainComponent implements OnInit {
 
   }
   ngOnInit() {
+      this.storeSettingsService.load();
       this.router.events.subscribe((event: any) => {
           this.navigationInterceptor(event)
       })

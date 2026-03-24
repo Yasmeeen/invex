@@ -8,7 +8,7 @@ import { Branch, Order, Product, productOrder } from "@core/models/products.mode
 import { OrdersSerivce } from "@shared/services/orders.service";
 import { AppNotificationService } from "@shared/services/app-notification.service";
 import { Globals } from "@core/globals";
-import { environment } from "src/environments/environment";
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { BranchesServce } from "@shared/services/branches.service";
 import { Subscription } from "rxjs";
 import { TranslateService } from "@ngx-translate/core";
@@ -27,8 +27,6 @@ export class AddOrderComponent implements OnInit {
   createdOrder:any;
   branches: Branch [] = [];
   adminSelectedBranchId: string ='';
-  storeName = environment.storeName
-  storePhoneNumber =  environment.storePhoneNumber
   codeReader = new BrowserMultiFormatReader();
   isCameraActive = false;
   currentScanIndex: number ; 
@@ -72,7 +70,8 @@ export class AddOrderComponent implements OnInit {
     private branchesServce: BranchesServce,
     private translateService: TranslateService,
     public globals:Globals,
-    private authenticationService: AuthenticationService
+    private authenticationService: AuthenticationService,
+    public storeSettings: StoreSettingsService
   ) {}
 
   ngOnInit(): void {

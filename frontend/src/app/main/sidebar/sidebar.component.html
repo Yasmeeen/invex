@@ -6,11 +6,17 @@
 >
   <div class="app-sidebar">
     <a routerLink="/home" class="logo-container pb-3 flex flex-middle flex-center" (click)="closeSidebar()">
-      <img class="logo" default="/assets/images/logo2.png" alt="" />
-      <div class="logo-container__text">
-        <span class="size-lead weight-bold text-lavander">INVEX</span>
-        <div class="store-name">{{ storeName }}</div>
-      </div>
+      <ng-container *ngIf="storeSettings.settings$ | async as store">
+        <img
+          class="logo"
+          src="/assets/images/logo3.png"
+          alt=""
+        />
+        <div class="logo-container__text">
+          <span class="size-lead weight-bold text-lavander">INVEX</span>
+          <div class="store-name">{{ store.storeName }}</div>
+        </div>
+      </ng-container>
     </a>
 
     <nav class="main-routing-links plr-2" aria-label="Main">

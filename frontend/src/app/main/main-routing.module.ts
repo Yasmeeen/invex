@@ -20,19 +20,19 @@ const routes: Routes = [
         path: 'products',
         loadChildren: () => import('./products/products.module').then(m => m.ProductsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
       },
       {
         path: 'branches',
         loadChildren: () => import('./branches/branches.module').then(m => m.BranchesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
       },
       {
         path: 'categories',
         loadChildren: () => import('./categories/categories.module').then(m => m.CategoriesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
       },
       {
         path: 'settings',
@@ -44,7 +44,7 @@ const routes: Routes = [
         path: 'orders',
         loadChildren: () => import('./orders/orders.module').then(m => m.OrdersModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin','Employee'] }
+        data: { allowedRoles: ['Super Admin', 'Employee', 'Operation Manager'] }
       },
       {
         path: 'home',
@@ -56,7 +56,7 @@ const routes: Routes = [
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
       },
       {
         path: 'clients',

@@ -48,13 +48,14 @@ export class LoginComponent implements OnInit {
           password: this.user.password
         }
         this.authenticationService.login(user).subscribe(() => {
-          if(this.globals.currentUser.role == 'Employee'){
+          const role = this.globals.currentUser.role;
+          if (role === 'Employee' || role === 'Cashier') {
             this.router.navigate(['orders']);
-          }
-          else {
+          } else if (role === 'Operation Manager') {
+            this.router.navigate(['products']);
+          } else {
             this.router.navigate(['home']);
           }
- 
           });
     }
 

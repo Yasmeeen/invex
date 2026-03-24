@@ -68,7 +68,12 @@ export class UpdatePasswordComponent implements OnInit {
         }
         this.authenticationService.updatePassword(user).subscribe(() => {
           this.appNotificationService.push(this.translateService.instant('tr_password_updated_successfuly'),'success')
+          const role = this.globals.currentUser?.role;
+          if (role === 'Operation Manager') {
+            this.router.navigate(['inventory']);
+          } else {
             this.router.navigate(['home']);
+          }
           });
     }
 }

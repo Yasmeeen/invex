@@ -26,26 +26,26 @@ export class DashboardService {
     if (branchId) params.branchId = branchId;
     if (year) params.year = year;
   
-    return this.http.get(`${BASE_URL}/api/dashboard/invoicesPerMonth`, { params });
+    return this.http.get(`${BASE_URL}/dashboard/invoicesPerMonth`, { params });
   }
   getCategoriesStats(branchId?:string): Observable<any> {
     let params: any = {};
     if (branchId) params.branch = branchId;
-    return this.http.get(`${BASE_URL}/api/dashboard/categoriesStats`,{ params });
+    return this.http.get(`${BASE_URL}/dashboard/categoriesStats`, { params });
   }
   getOrdersStatusStats(branchId?: string) {
     let params: any = {};
     if (branchId) params.branch = branchId;
-    return this.http.get(`${BASE_URL}/api/dashboard/getOrdersStatusStats`, { params });
+    return this.http.get(`${BASE_URL}/dashboard/getOrdersStatusStats`, { params });
   }
   getUpcomingUnpaidInstallments() {
-    return this.http.get(`${BASE_URL}/api/dashboard/upcoming-unpaid`);
+    return this.http.get(`${BASE_URL}/dashboard/upcoming-unpaid`);
   }
   getPastUnpaidInstallments() {
-    return this.http.get(`${BASE_URL}/api/dashboard/past-unpaid`);
+    return this.http.get(`${BASE_URL}/dashboard/past-unpaid`);
   }
   markAsPaid(id: string) {
-    return this.http.put(`${BASE_URL}/api/dashboard/${id}/pay`, {});
+    return this.http.put(`${BASE_URL}/dashboard/${id}/pay`, {});
   }
   
   

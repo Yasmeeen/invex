@@ -1,236 +1,258 @@
-<div class="row">
-  <div class="col-md-12">
-    <div class="filters-card bg-secondary plr-4 ptb-2 mt-4">
-      <div class="row">
-        <!-- <div class="filters-card bg-secondary plr-4 ptb-2 mt-4">
-          </div> -->
-        <div class="col-md-4" >
-          <div
-            class="form-group"
+<div class="dashboard-page">
+  <header class="dashboard-page__hero">
+    <h1 class="dashboard-page__title">{{ 'tr_dashboard' | translate }}</h1>
+    <p class="dashboard-page__lead">{{ 'sales_summary' | translate }}</p>
+  </header>
+
+  <!-- Top filter bar -->
+  <section class="dashboard-toolbar" aria-label="Dashboard filters">
+    <div class="dashboard-toolbar__inner">
+      <div class="dashboard-toolbar__field">
+        <label class="dashboard-toolbar__label">{{ 'tr_branches' | translate }}</label>
+        <div class="input-with-icon bg-white dashboard-toolbar__control">
+          <ng-select
+            class="s-control s-select"
+            placeholder="{{ 'tr_select' | translate }}"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="selectedBranch"
+            name="branchId"
+            [items]="branches"
+            (change)="changeBranch()"
+            [clearable]="true"
           >
-            <label>{{ 'tr_branches' | translate }}</label>
-            <div class="input-with-icon bg-white">
-              <ng-select
-                class="s-control s-select"
-                placeholder="{{ 'tr_select' | translate }}"
-                bindLabel="name"
-                bindValue="_id"
-          
-                [(ngModel)]= "selectedBranch"
-                #branch="ngModel"
-                name="branchId"
-                [items]="branches"
-                (change)="changeBranch()"
-                required
-              >
-              </ng-select>
-              <i class="fa fa-caret-down input-icon"></i>
-            </div>
-          </div>
+          </ng-select>
+          <i class="fa fa-caret-down input-icon"></i>
         </div>
       </div>
-    </div>
-  
-  </div>
 
-
-
-  <div class="col-md-12">
-    <div class="container-card">
-      <div class="pb-3">
-        <div class="size-lead weight-medium steel flex flex-middle flex-space-between">
-          <div>
-            <a class="hover-link pointer weight-bold">{{ 'sales_summary' | translate }}</a>
-            <!-- <div class="size-small mtb-1 plr-1">{{ 'tr_sales_increase' | translate:{percent:38} }}</div> -->
-          </div>
-        </div>
-
-        <div class="filters-card bg-secondary plr-4 ptb-2 mt-4">
-          <div >
-        
-            <div class="row">
-              <div class="form-group col-md-3">
-                <label for="">{{'tr_from' | translate}}</label>
-                <div class="input-with-icon">
-                    <input [(ngModel)]="fromDate"  (dateChange)="getOrderStatistics()"
-                        placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId" class="s-control bg-white">
-                    <mat-datepicker #pickId></mat-datepicker>
-                    <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
-                    </mat-datepicker-toggle>
-                </div>
-            </div>
-            <div class="form-group col-md-3">
-                <label for="">{{'tr_to' | translate}}</label>
-                <div class="input-with-icon">
-                    <input [(ngModel)]="toDate"
-                        placeholder="{{'tr_pick_date' | translate}}" [matDatepicker]="pickId2" class="s-control bg-white" (dateChange)="getOrderStatistics()">
-                    <mat-datepicker #pickId2></mat-datepicker>
-                    <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId2">
-                    </mat-datepicker-toggle>
-                </div>
-            </div>
-     
-            </div>
-      
-          </div>
-        </div>
-
-        <div class="flex flex-middle width-100 flex-wrap">
-          <div>
-            <div class="flex flex-middle mt-6">
-              <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
-                <i class="fa fa-users"></i>
-              </div>
-              <div class="ml-3">
-                <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalInvoices}} {{ 'tr_total_number_of_invoices' | translate }} </a>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
-              </div>
-            </div>
-
-            <div class="flex flex-middle mt-6">
-              <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
-                <i class="fa fa-link"></i>
-              </div>
-              <div class="ml-3">
-                <a class="hover-link pointer weight-bold" >{{orderStatistics?.totalSales}} {{ 'tr_total_amount' | translate}} </a>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
-              </div>
-            </div>
-
-            <div class="flex flex-middle mt-6">
-              <div class="bg-warning text-warning border rounded-100 size-small ptb-3 plr-3">
-                <i class="fa fa-calendar"></i>
-              </div>
-              <div class="ml-3">
-                <a class="hover-link pointer weight-bold" >{{orderStatistics?.netProfit}} {{ 'tr_net_profit' | translate }} </a>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
-                <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
-              </div>
-            </div>
-          </div>
-          <div>
-            <img src="assets/images/laptop.png" alt="">
-          </div>
+      <div class="dashboard-toolbar__field">
+        <label class="dashboard-toolbar__label">{{ 'tr_from' | translate }}</label>
+        <div class="input-with-icon dashboard-toolbar__control">
+          <input
+            [(ngModel)]="fromDate"
+            name="fromDate"
+            placeholder="{{ 'tr_pick_date' | translate }}"
+            [matDatepicker]="pickFrom"
+            class="s-control bg-white"
+          />
+          <mat-datepicker #pickFrom></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickFrom"></mat-datepicker-toggle>
         </div>
       </div>
-    </div>
-  </div>
 
-   <div class="col-md-12">
-    <div class="container-card">
-      <h5 class="card-header weight-bold mb-4">{{'tr_upcoming_unpaid_installments' | translate}}</h5>
-      <div class="card-body" *ngIf="installments.length; else noInstallments">
-        <table class="table s-table">
-          <thead>
-            <tr>
-              <th>{{'tr_supplier' | translate}}</th>
-              <th> {{'tr_due_date' | translate}}</th>
-              <th> {{'tr_amount' | translate}}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let inst of installments">
-              <td>{{ inst.vendor?.name }}</td>
-              <td>{{ inst.dueDate | date }}</td>
-              <td>{{ inst.amount | currency:'EGP ':'symbol':'1.2-2' }}</td>
-              <td>
-                <button class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id,inst)" >Mark Paid</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="dashboard-toolbar__field">
+        <label class="dashboard-toolbar__label">{{ 'tr_to' | translate }}</label>
+        <div class="input-with-icon dashboard-toolbar__control">
+          <input
+            [(ngModel)]="toDate"
+            name="toDate"
+            placeholder="{{ 'tr_pick_date' | translate }}"
+            [matDatepicker]="pickTo"
+            class="s-control bg-white"
+          />
+          <mat-datepicker #pickTo></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickTo"></mat-datepicker-toggle>
+        </div>
       </div>
-      <ng-template #noInstallments>
-        <p class="text-muted">No upcoming unpaid installments.</p>
-      </ng-template>
-    </div>
-   </div>
-  
-   <div class="col-md-12">
-    <div class="container-card">
-      <h5 class="card-header weight-bold mb-4">{{'tr_past_unpaid_installments' | translate}}</h5>
-  
-      <div class="card-body" *ngIf="pastInstallments.length; else noPastInstallments">
-        <table class="table s-table">
-          <thead>
-            <tr>
-              <th>{{'tr_supplier' | translate}}</th>
-              <th>{{'tr_due_date' | translate}}</th>
-              <th>{{'tr_amount' | translate}}</th>
-              <th></th>
-            </tr>
-          </thead>
-  
-          <tbody>
-            <tr *ngFor="let inst of pastInstallments">
-              <td>{{ inst.vendor?.name }}</td>
-              <td>{{ inst.dueDate | date }}</td>
-              <td>{{ inst.amount | currency:'EGP ':'symbol':'1.2-2' }}</td>
-              <td>
-                <button class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id,inst)">
-                  {{'tr_mark_paid' | translate}}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-  
-      <ng-template #noPastInstallments>
-        <p class="text-muted">{{'tr_no_past_unpaid_installments' | translate}}</p>
-      </ng-template>
-    </div>
-  </div>
-  
 
-  <!-- Products -->
-  <div class="col-md-6">
-    <div class="container-card">
-      <div class="dashboard-card-header">
-        <span class="title">{{ 'tr_products' | translate }}</span>
-        <span class="count">{{ this.productsStats?.totalProducts }}</span>
+      <div class="dashboard-toolbar__actions">
+        <button type="button" class="s-btn btn-primary dashboard-toolbar__apply" (click)="applyFilters()">
+          <i class="fa fa-check mr-2" aria-hidden="true"></i>
+          {{ 'tr_apply' | translate }}
+        </button>
       </div>
-      <div id="products-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">{{ 'tr_stock_status' | translate }}</div>
     </div>
-  </div>
+  </section>
 
-  <!-- Orders -->
-  <div class="col-md-6">
-    <div class="container-card">
-      <div class="dashboard-card-header">
-        <span class="title">{{ 'tr_orders' | translate }}</span>
+  <!-- KPIs -->
+  <section class="dashboard-section">
+    <div class="dashboard-section__head">
+      <p class="dashboard-section__subtitle" *ngIf="!isToday">
+        {{ fromDate | date: 'dd/M/yyyy' }} {{ 'tr_to' | translate }} {{ toDate | date: 'dd/M/yyyy' }}
+      </p>
+      <p class="dashboard-section__subtitle" *ngIf="isToday">{{ 'tr_today' | translate }}</p>
+    </div>
+
+    <div class="dashboard-kpi-grid">
+      <article class="dashboard-kpi-card dashboard-kpi-card--sales">
+        <div class="dashboard-kpi-card__icon" aria-hidden="true">
+          <i class="fa fa-line-chart"></i>
+        </div>
+        <div class="dashboard-kpi-card__body">
+          <span class="dashboard-kpi-card__label">{{ 'tr_total_amount' | translate }}</span>
+          <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalSales }}</span>
+        </div>
+      </article>
+
+      <article class="dashboard-kpi-card dashboard-kpi-card--orders">
+        <div class="dashboard-kpi-card__icon" aria-hidden="true">
+          <i class="fa fa-shopping-cart"></i>
+        </div>
+        <div class="dashboard-kpi-card__body">
+          <span class="dashboard-kpi-card__label">{{ 'tr_total_number_of_invoices' | translate }}</span>
+          <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalInvoices }}</span>
+        </div>
+      </article>
+
+      <article class="dashboard-kpi-card dashboard-kpi-card--profit">
+        <div class="dashboard-kpi-card__icon" aria-hidden="true">
+          <i class="fa fa-money"></i>
+        </div>
+        <div class="dashboard-kpi-card__body">
+          <span class="dashboard-kpi-card__label">{{ 'tr_net_profit' | translate }}</span>
+          <span class="dashboard-kpi-card__value">{{ orderStatistics?.netProfit }}</span>
+        </div>
+      </article>
+
+      <article class="dashboard-kpi-card dashboard-kpi-card--avg" *ngIf="averageOrderDisplay !== null">
+        <div class="dashboard-kpi-card__icon" aria-hidden="true">
+          <i class="fa fa-calculator"></i>
+        </div>
+        <div class="dashboard-kpi-card__body">
+          <span class="dashboard-kpi-card__label">{{ 'tr_average_order' | translate }}</span>
+          <span class="dashboard-kpi-card__value">{{ averageOrderDisplay }}</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Charts grid: 2 per row -->
+  <section class="dashboard-charts" aria-label="Charts">
+    <div class="dashboard-charts__grid">
+      <div class="dashboard-chart-card">
+        <div class="dashboard-chart-card__header">
+          <span class="dashboard-chart-card__title">{{ 'tr_products' | translate }}</span>
+          <span class="dashboard-chart-card__badge" *ngIf="productsStats?.totalProducts != null">{{
+            productsStats?.totalProducts
+          }}</span>
+        </div>
+        <p class="dashboard-chart-card__caption">{{ 'tr_stock_status' | translate }}</p>
+        <div id="products-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
       </div>
-      <div id="orders-chart" style="width: 100%; height: 200px;"></div>
-      <div class="text-center steel">{{ 'tr_order_status' | translate }}</div>
-    </div>
-  </div>
 
-  <!-- Invoices -->
-  <div class="col-md-6 mt-4">
-    <div class="container-card">
-      <div class="dashboard-card-header">
-        <span class="title">{{ 'tr_invoices' | translate }}</span>
-        <!-- <span class="count">{{ totalInvoices }}</span> -->
+      <div class="dashboard-chart-card">
+        <div class="dashboard-chart-card__header">
+          <span class="dashboard-chart-card__title">{{ 'tr_orders' | translate }}</span>
+          <span class="dashboard-chart-card__badge" *ngIf="ordersTotal != null">{{ ordersTotal }}</span>
+        </div>
+        <p class="dashboard-chart-card__caption">{{ 'tr_order_status' | translate }}</p>
+        <div id="orders-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
       </div>
-      <div id="invoices-chart" style="width: 100%; height: 250px;"></div>
-      <div class="text-center steel">{{ 'tr_invoice_stats' | translate }}</div>
-    </div>
-  </div>
 
-  <!-- Categories -->
-  <div class="col-md-6 mt-4">
-    <div class="container-card">
-      <div class="dashboard-card-header">
-        <span class="title">{{ 'tr_categories' | translate }}</span>
-        <!-- <span class="count">{{ totalCategories }}</span> -->
+      <div class="dashboard-chart-card">
+        <div class="dashboard-chart-card__header">
+          <span class="dashboard-chart-card__title">{{ 'tr_invoices' | translate }}</span>
+        </div>
+        <p class="dashboard-chart-card__caption">{{ 'tr_invoice_stats' | translate }}</p>
+        <div id="invoices-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
       </div>
-      <div id="categories-chart" style="width: 100%; height: 250px;"></div>
-      <div class="text-center steel">{{ 'tr_category_distribution' | translate }}</div>
-    </div>
-  </div>
 
+      <div class="dashboard-chart-card">
+        <div class="dashboard-chart-card__header">
+          <span class="dashboard-chart-card__title">{{ 'tr_categories' | translate }}</span>
+        </div>
+        <p class="dashboard-chart-card__caption">{{ 'tr_category_distribution' | translate }}</p>
+        <div id="categories-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Installments: tabs inside one card -->
+  <section class="dashboard-installments" aria-label="Installments">
+    <div class="dashboard-installments__card">
+      <div class="dashboard-installments__tabs" role="tablist">
+        <button
+          type="button"
+          class="dashboard-installments__tab"
+          [class.dashboard-installments__tab--active]="installmentsTab === 'upcoming'"
+          (click)="installmentsTab = 'upcoming'"
+          role="tab"
+          [attr.aria-selected]="installmentsTab === 'upcoming'"
+        >
+          {{ 'tr_tab_upcoming' | translate }}
+        </button>
+        <button
+          type="button"
+          class="dashboard-installments__tab"
+          [class.dashboard-installments__tab--active]="installmentsTab === 'past'"
+          (click)="installmentsTab = 'past'"
+          role="tab"
+          [attr.aria-selected]="installmentsTab === 'past'"
+        >
+          {{ 'tr_tab_past' | translate }}
+        </button>
+      </div>
+
+      <div
+        class="dashboard-installments__panel"
+        *ngIf="installmentsTab === 'upcoming'"
+        role="tabpanel"
+      >
+        <h3 class="dashboard-installments__heading">{{ 'tr_upcoming_unpaid_installments' | translate }}</h3>
+        <div *ngIf="installments.length; else noUpcomingTpl" class="dashboard-table-wrap">
+          <table class="table s-table dashboard-table">
+            <thead>
+              <tr>
+                <th>{{ 'tr_supplier' | translate }}</th>
+                <th>{{ 'tr_due_date' | translate }}</th>
+                <th>{{ 'tr_amount' | translate }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inst of installments">
+                <td>{{ inst.vendor?.name }}</td>
+                <td>{{ inst.dueDate | date }}</td>
+                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                <td class="dashboard-table__actions">
+                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                    {{ 'tr_mark_paid' | translate }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noUpcomingTpl>
+          <p class="dashboard-installments__empty">{{ 'tr_empty_state' | translate }}</p>
+        </ng-template>
+      </div>
+
+      <div
+        class="dashboard-installments__panel"
+        *ngIf="installmentsTab === 'past'"
+        role="tabpanel"
+      >
+        <h3 class="dashboard-installments__heading">{{ 'tr_past_unpaid_installments' | translate }}</h3>
+        <div *ngIf="pastInstallments.length; else noPastTpl" class="dashboard-table-wrap">
+          <table class="table s-table dashboard-table">
+            <thead>
+              <tr>
+                <th>{{ 'tr_supplier' | translate }}</th>
+                <th>{{ 'tr_due_date' | translate }}</th>
+                <th>{{ 'tr_amount' | translate }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let inst of pastInstallments">
+                <td>{{ inst.vendor?.name }}</td>
+                <td>{{ inst.dueDate | date }}</td>
+                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                <td class="dashboard-table__actions">
+                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                    {{ 'tr_mark_paid' | translate }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noPastTpl>
+          <p class="dashboard-installments__empty">{{ 'tr_no_past_unpaid_installments' | translate }}</p>
+        </ng-template>
+      </div>
+    </div>
+  </section>
 </div>

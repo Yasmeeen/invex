@@ -1,32 +1,373 @@
-.container-card {
-  background: #fff;
+/* Mint & forest reference — scoped to dashboard */
+:host {
+  display: block;
+  --dash-mint: #b8e88e;
+  --dash-mint-soft: rgba(184, 232, 142, 0.45);
+  --dash-forest: #1e4d2b;
+  --dash-forest-hover: #163a21;
+  --dash-surface: #f4f7f4;
+  --dash-card: #ffffff;
+  --dash-text: #1a1f1c;
+  --dash-mute: #6b7280;
+  --dash-border: #e8ede9;
+  --dash-radius: 16px;
+  --dash-shadow: 0 4px 24px rgba(30, 77, 43, 0.07);
+  --dash-shadow-hover: 0 8px 32px rgba(30, 77, 43, 0.1);
+}
+
+.dashboard-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2.5rem;
+  background: var(--dash-surface);
+  border-radius: var(--dash-radius);
+}
+
+.dashboard-page__hero {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-page__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--dash-text);
+}
+
+.dashboard-page__lead {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--dash-mute);
+  font-weight: 500;
+}
+
+/* Toolbar — single card, pill apply */
+.dashboard-toolbar {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-toolbar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--dash-card);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-toolbar__field {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.dashboard-toolbar__label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--dash-mute);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-toolbar__control {
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: transform 0.2s ease;
-  cursor: pointer;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+}
+
+/* أيقونة السهم لا تمنع الضغط على ng-select */
+::ng-deep .dashboard-toolbar .input-with-icon .input-icon {
+  pointer-events: none;
+}
+
+.dashboard-toolbar__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 2px;
+}
+
+.dashboard-toolbar__apply {
+  border-radius: 999px !important;
+  padding: 0.65rem 1.75rem !important;
+  font-weight: 600 !important;
+  background: var(--dash-forest) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 2px 12px rgba(30, 77, 43, 0.25);
+  transition: background 0.2s ease, transform 0.15s ease;
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    background: var(--dash-forest-hover) !important;
+    transform: translateY(-1px);
+  }
+
+  .fa {
+    margin-right: 0.35rem;
   }
 }
 
-.dashboard-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
+/* KPI grid */
+.dashboard-section {
+  margin-bottom: 1.75rem;
+}
 
-  .title {
-    font-weight: 600;
-    color: #333;
+.dashboard-section__head {
+  margin-bottom: 1rem;
+}
+
+.dashboard-section__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--dash-mute);
+  font-weight: 500;
+}
+
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-kpi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem;
+  background: var(--dash-card);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+  border: 1px solid var(--dash-border);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+
+  &:hover {
+    box-shadow: var(--dash-shadow-hover);
+    transform: translateY(-2px);
+  }
+}
+
+.dashboard-kpi-card__icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--dash-mint-soft);
+  color: var(--dash-forest);
+  font-size: 1.15rem;
+}
+
+.dashboard-kpi-card--profit .dashboard-kpi-card__icon {
+  background: rgba(245, 166, 35, 0.2);
+  color: #c4780a;
+}
+
+.dashboard-kpi-card--avg .dashboard-kpi-card__icon {
+  background: rgba(30, 77, 43, 0.12);
+}
+
+.dashboard-kpi-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.dashboard-kpi-card__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dash-mute);
+}
+
+.dashboard-kpi-card__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--dash-text);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+/* Charts — 2 per row */
+.dashboard-charts {
+  margin-bottom: 1.75rem;
+}
+
+.dashboard-charts__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+
+  @media (max-width: 991px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-chart-card {
+  padding: 1.25rem 1.35rem 1.5rem;
+  background: var(--dash-card);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+  border: 1px solid var(--dash-border);
+  cursor: default;
+
+  &:hover {
+    box-shadow: var(--dash-shadow-hover);
+  }
+}
+
+.dashboard-chart-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.dashboard-chart-card__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--dash-text);
+}
+
+.dashboard-chart-card__badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--dash-mint-soft);
+  color: var(--dash-forest);
+}
+
+.dashboard-chart-card__caption {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--dash-mute);
+  font-weight: 500;
+}
+
+.dashboard-chart-card__plot {
+  width: 100%;
+  min-height: 220px;
+
+  &--tall {
+    min-height: 280px;
   }
 
-  .count {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #007bff;
+  /* Donut charts (Products / Orders) — room for legend + center label */
+  &--donut {
+    min-height: 288px;
+  }
+}
+
+/* Installments card + tabs */
+.dashboard-installments {
+  margin-bottom: 1rem;
+}
+
+.dashboard-installments__card {
+  background: var(--dash-card);
+  border-radius: var(--dash-radius);
+  box-shadow: var(--dash-shadow);
+  border: 1px solid var(--dash-border);
+  padding: 1.25rem 1.35rem 1.5rem;
+  overflow: hidden;
+}
+
+.dashboard-installments__tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  margin-bottom: 1.25rem;
+  background: var(--dash-surface);
+  border-radius: 999px;
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-installments__tab {
+  border: none;
+  background: transparent;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--dash-mute);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    color: var(--dash-forest);
+  }
+
+  &--active {
+    background: var(--dash-mint);
+    color: var(--dash-forest);
+    box-shadow: 0 2px 8px rgba(184, 232, 142, 0.6);
+  }
+}
+
+.dashboard-installments__heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dash-text);
+  margin: 0 0 1rem;
+}
+
+.dashboard-installments__empty {
+  margin: 0;
+  padding: 1.5rem 0;
+  color: var(--dash-mute);
+  text-align: center;
+}
+
+.dashboard-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-table {
+  margin-bottom: 0;
+
+  thead th {
+    background: var(--dash-surface);
+    color: var(--dash-forest);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--dash-border);
+  }
+
+  tbody td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-color: var(--dash-border);
+  }
+}
+
+.dashboard-table__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.dashboard-table .s-btn.btn-secondary {
+  border-radius: 999px;
+  border-color: var(--dash-border);
+  font-weight: 600;
+
+  &:hover {
+    border-color: var(--dash-forest);
+    color: var(--dash-forest);
   }
 }

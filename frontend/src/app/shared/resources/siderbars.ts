@@ -72,7 +72,25 @@ export const  Employee = [
     routerLink: '/orders',
     icon: 'fa fa-ticket icon',
   },
+  {
+    name: 'tr_cashier.TITLE',
+    routerLink: '/cashier',
+    icon: 'fa fa-money  icon',
+  },
 
+];
+export const  Cashier = [
+
+  {
+    name: 'tr_orders',
+    routerLink: '/orders',
+    icon: 'fa fa-ticket icon',
+  },
+  {
+    name: 'tr_cashier.TITLE',
+    routerLink: '/cashier',
+    icon: 'fa fa-money  icon',
+  },
 
 ];
 

@@ -387,11 +387,24 @@
     "tr_pending": "Ausstehend",
     "tr_ordered": "Bestellt",
     "tr_amount":"Betrag",
-    "tr_upcoming_unpaid_installments": "Bevorstehende unbezahlte Raten",
-    "tr_mark_paid": "Als bezahlt markieren",
-    "tr_no_upcoming_unpaid_installments": "Keine bevorstehenden unbezahlten Raten.",
-    "tr_past_unpaid_installments": "Vergangene unbezahlte Raten",
-    "tr_no_past_unpaid_installments": "Keine vergangenen unbezahlten Raten."
+  "tr_upcoming_unpaid_installments": "Bevorstehende unbezahlte Raten",
+  "tr_mark_paid": "Als bezahlt markieren",
+  "tr_no_upcoming_unpaid_installments": "Keine bevorstehenden unbezahlten Raten.",
+  "tr_past_unpaid_installments": "Vergangene unbezahlte Raten",
+  "tr_no_past_unpaid_installments": "Keine vergangenen unbezahlten Raten.",
+  "tr_open_cashier": "Kasse öffnen",
+  "tr_close_cashier": "Kasse schließen",
+  "tr_cashier": {
+    "TITLE": "Kasse",
+    "SCAN_PRODUCT": "Produkt scannen...",
+    "CURRENT_ORDER": "Aktuelle Bestellung",
+    "PRODUCT": "Produkt",
+    "QTY": "Menge",
+    "PRICE": "Preis",
+    "TOTAL": "Summe",
+    "REMOVE": "Entfernen",
+    "PAY": "Bezahlen"
+  }
 
   }
   

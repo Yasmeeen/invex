@@ -60,6 +60,58 @@
     <!-- Order Panel -->
     <div class="order-panel">
       <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
+
+      <!-- Client Information (collapsible) -->
+      <div class="card mt-3">
+        <div class="card-header flex flex-between pointer" (click)="toggleClientInfo()">
+          <h4 class="m-0">{{ 'tr_client' | translate }}</h4>
+          <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
+        </div>
+        <div class="card-body" *ngIf="isClientInfoOpen">
+          <form [formGroup]="clientForm">
+            <div class="row">
+              <!-- Phone -->
+              <div class="col-md-4">
+                <div class="form-group" [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched">
+                  <label>{{ 'tr_client_phone' | translate }}</label>
+                  <input
+                    type="text"
+                    class="s-control"
+                    formControlName="phone"
+                  />
+                  <span class="text-error size-small validator" *ngIf="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched">
+                    {{ 'tr_client_phone_required' | translate }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Name -->
+              <div class="col-md-4">
+                <div class="form-group" [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched">
+                  <label>{{ 'tr_client_name' | translate }}</label>
+                  <input
+                    type="text"
+                    class="s-control"
+                    formControlName="name"
+                  />
+                </div>
+              </div>
+
+              <!-- Address -->
+              <div class="col-md-4">
+                <div class="form-group" [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched">
+                  <label>{{ 'tr_client_address' | translate }}</label>
+                  <input
+                    type="text"
+                    class="s-control"
+                    formControlName="address"
+                  />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
       <table class="products-table ">
         <thead>
           <tr>

@@ -391,7 +391,20 @@
   "tr_mark_paid": "Marquer comme payé",
   "tr_no_upcoming_unpaid_installments": "Aucun prochain versement impayé.",
   "tr_past_unpaid_installments": "Anciens versements impayés",
-  "tr_no_past_unpaid_installments": "Aucun ancien versement impayé."
+  "tr_no_past_unpaid_installments": "Aucun ancien versement impayé.",
+  "tr_open_cashier": "Ouvrir la caisse",
+  "tr_close_cashier": "Fermer la caisse",
+  "tr_cashier": {
+    "TITLE": "Caisse",
+    "SCAN_PRODUCT": "Scanner le produit...",
+    "CURRENT_ORDER": "Commande en cours",
+    "PRODUCT": "Produit",
+    "QTY": "Qté",
+    "PRICE": "Prix",
+    "TOTAL": "Total",
+    "REMOVE": "Supprimer",
+    "PAY": "Payer"
+  }
 }
 
 }

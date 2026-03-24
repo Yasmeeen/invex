@@ -386,7 +386,20 @@
   "tr_mark_paid": "تحديد كمدفوع",
   "tr_no_upcoming_unpaid_installments": "لا توجد أقساط قادمة غير مدفوعة.",
   "tr_past_unpaid_installments": "الأقساط السابقة غير المدفوعة",
-  "tr_no_past_unpaid_installments": "لا توجد أقساط سابقة غير مدفوعة."
+  "tr_no_past_unpaid_installments": "لا توجد أقساط سابقة غير مدفوعة.",
+  "tr_open_cashier": "فتح الكاشير",
+  "tr_close_cashier": "إغلاق الكاشير",
+  "tr_cashier": {
+    "TITLE": "الكاشير",
+    "SCAN_PRODUCT": "امسح المنتج...",
+    "CURRENT_ORDER": "الطلب الحالي",
+    "PRODUCT": "المنتج",
+    "QTY": "الكمية",
+    "PRICE": "السعر",
+    "TOTAL": "الإجمالي",
+    "REMOVE": "إزالة",
+    "PAY": "ادفع"
+  }
 
 
 }

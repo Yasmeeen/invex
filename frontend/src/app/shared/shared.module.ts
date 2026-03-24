@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClientModule } from '@angular/common/http';
 import { CoreModule } from '@core/core.module';
 import { TranslateModule } from '@ngx-translate/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { GhostLineComponent } from './components/ghost-line/ghost-line.component';
 import { Pagination } from './components/pagination/pagination';
 import {NgSelectModule} from '@ng-select/ng-select';
@@ -26,6 +26,7 @@ import { NotAuthorizedComponent } from './components/not-authorized/not-authoriz
     CommonModule,
     HttpClientModule,
     FormsModule,
+    ReactiveFormsModule,
     CoreModule.forRoot(),
     NgSelectModule,
     TranslateModule
@@ -37,6 +38,7 @@ import { NotAuthorizedComponent } from './components/not-authorized/not-authoriz
     TranslateModule,
     CommonModule,
     FormsModule,
+    ReactiveFormsModule,
     LoadingBarHttpClientModule,
     ConfirmationDialogComponent,
     MultiCheckboxComponent,

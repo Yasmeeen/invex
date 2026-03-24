@@ -1,4 +1,19 @@
+import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
+
+/** Safe branch ObjectId from query string (rejects literal "undefined", invalid ids). */
+const parseBranchIdFilter = (branchId) => {
+  const branchIdStr = branchId != null ? String(branchId).trim() : '';
+  if (
+    !branchIdStr ||
+    branchIdStr === 'undefined' ||
+    branchIdStr === 'null' ||
+    !mongoose.Types.ObjectId.isValid(branchIdStr)
+  ) {
+    return null;
+  }
+  return branchIdStr;
+};
 
 // Get all products (with pagination and optional search)
 // Get all products (with pagination, optional search, optional branch filter)
@@ -203,9 +218,9 @@ export const getProducts = async (req, res) => {
       ];
     }
 
-    // Optional branch filter
-    if (branchId) {
-      query.branch = branchId; // only filter if branchId is provided
+    const safeBranchId = parseBranchIdFilter(branchId);
+    if (safeBranchId) {
+      query.branch = safeBranchId;
     }
 
     const [products, total] = await Promise.all([
@@ -355,8 +370,8 @@ export const deleteProduct = async (req, res) => {
 export const getProductStats = async (req, res) => {
   try {
     const { branchId } = req.query;
-    // Filter only if branchId is provided
-    const filter = branchId ? { branch: branchId } : {};
+    const safeBranchId = parseBranchIdFilter(branchId);
+    const filter = safeBranchId ? { branch: safeBranchId } : {};
 
     // Count stats
     const totalProducts = await Product.countDocuments(filter);
@@ -367,7 +382,7 @@ export const getProductStats = async (req, res) => {
       totalProducts,
       inStock,
       outOfStock,
-      branch: branchId || 'All Branches',
+      branch: safeBranchId || 'All Branches',
     });
   } catch (error) {
     console.error('Error fetching product stats:', error);

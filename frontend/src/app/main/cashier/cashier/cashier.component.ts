@@ -1,4 +1,7 @@
 import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { debounceTime, switchMap, catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 import { Globals } from '@core/globals';
 import { Branch, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
@@ -31,19 +34,27 @@ export class CashierComponent implements AfterViewInit {
   branches: Branch [] =[];
   adminSelectedBranchId: string
 
+  // Client information section
+  isClientInfoOpen = false;
+  clientForm: FormGroup;
+  isExistingClient = false;
+
   constructor(
     private productsSerivce: ProductsSerivce, 
     private ordersSerivce: OrdersSerivce,
     private authenticationService: AuthenticationService,
     private branchesServce: BranchesServce,
     private globals: Globals,
-    private appNotificationService: AppNotificationService
+    private appNotificationService: AppNotificationService,
+    private fb: FormBuilder
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
-    if( this.curentUser.role == 'Super Admin'){
-      this.getBranches();
+    if (this.curentUser.role === 'Super Admin') {
+      this.getBranches(); // loadProducts runs after a branch is selected
+    } else {
+      this.loadProducts();
     }
-    this.loadProducts();
+    this.initClientForm();
   }
   getBranches() {
     let params = {
@@ -57,6 +68,74 @@ export class CashierComponent implements AfterViewInit {
    })
   }
 
+  private initClientForm() {
+    this.clientForm = this.fb.group({
+      phone: ['', [Validators.required]],
+      name: [''],
+      address: ['']
+    });
+
+    const phoneControl = this.clientForm.get('phone');
+    const nameControl = this.clientForm.get('name');
+    const addressControl = this.clientForm.get('address');
+
+    phoneControl?.valueChanges
+      .pipe(
+        debounceTime(400),
+        switchMap((phone: string) => {
+          if (!phone) {
+            this.isExistingClient = false;
+            nameControl?.reset();
+            addressControl?.reset();
+            nameControl?.clearValidators();
+            addressControl?.clearValidators();
+            nameControl?.updateValueAndValidity({ emitEvent: false });
+            addressControl?.updateValueAndValidity({ emitEvent: false });
+            nameControl?.enable({ emitEvent: false });
+            addressControl?.enable({ emitEvent: false });
+            return of(null);
+          }
+          return this.ordersSerivce.getClientByPhone(phone).pipe(
+            catchError((err) => {
+              if (err.status === 404) {
+                this.isExistingClient = false;
+                nameControl?.enable({ emitEvent: false });
+                addressControl?.enable({ emitEvent: false });
+                nameControl?.setValidators([Validators.required]);
+                addressControl?.setValidators([Validators.required]);
+                nameControl?.updateValueAndValidity({ emitEvent: false });
+                addressControl?.updateValueAndValidity({ emitEvent: false });
+                nameControl?.reset();
+                addressControl?.reset();
+              }
+              return of(null);
+            })
+          );
+        })
+      )
+      .subscribe((client: any) => {
+        if (client) {
+          this.isExistingClient = true;
+          nameControl?.setValue(client.name, { emitEvent: false });
+          addressControl?.setValue(client.address, { emitEvent: false });
+          nameControl?.disable({ emitEvent: false });
+          addressControl?.disable({ emitEvent: false });
+          nameControl?.clearValidators();
+          addressControl?.clearValidators();
+          nameControl?.updateValueAndValidity({ emitEvent: false });
+          addressControl?.updateValueAndValidity({ emitEvent: false });
+        }
+      });
+  }
+
+  toggleClientInfo() {
+    this.isClientInfoOpen = !this.isClientInfoOpen;
+    if (!this.isClientInfoOpen) {
+      this.clientForm.reset();
+      this.isExistingClient = false;
+    }
+  }
+
   ngAfterViewInit() {
     this.focusBarcodeInput();
   }
@@ -68,16 +147,20 @@ export class CashierComponent implements AfterViewInit {
   }
 
   loadProducts() {
-    let params:any ={
-      page:1,
-      limit:1000
+    let params: any = {
+      page: 1,
+      limit: 1000
+    };
+    const selectedBranchId =
+      this.curentUser.role === 'Super Admin'
+        ? this.adminSelectedBranchId
+        : this.globals.currentUser?.branch?._id;
+
+    if (selectedBranchId) {
+      params['branchId'] = selectedBranchId;
     }
-    let selectedBranchId = this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id
- 
-    params['branchId'] = selectedBranchId;
-  
-    
-    this.productsSerivce.getProducts(params).subscribe((res:any) => {
+
+    this.productsSerivce.getProducts(params).subscribe((res: any) => {
       this.products = res.products;
     });
   }

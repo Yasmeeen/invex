@@ -41,4 +41,9 @@ updateOrder(order:any): Observable<Order> {
   );
 }
 
+getClientByPhone(phone: string): Observable<any> {
+  const url = `${BASE_URL}clients/by-phone/${phone}`;
+  return this.http.get<any>(url);
+}
+
 }

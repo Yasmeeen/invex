@@ -99,7 +99,17 @@
           <tbody>
             <tr *ngFor="let product of productsList; let i = index">
               <td>{{ i + 1 }}</td>
-              <td>{{ product.name }}</td>
+              <td>
+                <span class="products-list__name-cell">
+                  <img
+                    *ngIf="product.imageUrl"
+                    class="products-list__thumb"
+                    [src]="product.imageUrl"
+                    alt=""
+                  />
+                  <span class="products-list__name-text">{{ product.name }}</span>
+                </span>
+              </td>
               <td>
                 <span *ngIf="product.inWarehouse" class="location-badge location-badge--warehouse">{{
                   "tr_warehouse" | translate

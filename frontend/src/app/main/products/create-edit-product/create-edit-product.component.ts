@@ -17,8 +17,9 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { Subscription } from 'rxjs';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
+import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
+import { environment } from 'src/environments/environment';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { DomSanitizer } from '@angular/platform-browser';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -41,8 +42,11 @@ export class CreateEditProductComponent implements OnInit {
   storeInWarehouse = false;
   categories: Category [];
   private subscriptions: Subscription[] = [];
-  isCodeGenerated = false; 
-  imageSrc: any;
+  isCodeGenerated = false;
+  /** Saved Cloudinary (or other HTTPS) URL */
+  productImageUrl = '';
+  isUploadingImage = false;
+  readonly maxImageBytes = 5 * 1024 * 1024;
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
   @ViewChild('modalContainer') modalContainer: ElementRef;
   @ViewChild('modalContent') modalContent: ElementRef;
@@ -57,7 +61,7 @@ export class CreateEditProductComponent implements OnInit {
     private translateService: TranslateService,
     private branchesServce:BranchesServce ,
     @Inject(MAT_DIALOG_DATA) public data: any,
-    private sanitizer: DomSanitizer
+    private cloudinaryUpload: CloudinaryUploadService
 
   ) {}
 
@@ -120,7 +124,55 @@ export class CreateEditProductComponent implements OnInit {
         category: response.category,
         branch: response.branch || null,
       });
+      this.productImageUrl = response.imageUrl || '';
     });
+  }
+
+  isCloudinaryConfigured(): boolean {
+    return !!environment.cloudinary?.cloudName;
+  }
+
+  onProductImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.appNotificationService.push(this.translateService.instant('tr_product_image_invalid_type'), 'error');
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.appNotificationService.push(this.translateService.instant('tr_product_image_too_large'), 'error');
+      input.value = '';
+      return;
+    }
+    if (!this.isCloudinaryConfigured()) {
+      this.appNotificationService.push(this.translateService.instant('tr_cloudinary_not_configured'), 'error');
+      input.value = '';
+      return;
+    }
+    this.isUploadingImage = true;
+    this.subscriptions.push(
+      this.cloudinaryUpload.uploadProductImage(file).subscribe(
+        (url) => {
+          this.isUploadingImage = false;
+          this.productImageUrl = url;
+          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_ok'), 'success');
+          input.value = '';
+        },
+        () => {
+          this.isUploadingImage = false;
+          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_failed'), 'error');
+          input.value = '';
+        }
+      )
+    );
+  }
+
+  clearProductImage(): void {
+    this.productImageUrl = '';
   }
 
 
@@ -144,6 +196,9 @@ generateBarcode() {
 }
 
 createProduct() {
+  if (this.isUploadingImage) {
+    return;
+  }
   if (!this.basicInfoForm.valid) return;
   if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
     this.appNotificationService.push(
@@ -157,6 +212,7 @@ createProduct() {
     ...this.basicInfoForm.value,
     code: this.codeValue,
     inWarehouse: this.storeInWarehouse,
+    imageUrl: this.productImageUrl || '',
   };
   if (this.storeInWarehouse) {
     delete payload.branch;
@@ -207,6 +263,9 @@ printHtml(html: string) {
 
 
 updateProduct() {
+  if (this.isUploadingImage) {
+    return;
+  }
   this.product = this.basicInfoForm.value;
   if (!this.basicInfoForm.valid) return;
   if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
@@ -221,6 +280,7 @@ updateProduct() {
     ...this.basicInfoForm.value,
     code: this.codeValue,
     inWarehouse: this.storeInWarehouse,
+    imageUrl: this.productImageUrl,
   };
   if (this.storeInWarehouse) {
     delete payload.branch;

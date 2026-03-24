@@ -72,7 +72,7 @@
         class="sidebar-collapse-btn"
         (click)="toggleCollapse()"
         [attr.aria-expanded]="!isCollapsed"
-        [attr.aria-label]="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        [attr.aria-label]="(isCollapsed ? 'tr_sidebar_expand_menu' : 'tr_sidebar_collapse_menu') | translate"
       >
         <i
           class="fa"

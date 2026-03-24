@@ -10,13 +10,15 @@ import clientsRoutes from './modules/clients_module/router.js';
 import connectToMongoDB from './DB/connection.js';
 import purchasingRoutes from './modules/purchasing_module/router.js';
 import settingsRoutes from './modules/settings_module/router.js';
+import uploadRoutes from './modules/uploads_module/router.js';
 
 
 const PORT = process.env.PORT || 3000;
 
 const bootstrap = (app, express) => {
   // Middleware
-  app.use(express.json({ limit: '2mb' }));
+  // Image uploads are sent as data URLs from frontend, so allow larger JSON bodies.
+  app.use(express.json({ limit: '10mb' }));
 
   // Health check route
   app.get('/', (req, res) => {
@@ -43,6 +45,7 @@ const bootstrap = (app, express) => {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/clients', clientsRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/uploads', uploadRoutes);
 
   // Start server
   app.listen(PORT, () => {

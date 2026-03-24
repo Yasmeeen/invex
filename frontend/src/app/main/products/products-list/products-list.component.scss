@@ -89,7 +89,29 @@ body {
   text-overflow: ellipsis;
 }
 
-img {
+.barcode-continer img {
   width: 38mm;
   height: auto;
+}
+
+.products-list__name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.products-list .products-list__thumb {
+  width: 40px;
+  height: 40px;
+  max-width: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #e8e8e8;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.products-list__name-text {
+  min-width: 0;
 }

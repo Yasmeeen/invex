@@ -48,6 +48,12 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** Public HTTPS URL (e.g. Cloudinary secure_url) */
+    imageUrl: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: true,

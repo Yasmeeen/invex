@@ -137,7 +137,16 @@
           *ngFor="let product of filteredProducts()"
           (click)="addProduct(product)"
         >
-          <!-- <img [src]="product.image" alt="{{ product.name }}" /> -->
+          <div class="product-card__image-wrap">
+            <img
+              *ngIf="product.imageUrl"
+              [src]="product.imageUrl"
+              alt=""
+            />
+            <div *ngIf="!product.imageUrl" class="product-card__image-placeholder" aria-hidden="true">
+              <i class="fa fa-cube"></i>
+            </div>
+          </div>
            <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
           <div class="product-name">{{ product.name }}</div>
           <div class="product-price">{{ product.price |  currency:'EGP ':'symbol':'1.2-2' }}</div>
@@ -162,7 +171,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let item of orderItems; let i = index">
-            <td>{{ item.name }}</td>
+            <td>
+              <span class="order-line-product">
+                <img
+                  *ngIf="item.imageUrl"
+                  class="order-line-thumb"
+                  [src]="item.imageUrl"
+                  alt=""
+                />
+                <span>{{ item.name }}</span>
+              </span>
+            </td>
             <td>
               <button (click)="decreaseQty(i)">-</button>
               {{ item.quantity }}

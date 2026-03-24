@@ -14,6 +14,8 @@ export interface Product {
   isApplyDiscount?: boolean;
   /** Central warehouse (no branch) */
   inWarehouse?: boolean;
+  /** Product photo URL (e.g. Cloudinary https) */
+  imageUrl?: string;
 }
 export interface Category {
   _id: string;

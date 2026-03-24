@@ -12,6 +12,15 @@ const resolveCategoryId = (category) => {
   return null;
 };
 
+/** Optional product image: only allow non-empty https URLs (e.g. Cloudinary). */
+const normalizeImageUrl = (raw) => {
+  if (raw == null || raw === '') return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+  if (!/^https:\/\//i.test(s)) return '';
+  return s.slice(0, 2048);
+};
+
 /** Safe branch ObjectId from query string (rejects literal "undefined", invalid ids). */
 const parseBranchIdFilter = (branchId) => {
   const branchIdStr = branchId != null ? String(branchId).trim() : '';
@@ -289,7 +298,8 @@ export const getProductById = async (req, res) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl } = req.body;
+    const imageUrlNorm = normalizeImageUrl(imageUrl);
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
 
@@ -333,6 +343,7 @@ export const createProduct = async (req, res) => {
         category: categoryId,
         branch: null,
         inWarehouse: true,
+        imageUrl: imageUrlNorm,
       });
 
       return res.status(201).json({ message: '✅ Product created', createdProduct });
@@ -361,6 +372,7 @@ export const createProduct = async (req, res) => {
       category: categoryId,
       branch: branch._id,
       inWarehouse: false,
+      imageUrl: imageUrlNorm,
     });
 
     res.status(201).json({ message: '✅ Product created', createdProduct });
@@ -381,6 +393,8 @@ export const createProduct = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse } = req.body;
+    const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
+    const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
 
@@ -417,21 +431,22 @@ export const updateProduct = async (req, res) => {
         return res.status(409).json({ error: 'Product code already exists in warehouse' });
       }
 
-      const product = await Product.findByIdAndUpdate(
-        req.params.id,
-        {
-          name,
-          code,
-          price: priceNum,
-          netPrice: netNum,
-          category: categoryId,
-          branch: null,
-          inWarehouse: true,
-          stock: stockNum,
-          discount: discount ?? 0,
-        },
-        { new: true }
-      );
+      const updateDoc = {
+        name,
+        code,
+        price: priceNum,
+        netPrice: netNum,
+        category: categoryId,
+        branch: null,
+        inWarehouse: true,
+        stock: stockNum,
+        discount: discount ?? 0,
+      };
+      if (imageUrlNorm !== undefined) {
+        updateDoc.imageUrl = imageUrlNorm;
+      }
+
+      const product = await Product.findByIdAndUpdate(req.params.id, updateDoc, { new: true });
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
@@ -458,21 +473,22 @@ export const updateProduct = async (req, res) => {
       return res.status(409).json({ error: 'Product code already exists in this branch' });
     }
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      {
-        name,
-        code,
-        price: priceNum,
-        netPrice: netNum,
-        category: categoryId,
-        branch: branch._id,
-        inWarehouse: false,
-        stock: stockNum,
-        discount: discount ?? 0,
-      },
-      { new: true }
-    );
+    const updateDocBranch = {
+      name,
+      code,
+      price: priceNum,
+      netPrice: netNum,
+      category: categoryId,
+      branch: branch._id,
+      inWarehouse: false,
+      stock: stockNum,
+      discount: discount ?? 0,
+    };
+    if (imageUrlNorm !== undefined) {
+      updateDocBranch.imageUrl = imageUrlNorm;
+    }
+
+    const product = await Product.findByIdAndUpdate(req.params.id, updateDocBranch, { new: true });
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });

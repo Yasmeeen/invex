@@ -51,5 +51,6 @@ export const ORDER_PAY_URL = ORDERS_URL + '/pay';
 export const ORDER_TRACK_URL = ORDERS_URL + '/track/';
 
 export const STORE_SETTINGS_URL = BASE_URL + '/settings/store';
+export const UPLOAD_PRODUCT_IMAGE_URL = BASE_URL + '/uploads/product-image';
 
 

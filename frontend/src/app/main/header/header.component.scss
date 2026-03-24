@@ -2,212 +2,242 @@
 @import 'blocks';
 @import 'variables';
 
-.header-container {
-    .dragon-image {
-        height: 70px;
-        width: 70px;
-        margin-top: -10px;
-        margin-bottom: -10px;
-        position: absolute;
-        top: 0;
-        img {
-            object-fit: contain;
-            height: 70px;
-            width: 70px;
-            animation: cheerfulDragon 10s ease 0s infinite;
-            display: inline-block;
-        }
-    }
-    .app-journal-container {
-        // width: calc(100% - 400px);
-        .app-journal-wrapper{
-            position: relative;
-        }
-    }
-    .app-journal {
-        height: 50px;
-    }
-    .app-journal-text {
-        width: auto;
-        border-radius: 100px;
-        border: 1px solid;
-        background: #fff;
-        padding-top: 8px;
-        padding-bottom: 8px;
-        p {
-            line-height: 18px;
-        }
-    }
-    .single-header-box {
-        @extend %flex-centered;
-        cursor: pointer;
-        width: 50px;
-        height: 50px;
-        background-color: rgba(255, 255, 255, .7);
-        border-radius: 4px;
-        padding: 4px;
-        border: 1px solid $light_gray;
-        position: relative;
-        font-size: 1.875rem;
-        color: $steel;
-        .notifications-count-container{
-            position: relative;
-        }
-        .notifications-count {
-            position: absolute;
-            top: -32px;
-            width: 22px;
-            height: 22px;
-            color: #fff;
-            border-radius: 50%;
-            font-size: 12px;
-            line-height: 22px;
-            text-shadow: 0 0.5px 0 rgba(0, 0, 0, .19);
-            text-align: center;
-            background-color: #ff3b30;
-            background: linear-gradient(to right, #ff5c6a, #ff3b30);
-            @extend %flex-centered;
-        }
+/* Modern top bar — mint / forest admin (aligned with dashboard) */
+$topbar-bg: #ffffff;
+$topbar-border: #e8ede9;
+$topbar-shadow: 0 1px 0 rgba(30, 77, 43, 0.06), 0 4px 24px rgba(30, 77, 43, 0.06);
+$forest: #1e4d2b;
+$mint-soft: rgba(184, 232, 142, 0.45);
 
-        &.header-options-menu {
-            font-size: 1rem;
-            background: transparent;
-            border: 0;
-            width: auto;
-            padding: 0;
-
-            .options-menu {
-                padding: 0 6px;
-                transition: $transition_1;
-                height: 100%;
-                @extend %flex-centered;
-
-                .options-menu-container .logout {
-                    color: $salmon;
-                }
-            }
-
-            & .options-menu:hover,
-            & .options-menu.active {
-                background-color: rgba(0, 0, 0, 0.03);
-            }
-        }
-        .single-notification{
-            &:hover{
-                background-color: #dfeefa !important;
-            }
-            &.unread{
-                background-color: #f6fbfe;
-            }
-            .notifications-icon{
-                width: 58px;
-                height: 58px;
-                background-color: #fff;
-                border-radius: 6px;
-                .annoncement-img{
-                    width: 24px;
-                }
-                .notification-img{
-                    width: 30px;
-                }
-            }
-            .messages-icon{
-                width: 40px;
-                height: 40px;
-                object-fit: contain;
-                border-radius: 6px;
-            }
-            .message-actor{
-                border-radius: 6px;
-                color: #fff;
-                padding: 0.1rem;
-            }
-            .notifications-title{
-                max-width: 220px;
-                min-width: 220px;
-            }
-        }
-
-    }
-    .menu-icon {
-        font-size: 1.5rem;
-        cursor: pointer;
-    }
+:host {
+  display: block;
+  width: 100%;
 }
 
-
-@keyframes cheerfulDragon {
-    0% {
-        transform: rotate(0deg) scale(1);
-    }
-    10% {
-        transform: rotate(0deg) scale(1);
-    }
-    20% {
-        transform: rotate(0deg) scale(1);
-    }
-    30% {
-        transform: rotate(0deg) scale(1);
-    }
-    40% {
-        transform: rotate(0deg) scale(1);
-    }
-    50% {
-        transform: rotate(-10deg) scale(1.2);
-    }
-    60% {
-        transform: rotate(0deg) scale(1);
-    }
-    70% {
-        transform: rotate(0deg) scale(1);
-    }
-    80% {
-        transform: rotate(0deg) scale(1);
-    }
-    90% {
-        transform: rotate(0deg) scale(1);
-    }
-    100% {
-        transform: rotate(360deg) scale(1);
-    }
+.app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 56px;
+  padding: 0.5rem 1.25rem;
+  background: $topbar-bg;
+  border-radius: 16px;
+  border: 1px solid $topbar-border;
+  box-shadow: $topbar-shadow;
 }
 
-::ng-deep.freshwidget-theme {
-    display: none;
+.app-topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
+.app-topbar__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-decoration: none !important;
+  color: inherit;
+  min-width: 0;
 
-// main mixin
+  &:hover .app-topbar__brand-name {
+    color: $forest;
+  }
+}
+
+.app-topbar__brand-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: $very-dark-gray;
+  line-height: 1.2;
+}
+
+.app-topbar__brand-sub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: $steel;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-topbar__right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem 0.5rem;
+}
+
+.app-topbar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: $steel;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: rgba(30, 77, 43, 0.06);
+    color: $forest;
+  }
+
+  &:focus {
+    outline: 2px solid rgba(30, 77, 43, 0.35);
+    outline-offset: 2px;
+  }
+}
+
+.app-topbar__menu-btn {
+  margin-inline-end: 0.25rem;
+}
+
+.app-topbar__cta {
+  white-space: nowrap;
+}
+
+.app-topbar__cta-secondary {
+  white-space: nowrap;
+}
+
+.app-topbar__user {
+  position: relative;
+  margin-inline-start: 0.25rem;
+}
+
+.app-topbar__user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem 0.35rem 0.35rem;
+  border: 1px solid $light_gray;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    border-color: rgba(30, 77, 43, 0.25);
+    box-shadow: 0 2px 8px rgba(30, 77, 43, 0.08);
+  }
+}
+
+.app-topbar__user--open .app-topbar__user-trigger {
+  border-color: rgba(30, 77, 43, 0.35);
+  box-shadow: 0 2px 12px rgba(30, 77, 43, 0.1);
+}
+
+.app-topbar__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: $mint-soft;
+  color: $forest;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-topbar__user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $dark-gray;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-topbar__caret {
+  font-size: 0.75rem;
+  color: $steel;
+  margin-inline-start: 0.15rem;
+}
+
+.app-topbar__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-end: 0;
+  min-width: 200px;
+  padding: 0.35rem;
+  background: #fff;
+  border: 1px solid $topbar-border;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(30, 77, 43, 0.12);
+  z-index: 100;
+  animation: appTopbarDropdown 0.18s ease;
+}
+
+@keyframes appTopbarDropdown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-topbar__dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: $dark-gray;
+  cursor: pointer;
+  text-align: inherit;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(30, 77, 43, 0.06);
+  }
+
+  i {
+    width: 1.1rem;
+    text-align: center;
+  }
+}
+
+.app-topbar__dropdown-item--danger {
+  color: $salmon;
+
+  &:hover {
+    background: rgba(255, 138, 101, 0.12);
+  }
+}
+
+// RTL/LTR: flex + logical properties handle layout; mixin kept for build pipeline.
 @mixin biDirectional($start, $end) {
-    .header-boxes-container {
-        float: $end;
-
-        .single-header-box {
-            .notifications-count{
-                #{$start}: 0;
-            }
-            margin-#{$start}: 15px;
-            float: $end;
-        }
-    }
-    .app-journal-text {
-        padding-#{$start}: 50px;
-        padding-#{$end}: 30px;
-    }
-    .app-journal-wrapper {
-        padding-#{$start}: 30px;
-    }
-    .dragon-image {
-        #{$start}: 0;
-    }
 }
 
-// directions
 @import 'directions/decide';
 
 @mixin actorStyles($primary, $secondary, $from, $to, $siteBackground) {
-    .app-journal-text {
-        border-color: $primary !important;
-    }
+  .app-topbar__avatar {
+    background: $secondary;
+    color: $primary;
+  }
 }
+
 @import 'themes/decide';

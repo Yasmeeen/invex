@@ -1,35 +1,30 @@
 <div class="sidebar-background" (click)="closeSidebar()"></div>
-<div id="main-sidebar" class="main-sidebar">
+<div
+  id="main-sidebar"
+  class="main-sidebar"
+  [class.main-sidebar--collapsed]="isCollapsed"
+>
   <div class="app-sidebar">
-
-    <div class="logo-container pb-3 flex flex-middle flex-center">
-      <img class="logo" default="/assets/images/logo2.png">
-      <div>
+    <a routerLink="/home" class="logo-container pb-3 flex flex-middle flex-center" (click)="closeSidebar()">
+      <img class="logo" default="/assets/images/logo2.png" alt="" />
+      <div class="logo-container__text">
         <span class="size-lead weight-bold text-lavander">INVEX</span>
-        <div class="store-name">{{storeName}}</div>
+        <div class="store-name">{{ storeName }}</div>
       </div>
+    </a>
 
-    </div>
-
-
-    <!-- <div class="main-routing-links">
-            <div *ngFor="let link of appSidebar" routerLinkActive="active-link" class="anchor-container">
-              <div>
-                <a [routerLink]="link.routerLink">
-                  <div class="link-content">
-                    <span [class]="link.icon"></span>
-                    <span class="main-icon-text">
-                            {{ link.name | translate }}
-                        </span>
-                  </div>
-                </a>
-              </div>
-            </div>
-        </div> -->
-    <div class="main-routing-links plr-2">
-      <div *ngFor="let link of appSidebar" routerLinkActive="active-link" class="anchor-container">
-        <div >
-          <a [routerLink]="link.routerLink">
+    <nav class="main-routing-links plr-2" aria-label="Main">
+      <div
+        *ngFor="let link of appSidebar"
+        routerLinkActive="active-link"
+        class="anchor-container"
+      >
+        <div>
+          <a
+            [routerLink]="link.routerLink"
+            [attr.title]="link.name | translate"
+            (click)="closeSidebar()"
+          >
             <div class="link-content">
               <span [class]="link.icon"></span>
               <span class="main-icon-text">
@@ -38,19 +33,47 @@
             </div>
           </a>
         </div>
-        <span *ngIf="link.children" class="fa fa-caret-down children-arrow" (click)="toggleChildren($event)">
-        </span>
+        <span
+          *ngIf="link.children"
+          class="fa fa-caret-down children-arrow"
+          (click)="toggleChildren($event)"
+        ></span>
         <div *ngIf="link.children" class="child-menu mr-2">
-          <div *ngFor="let child of link.children" routerLinkActive="child-active" class="anchor-container">
-            <a [routerLink]="child.routerLink" >
+          <div
+            *ngFor="let child of link.children"
+            routerLinkActive="child-active"
+            class="anchor-container"
+          >
+            <a
+              [routerLink]="child.routerLink"
+              [attr.title]="child.name | translate"
+              (click)="closeSidebar()"
+            >
               <div class="link-content">
-                  <span class="size-small" >
-                    {{child.name | translate}}
-                  </span>
+                <span class="size-small">
+                  {{ child.name | translate }}
+                </span>
               </div>
             </a>
           </div>
         </div>
       </div>
+    </nav>
+
+    <div class="sidebar-footer hidden-mobile">
+      <button
+        type="button"
+        class="sidebar-collapse-btn"
+        (click)="toggleCollapse()"
+        [attr.aria-expanded]="!isCollapsed"
+        [attr.aria-label]="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      >
+        <i
+          class="fa"
+          [ngClass]="isCollapsed ? 'fa-angle-double-right' : 'fa-angle-double-left'"
+          aria-hidden="true"
+        ></i>
+      </button>
     </div>
   </div>
+</div>

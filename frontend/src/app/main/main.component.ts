@@ -16,6 +16,10 @@ export class MainComponent implements OnInit {
   currentUser:CurrentUser;
   arabicSelected: boolean = false;
   englishSelected: boolean = false;
+
+  /** Narrow sidebar mode — synced from sidebar collapse control */
+  sidebarCollapsed = false;
+
   constructor(
       private router:Router,
       private translate: TranslateService
@@ -37,12 +41,16 @@ export class MainComponent implements OnInit {
 
   // Shows and hides the loading spinner during RouterEvent changes
   navigationInterceptor(event: RouterEvent): void {
-      if (event instanceof NavigationEnd) {
+    if (event instanceof NavigationEnd) {
           document.body.classList.remove('sidebar-active')
           let activeRouterMenus = document.querySelectorAll('.anchor-container');
           for (let i = 0; i < activeRouterMenus.length; i++) {
               activeRouterMenus[i].classList.remove('children-active');
           }
       }
+  }
+
+  onSidebarCollapsed(collapsed: boolean): void {
+    this.sidebarCollapsed = collapsed;
   }
 }

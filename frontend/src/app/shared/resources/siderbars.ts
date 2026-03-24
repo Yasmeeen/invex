@@ -94,3 +94,34 @@ export const  Cashier = [
 
 ];
 
+export const  OperationManager = [
+
+  {
+    name: 'tr_orders',
+    routerLink: '/orders',
+    icon: 'fa fa-ticket icon',
+  },
+  {
+    name: 'tr_inventory',
+    routerLink: '/inventory',
+    icon: 'fa fa-list-ul  icon',
+  },
+  {
+    name: 'tr_products',
+    routerLink: '/products',
+    icon: 'fa fa-list-ul  icon',
+  },
+  {
+    name: 'tr_branches',
+    routerLink: '/branches',
+    icon: 'fa fa-map-marker icon',
+  },
+  {
+    name: 'tr_categories',
+    routerLink: '/categories',
+    icon: 'fa fa-list-ul  icon',
+  },
+
+];
+
+

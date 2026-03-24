@@ -1,6 +1,6 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
-import { AdminSidebar,Employee } from '@shared/resources';
+import { AdminSidebar,Cashier,Employee, OperationManager } from '@shared/resources';
 import { Globals } from 'src/app/core/globals';
 import { environment } from 'src/environments/environment.prod';
 
@@ -16,6 +16,12 @@ export class SidebarComponent implements OnInit {
   levelName = '';
   user: any = [{}];
   storeName = environment.storeName;
+
+  /** Desktop-only narrow sidebar */
+  isCollapsed = false;
+  @Output() collapsedChange = new EventEmitter<boolean>();
+
+  private readonly collapseStorageKey = 'appSidebarCollapsed';
   constructor(
       public globals: Globals,
       private authenticationService: AuthenticationService
@@ -25,6 +31,12 @@ export class SidebarComponent implements OnInit {
       this.appSidebar = Employee;
       
     }
+    else if(globals.currentUser.role == 'Operation Manager'){ 
+      this.appSidebar = OperationManager; 
+    }
+    else if(globals.currentUser.role == 'Cashier'){
+      this.appSidebar = Cashier;
+    }
     else{
       this.appSidebar = AdminSidebar;
     }
@@ -32,6 +44,20 @@ export class SidebarComponent implements OnInit {
   }
 
   ngOnInit() {
+    const saved = localStorage.getItem(this.collapseStorageKey);
+    if (saved === 'true') {
+      this.isCollapsed = true;
+      this.collapsedChange.emit(true);
+    }
+  }
+
+  toggleCollapse(): void {
+    if (typeof window !== 'undefined' && window.innerWidth <= 991) {
+      return;
+    }
+    this.isCollapsed = !this.isCollapsed;
+    localStorage.setItem(this.collapseStorageKey, String(this.isCollapsed));
+    this.collapsedChange.emit(this.isCollapsed);
   }
   toggleChildren(event:any) {
     event.preventDefault();

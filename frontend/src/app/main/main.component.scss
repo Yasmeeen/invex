@@ -6,17 +6,14 @@
     min-height: 100vh;
 
     .main-header {
-
-        margin-bottom: 35px;
+        margin-bottom: 28px;
         margin-top: 10px;
-        background-color: white;
+        background-color: transparent;
         position: sticky;
-        padding: 10px;;
+        padding: 0;
         top: 0;
         z-index: 10;
-        height: 70px;
-        border-radius: 18px;
-        box-shadow: 0 2px 6px rgba(37, 83, 185, 0.1);
+        min-height: 64px;
     }
 }
 
@@ -24,6 +21,11 @@
 @mixin biDirectional($start, $end) {
     .main-container {
         padding-#{$start}: 285px;
+        transition: padding 0.35s ease;
+
+        &.main-container--sidebar-collapsed {
+            padding-#{$start}: 104px;
+        }
     }
 }
 
@@ -34,6 +36,10 @@
     @mixin biDirectional($start, $end) {
         .main-container {
             padding-#{$start}: 0;
+
+            &.main-container--sidebar-collapsed {
+                padding-#{$start}: 0;
+            }
         }
     }
     // directions

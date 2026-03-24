@@ -1,12 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageSwitcherComponent } from '@shared/components/language-switcher/language-switcher.component';
-import { AppNotificationService } from '@shared/services/app-notification.service';
 import { Globals } from 'src/app/core/globals';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
-import { BASE_URL } from '@core/base/urls';
-import { UserSerivce } from '@shared/services/user.service';
+import { environment } from 'src/environments/environment.prod';
 
 @Component({
   selector: 'app-header',
@@ -18,37 +16,49 @@ export class HeaderComponent implements OnInit {
   user: any;
   selectedLanguage: any;
   avatarURL: any;
-  userInfo: any
+  userInfo: any;
+
+  storeName = environment.storeName;
+  userMenuOpen = false;
 
   constructor(
     private globals: Globals,
-    private userService: UserSerivce,
     private translate: TranslateService,
     private authenticationService: AuthenticationService,
-    private appNotificationService: AppNotificationService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private hostEl: ElementRef<HTMLElement>
   ) { }
 
+  get userDisplayName(): string {
+    const u = this.currentUser;
+    if (!u) {
+      return '';
+    }
+    return (u.name || u.username || u.email || 'User').toString();
+  }
+
+  get userInitials(): string {
+    const name = this.userDisplayName.trim();
+    if (!name) {
+      return '?';
+    }
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
   ngOnInit(): void {
-    // this.avatarURL = BASE_URL + this.globals.currentSchool.avatar_url;
     this.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.setUserLanguage();
   }
 
-
   setUserLanguage() {
     const userLocal =   this.currentUser.locale
     document.querySelector('body')?.setAttribute('dir', userLocal == 'ar' ? 'rtl' : 'ltr');
     this.translate.use(userLocal);
-    // this.userService.getCurrentUser(this.currentUser.id).subscribe(Response => {
-    //   this.user = Response;
-    //   this.globals.currentUser.locale = this.user.locale;
-    //   this.selectedLanguage = this.user.locale;
-    //   localStorage.setItem('currentUser', JSON.stringify(this.globals.currentUser));
-    //   this.translate.use(this.user.locale);
-    //   document.querySelector('body')?.setAttribute('dir', this.user.locale !== 'ar' ? 'ltr' : 'rtl');
-    // });
   }
 
   logout() {
@@ -62,7 +72,34 @@ export class HeaderComponent implements OnInit {
         disableClose: true,
     });
 }
+
   openSidebar() {
     document.body.classList.add('sidebar-active');
+  }
+
+  toggleUserMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.userMenuOpen = !this.userMenuOpen;
+  }
+
+  closeUserMenu(): void {
+    this.userMenuOpen = false;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.userMenuOpen) {
+      return;
+    }
+    const t = event.target as Node;
+    if (this.hostEl.nativeElement.contains(t)) {
+      return;
+    }
+    this.userMenuOpen = false;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.userMenuOpen = false;
   }
 }

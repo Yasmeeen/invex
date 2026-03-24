@@ -27,7 +27,8 @@ export class CreateEditUserComponent implements OnInit {
   roles= [
     'Super Admin',
     'Employee',
-    'Cashier'
+    'Cashier',
+    'Operation Manager'
   ]
 
   private subscriptions: Subscription[] = [];

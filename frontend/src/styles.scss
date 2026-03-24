@@ -2,6 +2,12 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'initializer';
+
+/* App-wide visual scale (~90% browser zoom). Uses CSS zoom (Chromium, Safari, modern Firefox). */
+html {
+    zoom: 0.9;
+}
+
 body,
 html {
     padding: 0;

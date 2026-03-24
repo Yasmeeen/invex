@@ -37,6 +37,8 @@ export class CreateEditProductComponent implements OnInit {
   productId: string;
   isSubmitting: boolean;
   isEdit: boolean = false;
+  /** When true, product is stored in central warehouse (no branch). */
+  storeInWarehouse = false;
   categories: Category [];
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false; 
@@ -71,6 +73,13 @@ export class CreateEditProductComponent implements OnInit {
 
   }
 
+  setStorageMode(warehouse: boolean) {
+    this.storeInWarehouse = warehouse;
+    if (warehouse && this.basicInfoForm?.form) {
+      this.basicInfoForm.form.patchValue({ branch: null });
+    }
+  }
+
   getCategories() {
     let params = {
       'page': 1,
@@ -97,10 +106,21 @@ export class CreateEditProductComponent implements OnInit {
   }
 
   getProductData() {
-    this.productsSerivce.getProduct(this.productId).subscribe((response:any)=> {
-      this.productId = response._id
-      this.basicInfoForm.form.patchValue(response);
-    })
+    this.productsSerivce.getProduct(this.productId).subscribe((response: any) => {
+      this.productId = response._id;
+      this.storeInWarehouse = !!response.inWarehouse;
+      this.codeValue = response.code;
+      this.basicInfoForm.form.patchValue({
+        name: response.name,
+        code: response.code,
+        price: response.price,
+        netPrice: response.netPrice,
+        stock: response.stock,
+        discount: response.discount,
+        category: response.category,
+        branch: response.branch || null,
+      });
+    });
   }
 
 
@@ -125,11 +145,22 @@ generateBarcode() {
 
 createProduct() {
   if (!this.basicInfoForm.valid) return;
+  if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_branch_required'),
+      'error'
+    );
+    return;
+  }
 
-  const payload = {
+  const payload: any = {
     ...this.basicInfoForm.value,
-    code: this.codeValue
+    code: this.codeValue,
+    inWarehouse: this.storeInWarehouse,
   };
+  if (this.storeInWarehouse) {
+    delete payload.branch;
+  }
 
   this.productsSerivce.createProduct(payload).subscribe(
     (res: any) => {
@@ -178,11 +209,22 @@ printHtml(html: string) {
 updateProduct() {
   this.product = this.basicInfoForm.value;
   if (!this.basicInfoForm.valid) return;
+  if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_branch_required'),
+      'error'
+    );
+    return;
+  }
   this.product = this.basicInfoForm.value;
-  const payload = {
+  const payload: any = {
     ...this.basicInfoForm.value,
-    code: this.codeValue   // ✅ لازم يتضاف يدوي
+    code: this.codeValue,
+    inWarehouse: this.storeInWarehouse,
   };
+  if (this.storeInWarehouse) {
+    delete payload.branch;
+  }
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {

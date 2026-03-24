@@ -34,6 +34,8 @@ export class ProductsListComponent implements OnInit {
   iscategoryNotAuthorized: boolean = false;
   selectedBranch: string ;
   branches: Branch [] = [];
+  /** all | warehouse | branches */
+  locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   totalNumberOfProducts: number;
 
   currentOrder: any = {
@@ -42,7 +44,7 @@ export class ProductsListComponent implements OnInit {
   }
   params: any = {
     page: 1,
-    perPage: this.paginationPerPage,
+    limit: this.paginationPerPage,
   };
   categorysParams: any = {
     page: 1,
@@ -74,11 +76,21 @@ export class ProductsListComponent implements OnInit {
   }
   getproducts() {
     this.productsLoading = true;
-    if(this.selectedBranch){
-      this.params['branchId'] = this.selectedBranch;
-    }
-    else {
-      delete this.params['branchId']
+    delete this.params['branchId'];
+    delete this.params['warehouseOnly'];
+    delete this.params['excludeWarehouse'];
+
+    if (this.locationFilter === 'warehouse') {
+      this.params['warehouseOnly'] = true;
+    } else if (this.locationFilter === 'branches') {
+      this.params['excludeWarehouse'] = true;
+      if (this.selectedBranch) {
+        this.params['branchId'] = this.selectedBranch;
+      }
+    } else {
+      if (this.selectedBranch) {
+        this.params['branchId'] = this.selectedBranch;
+      }
     }
 
     this.subscriptions.push(this.productsService.getProducts(this.params).subscribe((response: any) => {

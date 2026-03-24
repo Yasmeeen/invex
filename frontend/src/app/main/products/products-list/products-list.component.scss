@@ -1,3 +1,16 @@
+.location-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.location-badge--warehouse {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 .products-list{
   td, th {
       &:nth-child(1){

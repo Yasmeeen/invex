@@ -36,10 +36,23 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4" >
-        <div
-          class="form-group"
-        >
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_location_filter' | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="locationFilter"
+            name="locationFilter"
+            (change)="getproducts()"
+          >
+            <option value="all">{{ 'tr_location_all' | translate }}</option>
+            <option value="warehouse">{{ 'tr_warehouse' | translate }}</option>
+            <option value="branches">{{ 'tr_location_branches_only' | translate }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
+        <div class="form-group">
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon bg-white">
             <ng-select
@@ -47,12 +60,11 @@
               placeholder="{{ 'tr_select' | translate }}"
               bindLabel="name"
               bindValue="_id"
-              [(ngModel)]= "selectedBranch"
-              #branch="ngModel"
+              [(ngModel)]="selectedBranch"
               name="branchId"
               [items]="branches"
+              [clearable]="true"
               (change)="getproducts()"
-              required
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
@@ -74,7 +86,7 @@
             <tr>
               <th></th>
               <th>{{ "tr_product_name" | translate }}</th>
-              <th>{{ "tr_branch" | translate }}</th>
+              <th>{{ "tr_location" | translate }}</th>
               <th>{{ "tr_code" | translate }}</th>
               <th>{{ "tr_category" | translate }}</th>
               <th>{{ "tr_stock" | translate }}</th>
@@ -88,7 +100,12 @@
             <tr *ngFor="let product of productsList; let i = index">
               <td>{{ i + 1 }}</td>
               <td>{{ product.name }}</td>
-              <td>{{ product.branch?.name }}</td>
+              <td>
+                <span *ngIf="product.inWarehouse" class="location-badge location-badge--warehouse">{{
+                  "tr_warehouse" | translate
+                }}</span>
+                <span *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
+              </td>
               <td>{{ product.code }}</td>
               <td>{{ product.category?.name }}</td>
               <td>{{ product.stock }}</td>

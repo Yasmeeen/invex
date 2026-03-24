@@ -1,6 +1,17 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 
+/** Category id from body: `{ _id }`, `{ id }`, plain id string, or ObjectId. */
+const resolveCategoryId = (category) => {
+  if (category == null || category === '') return null;
+  if (typeof category === 'string') return category.trim() || null;
+  if (typeof category === 'object') {
+    const id = category?._id ?? category?.id;
+    if (id != null && id !== '') return String(id);
+  }
+  return null;
+};
+
 /** Safe branch ObjectId from query string (rejects literal "undefined", invalid ids). */
 const parseBranchIdFilter = (branchId) => {
   const branchIdStr = branchId != null ? String(branchId).trim() : '';
@@ -204,7 +215,7 @@ export const generateBarcodeImage = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', branchId } = req.query;
+    const { page = 1, limit = 10, search = '', branchId, warehouseOnly, excludeWarehouse } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     // Build query
@@ -216,6 +227,12 @@ export const getProducts = async (req, res) => {
         { name: { $regex: search, $options: 'i' } },
         { code: { $regex: search, $options: 'i' } },
       ];
+    }
+
+    if (warehouseOnly === 'true' || warehouseOnly === true) {
+      query.inWarehouse = true;
+    } else if (excludeWarehouse === 'true' || excludeWarehouse === true) {
+      query.inWarehouse = { $ne: true };
     }
 
     const safeBranchId = parseBranchIdFilter(branchId);
@@ -272,13 +289,63 @@ export const getProductById = async (req, res) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse } = req.body;
+    const isWarehouse =
+      inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
 
-    if (!name || !code || !price || !netPrice || !category._id || !branch._id || !stock) {
+    const categoryId = resolveCategoryId(category);
+    const priceNum = Number(price);
+    const netNum = Number(netPrice);
+    const stockNum = Number(stock);
+
+    if (
+      !name ||
+      code == null ||
+      String(code).trim() === '' ||
+      Number.isNaN(priceNum) ||
+      Number.isNaN(netNum) ||
+      !categoryId ||
+      stock === undefined ||
+      stock === null ||
+      Number.isNaN(stockNum)
+    ) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // ✅ Check if a product with the same code exists in the same branch
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    if (isWarehouse) {
+      // Unique index is { code, branch }; warehouse uses branch: null (matches null or missing field).
+      const existingWh = await Product.findOne({ code, branch: null });
+      if (existingWh) {
+        return res.status(409).json({ error: 'Product code already exists in warehouse' });
+      }
+
+      const createdProduct = await Product.create({
+        name,
+        code,
+        price: priceNum,
+        netPrice: netNum,
+        stock: stockNum,
+        discount: discount ?? 0,
+        category: categoryId,
+        branch: null,
+        inWarehouse: true,
+      });
+
+      return res.status(201).json({ message: '✅ Product created', createdProduct });
+    }
+
+    if (!branch?._id) {
+      return res.status(400).json({ error: 'Branch is required when not storing in warehouse' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(String(branch._id))) {
+      return res.status(400).json({ error: 'Invalid branch' });
+    }
+
     const existingProduct = await Product.findOne({ code, branch: branch._id });
     if (existingProduct) {
       return res.status(409).json({ error: 'Product code already exists in this branch' });
@@ -287,17 +354,24 @@ export const createProduct = async (req, res) => {
     const createdProduct = await Product.create({
       name,
       code,
-      price,
-      netPrice,
-      stock,
-      discount,
-      category: category._id,
+      price: priceNum,
+      netPrice: netNum,
+      stock: stockNum,
+      discount: discount ?? 0,
+      category: categoryId,
       branch: branch._id,
+      inWarehouse: false,
     });
 
     res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
     console.error('❌ Error creating product:', error.message);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Product code already exists for this storage location' });
+    }
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message || 'Invalid product data' });
+    }
     res.status(500).json({ error: 'Failed to create product' });
   }
 };
@@ -306,14 +380,74 @@ export const createProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse } = req.body;
+    const isWarehouse =
+      inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
 
-    // ✅ Fix validation (used || instead of comma)
-    if (!name || !code || !price || !netPrice || !category?._id || !branch?._id || !stock) {
+    const categoryId = resolveCategoryId(category);
+    const priceNum = Number(price);
+    const netNum = Number(netPrice);
+    const stockNum = Number(stock);
+
+    if (
+      !name ||
+      code == null ||
+      String(code).trim() === '' ||
+      Number.isNaN(priceNum) ||
+      Number.isNaN(netNum) ||
+      !categoryId ||
+      stock === undefined ||
+      stock === null ||
+      Number.isNaN(stockNum)
+    ) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // ✅ Prevent duplicate product code in the same branch (excluding itself)
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    if (isWarehouse) {
+      const existingWh = await Product.findOne({
+        code,
+        branch: null,
+        _id: { $ne: req.params.id },
+      });
+      if (existingWh) {
+        return res.status(409).json({ error: 'Product code already exists in warehouse' });
+      }
+
+      const product = await Product.findByIdAndUpdate(
+        req.params.id,
+        {
+          name,
+          code,
+          price: priceNum,
+          netPrice: netNum,
+          category: categoryId,
+          branch: null,
+          inWarehouse: true,
+          stock: stockNum,
+          discount: discount ?? 0,
+        },
+        { new: true }
+      );
+
+      if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      return res.json({ message: '✅ Product updated', product });
+    }
+
+    if (!branch?._id) {
+      return res.status(400).json({ error: 'Branch is required when not storing in warehouse' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(String(branch._id))) {
+      return res.status(400).json({ error: 'Invalid branch' });
+    }
+
     const existingProduct = await Product.findOne({
       code,
       branch: branch._id,
@@ -329,12 +463,13 @@ export const updateProduct = async (req, res) => {
       {
         name,
         code,
-        price,
-        netPrice,
-        category: category._id,
+        price: priceNum,
+        netPrice: netNum,
+        category: categoryId,
         branch: branch._id,
-        stock,
-        discount,
+        inWarehouse: false,
+        stock: stockNum,
+        discount: discount ?? 0,
       },
       { new: true }
     );
@@ -346,6 +481,12 @@ export const updateProduct = async (req, res) => {
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product:', error.message);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Product code already exists for this storage location' });
+    }
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message || 'Invalid product data' });
+    }
     res.status(500).json({ error: 'Failed to update product' });
   }
 };
@@ -364,6 +505,118 @@ export const deleteProduct = async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting product:', error.message);
     res.status(500).json({ error: 'Failed to delete product' });
+  }
+};
+
+/**
+ * Transfer product stock from one branch to another.
+ * Reuses existing product data; only stock and branch placement are affected.
+ */
+export const transferProductStock = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { productId, quantity, fromBranchId, toBranchId, fromWarehouse } = req.body;
+    const transferQty = Number(quantity);
+    const fromWh =
+      fromWarehouse === true || fromWarehouse === 'true' || String(fromWarehouse).toLowerCase() === 'true';
+
+    if (!productId || !toBranchId || !transferQty || transferQty <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: fromWh
+          ? 'productId, quantity, toBranchId are required.'
+          : 'productId, quantity, fromBranchId, toBranchId are required.',
+      });
+    }
+
+    if (!fromWh && !fromBranchId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'productId, quantity, fromBranchId, toBranchId are required.' });
+    }
+
+    if (!fromWh && fromBranchId === toBranchId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'From/To branch cannot be the same.' });
+    }
+
+    const sourceProduct = await Product.findById(productId).session(session);
+    if (!sourceProduct) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Source product not found.' });
+    }
+
+    if (fromWh) {
+      if (!sourceProduct.inWarehouse) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Selected product is not in warehouse.' });
+      }
+    } else if (String(sourceProduct.branch) !== String(fromBranchId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Source branch does not match selected product branch.' });
+    }
+
+    if (Number(sourceProduct.stock) < transferQty) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: fromWh ? 'Not enough stock in warehouse.' : 'Not enough stock in source branch.',
+      });
+    }
+
+    // Decrease stock at source (warehouse or branch)
+    sourceProduct.stock = Number(sourceProduct.stock) - transferQty;
+    await sourceProduct.save({ session });
+
+    // Increase stock in destination branch if same code exists there, otherwise create one.
+    let destinationProduct = await Product.findOne({
+      code: sourceProduct.code,
+      branch: toBranchId,
+      inWarehouse: { $ne: true },
+    }).session(session);
+
+    if (destinationProduct) {
+      destinationProduct.stock = Number(destinationProduct.stock) + transferQty;
+      await destinationProduct.save({ session });
+    } else {
+      destinationProduct = await Product.create(
+        [
+          {
+            name: sourceProduct.name,
+            code: sourceProduct.code,
+            price: sourceProduct.price,
+            netPrice: sourceProduct.netPrice,
+            stock: transferQty,
+            discount: sourceProduct.discount || 0,
+            category: sourceProduct.category,
+            branch: toBranchId,
+            inWarehouse: false,
+          },
+        ],
+        { session }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "✅ Stock transferred successfully",
+      sourceProduct,
+      destinationProduct: Array.isArray(destinationProduct) ? destinationProduct[0] : destinationProduct,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error("❌ Error transferring stock:", error.message);
+    return res.status(500).json({ error: "Failed to transfer stock" });
   }
 };
 

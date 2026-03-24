@@ -1,1 +1,113 @@
-<p>create-edit-product works!</p>
+<div class="complex-modal">
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="closeModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">
+          {{ "tr_transfer_product" | translate }}
+        </h3>
+      </div>
+
+      <div class="modal-body weight-medium steel">
+        <div class="content-container plr-4 ptb-3">
+          <div
+            class="alert alert-error mb-3"
+            *ngIf="warehouseForm.invalid && warehouseForm.submitted"
+          >
+            {{ "tr_fill_required_fields" | translate }}
+          </div>
+
+          <form #warehouseForm="ngForm">
+            <div class="row">
+              <div
+                class="col-md-6"
+              >
+                <div
+                  class="form-group"
+                  [class.has-error]="productId.invalid && warehouseForm.submitted"
+                >
+                  <label>{{ "tr_product_name" | translate }}</label>
+                  <div class="input-with-icon bg-white">
+                    <ng-select
+                      class="s-control s-select"
+                      placeholder="{{ 'tr_select' | translate }}"
+                      bindLabel="name"
+                      bindValue="_id"
+                      [(ngModel)]="transferPayload.productId"
+                      #productId="ngModel"
+                      name="productId"
+                      [items]="products"
+                      [clearable]="false"
+                      required
+                    ></ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div
+                  class="form-group"
+                  [class.has-error]="quantity.invalid && warehouseForm.submitted"
+                >
+                  <label>{{ "tr_quantity" | translate }}</label>
+                  <input
+                    type="number"
+                    class="s-control"
+                    [(ngModel)]="transferPayload.quantity"
+                    #quantity="ngModel"
+                    name="quantity"
+                    min="1"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="col-md-12 mb-2">
+                <p class="text-muted steel size-small m-0">{{ "tr_transfer_from_warehouse_hint" | translate }}</p>
+              </div>
+
+              <div class="col-md-6">
+                <div
+                  class="form-group"
+                  [class.has-error]="toBranchId.invalid && warehouseForm.submitted"
+                >
+                  <label>{{ "tr_to_branch" | translate }}</label>
+                  <div class="input-with-icon bg-white">
+                    <ng-select
+                      class="s-control s-select"
+                      placeholder="{{ 'tr_select' | translate }}"
+                      bindLabel="name"
+                      bindValue="_id"
+                      [(ngModel)]="transferPayload.toBranchId"
+                      #toBranchId="ngModel"
+                      name="toBranchId"
+                      [items]="branches"
+                      [clearable]="false"
+                      required
+                    ></ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-footer mt-3 text-right">
+        <button class="s-btn btn-secondary mr-3" (click)="closeModal()">
+          {{ "tr_cancel" | translate }}
+        </button>
+        <button
+          class="s-btn btn-primary"
+          type="button"
+          [disabled]="isSubmitting"
+          (click)="submitForm()"
+        >
+          {{ "tr_transfer" | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

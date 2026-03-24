@@ -3,7 +3,7 @@
 export interface Product {
   _id: string;
   name: string;
-  branch: Branch;
+  branch?: Branch | null;
   category: Category;
   code: string;
   stock: number;
@@ -11,7 +11,9 @@ export interface Product {
   netPrice: number;
   discount: number;
   quantity?: number;
-  isApplyDiscount?: boolean
+  isApplyDiscount?: boolean;
+  /** Central warehouse (no branch) */
+  inWarehouse?: boolean;
 }
 export interface Category {
   _id: string;

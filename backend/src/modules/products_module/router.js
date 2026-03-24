@@ -6,6 +6,7 @@ import {
     createProduct,
     updateProduct,
     deleteProduct,
+    transferProductStock,
     getProductStats,
     generateBarcodePDF,
     generateBarcode,
@@ -18,6 +19,7 @@ router.get('/getProductsStats', getProductStats);             // GET all with pa
 router.get("/barcode-pdf", generateBarcodePDF);
 router.get('/generate-barcode', generateBarcode);
 router.get('/barcode/:code', generateBarcodeImage);
+router.post('/transfer-stock', transferProductStock);
 router.get('/:id', getProductById);        // GET one by ID
 router.post('/createProduct', createProduct);           // POST create
 router.put('/:id', updateProduct);         // PUT update

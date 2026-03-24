@@ -173,36 +173,7 @@
                     </div>
                   </div>
 
-                  <!-- Branch -->
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_branch' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          [clearable]="false"
-                          ngModel
-                          #branch="ngModel"
-                          name="branch"
-                          [items]="branches"
-                          required
-                        ></ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="branch.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_branch_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-
+            
             
 
                   <!-- Stock -->
@@ -247,6 +218,62 @@
                       />
                     </div>
                   </div>
+                  <div class="col-md-8">
+                    <div class="form-group">
+                      <label>{{ 'tr_product_storage' | translate }}</label>
+                      <div class="storage-choice">
+                        <label class="storage-option">
+                          <input
+                            type="radio"
+                            name="storageMode"
+                            [checked]="!storeInWarehouse"
+                            (change)="setStorageMode(false)"
+                          />
+                          <span>{{ 'tr_storage_branch' | translate }}</span>
+                        </label>
+                        <label class="storage-option">
+                          <input
+                            type="radio"
+                            name="storageMode"
+                            [checked]="storeInWarehouse"
+                            (change)="setStorageMode(true)"
+                          />
+                          <span>{{ 'tr_warehouse' | translate }}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Branch -->
+                  <div class="col-md-6" *ngIf="!storeInWarehouse">
+                    <div
+                      class="form-group"
+                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_branch' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          [clearable]="false"
+                          ngModel
+                          #branch="ngModel"
+                          name="branch"
+                          [items]="branches"
+                          [required]="!storeInWarehouse"
+                        ></ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="branch.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_branch_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
 
                 </div>
               </form>

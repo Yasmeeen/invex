@@ -217,6 +217,8 @@ export class CashierComponent implements AfterViewInit {
 
     if (selectedBranchId) {
       params['branchId'] = selectedBranchId;
+    } else {
+      params['excludeWarehouse'] = true;
     }
 
     this.productsSerivce.getProducts(params).subscribe((res: any) => {

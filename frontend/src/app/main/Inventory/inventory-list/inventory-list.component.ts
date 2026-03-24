@@ -37,7 +37,8 @@ export class InventoryListComponent implements OnInit {
   }
   params: any = {
     page: 1,
-    perPage: this.paginationPerPage,
+    limit: this.paginationPerPage,
+    warehouseOnly: true,
   };
   categorysParams: any = {
     page: 1,
@@ -108,6 +109,7 @@ export class InventoryListComponent implements OnInit {
       term = (searchKey == 'by_category_id') ? term : term.target.value.trim()
       this.params['search'] = term;
       this.params.page = 1;
+      this.params['warehouseOnly'] = true;
       this.getproducts();
     }, 500);
   }
@@ -116,10 +118,10 @@ export class InventoryListComponent implements OnInit {
     this.getproducts();
   }
 
-  createOrEditproduct(isEdit: boolean, product?: Product){
+  openTransferProductForm(){
     let dialogRef = this.dialog.open(CreateEditProductComponent, {
       width: '850px',
-      data: {isEdit:isEdit,product:product, productId: product?._id},
+      data: {},
       disableClose: true,
   });
   dialogRef.afterClosed().subscribe(event => {

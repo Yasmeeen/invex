@@ -40,7 +40,13 @@ const productSchema = new mongoose.Schema(
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: true,
+      required: false,
+      default: null,
+    },
+    /** Central warehouse stock (no branch). Mutually exclusive with branch placement. */
+    inWarehouse: {
+      type: Boolean,
+      default: false,
     },
   },
   {

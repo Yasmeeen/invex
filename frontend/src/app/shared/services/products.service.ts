@@ -64,6 +64,18 @@ deleteProduct(productId: string) {
     })
   );
 }
+
+transferProductStock(payload: {
+  productId: string;
+  quantity: number;
+  toBranchId: string;
+  /** Transfer from central warehouse (inventory). Omit when moving between branches. */
+  fromWarehouse?: boolean;
+  fromBranchId?: string;
+}) {
+  return this.http.post(`${PRODUCTS_URL}/transfer-stock`, payload);
+}
+
 getProductsStats(branchId?: any) {
   let params: any = {};
   if (branchId) params.branchId = branchId;

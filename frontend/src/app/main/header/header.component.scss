@@ -2,12 +2,14 @@
 @import 'blocks';
 @import 'variables';
 
-/* Modern top bar — mint / forest admin (aligned with dashboard) */
+/* Top bar — purple admin shell */
 $topbar-bg: #ffffff;
-$topbar-border: #e8ede9;
-$topbar-shadow: 0 1px 0 rgba(30, 77, 43, 0.06), 0 4px 24px rgba(30, 77, 43, 0.06);
-$forest: #1e4d2b;
-$mint-soft: rgba(184, 232, 142, 0.45);
+$topbar-border: rgba(108, 92, 231, 0.12);
+$topbar-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), 0 8px 30px rgba(108, 92, 231, 0.08);
+$purple: #6c5ce7;
+$purple-soft: rgba(108, 92, 231, 0.12);
+$mint-soft: rgba(108, 92, 231, 0.18);
+$forest: #6c5ce7;
 
 :host {
   display: block;
@@ -19,8 +21,8 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 56px;
-  padding: 0.5rem 1.25rem;
+  min-height: 60px;
+  padding: 0.55rem 1.15rem;
   background: $topbar-bg;
   border-radius: 16px;
   border: 1px solid $topbar-border;
@@ -30,8 +32,16 @@ $mint-soft: rgba(184, 232, 142, 0.45);
 .app-topbar__left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.app-topbar__brand--inline {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-shrink: 0;
+  margin-inline-start: 0.25rem;
 }
 
 .app-topbar__brand {
@@ -48,10 +58,10 @@ $mint-soft: rgba(184, 232, 142, 0.45);
 }
 
 .app-topbar__brand-name {
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 800;
   letter-spacing: -0.02em;
-  color: $very-dark-gray;
+  color: $purple;
   line-height: 1.2;
 }
 
@@ -89,18 +99,38 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   transition: background 0.2s ease, color 0.2s ease;
 
   &:hover {
-    background: rgba(30, 77, 43, 0.06);
-    color: $forest;
+    background: $purple-soft;
+    color: $purple;
   }
 
   &:focus {
-    outline: 2px solid rgba(30, 77, 43, 0.35);
+    outline: 2px solid rgba(108, 92, 231, 0.35);
     outline-offset: 2px;
   }
 }
 
 .app-topbar__menu-btn {
-  margin-inline-end: 0.25rem;
+  margin-inline-end: 0;
+  flex-shrink: 0;
+}
+
+.app-topbar__icon-btn--ghost {
+  position: relative;
+}
+
+.app-topbar__notify-dot {
+  position: absolute;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  pointer-events: none;
+
+  &--warn {
+    background: #fdcb6e;
+    inset-inline-end: 10px;
+  }
 }
 
 .app-topbar__cta {
@@ -128,14 +158,14 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 
   &:hover {
-    border-color: rgba(30, 77, 43, 0.25);
-    box-shadow: 0 2px 8px rgba(30, 77, 43, 0.08);
+    border-color: rgba(108, 92, 231, 0.25);
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.1);
   }
 }
 
 .app-topbar__user--open .app-topbar__user-trigger {
-  border-color: rgba(30, 77, 43, 0.35);
-  box-shadow: 0 2px 12px rgba(30, 77, 43, 0.1);
+  border-color: rgba(108, 92, 231, 0.35);
+  box-shadow: 0 2px 12px rgba(108, 92, 231, 0.12);
 }
 
 .app-topbar__avatar {
@@ -143,7 +173,7 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   height: 34px;
   border-radius: 50%;
   background: $mint-soft;
-  color: $forest;
+  color: $purple;
   font-size: 0.75rem;
   font-weight: 700;
   display: inline-flex;
@@ -177,7 +207,7 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   background: #fff;
   border: 1px solid $topbar-border;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(30, 77, 43, 0.12);
+  box-shadow: 0 12px 40px rgba(108, 92, 231, 0.15);
   z-index: 100;
   animation: appTopbarDropdown 0.18s ease;
 }
@@ -210,7 +240,7 @@ $mint-soft: rgba(184, 232, 142, 0.45);
   transition: background 0.15s ease;
 
   &:hover {
-    background: rgba(30, 77, 43, 0.06);
+    background: $purple-soft;
   }
 
   i {
@@ -241,3 +271,9 @@ $mint-soft: rgba(184, 232, 142, 0.45);
 }
 
 @import 'themes/decide';
+
+@media (max-width: 767px) {
+  .app-topbar__brand--inline {
+    display: none !important;
+  }
+}

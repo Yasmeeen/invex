@@ -50,6 +50,27 @@ export class SidebarComponent implements OnInit {
     }
   }
 
+  get userDisplayName(): string {
+    const u = this.globals?.currentUser as unknown as Record<string, string> | undefined;
+    if (!u) return '';
+    return (u['name'] || u['username'] || u['email'] || 'User').toString();
+  }
+
+  get userInitials(): string {
+    const name = this.userDisplayName.trim();
+    if (!name) return '?';
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  get userRoleLabel(): string {
+    const r = this.globals?.currentUser?.role as string | undefined;
+    return r ? String(r) : '';
+  }
+
   toggleCollapse(): void {
     if (typeof window !== 'undefined' && window.innerWidth <= 991) {
       return;
@@ -58,11 +79,22 @@ export class SidebarComponent implements OnInit {
     localStorage.setItem(this.collapseStorageKey, String(this.isCollapsed));
     this.collapsedChange.emit(this.isCollapsed);
   }
-  toggleChildren(event:any) {
+  toggleChildren(event: Event): void {
     event.preventDefault();
     event.stopPropagation();
-    event.target.parentElement.classList.toggle('children-active');
-}
+    const t = event.target as HTMLElement | null;
+    const row = t?.closest('.anchor-container');
+    row?.classList.toggle('children-active');
+  }
+
+  /** Expand/collapse section when clicking parent row (no route). */
+  toggleParentSection(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    const host = (event.currentTarget as HTMLElement) || (event.target as HTMLElement)?.closest('.link-content--nonav');
+    const row = host?.closest('.anchor-container');
+    row?.classList.toggle('children-active');
+  }
   closeSidebar() {
     document.body.classList.remove('sidebar-active');
   }

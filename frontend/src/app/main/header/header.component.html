@@ -2,14 +2,14 @@
   <div class="app-topbar__left">
     <button
       type="button"
-      class="app-topbar__icon-btn app-topbar__menu-btn hidden-desktop"
-      (click)="openSidebar()"
-      [attr.aria-label]="'Menu'"
+      class="app-topbar__icon-btn app-topbar__menu-btn"
+      (click)="onMenuClick()"
+      [attr.aria-label]="'tr_menu' | translate"
     >
       <i class="fa fa-bars" aria-hidden="true"></i>
     </button>
 
-    <a routerLink="/home" class="app-topbar__brand">
+    <a routerLink="/home" class="app-topbar__brand app-topbar__brand--inline hidden-mobile">
       <span class="app-topbar__brand-name">INVEX</span>
       <ng-container *ngIf="storeSettings.settings$ | async as store">
         <span class="app-topbar__brand-sub" *ngIf="store?.storeName">{{ store.storeName }}</span>
@@ -18,13 +18,14 @@
   </div>
 
   <div class="app-topbar__right">
-    <!-- <button
+    <button
       type="button"
-      class="app-topbar__icon-btn"
-      [attr.aria-label]="'Notifications'"
+      class="app-topbar__icon-btn app-topbar__icon-btn--ghost hidden-mobile"
+      [attr.aria-label]="'tr_notifications' | translate"
     >
+      <span class="app-topbar__notify-dot app-topbar__notify-dot--warn" aria-hidden="true"></span>
       <i class="fa fa-bell-o" aria-hidden="true"></i>
-    </button> -->
+    </button>
 
     <button
       type="button"
@@ -48,10 +49,16 @@
       {{ 'tr_contact_us' | translate }}
     </a>
 
-    <div
-      class="app-topbar__user"
-      [class.app-topbar__user--open]="userMenuOpen"
+    <button
+      type="button"
+      class="app-topbar__icon-btn hidden-mobile"
+      (click)="logout()"
+      [attr.aria-label]="('tr_signin.logout' | translate)"
     >
+      <i class="fa fa-power-off" aria-hidden="true"></i>
+    </button>
+
+    <div class="app-topbar__user" [class.app-topbar__user--open]="userMenuOpen">
       <button
         type="button"
         class="app-topbar__user-trigger"
@@ -65,11 +72,7 @@
       </button>
 
       <div class="app-topbar__dropdown" *ngIf="userMenuOpen">
-        <button
-          type="button"
-          class="app-topbar__dropdown-item hidden-desktop"
-          (click)="closeUserMenu(); openChangeLanguageDailog()"
-        >
+        <button type="button" class="app-topbar__dropdown-item hidden-desktop" (click)="closeUserMenu(); openChangeLanguageDailog()">
           <i class="fa fa-language steel" aria-hidden="true"></i>
           {{ 'tr_language' | translate }}
         </button>

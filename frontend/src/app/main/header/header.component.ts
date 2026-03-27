@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, OnInit } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageSwitcherComponent } from '@shared/components/language-switcher/language-switcher.component';
@@ -12,6 +12,9 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
   styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent implements OnInit {
+  /** Desktop: collapse rail; mobile: open drawer */
+  @Output() toggleDesktopSidebar = new EventEmitter<void>();
+
   currentUser: any;
   user: any;
   selectedLanguage: any;
@@ -75,6 +78,14 @@ export class HeaderComponent implements OnInit {
 
   openSidebar() {
     document.body.classList.add('sidebar-active');
+  }
+
+  onMenuClick(): void {
+    if (typeof window !== 'undefined' && window.innerWidth <= 991) {
+      this.openSidebar();
+    } else {
+      this.toggleDesktopSidebar.emit();
+    }
   }
 
   toggleUserMenu(event: MouseEvent): void {

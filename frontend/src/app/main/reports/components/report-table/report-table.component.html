@@ -2,7 +2,7 @@
   <table class="s-table table layout-fixed">
     <thead>
       <tr>
-        <th *ngFor="let col of columns">{{ col.label }}</th>
+        <th *ngFor="let col of columns">{{ col.labelKey | translate }}</th>
       </tr>
     </thead>
     <tbody>
@@ -10,7 +10,7 @@
         <td *ngFor="let col of columns">{{ row[col.key] }}</td>
       </tr>
       <tr *ngIf="!rows || rows.length === 0">
-        <td [attr.colspan]="columns.length" class="text-center">No data</td>
+        <td [attr.colspan]="columns.length" class="text-center">{{ 'tr_report_no_data' | translate }}</td>
       </tr>
     </tbody>
   </table>

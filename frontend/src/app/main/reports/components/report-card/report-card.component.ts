@@ -6,8 +6,10 @@ import { Component, Input } from '@angular/core';
   styleUrls: ['./report-card.component.scss'],
 })
 export class ReportCardComponent {
-  @Input() title = '';
+  @Input() titleKey = '';
+  @Input() titleParams: Record<string, unknown> = {};
   @Input() value: any = '';
-  @Input() hint = '';
+  @Input() hintKey = '';
+  @Input() hintParams: Record<string, unknown> = {};
 }
 

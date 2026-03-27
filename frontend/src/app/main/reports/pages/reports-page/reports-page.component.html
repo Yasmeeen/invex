@@ -1,10 +1,10 @@
 <div class="reports-page">
   <div class="reports-page__head">
-    <h2 class="reports-page__title">{{ reportTitle }}</h2>
+    <h2 class="reports-page__title">{{ reportTitleKey | translate }}</h2>
     <div class="reports-page__actions">
-      <button class="s-btn btn-secondary" (click)="exportExcel()">Export Excel</button>
-      <button class="s-btn btn-secondary" (click)="exportPdf()">Export PDF</button>
-      <button class="s-btn btn-primary" (click)="printReport()">Print</button>
+      <button class="s-btn btn-secondary" (click)="exportExcel()">{{ 'tr_report_export_excel' | translate }}</button>
+      <button class="s-btn btn-secondary" (click)="exportPdf()">{{ 'tr_report_export_pdf' | translate }}</button>
+      <button class="s-btn btn-primary" (click)="printReport()">{{ 'tr_report_print' | translate }}</button>
     </div>
   </div>
 
@@ -12,14 +12,20 @@
 
   <div class="row cards-row">
     <div class="col-md-3 mb-3" *ngFor="let card of cards">
-      <app-report-card [title]="card.title" [value]="card.value" [hint]="card.hint || ''"></app-report-card>
+      <app-report-card
+        [titleKey]="card.titleKey"
+        [titleParams]="card.titleParams || {}"
+        [value]="card.value"
+        [hintKey]="card.hintKey || ''"
+        [hintParams]="card.hintParams || {}"
+      ></app-report-card>
     </div>
   </div>
 
   <app-chart-wrapper
     *ngIf="chartOptions"
     [renderKey]="chartRedrawKey"
-    [title]="reportTitle + ' Chart'"
+    [title]="(reportTitleKey | translate) + ' — ' + ('tr_report_chart_suffix' | translate)"
     [options]="chartOptions"
   ></app-chart-wrapper>
 

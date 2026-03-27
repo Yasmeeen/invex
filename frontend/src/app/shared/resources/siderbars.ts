@@ -67,6 +67,19 @@ export const  AdminSidebar = [
     routerLink: '/orders',
     icon: 'fa fa-list-alt icon',
   },
+  {
+    name: 'tr_reports',
+    routerLink: 'null',
+    icon: 'fa fa-bar-chart icon',
+    children: [
+      { name: 'tr_reports_sales', routerLink: '/reports/sales', icon: 'fa fa-line-chart icon' },
+      { name: 'tr_reports_profit', routerLink: '/reports/profit', icon: 'fa fa-area-chart icon' },
+      { name: 'tr_reports_products', routerLink: '/reports/products', icon: 'fa fa-cube icon' },
+      { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
+      { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
+      { name: 'tr_reports_installments', routerLink: '/reports/installments', icon: 'fa fa-calendar icon' },
+    ],
+  },
 
 
 ];
@@ -125,6 +138,19 @@ export const  OperationManager = [
     name: 'tr_categories',
     routerLink: '/categories',
     icon: 'fa fa-tags icon',
+  },
+  {
+    name: 'tr_reports',
+    routerLink: 'null',
+    icon: 'fa fa-bar-chart icon',
+    children: [
+      { name: 'tr_reports_sales', routerLink: '/reports/sales', icon: 'fa fa-line-chart icon' },
+      { name: 'tr_reports_profit', routerLink: '/reports/profit', icon: 'fa fa-area-chart icon' },
+      { name: 'tr_reports_products', routerLink: '/reports/products', icon: 'fa fa-cube icon' },
+      { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
+      { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
+      { name: 'tr_reports_installments', routerLink: '/reports/installments', icon: 'fa fa-calendar icon' },
+    ],
   },
 
 ];

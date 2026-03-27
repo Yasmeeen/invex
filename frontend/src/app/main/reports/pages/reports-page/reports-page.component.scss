@@ -1,0 +1,30 @@
+.reports-page {
+  display: block;
+}
+
+.reports-page__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.reports-page__title {
+  margin: 0;
+  color: #1e4d2b;
+}
+
+.reports-page__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media print {
+  :host ::ng-deep .main-sidebar,
+  :host ::ng-deep .main-header,
+  :host ::ng-deep .reports-page__actions,
+  :host ::ng-deep .report-filters {
+    display: none !important;
+  }
+}
+

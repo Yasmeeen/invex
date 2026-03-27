@@ -1,5 +1,7 @@
 import { ProductsSerivce } from './../../../shared/services/products.service';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 import * as Highcharts from 'highcharts';
 import HC_treemap from 'highcharts/modules/treemap';
 import HC_solidGauge from 'highcharts/modules/solid-gauge';
@@ -29,7 +31,7 @@ const DONUT_ORDER_RESTORED = '#74c69d';
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, OnDestroy {
   fromDate: Date = new Date();
   toDate: Date = new Date();
   selectedBranch: any;
@@ -48,10 +50,13 @@ export class HomeComponent implements OnInit {
   /** Total orders (sum of status segments) for dashboard badge */
   ordersTotal: number | null = null;
 
+  private langChangeSub?: Subscription;
+
   constructor(
     private dashboardService: DashboardService,
     private productsSerivce: ProductsSerivce,
-    private branchesServce: BranchesServce
+    private branchesServce: BranchesServce,
+    private translate: TranslateService
   ) {}
 
   get averageOrderDisplay(): string | null {
@@ -69,6 +74,29 @@ export class HomeComponent implements OnInit {
     this.getBranches();
     this.loadUpcomingInstallments();
     this.loadPastUpcomingInstallments();
+    this.langChangeSub = this.translate.onLangChange.subscribe(() =>
+      this.refreshChartsForCurrentLanguage()
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.langChangeSub?.unsubscribe();
+  }
+
+  /** Rebuild charts only (strings) after language switch without reloading KPI stats. */
+  private refreshChartsForCurrentLanguage(): void {
+    if (this.productsStats) {
+      this.productsChart(this.productsStats);
+    }
+    this.ordersChart();
+    this.invoicesChart();
+    this.categoriesChart();
+  }
+
+  private chartMonthShortLabels(): string[] {
+    return Array.from({ length: 12 }, (_, i) =>
+      this.translate.instant(`tr_chart_month_${i}`)
+    );
   }
 
   loadDashboardChartsAndStats(): void {
@@ -268,9 +296,13 @@ export class HomeComponent implements OnInit {
   productsChart(productsStats: any): void {
     const inStock = Math.max(0, Number(productsStats?.inStock) || 0);
     const outOfStock = Math.max(0, Number(productsStats?.outOfStock) || 0);
-    this.renderDonutChart('products-chart', 'Stock', [
-      { name: 'In Stock', y: inStock, color: DONUT_STOCK_IN },
-      { name: 'Out of Stock', y: outOfStock, color: DONUT_STOCK_OUT },
+    this.renderDonutChart('products-chart', this.translate.instant('tr_chart_stock'), [
+      { name: this.translate.instant('tr_chart_in_stock'), y: inStock, color: DONUT_STOCK_IN },
+      {
+        name: this.translate.instant('tr_chart_out_of_stock'),
+        y: outOfStock,
+        color: DONUT_STOCK_OUT,
+      },
     ]);
   }
 
@@ -283,9 +315,9 @@ export class HomeComponent implements OnInit {
         const yC = Math.max(0, Number(completed?.y) || 0);
         const yR = Math.max(0, Number(restored?.y) || 0);
         this.ordersTotal = yC + yR;
-        this.renderDonutChart('orders-chart', 'Orders', [
-          { name: 'Completed', y: yC, color: DONUT_ORDER_DONE },
-          { name: 'Restored', y: yR, color: DONUT_ORDER_RESTORED },
+        this.renderDonutChart('orders-chart', this.translate.instant('tr_chart_orders'), [
+          { name: this.translate.instant('tr_chart_completed'), y: yC, color: DONUT_ORDER_DONE },
+          { name: this.translate.instant('tr_chart_restored'), y: yR, color: DONUT_ORDER_RESTORED },
         ]);
       },
       error: () => {
@@ -296,7 +328,7 @@ export class HomeComponent implements OnInit {
 
   invoicesChart(): void {
     this.dashboardService.getInvoicesPerMonth(this.selectedBranch).subscribe((res: any) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = this.chartMonthShortLabels();
       const data: number[] = res.monthlyCounts || [];
       const max = data.length ? Math.max(...data) : 0;
       const maxIdx = max > 0 ? data.indexOf(max) : -1;
@@ -307,7 +339,10 @@ export class HomeComponent implements OnInit {
 
       Highcharts.chart('invoices-chart', {
         chart: { ...this.chartCommon(), type: 'column' },
-        title: { text: `Invoices in ${res.year}`, style: { color: DASH_FOREST, fontWeight: '600' } },
+        title: {
+          text: this.translate.instant('tr_invoices_in_year', { year: res.year }),
+          style: { color: DASH_FOREST, fontWeight: '600' },
+        },
         credits: { enabled: false },
         xAxis: {
           categories: months,
@@ -316,7 +351,10 @@ export class HomeComponent implements OnInit {
           labels: { style: { color: '#6b7280' } },
         },
         yAxis: {
-          title: { text: 'Number of Invoices', style: { color: '#6b7280' } },
+          title: {
+            text: this.translate.instant('tr_number_of_invoices'),
+            style: { color: '#6b7280' },
+          },
           gridLineColor: DASH_MUTE,
         },
         plotOptions: {
@@ -327,7 +365,7 @@ export class HomeComponent implements OnInit {
         },
         series: [
           {
-            name: 'Invoices',
+            name: this.translate.instant('tr_invoices'),
             type: 'column',
             data: columnData,
           },
@@ -341,9 +379,13 @@ export class HomeComponent implements OnInit {
       const categories = res.stats.map((c: any) => c.categoryName);
       const totalItems = res.stats.map((c: any) => c.totalItems);
 
+      const totalItemsLabel = this.translate.instant('tr_total_items');
       Highcharts.chart('categories-chart', {
         chart: { ...this.chartCommon(), type: 'bar' },
-        title: { text: 'Items per Category', style: { color: DASH_FOREST, fontWeight: '600' } },
+        title: {
+          text: this.translate.instant('tr_items_per_category'),
+          style: { color: DASH_FOREST, fontWeight: '600' },
+        },
         credits: { enabled: false },
         xAxis: {
           categories,
@@ -357,7 +399,7 @@ export class HomeComponent implements OnInit {
           },
         },
         yAxis: {
-          title: { text: 'Total Items', style: { color: '#6b7280' } },
+          title: { text: totalItemsLabel, style: { color: '#6b7280' } },
           gridLineColor: DASH_MUTE,
         },
         plotOptions: {
@@ -369,7 +411,7 @@ export class HomeComponent implements OnInit {
         },
         series: [
           {
-            name: 'Total Items',
+            name: totalItemsLabel,
             type: 'bar',
             data: totalItems,
           },

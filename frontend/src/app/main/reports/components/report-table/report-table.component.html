@@ -1,0 +1,18 @@
+<div class="table-container reports-table bg-white">
+  <table class="s-table table layout-fixed">
+    <thead>
+      <tr>
+        <th *ngFor="let col of columns">{{ col.label }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let row of rows">
+        <td *ngFor="let col of columns">{{ row[col.key] }}</td>
+      </tr>
+      <tr *ngIf="!rows || rows.length === 0">
+        <td [attr.colspan]="columns.length" class="text-center">No data</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+

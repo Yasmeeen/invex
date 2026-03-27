@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
+import StockMovement from '../../DB/models/stockMovement.model.js';
 
 /** Category id from body: `{ _id }`, `{ id }`, plain id string, or ObjectId. */
 const resolveCategoryId = (category) => {
@@ -622,6 +623,26 @@ export const transferProductStock = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    // Stock movement audit log (outside transaction)
+    try {
+      await StockMovement.create({
+        movementType: 'transfer',
+        productId: sourceProduct._id,
+        productName: sourceProduct.name,
+        branchId: fromWh ? toBranchId : fromBranchId,
+        fromBranchId: fromWh ? null : fromBranchId,
+        toBranchId,
+        quantity: transferQty,
+        unitPrice: Number(sourceProduct.price || 0),
+        totalValue: Number(sourceProduct.price || 0) * Number(transferQty || 0),
+        referenceType: 'transfer',
+        referenceId: sourceProduct._id,
+        notes: fromWh ? 'Warehouse -> Branch transfer' : 'Branch -> Branch transfer',
+      });
+    } catch (movementError) {
+      console.error('⚠️ Failed to log transfer stock movement:', movementError.message);
+    }
 
     return res.status(200).json({
       message: "✅ Stock transferred successfully",

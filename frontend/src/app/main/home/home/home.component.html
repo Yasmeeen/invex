@@ -5,7 +5,7 @@
   </header>
 
   <!-- Top filter bar -->
-  <section class="dashboard-toolbar" aria-label="Dashboard filters">
+  <section class="dashboard-toolbar" [attr.aria-label]="'tr_dashboard_filters' | translate">
     <div class="dashboard-toolbar__inner">
       <div class="dashboard-toolbar__field">
         <label class="dashboard-toolbar__label">{{ 'tr_branches' | translate }}</label>
@@ -118,7 +118,7 @@
   </section>
 
   <!-- Charts grid: 2 per row -->
-  <section class="dashboard-charts" aria-label="Charts">
+  <section class="dashboard-charts" [attr.aria-label]="'tr_dashboard_charts' | translate">
     <div class="dashboard-charts__grid">
       <div class="dashboard-chart-card">
         <div class="dashboard-chart-card__header">
@@ -160,7 +160,7 @@
   </section>
 
   <!-- Installments: tabs inside one card -->
-  <section class="dashboard-installments" aria-label="Installments">
+  <section class="dashboard-installments" [attr.aria-label]="'tr_installments' | translate">
     <div class="dashboard-installments__card">
       <div class="dashboard-installments__tabs" role="tablist">
         <button

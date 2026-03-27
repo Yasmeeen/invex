@@ -1,0 +1,30 @@
+<div class="reports-page">
+  <div class="reports-page__head">
+    <h2 class="reports-page__title">{{ reportTitle }}</h2>
+    <div class="reports-page__actions">
+      <button class="s-btn btn-secondary" (click)="exportExcel()">Export Excel</button>
+      <button class="s-btn btn-secondary" (click)="exportPdf()">Export PDF</button>
+      <button class="s-btn btn-primary" (click)="printReport()">Print</button>
+    </div>
+  </div>
+
+  <app-report-filters (apply)="onApplyFilters($event)"></app-report-filters>
+
+  <div class="row cards-row">
+    <div class="col-md-3 mb-3" *ngFor="let card of cards">
+      <app-report-card [title]="card.title" [value]="card.value" [hint]="card.hint || ''"></app-report-card>
+    </div>
+  </div>
+
+  <app-chart-wrapper
+    *ngIf="chartOptions"
+    [renderKey]="chartRedrawKey"
+    [title]="reportTitle + ' Chart'"
+    [options]="chartOptions"
+  ></app-chart-wrapper>
+
+  <div class="mt-3">
+    <app-report-table [columns]="tableColumns" [rows]="tableRows"></app-report-table>
+  </div>
+</div>
+

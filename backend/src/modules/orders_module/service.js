@@ -2,6 +2,7 @@ import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Client from "../../DB/models/client.model.js";
+import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
 
@@ -182,6 +183,7 @@ export const createOrder = async (req, res) => {
       numberOfProducts += quantity;
 
       let price = Number(selected.price) || 0;
+      const itemCost = Number(selected.netPrice ?? selected.cost ?? 0);
       const isApplyDiscount = !!selected.isApplyDiscount;
 
       if (isApplyDiscount && selected.discount > 0) {
@@ -203,6 +205,7 @@ export const createOrder = async (req, res) => {
         code: selected.code,
         quantity,
         price,
+        cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
       });
     }
@@ -239,6 +242,29 @@ export const createOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    // Stock movement logs (non-transactional audit trail)
+    try {
+      const movementDocs = orderProducts.map((item) => ({
+        movementType: 'sale',
+        productId: item.productId,
+        productName: item.name,
+        branchId: branch || null,
+        fromBranchId: branch || null,
+        toBranchId: null,
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.price || 0),
+        totalValue: Number(item.price || 0) * Number(item.quantity || 0),
+        referenceType: 'order',
+        referenceId: newOrder._id,
+        notes: `Order #${newOrder.orderNumber}`,
+      }));
+      if (movementDocs.length) {
+        await StockMovement.insertMany(movementDocs);
+      }
+    } catch (movementError) {
+      console.error('⚠️ Failed to log sale stock movement:', movementError.message);
+    }
 
     res.status(201).json({
       message: "✅ Order created successfully",
@@ -330,6 +356,25 @@ export const restoreOrder = async (req, res) => {
       if (product) {
         product.stock += item.quantity;
         await product.save();
+
+        try {
+          await StockMovement.create({
+            movementType: 'return',
+            productId: product._id,
+            productName: product.name,
+            branchId: order.branch || null,
+            fromBranchId: null,
+            toBranchId: order.branch || null,
+            quantity: Number(item.quantity || 0),
+            unitPrice: Number(item.price || 0),
+            totalValue: Number(item.price || 0) * Number(item.quantity || 0),
+            referenceType: 'order',
+            referenceId: order._id,
+            notes: `Restore order #${order.orderNumber}`,
+          });
+        } catch (movementError) {
+          console.error('⚠️ Failed to log return stock movement:', movementError.message);
+        }
 
         console.log(`✅ Restored ${item.quantity} to ${product.name} (new stock: ${product.stock})`);
       } else {

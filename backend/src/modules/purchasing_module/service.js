@@ -1,6 +1,7 @@
 
 
 import PurchasingRequest from "../../DB/models/purchasingRequest.model.js";
+import StockMovement from "../../DB/models/stockMovement.model.js";
 
 // ✅ Get all Purchasing Requests (with pagination & optional search)
 export const getPurchasingRequests = async (req, res) => {
@@ -65,6 +66,24 @@ export const createPurchasingRequest = async (req, res) => {
   try {
     const newPurchasingRequest = new PurchasingRequest(req.body);
     await newPurchasingRequest.save();
+
+    // Purchase movement log (request-level; current model has no per-product quantities).
+    try {
+      await StockMovement.create({
+        movementType: 'purchase',
+        productId: null,
+        productName: 'Purchasing request',
+        quantity: 1,
+        unitPrice: Number(newPurchasingRequest.totalAmount || 0),
+        totalValue: Number(newPurchasingRequest.totalAmount || 0),
+        referenceType: 'purchasingRequest',
+        referenceId: newPurchasingRequest._id,
+        notes: newPurchasingRequest.notes || '',
+      });
+    } catch (movementError) {
+      console.error('⚠️ Failed to log purchase movement:', movementError.message);
+    }
+
     res.status(201).json({ message: 'Purchasing request created successfully', data: newPurchasingRequest });
   } catch (error) {
     res.status(400).json({ message: 'Error creating purchasing request', error: error.message });

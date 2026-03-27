@@ -41,6 +41,12 @@ const routes: Routes = [
         data: { allowedRoles: ['Super Admin'] }
       },
       {
+        path: 'reports',
+        loadChildren: () => import('./reports/reports.module').then(m => m.ReportsModule),
+        canActivate: [RoleGuard],
+        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+      },
+      {
         path: 'orders',
         loadChildren: () => import('./orders/orders.module').then(m => m.OrdersModule),
         canActivate: [RoleGuard],

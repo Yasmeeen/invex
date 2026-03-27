@@ -11,6 +11,7 @@ import connectToMongoDB from './DB/connection.js';
 import purchasingRoutes from './modules/purchasing_module/router.js';
 import settingsRoutes from './modules/settings_module/router.js';
 import uploadRoutes from './modules/uploads_module/router.js';
+import reportsRoutes from './modules/reports_module/router.js';
 
 
 const PORT = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ const bootstrap = (app, express) => {
   app.use('/api/clients', clientsRoutes);
   app.use('/api/settings', settingsRoutes);
   app.use('/api/uploads', uploadRoutes);
+  app.use('/api/reports', reportsRoutes);
 
   // Start server
   app.listen(PORT, () => {

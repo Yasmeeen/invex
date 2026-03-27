@@ -33,6 +33,8 @@ const orderSchema = new mongoose.Schema(
         code: { type: String, required: true },
         quantity: { type: Number, required: true },
         price: { type: Number, required: true },
+        /** Snapshot item cost at time of sale (for profit reports). */
+        cost: { type: Number, required: false, default: 0, min: 0 },
         isApplyDiscount: { type: Boolean, default: false },
       },
     ],

@@ -10,6 +10,21 @@ const toDate = (value, fallback) => {
   return d;
 };
 
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const parseCustomerPhone = (query) => {
+  const v = String(query.customer_phone ?? query.customerPhone ?? '').trim();
+  return v.length ? v : null;
+};
+
+/** Match orders by client ObjectId and/or phone (substring, case-insensitive). */
+const appendOrderCustomerFilters = (match, f) => {
+  if (f.customerId) match.clientId = f.customerId;
+  if (f.customerPhone) {
+    match.clientPhoneNumber = { $regex: escapeRegex(f.customerPhone), $options: 'i' };
+  }
+};
+
 const parseCommonFilters = (query) => {
   const now = new Date();
   const from = toDate(query.from, new Date(now.getFullYear(), now.getMonth(), 1));
@@ -28,6 +43,7 @@ const parseCommonFilters = (query) => {
     customerId: mongoose.Types.ObjectId.isValid(String(query.customer_id || ''))
       ? new mongoose.Types.ObjectId(String(query.customer_id))
       : null,
+    customerPhone: parseCustomerPhone(query),
     groupBy: String(query.groupBy || 'daily') === 'monthly' ? 'monthly' : 'daily',
     page: Math.max(1, Number(query.page) || 1),
     limit: Math.max(1, Math.min(200, Number(query.limit) || 20)),
@@ -47,7 +63,7 @@ export const getSalesReport = async (req, res) => {
       status: { $ne: 'restored' },
     };
     if (f.branchId) baseMatch.branch = f.branchId;
-    if (f.customerId) baseMatch.clientId = f.customerId;
+    appendOrderCustomerFilters(baseMatch, f);
     if (f.productId) baseMatch['products.productId'] = f.productId;
 
     const [summary] = await Order.aggregate([
@@ -106,7 +122,7 @@ export const getProfitReport = async (req, res) => {
     const f = parseCommonFilters(req.query);
     const match = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) match.branch = f.branchId;
-    if (f.customerId) match.clientId = f.customerId;
+    appendOrderCustomerFilters(match, f);
     if (f.productId) match['products.productId'] = f.productId;
     const unwindMatch = f.productId ? { 'products.productId': f.productId } : {};
 
@@ -178,7 +194,7 @@ export const getProductsReport = async (req, res) => {
     const lowStockThreshold = Math.max(0, Number(req.query.lowStockThreshold) || 5);
     const orderMatch = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) orderMatch.branch = f.branchId;
-    if (f.customerId) orderMatch.clientId = f.customerId;
+    appendOrderCustomerFilters(orderMatch, f);
     if (f.productId) orderMatch['products.productId'] = f.productId;
 
     const topSellingProducts = await Order.aggregate([
@@ -285,7 +301,7 @@ export const getCustomersReport = async (req, res) => {
     const f = parseCommonFilters(req.query);
     const match = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) match.branch = f.branchId;
-    if (f.customerId) match.clientId = f.customerId;
+    appendOrderCustomerFilters(match, f);
     if (f.productId) match['products.productId'] = f.productId;
 
     const customers = await Order.aggregate([

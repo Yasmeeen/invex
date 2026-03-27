@@ -8,31 +8,49 @@
       <label>{{ 'tr_to' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.to" />
     </div>
-    <div class="col-md-2">
+    <div class="col-md-3">
       <label>{{ 'tr_report_filter_branch_id' | translate }}</label>
-      <input
-        class="s-control"
-        type="text"
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_report_all_branches' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="branches"
         [(ngModel)]="filters.branch_id"
-        [placeholder]="'tr_report_placeholder_optional' | translate"
-      />
+        name="reportBranch"
+        [clearable]="true"
+        [searchable]="true"
+        (change)="onBranchChange()"
+      >
+      </ng-select>
     </div>
-    <div class="col-md-2">
+    <div class="col-md-3">
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
-      <input
-        class="s-control"
-        type="text"
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_report_all_products' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="products"
         [(ngModel)]="filters.product_id"
-        [placeholder]="'tr_report_placeholder_optional' | translate"
-      />
+        name="reportProduct"
+        [clearable]="true"
+        [searchable]="true"
+      >
+        <ng-template ng-option-tmp let-item="item">
+          <span>{{ item.name }}</span>
+          <span class="report-filters__opt-code" *ngIf="item?.code"> ({{ item.code }})</span>
+        </ng-template>
+      </ng-select>
     </div>
     <div class="col-md-2">
-      <label>{{ 'tr_report_filter_customer_id' | translate }}</label>
+      <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
       <input
         class="s-control"
-        type="text"
-        [(ngModel)]="filters.customer_id"
-        [placeholder]="'tr_report_placeholder_optional' | translate"
+        type="tel"
+        [(ngModel)]="filters.customer_phone"
+        [placeholder]="'tr_report_placeholder_customer_phone' | translate"
+        autocomplete="tel"
       />
     </div>
     <div class="col-md-2">
@@ -49,4 +67,3 @@
     <button class="s-btn btn-secondary" type="button" (click)="reset()">{{ 'tr_reset' | translate }}</button>
   </div>
 </div>
-

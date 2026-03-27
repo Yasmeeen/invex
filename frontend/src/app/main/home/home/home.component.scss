@@ -83,8 +83,8 @@
   z-index: 1;
 }
 
-/* أيقونة السهم لا تمنع الضغط على ng-select */
-::ng-deep .dashboard-toolbar .input-with-icon .input-icon {
+/* أيقونة السهم فقط: لا تُطبَّق على mat-datepicker-toggle (.date-picker) وإلا لن يُفتح التقويم */
+::ng-deep .dashboard-toolbar .input-with-icon .input-icon:not(.date-picker) {
   pointer-events: none;
 }
 

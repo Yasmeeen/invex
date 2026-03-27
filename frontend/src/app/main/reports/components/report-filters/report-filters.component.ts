@@ -1,36 +1,85 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { BranchesServce } from '@shared/services/branches.service';
+import { ProductsSerivce } from '@shared/services/products.service';
 
 @Component({
   selector: 'app-report-filters',
   templateUrl: './report-filters.component.html',
   styleUrls: ['./report-filters.component.scss'],
 })
-export class ReportFiltersComponent {
+export class ReportFiltersComponent implements OnInit {
   @Output() apply = new EventEmitter<any>();
+
+  branches: any[] = [];
+  products: any[] = [];
 
   filters: any = {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
-    branch_id: '',
-    product_id: '',
-    customer_id: '',
+    branch_id: null as string | null,
+    product_id: null as string | null,
+    customer_phone: '',
     groupBy: 'daily',
   };
+
+  constructor(
+    private branchesServce: BranchesServce,
+    private productsSerivce: ProductsSerivce
+  ) {}
+
+  ngOnInit(): void {
+    this.loadBranches();
+    this.loadProducts();
+  }
 
   private formatDate(d: Date): string {
     return d.toISOString().slice(0, 10);
   }
 
-  applyFilters() {
-    this.apply.emit({ ...this.filters });
+  loadBranches(): void {
+    this.branchesServce.getBranchs({ page: 1, limit: 1000 }).subscribe({
+      next: (res: any) => (this.branches = res.branches || []),
+      error: () => (this.branches = []),
+    });
   }
 
-  reset() {
-    this.filters.branch_id = '';
-    this.filters.product_id = '';
-    this.filters.customer_id = '';
+  loadProducts(): void {
+    const params: Record<string, string | number> = { page: 1, limit: 2000 };
+    if (this.filters.branch_id) {
+      params.branchId = String(this.filters.branch_id);
+    }
+    this.productsSerivce.getProducts(params).subscribe({
+      next: (res: any) => (this.products = res.products || []),
+      error: () => (this.products = []),
+    });
+  }
+
+  onBranchChange(): void {
+    this.filters.product_id = null;
+    this.loadProducts();
+  }
+
+  private normalizeFilterPayload(): Record<string, string> {
+    return {
+      from: this.filters.from || '',
+      to: this.filters.to || '',
+      branch_id: this.filters.branch_id ? String(this.filters.branch_id) : '',
+      product_id: this.filters.product_id ? String(this.filters.product_id) : '',
+      customer_phone: (this.filters.customer_phone || '').trim(),
+      groupBy: this.filters.groupBy || 'daily',
+    };
+  }
+
+  applyFilters(): void {
+    this.apply.emit(this.normalizeFilterPayload());
+  }
+
+  reset(): void {
+    this.filters.branch_id = null;
+    this.filters.product_id = null;
+    this.filters.customer_phone = '';
     this.filters.groupBy = 'daily';
+    this.loadProducts();
     this.applyFilters();
   }
 }
-

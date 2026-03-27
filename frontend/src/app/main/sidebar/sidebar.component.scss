@@ -20,7 +20,7 @@
     }
 
     .store-name{
-        color: #e1a736;
+        color: #0584dc;
         font-weight: bold;
     }
 
@@ -28,6 +28,7 @@
         padding: 2rem 0 0;
         height: 100%;
         top: 0;
+        background-color: #fff;
         overflow: auto;
         position: fixed;
         width: inherit;
@@ -51,7 +52,7 @@
                     font-size: 16px;
                     color: $dark-gray;
                     padding: 1rem 1rem 1rem 1.8rem;
-                    border-radius: 12px;
+                    // border-radius: 12px;
                     transition: background 0.2s ease, color 0.2s ease;
 
                     .icon {
@@ -211,7 +212,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border-radius: 12px;
+    //   border-radius: 12px;
       border: 2px solid rgba(30, 77, 43, 0.4);
       background: linear-gradient(180deg, rgba(30, 77, 43, 0.14) 0%, rgba(30, 77, 43, 0.08) 100%);
       color: #1e4d2b;

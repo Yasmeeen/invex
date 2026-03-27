@@ -70,7 +70,7 @@
           (click)="toggleChildren($event)"
           (keydown.enter)="toggleChildren($event)"
         ></span>
-        <div *ngIf="link.children" class="child-menu mr-2">
+        <div *ngIf="link.children" class="child-menu">
           <div
             *ngFor="let child of link.children"
             routerLinkActive="child-active"
@@ -92,21 +92,5 @@
         </div>
       </div>
     </nav>
-
-    <div class="sidebar-footer hidden-mobile">
-      <button
-        type="button"
-        class="sidebar-collapse-btn"
-        (click)="toggleCollapse()"
-        [attr.aria-expanded]="!isCollapsed"
-        [attr.aria-label]="(isCollapsed ? 'tr_sidebar_expand_menu' : 'tr_sidebar_collapse_menu') | translate"
-      >
-        <i
-          class="fa"
-          [ngClass]="isCollapsed ? 'fa-angle-double-right' : 'fa-angle-double-left'"
-          aria-hidden="true"
-        ></i>
-      </button>
-    </div>
   </div>
 </div>

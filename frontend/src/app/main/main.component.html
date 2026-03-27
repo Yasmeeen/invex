@@ -1,10 +1,12 @@
 <system-alerts></system-alerts>
 <div class="main-container" [class.main-container--sidebar-collapsed]="sidebarCollapsed">
   <app-sidebar #appSidebar (collapsedChange)="onSidebarCollapsed($event)"></app-sidebar>
-  <div class="main-content plr-7 ptb-2 plr-3-mob">
+  <div class="main-column">
     <div class="main-header">
       <app-header (toggleDesktopSidebar)="appSidebar.toggleCollapse()"></app-header>
     </div>
-    <router-outlet></router-outlet>
+    <div class="main-content plr-7 ptb-4 plr-3-mob">
+      <router-outlet></router-outlet>
+    </div>
   </div>
 </div>

@@ -279,6 +279,9 @@ tooltip-content .tooltip {
     .s-table.striped-table tbody tr:nth-child(even)  {
         background: $siteBackground
     }
+    .main-container .main-column {
+        background: $siteBackground;
+    }
 }
 
 @import 'themes/decide';

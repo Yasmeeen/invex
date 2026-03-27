@@ -22,11 +22,14 @@ $forest: #6c5ce7;
   justify-content: space-between;
   gap: 1rem;
   min-height: 60px;
-  padding: 0.55rem 1.15rem;
+  padding: 0.55rem 1.25rem;
   background: $topbar-bg;
-  border-radius: 16px;
-  border: 1px solid $topbar-border;
-  box-shadow: $topbar-shadow;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid $topbar-border;
+  box-shadow: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .app-topbar__left {
@@ -275,5 +278,9 @@ $forest: #6c5ce7;
 @media (max-width: 767px) {
   .app-topbar__brand--inline {
     display: none !important;
+  }
+
+  .app-topbar {
+    border-bottom: 1px solid $topbar-border;
   }
 }

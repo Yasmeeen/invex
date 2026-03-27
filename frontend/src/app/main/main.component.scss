@@ -1,54 +1,50 @@
 @import 'mixins';
 
 .main-container {
-    margin: 0 auto;
+    margin: 0;
     position: relative;
+    display: flex;
+    align-items: stretch;
     min-height: 100vh;
     max-width: 100%;
+    box-sizing: border-box;
+
+    .main-column {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+        min-height: 100vh;
+    }
 
     .main-content {
         min-width: 0;
         max-width: 100%;
         box-sizing: border-box;
+        flex: 1;
     }
 
     .main-header {
-        margin-bottom: 28px;
-        margin-top: 10px;
-        background-color: transparent;
-        position: sticky;
+        margin: 0;
         padding: 0;
+        background: #fff;
+        border-bottom: 1px solid rgba(108, 92, 231, 0.12);
+        position: sticky;
         top: 0;
         z-index: 10;
-        min-height: 64px;
+        min-height: 60px;
+        flex-shrink: 0;
     }
 }
 
-// main mixin
-@mixin biDirectional($start, $end) {
-    .main-container {
-        padding-#{$start}: 285px;
-        transition: padding 0.35s ease;
-
-        &.main-container--sidebar-collapsed {
-            padding-#{$start}: 104px;
-        }
-    }
-}
+// Sidebar width comes from app-sidebar :host (flex item); no horizontal padding.
+@mixin biDirectional($start, $end) {}
 
 // directions
 @import 'directions/decide';
 
 @media (max-width: 991px){
-    @mixin biDirectional($start, $end) {
-        .main-container {
-            padding-#{$start}: 0;
-
-            &.main-container--sidebar-collapsed {
-                padding-#{$start}: 0;
-            }
-        }
-    }
+    @mixin biDirectional($start, $end) {}
     // directions
     @import 'directions/decide';
 }

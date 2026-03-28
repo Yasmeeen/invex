@@ -452,6 +452,7 @@
     }
   
     .invoice-table {
+      display: table;
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 5px;
@@ -504,9 +505,16 @@
     }
   }
   
+  /* Invoice markup lives in DOM for window.print(); hidden on screen only */
+  @media screen {
+    .invoice-container {
+      display: none !important;
+    }
+  }
+
   /* Print Styles */
   @media print {
-    body *، .cashier {
+    body *, .cashier {
       visibility: hidden;
       display: none !important;
     }
@@ -524,10 +532,13 @@
     }
   
     #print-container {
+      display: block !important;
       position: absolute;
       left: 0;
       top: 0;
       width: 58mm;
+      height: auto;
+      overflow: visible;
     }
   }
   

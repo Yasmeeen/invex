@@ -12,7 +12,7 @@ export const environment = {
      */
     cloudinary: {
         cloudName: 'drzowlo9s',
-        uploadPreset: 'invex_products_unsigned',
+        uploadPreset: 'ml_default',
         folder: 'products',
     },
 };

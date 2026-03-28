@@ -4,7 +4,7 @@ export const environment = {
     apiUrl: '/api',
     cloudinary: {
         cloudName: 'drzowlo9s',
-        uploadPreset: 'invex_products_unsigned',
+        uploadPreset: 'ml_default',
         folder: 'products',
     },
 };

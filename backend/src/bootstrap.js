@@ -1,3 +1,4 @@
+import path from 'path';
 import cors from 'cors';
 import categoriesRoutes from './modules/categories_module/router.js';
 import branchesRoutes from './modules/branches_module/router.js';
@@ -20,6 +21,12 @@ const bootstrap = (app, express) => {
   // Middleware
   // Image uploads are sent as data URLs from frontend, so allow larger JSON bodies.
   app.use(express.json({ limit: '10mb' }));
+
+  // Local product images when Cloudinary is not configured (see uploads_module/service.js)
+  app.use(
+    '/uploads',
+    express.static(path.join(process.cwd(), 'public', 'uploads'))
+  );
 
   // Health check route
   app.get('/', (req, res) => {

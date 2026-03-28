@@ -24,12 +24,13 @@ export class CreateEditUserComponent implements OnInit {
   isEdit: boolean = false;
   branches: Branch [] = [];
   user: User
-  roles= [
+  roles = [
     'Super Admin',
+    'Co Admin',
     'Employee',
     'Cashier',
-    'Operation Manager'
-  ]
+    'Operation Manager',
+  ];
 
   private subscriptions: Subscription[] = [];
 

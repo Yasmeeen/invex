@@ -1,11 +1,17 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
+import { ProfitReportGuard } from '@core/guards/profit-report.guard';
 import { ReportsPageComponent } from './pages/reports-page/reports-page.component';
 
 const routes: Routes = [
   { path: '', redirectTo: 'sales', pathMatch: 'full' },
   { path: 'sales', component: ReportsPageComponent, data: { reportType: 'sales' } },
-  { path: 'profit', component: ReportsPageComponent, data: { reportType: 'profit' } },
+  {
+    path: 'profit',
+    component: ReportsPageComponent,
+    data: { reportType: 'profit' },
+    canActivate: [ProfitReportGuard],
+  },
   { path: 'products', component: ReportsPageComponent, data: { reportType: 'products' } },
   { path: 'stock', component: ReportsPageComponent, data: { reportType: 'stock' } },
   { path: 'customers', component: ReportsPageComponent, data: { reportType: 'customers' } },

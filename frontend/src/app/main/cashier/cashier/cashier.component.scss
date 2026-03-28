@@ -2,6 +2,12 @@
 @import 'variables';
 @import 'color_scheme';
 @import 'print';
+
+
+#print-container {
+  display: none;
+}
+
 /* Fullscreen overlay */
 .cashier-overlay {
     position: fixed;

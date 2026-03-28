@@ -1,4 +1,4 @@
-export const  AdminSidebar = [
+export const AdminSidebar = [
   {
     name: 'tr_dashboard',
     routerLink: '/home',
@@ -83,6 +83,20 @@ export const  AdminSidebar = [
 
 
 ];
+
+/** Co Admin: full admin menu except dashboard (/home) and profit report. */
+export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== '/home').map(
+  (item) => {
+    if (!item.children?.length) {
+      return item;
+    }
+    return {
+      ...item,
+      children: item.children.filter((c) => c.routerLink !== '/reports/profit'),
+    };
+  }
+);
+
 export const  Employee = [
 
   {

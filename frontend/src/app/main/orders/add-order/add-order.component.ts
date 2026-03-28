@@ -15,6 +15,7 @@ import { TranslateService } from "@ngx-translate/core";
 import { AuthenticationService } from "@core/services/authentication.service";
 import { ProductsSerivce } from "@shared/services/products.service";
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { canPickBranchRole } from '@core/utils/role-utils';
 
 @Component({
   selector: "app-add-order",
@@ -76,7 +77,7 @@ export class AddOrderComponent implements OnInit {
 
   ngOnInit(): void {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
-    if( this.curentUser.role == 'Super Admin'){
+    if (canPickBranchRole(this.curentUser?.role)) {
       this.getBranches();
     }
 
@@ -86,7 +87,9 @@ export class AddOrderComponent implements OnInit {
   // Fetch all products for dropdown
   getProducts() {
     let params ={
-      branchId: this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id,
+      branchId: canPickBranchRole(this.curentUser?.role)
+        ? this.adminSelectedBranchId
+        : this.globals.currentUser.branch._id,
       'page': 1,
       'limit': 1000
     }
@@ -144,7 +147,9 @@ export class AddOrderComponent implements OnInit {
       ...this.orderProducts.map((p) => Array(p.quantity).fill(p._id))
     );
 
-    let selectedBranchId = this.curentUser.role == 'Super Admin' ? this.adminSelectedBranchId :this.globals.currentUser.branch._id
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser.branch._id;
  
 
     const orderPayload = {

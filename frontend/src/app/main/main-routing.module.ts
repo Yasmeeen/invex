@@ -14,43 +14,43 @@ const routes: Routes = [
         path: 'users',
         loadChildren: () => import('./users/users.module').then(m => m.UsersModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] }
       },
       {
         path: 'products',
         loadChildren: () => import('./products/products.module').then(m => m.ProductsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
       },
       {
         path: 'branches',
         loadChildren: () => import('./branches/branches.module').then(m => m.BranchesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
       },
       {
         path: 'categories',
         loadChildren: () => import('./categories/categories.module').then(m => m.CategoriesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
       },
       {
         path: 'settings',
         loadChildren: () => import('./settings/settings.module').then(m => m.SettingsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] }
       },
       {
         path: 'reports',
         loadChildren: () => import('./reports/reports.module').then(m => m.ReportsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
       },
       {
         path: 'orders',
         loadChildren: () => import('./orders/orders.module').then(m => m.OrdersModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Employee', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Employee', 'Operation Manager'] }
       },
       {
         path: 'home',
@@ -62,31 +62,31 @@ const routes: Routes = [
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
       },
       {
         path: 'clients',
         loadChildren:() => import('./clients/clients.module').then(m => m.ClientsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] }
       },
       {
         path: 'purchasing',
         loadChildren:() => import('./purchasing/purchasing.module').then(m => m.PurchasingModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] }
       },
       {
         path: 'suppliers',
         loadChildren:() => import('./vendors/vendors.module').then(m => m.VendorsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] }
       },
       {
         path: 'cashier',
         loadChildren:() => import('./cashier/cashier.module').then(m => m.CashierModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin','Employee','Cashier'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Employee', 'Cashier'] }
       },
 
 

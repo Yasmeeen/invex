@@ -18,6 +18,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { canPickBranchRole } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-cashier-order',
@@ -74,7 +75,7 @@ export class CashierComponent implements AfterViewInit {
     public storeSettings: StoreSettingsService
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
-    if (this.curentUser.role === 'Super Admin') {
+    if (canPickBranchRole(this.curentUser?.role)) {
       this.getBranches(); // loadProducts runs after a branch is selected
     } else {
       this.loadProducts();
@@ -209,10 +210,9 @@ export class CashierComponent implements AfterViewInit {
       page: 1,
       limit: 1000
     };
-    const selectedBranchId =
-      this.curentUser.role === 'Super Admin'
-        ? this.adminSelectedBranchId
-        : this.globals.currentUser?.branch?._id;
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser?.branch?._id;
 
     if (selectedBranchId) {
       params['branchId'] = selectedBranchId;
@@ -290,10 +290,9 @@ export class CashierComponent implements AfterViewInit {
       }
     }
 
-    const selectedBranchId =
-      this.curentUser.role === 'Super Admin'
-        ? this.adminSelectedBranchId
-        : this.globals.currentUser.branch._id;
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser.branch._id;
 
     let clientName = 'Walk-in';
     let clientPhoneNumber = '00';

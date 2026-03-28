@@ -1,6 +1,6 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
-import { AdminSidebar,Cashier,Employee, OperationManager } from '@shared/resources';
+import { AdminSidebar, Cashier, CoAdminSidebar, Employee, OperationManager } from '@shared/resources';
 import { Globals } from 'src/app/core/globals';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -35,6 +35,9 @@ export class SidebarComponent implements OnInit {
     }
     else if(globals.currentUser.role == 'Cashier'){
       this.appSidebar = Cashier;
+    }
+    else if (globals.currentUser.role === 'Co Admin') {
+      this.appSidebar = CoAdminSidebar;
     }
     else{
       this.appSidebar = AdminSidebar;

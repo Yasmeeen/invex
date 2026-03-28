@@ -42,7 +42,7 @@
               </mat-datepicker-toggle>
           </div>
       </div>
-      <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin'">
+      <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
         <div
           class="form-group"
         >
@@ -120,7 +120,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-3" *ngIf="curentUser.role == 'Super Admin'">
+      <div class="col-md-3" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
         <div class="form-group mb-0">
           <label>{{ "tr_branch" | translate }}</label>
           <div class="input-with-icon bg-white width-100">

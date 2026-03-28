@@ -3,8 +3,8 @@
   <div class="cashier-header bg-primary flex flex-middle">
     <div class="flex flex-middle width-100">
       <span class="text-white  mr-4">{{ "tr_cashier.TITLE" | translate }}</span>
-      <!-- Branch Selection (Super Admin only) -->
-      <div *ngIf="curentUser.role === 'Super Admin'" class="branch-selection max-300 width-100">
+      <!-- Branch Selection (Super Admin / Co Admin) -->
+      <div *ngIf="curentUser.role === 'Super Admin' || curentUser.role === 'Co Admin'" class="branch-selection max-300 width-100">
         <div class="form-group mb-0">
           <div class="input-with-icon">
             <ng-select

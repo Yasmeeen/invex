@@ -53,6 +53,8 @@ export class LoginComponent implements OnInit {
             this.router.navigate(['orders']);
           } else if (role === 'Operation Manager') {
             this.router.navigate(['products']);
+          } else if (role === 'Co Admin') {
+            this.router.navigate(['products']);
           } else {
             this.router.navigate(['home']);
           }

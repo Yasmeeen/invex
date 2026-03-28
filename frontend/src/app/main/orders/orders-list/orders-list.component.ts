@@ -17,6 +17,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { BranchesServce } from '@shared/services/branches.service';
+import { canPickBranchRole } from '@core/utils/role-utils';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -191,7 +192,9 @@ export class OrdersListComponent implements OnInit {
     let params ={
       from:  this.fromDate.toLocaleDateString('en-CA'),
       to:   this.toDate.toLocaleDateString('en-CA'),
-      branch: this.curentUser.role == 'Super Admin' ? this.selectedBranchId :this.globals.currentUser.branch._id,
+      branch: canPickBranchRole(this.curentUser?.role)
+        ? this.selectedBranchId
+        : this.globals.currentUser.branch._id,
     }
     if( this.curentUser.role == 'Employee'){
       this.params.branch = this.curentUser.branch?._id

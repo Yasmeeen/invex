@@ -34,7 +34,7 @@ export class CashierComponent implements AfterViewInit {
 
   searchTerm = '';
   barcode = '';
-  isCashierFullScreen: boolean = true;
+  isCashierFullScreen: boolean = false;
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string

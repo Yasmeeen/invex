@@ -41,18 +41,17 @@
         type="text"
         name="code"
         [(ngModel)]="codeValue"
-        placeholder="Scan or enter code"
+        [attr.placeholder]="'tr_product_code_placeholder' | translate"
         #code="ngModel"
         required
-        [disabled]="isCodeGenerated"  
       />
       <button type="button" class="scan-btn" (click)="toggleCamera()">
-        <i class="fa fa-camera"></i> Scan QR
+        <i class="fa fa-camera" aria-hidden="true"></i>
+        {{ 'tr_product_scan_qr' | translate }}
       </button>
 
-      <!-- زر توليد كود تلقائي -->
       <button type="button" class="s-btn btn-secondary ml-2" (click)="generateBarcode()">
-        Generate Automatic Barcode
+        {{ 'tr_product_generate_barcode' | translate }}
       </button>
     </div>
 

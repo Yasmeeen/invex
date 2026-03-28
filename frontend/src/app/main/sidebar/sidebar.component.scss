@@ -16,9 +16,9 @@ $shell-icon-active: mix($shell-purple, $shell-muted, 52%);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    flex-basis: 272px;
-    width: 272px;
-    max-width: 272px;
+    flex-basis: 250px;
+    width: 250px;
+    max-width: 250px;
     align-self: stretch;
     min-height: 100vh;
     box-sizing: border-box;
@@ -143,7 +143,7 @@ $shell-icon-active: mix($shell-purple, $shell-muted, 52%);
                 display: block;
                 text-decoration: none !important;
                 font-size: 1rem;
-                border-radius: 12px;
+                border-radius: 4px;
                 margin: 0.2rem 0.5rem;
 
                 .link-content {
@@ -157,7 +157,7 @@ $shell-icon-active: mix($shell-purple, $shell-muted, 52%);
                     font-weight: 600;
                     color: $shell-text;
                     padding: 0.85rem 0.9rem;
-                    border-radius: 12px;
+                    border-radius: 4px;
                     transition: background 0.2s ease, color 0.2s ease;
                     min-width: 0;
 
@@ -385,7 +385,7 @@ $shell-icon-active: mix($shell-purple, $shell-muted, 52%);
 
                 .child-menu {
                     .link-content span {
-                        padding-#{$start}: 1rem
+                        padding-#{$start}: 0.6rem
                     }
 
                     .grandchild-menu {
@@ -513,8 +513,8 @@ $shell-icon-active: mix($shell-purple, $shell-muted, 52%);
             position: fixed;
             top: 0;
             bottom: 0;
-            width: 272px;
-            max-width: 272px;
+            width: 250px;
+            max-width: 250px;
             height: 100vh !important;
             min-height: 100vh !important;
             margin: 0;

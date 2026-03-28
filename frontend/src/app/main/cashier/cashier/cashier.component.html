@@ -178,8 +178,14 @@
     <!-- <div class="separator dashed"></div> -->
   </ng-container>
 
-  <!-- Products Table -->
+  <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
   <table class="invoice-table products-table">
+    <colgroup>
+      <col class="products-table__col-name" />
+      <col class="products-table__col-qty" />
+      <col class="products-table__col-price" />
+      <col class="products-table__col-total" />
+    </colgroup>
     <tr class="header bold">
       <td>{{ 'tr_name' | translate }}</td>
       <td>{{ 'tr_cashier.QTY' | translate }}</td>

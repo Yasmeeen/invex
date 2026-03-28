@@ -350,4 +350,28 @@ export class CashierComponent implements AfterViewInit {
   closeCashier() {
     this.isCashierFullScreen = false;
   }
+
+  /**
+   * Receipt: show client block only when order has real client data (not cashier defaults:
+   * phone "00", name "Walk-in", address "-").
+   */
+  get showReceiptClientSection(): boolean {
+    const o = this.createdOrder;
+    if (!o) {
+      return false;
+    }
+    const phone = (o.clientPhoneNumber || '').trim();
+    const name = (o.clientName || '').trim();
+    const addr = (o.clientAddress || '').trim();
+    if (phone && phone !== '00') {
+      return true;
+    }
+    if (name && name !== 'Walk-in') {
+      return true;
+    }
+    if (addr && addr !== '-') {
+      return true;
+    }
+    return false;
+  }
 }

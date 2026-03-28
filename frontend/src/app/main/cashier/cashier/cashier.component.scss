@@ -371,6 +371,32 @@
     font-size: 9px;
   }
   
+  .invoice-client-block {
+    margin: 6px 0 8px;
+    padding: 4px 2px 6px;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+  }
+
+  .invoice-client-block__title {
+    font-weight: 700;
+    font-size: 11px;
+    text-align: center;
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .invoice-client-block__table td {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  .invoice-client-block__label {
+    font-weight: 700;
+    white-space: nowrap;
+    width: 40%;
+  }
+
   .store-name {
     font-size: 14px;
     font-weight: bold;
@@ -508,7 +534,7 @@
   /* Invoice markup lives in DOM for window.print(); hidden on screen only */
   @media screen {
     .invoice-container {
-      display: none !important;
+      // display: none !important;
     }
   }
 

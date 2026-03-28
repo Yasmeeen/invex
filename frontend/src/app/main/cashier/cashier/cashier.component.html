@@ -51,83 +51,7 @@
               <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
               <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
             </div>
-            <div class="card-body" *ngIf="isClientInfoOpen">
-              <form [formGroup]="clientForm">
-                <div class="row">
-          
-
-                  <!-- Phone -->
-                  <div class="col-md-4">
-                    <div class="form-group" [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched">
-                      <label>{{ 'tr_client_phone' | translate }}</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        formControlName="phone"
-                      />
-                      <span class="text-error size-small validator" *ngIf="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched">
-                        {{ 'tr_client_phone_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
     
-                  <!-- Name -->
-                  <div class="col-md-4">
-                    <div class="form-group" [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched">
-                      <label>{{ 'tr_client_name' | translate }}</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        formControlName="name"
-                      />
-                    </div>
-                  </div>
-    
-                  <!-- Address -->
-                  <div class="col-md-4">
-                    <div class="form-group" [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched">
-                      <label>{{ 'tr_client_address' | translate }}</label>
-                      <input
-                        type="text"
-                        class="s-control"
-                        formControlName="address"
-                      />
-                    </div>
-                  </div>
-
-                          <!-- Payment method -->
-                          <div class="col-md-4">
-                            <div class="form-group">
-                              <label>{{ 'tr_payment_method' | translate }}</label>
-                              <div class="input-with-icon">
-                                <ng-select
-                                  class="s-control s-select cashier-payment-select"
-                                  [items]="paymentMethods"
-                                  bindValue="id"
-                                  [clearable]="false"
-                                  formControlName="paymentMethod"
-                                  placeholder="{{ 'tr_payment_method' | translate }}"
-                                >
-                                  <ng-template ng-label-tmp let-item="item">
-                                    <span class="payment-option" *ngIf="item">
-                                      <img [src]="item.logo" class="payment-logo" alt="" />
-                                      <span>{{ item.labelKey | translate }}</span>
-                                    </span>
-                                  </ng-template>
-                                  <ng-template ng-option-tmp let-item="item">
-                                    <span class="payment-option">
-                                      <img [src]="item.logo" class="payment-logo" alt="" />
-                                      <span>{{ item.labelKey | translate }}</span>
-                                    </span>
-                                  </ng-template>
-                                </ng-select>
-                                <i class="fa fa-credit-card input-icon"></i>
-                              </div>
-                            </div>
-                          </div>
-                </div>
-              </form>
-            </div>
           </div>
 
  
@@ -231,7 +155,28 @@
     </tr>
   </table>
 
-  <div class="separator dashed"></div>
+
+
+  <ng-container *ngIf="showReceiptClientSection">
+    <div class="invoice-client-block">
+      <div class="invoice-client-block__title">{{ 'tr_client_info' | translate }}</div>
+      <table class="invoice-table invoice-client-block__table">
+        <tr *ngIf="createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00'">
+          <td class="invoice-client-block__label">{{ 'tr_phone_number' | translate }}</td>
+          <td>{{ createdOrder.clientPhoneNumber }}</td>
+        </tr>
+        <tr *ngIf="createdOrder?.clientName && createdOrder.clientName !== 'Walk-in'">
+          <td class="invoice-client-block__label">{{ 'tr_client_name' | translate }}</td>
+          <td>{{ createdOrder.clientName }}</td>
+        </tr>
+        <tr *ngIf="createdOrder?.clientAddress && createdOrder.clientAddress !== '-'">
+          <td class="invoice-client-block__label">{{ 'tr_client_address' | translate }}</td>
+          <td>{{ createdOrder.clientAddress }}</td>
+        </tr>
+      </table>
+    </div>
+    <!-- <div class="separator dashed"></div> -->
+  </ng-container>
 
   <!-- Products Table -->
   <table class="invoice-table products-table">
@@ -250,7 +195,7 @@
     </tr>
   </table>
 
-  <div class="separator dashed"></div>
+  <!-- <div class="separator dashed"></div> -->
 
   <!-- Totals -->
   <table class="invoice-table totals-table">

@@ -17,11 +17,21 @@ import { ImagePreloadDirective } from './components/image/image.directive';
 import { MatDatepickerModule} from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { NotAuthorizedComponent } from './components/not-authorized/not-authorized.component';
+import { ReceiptTranslatePipe } from './pipes/receipt-translate.pipe';
 
 
 
 @NgModule({
-  declarations: [GhostLineComponent,Pagination,ConfirmationDialogComponent,MultiCheckboxComponent,OrderByComponent,ImagePreloadDirective,NotAuthorizedComponent],
+  declarations: [
+    GhostLineComponent,
+    Pagination,
+    ConfirmationDialogComponent,
+    MultiCheckboxComponent,
+    OrderByComponent,
+    ImagePreloadDirective,
+    NotAuthorizedComponent,
+    ReceiptTranslatePipe,
+  ],
   imports: [
     CommonModule,
     HttpClientModule,
@@ -47,7 +57,7 @@ import { NotAuthorizedComponent } from './components/not-authorized/not-authoriz
     MatDatepickerModule,
     MatNativeDateModule,
     NotAuthorizedComponent,
-
+    ReceiptTranslatePipe,
   ],
   providers: [VersionCheckService,UpdateService]
 })

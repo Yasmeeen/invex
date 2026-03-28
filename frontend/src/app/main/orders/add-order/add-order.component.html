@@ -208,86 +208,92 @@
       </div>
     </div>
 
-    <!-- Invoice -->
+    <!-- Invoice (labels follow store receipt language) -->
     <div class="invoice-container" id="print-container">
-      <div class="center">
-        <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
-      </div>
+      <ng-container *ngIf="storeSettings.settings$ | async as st">
+        <div class="center">
+          <div class="bold">{{ st.storeName }}</div>
+        </div>
 
-      <table>
-        <tr>
-          <td>{{'tr_client' | translate}}:</td>
-          <td>{{order.clientName}}</td>
-        </tr>
-        <tr>
-          <td>{{'tr_phone_number' | translate}}:</td>
-          <td>{{order.clientPhoneNumber}}</td>
-        </tr>
-        <tr>
-          <td>{{'tr_address' | translate}}:</td>
-          <td>{{order.clientAddress}}</td>
-        </tr>
-      </table>
+        <table>
+          <tr>
+            <td>{{ 'tr_client' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td>{{ order.clientName }}</td>
+          </tr>
+          <tr>
+            <td>{{ 'tr_phone_number' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td>{{ order.clientPhoneNumber }}</td>
+          </tr>
+          <tr>
+            <td>{{ 'tr_address' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td>{{ order.clientAddress }}</td>
+          </tr>
+        </table>
 
-      <div class="dashed"></div>
+        <div class="dashed"></div>
 
-      <table>
-        <tr>
-          <td>{{'tr_invoice_number' | translate}}:</td>
-          <td>{{createdOrder?.orderNumber}}</td>
-          <td>{{'tr_number_of_items' | translate}}:</td>
-          <td>{{createdOrder?.numberOfProducts}}</td>
-        </tr>
-        <tr>
-          <td>{{'tr_date' | translate}}:</td>
-          <td colspan="3">{{todayDate | date: 'dd, MMM, Y'}}</td>
-        </tr>
-      </table>
+        <table>
+          <tr>
+            <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td>{{ createdOrder?.orderNumber }}</td>
+            <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td>{{ createdOrder?.numberOfProducts }}</td>
+          </tr>
+          <tr>
+            <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}:</td>
+            <td colspan="3">{{ todayDate | date: 'dd, MMM, Y' }}</td>
+          </tr>
+        </table>
 
-      <div class="dashed"></div>
+        <div class="dashed"></div>
 
-      <table>
-        <tr class="bold">
-          <td>{{ 'tr_total' | translate }}</td>
-          <td>{{ 'tr_quantity' | translate }}</td>
-          <td>{{ 'tr_discount' | translate }}</td>
-          <td>{{ 'tr_price' | translate }}</td>
-          <td>{{ 'tr_name' | translate }}</td>
-        </tr>
-        <tr *ngFor="let item of orderProducts">
-          <td>{{item.totalPrice}}</td>
-          <td>{{item.quantity}}</td>
-          <td>{{item.selectedProduct.isApplyDiscount? item.selectedProduct.discount : 0}} %</td>
-          <td>{{item.selectedProduct.price}}</td>
-          <td>{{item.selectedProduct.name}}</td>
-        </tr>
-      </table>
+        <table>
+          <tr class="bold">
+            <td>{{ 'tr_total' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ 'tr_quantity' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ 'tr_discount' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
+          </tr>
+          <tr *ngFor="let item of orderProducts">
+            <td>{{ item.totalPrice }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.selectedProduct.isApplyDiscount ? item.selectedProduct.discount : 0 }} %</td>
+            <td>{{ item.selectedProduct.price }}</td>
+            <td>{{ item.selectedProduct.name }}</td>
+          </tr>
+        </table>
 
-      <div class="dashed"></div>
+        <div class="dashed"></div>
 
-      <table>
-        <tr class="total">
-          <td>{{ 'tr_total_invoice' | translate }}</td>
-          <td>{{createdOrder?.totalPrice}}</td>
-        </tr>
-        <tr>
-          <td>{{ 'tr_discount_percent' | translate }}</td>
-          <td>0</td>
-        </tr>
-        <tr>
-          <td>{{ 'tr_discount_amount' | translate }}</td>
-          <td>0</td>
-        </tr>
-      </table>
+        <table>
+          <tr class="total">
+            <td>{{ 'tr_total_invoice' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ createdOrder?.totalPrice }}</td>
+          </tr>
+          <tr>
+            <td>{{ 'tr_discount_percent' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>{{ 'tr_discount_amount' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>0</td>
+          </tr>
+        </table>
 
-      <div class="double-border"></div>
-      <div class="final-total">{{'tr_final_invoice_value' | translate}}<br />{{createdOrder?.totalPrice}}</div>
-      <div class="double-border"></div>
+        <div class="double-border"></div>
+        <div class="final-total">
+          {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}<br />{{
+            createdOrder?.totalPrice
+          }}
+        </div>
+        <div class="double-border"></div>
 
-      <div class="center">
-        <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
-        <div>{{ (storeSettings.settings$ | async)?.storePhoneNumber }}</div>
-      </div>
+        <div class="center">
+          <div class="bold">{{ st.storeName }}</div>
+          <div>{{ st.storePhoneNumber }}</div>
+        </div>
+      </ng-container>
     </div>
   </div>
 </div>

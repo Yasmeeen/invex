@@ -131,113 +131,114 @@
 </div>
 
   
-<!-- Invoice -->
+<!-- Invoice (labels follow store receipt language, not UI language) -->
 <div class="invoice-container" id="print-container">
-
-  <!-- Store Name -->
-  <div class="store-name center mtb-4 bold">
-    {{ (storeSettings.settings$ | async)?.storeName }}
-  </div>
-
-  <!-- Invoice Meta -->
-  <table class="invoice-table meta-table">
-    <tr>
-      <td>{{ 'tr_invoice_number' | translate }}</td>
-      <td>{{ createdOrder?.orderNumber }}</td>
-    </tr>
-    <tr>
-      <td>{{ 'tr_number_of_items' | translate }}</td>
-      <td>{{ createdOrder?.numberOfProducts }}</td>
-    </tr>
-    <tr>
-      <td>{{ 'tr_date' | translate }}</td>
-      <td>{{ todayDate | date: 'dd MMM y' }}</td>
-    </tr>
-  </table>
-
-
-
-  <ng-container *ngIf="showReceiptClientSection">
-    <div class="invoice-client-block">
-      <div class="invoice-client-block__title">{{ 'tr_client_info' | translate }}</div>
-      <table class="invoice-table invoice-client-block__table">
-        <tr *ngIf="createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00'">
-          <td class="invoice-client-block__label">{{ 'tr_phone_number' | translate }}</td>
-          <td>{{ createdOrder.clientPhoneNumber }}</td>
-        </tr>
-        <tr *ngIf="createdOrder?.clientName && createdOrder.clientName !== 'Walk-in'">
-          <td class="invoice-client-block__label">{{ 'tr_client_name' | translate }}</td>
-          <td>{{ createdOrder.clientName }}</td>
-        </tr>
-        <tr *ngIf="createdOrder?.clientAddress && createdOrder.clientAddress !== '-'">
-          <td class="invoice-client-block__label">{{ 'tr_client_address' | translate }}</td>
-          <td>{{ createdOrder.clientAddress }}</td>
-        </tr>
-      </table>
+  <ng-container *ngIf="storeSettings.settings$ | async as st">
+    <!-- Store Name -->
+    <div class="store-name center mtb-4 bold">
+      {{ st.storeName }}
     </div>
-    <!-- <div class="separator dashed"></div> -->
+
+    <!-- Invoice Meta -->
+    <table class="invoice-table meta-table">
+      <tr>
+        <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ createdOrder?.orderNumber }}</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ createdOrder?.numberOfProducts }}</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ todayDate | date: 'dd MMM y' }}</td>
+      </tr>
+    </table>
+
+    <ng-container *ngIf="showReceiptClientSection">
+      <div class="invoice-client-block">
+        <div class="invoice-client-block__title">
+          {{ 'tr_client_info' | receiptTranslate: st.receiptLanguage }}
+        </div>
+        <table class="invoice-table invoice-client-block__table">
+          <tr *ngIf="createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_phone_number' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ createdOrder.clientPhoneNumber }}</td>
+          </tr>
+          <tr *ngIf="createdOrder?.clientName && createdOrder.clientName !== 'Walk-in'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_client_name' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ createdOrder.clientName }}</td>
+          </tr>
+          <tr *ngIf="createdOrder?.clientAddress && createdOrder.clientAddress !== '-'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_client_address' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ createdOrder.clientAddress }}</td>
+          </tr>
+        </table>
+      </div>
+    </ng-container>
+
+    <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
+    <table class="invoice-table products-table">
+      <colgroup>
+        <col class="products-table__col-name" />
+        <col class="products-table__col-qty" />
+        <col class="products-table__col-price" />
+        <col class="products-table__col-total" />
+      </colgroup>
+      <tr class="header bold">
+        <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_cashier.QTY' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_total' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+
+      <tr *ngFor="let item of createdOrder?.products">
+        <td class="item-name">{{ item.name }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>{{ item.price | number:'1.2-2' }}</td>
+        <td>{{ (item.price * item.quantity ) | number:'1.2-2' }}</td>
+      </tr>
+    </table>
+
+    <!-- Totals -->
+    <table class="invoice-table totals-table">
+      <tr class="bold">
+        <td>{{ 'tr_total_invoice' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ getTotal() | number:'1.2-2' }}</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_discount_percent' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ getAverageDiscountPercent() | number:'1.2-2' }}%</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_discount_amount' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ getDiscountAmount() | number:'1.2-2' }}</td>
+      </tr>
+      <tr class="bold">
+        <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ getTotalAfterDiscount() | number:'1.2-2' }}</td>
+      </tr>
+    </table>
+
+    <div class="separator double-border"></div>
+
+    <div class="final-total center bold">
+      {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
+      {{ getTotalAfterDiscount() | number:'1.2-2' }}
+    </div>
+
+    <div class="separator double-border"></div>
+
+    <div class="footer center">
+      <div class="bold">{{ st.storeName }}</div>
+      <div>{{ st.storePhoneNumber }}</div>
+    </div>
   </ng-container>
-
-  <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
-  <table class="invoice-table products-table">
-    <colgroup>
-      <col class="products-table__col-name" />
-      <col class="products-table__col-qty" />
-      <col class="products-table__col-price" />
-      <col class="products-table__col-total" />
-    </colgroup>
-    <tr class="header bold">
-      <td>{{ 'tr_name' | translate }}</td>
-      <td>{{ 'tr_cashier.QTY' | translate }}</td>
-      <td>{{ 'tr_price' | translate }}</td>
-      <td>{{ 'tr_total' | translate }}</td>
-    </tr>
-
-    <tr *ngFor="let item of createdOrder?.products">
-      <td class="item-name">{{ item.name }}</td>
-      <td>{{ item.quantity }}</td>
-      <td>{{ item.price | number:'1.2-2' }}</td>
-      <td>{{ (item.price * item.quantity )  | number:'1.2-2' }} </td>
-    </tr>
-  </table>
-
-  <!-- <div class="separator dashed"></div> -->
-
-  <!-- Totals -->
-  <table class="invoice-table totals-table">
-    <tr class="bold">
-      <td>{{ 'tr_total_invoice' | translate }}</td>
-      <td>{{ getTotal() | number:'1.2-2' }}</td>
-    </tr>
-    <tr>
-      <td>{{ 'tr_discount_percent' | translate }}</td>
-      <td>{{ getAverageDiscountPercent() | number:'1.2-2' }}%</td>
-    </tr>
-    <tr>
-      <td>{{ 'tr_discount_amount' | translate }}</td>
-      <td>{{ getDiscountAmount() | number:'1.2-2' }}</td>
-    </tr>
-    <tr class="bold">
-      <td>{{ 'tr_final_invoice_value' | translate }}</td>
-      <td>{{ getTotalAfterDiscount() | number:'1.2-2' }}</td>
-    </tr>
-  </table>
-
-  <div class="separator double-border"></div>
-
-  <!-- Final Total -->
-  <div class="final-total center bold">
-    {{ 'tr_final_invoice_value' | translate }} <br />
-    {{ getTotalAfterDiscount() | number:'1.2-2' }}
-  </div>
-
-  <div class="separator double-border"></div>
-
-  <!-- Footer -->
-  <div class="footer center">
-    <div class="bold">{{ (storeSettings.settings$ | async)?.storeName }}</div>
-    <div>{{ (storeSettings.settings$ | async)?.storePhoneNumber }}</div>
-  </div>
-
 </div>
 

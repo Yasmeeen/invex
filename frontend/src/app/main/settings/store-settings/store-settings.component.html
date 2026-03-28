@@ -30,6 +30,16 @@
     </div>
 
     <div class="store-settings-card__field">
+      <label class="store-settings-card__label">{{ 'tr_receipt_language' | translate }}</label>
+      <p class="store-settings-card__hint">{{ 'tr_receipt_language_hint' | translate }}</p>
+      <select class="s-control" name="receiptLanguage" [(ngModel)]="form.receiptLanguage">
+        <option *ngFor="let opt of receiptLanguageOptions" [value]="opt.value">
+          {{ opt.labelKey | translate }}
+        </option>
+      </select>
+    </div>
+
+    <div class="store-settings-card__field">
       <label class="store-settings-card__label">{{ 'tr_store_logo' | translate }}</label>
       <p class="store-settings-card__hint">{{ 'tr_logo_hint' | translate }}</p>
       <div class="store-settings-card__logo-row">

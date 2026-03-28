@@ -1,6 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { StoreSettings, StoreSettingsService } from '@shared/services/store-settings.service';
+import {
+  ReceiptLanguageCode,
+  StoreSettings,
+  StoreSettingsService,
+} from '@shared/services/store-settings.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
@@ -14,7 +18,15 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     storeName: '',
     storePhoneNumber: '',
     logoUrl: '',
+    receiptLanguage: 'en',
   };
+
+  readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
+    { value: 'ar', labelKey: 'tr_lang_ar' },
+    { value: 'en', labelKey: 'tr_lang_en' },
+    { value: 'de', labelKey: 'tr_lang_de' },
+    { value: 'fr', labelKey: 'tr_lang_fr' },
+  ];
 
   /** معاينة شعار المتجر فقط — بدون لوجو ثابت من assets */
   logoPreview = '';
@@ -28,12 +40,14 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.storeSettingsService.load();
+    // Settings are loaded from MainComponent.load(); avoid a second GET here — it can race with Save
+    // and an older GET response would overwrite receiptLanguage back to the previous value.
     this.settingsSub = this.storeSettingsService.settings$.subscribe((v) => {
       this.form = {
         storeName: v.storeName,
         storePhoneNumber: v.storePhoneNumber,
         logoUrl: v.logoUrl,
+        receiptLanguage: v.receiptLanguage || 'en',
       };
       this.logoPreview = this.form.logoUrl || '';
     });
@@ -79,6 +93,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         storeName: this.form.storeName?.trim() || '',
         storePhoneNumber: this.form.storePhoneNumber?.trim() || '',
         logoUrl: this.form.logoUrl || '',
+        receiptLanguage: this.form.receiptLanguage || 'en',
       })
       .subscribe({
         next: () => {

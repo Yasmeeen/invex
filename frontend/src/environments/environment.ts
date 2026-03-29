@@ -6,6 +6,8 @@ export const environment = {
     production: false,
     env: 'development',
     apiUrl: '/api',
+    /** QR code on report PDFs — Innovation technologies */
+    innovationWebsiteUrl: 'https://www.innovation-tec.com/',
     /**
      * Cloudinary (browser upload uses unsigned preset only — never put API secret here).
      * Dashboard → Settings → Upload → Upload presets → add Unsigned preset, then set uploadPreset below.

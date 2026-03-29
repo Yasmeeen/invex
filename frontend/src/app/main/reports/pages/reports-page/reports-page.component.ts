@@ -273,7 +273,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.exportService.exportToExcel(filename, this.tableRows);
   }
 
-  exportPdf(): void {
+  async exportPdf(): Promise<void> {
     const title = this.translate.instant(this.reportTitleKey);
     const summaryRows = this.cards.map((c) => ({
       label: this.translate.instant(c.titleKey, c.titleParams || {}),
@@ -286,7 +286,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         return acc;
       }, {})
     );
-    this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
+    await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
   }
 
   printReport(): void {

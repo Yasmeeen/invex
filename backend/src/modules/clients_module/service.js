@@ -74,14 +74,24 @@ export const getClientByPhone = async (req, res) => {
  */
 export const getClients = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, search = "", branch_id = "" } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const matchStage = search
-      ? {
-          phoneNumber: { $regex: search, $options: "i" },
-        }
-      : {};
+    const matchStage = {};
+    if (search) {
+      matchStage.phoneNumber = { $regex: search, $options: "i" };
+    }
+    if (branch_id && mongoose.Types.ObjectId.isValid(String(branch_id))) {
+      const branchOid = new mongoose.Types.ObjectId(String(branch_id));
+      const clientIdsFromOrders = await Order.distinct("clientId", {
+        branch: branchOid,
+        clientId: { $exists: true, $ne: null },
+      });
+      matchStage.$or = [
+        { branches: branchOid },
+        { _id: { $in: clientIdsFromOrders } },
+      ];
+    }
 
     const pipeline = [
       { $match: matchStage },

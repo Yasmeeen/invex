@@ -12,6 +12,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { isBranchManager } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-inventory-list',
@@ -61,6 +62,14 @@ export class InventoryListComponent implements OnInit {
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce
   ) { }
+
+  get canWarehouseTransfer(): boolean {
+    return !isBranchManager(this.globals.currentUser?.role);
+  }
+
+  get canDeleteFromWarehouse(): boolean {
+    return !isBranchManager(this.globals.currentUser?.role);
+  }
 
   ngOnInit(): void {
     this.getproducts();
@@ -118,7 +127,10 @@ export class InventoryListComponent implements OnInit {
     this.getproducts();
   }
 
-  openTransferProductForm(){
+  openTransferProductForm() {
+    if (!this.canWarehouseTransfer) {
+      return;
+    }
     let dialogRef = this.dialog.open(CreateEditProductComponent, {
       width: '850px',
       data: {},
@@ -131,7 +143,10 @@ export class InventoryListComponent implements OnInit {
   })
   }
 
-  deleteProduct(productId: string){
+  deleteProduct(productId: string) {
+    if (!this.canDeleteFromWarehouse) {
+      return;
+    }
     this.productsService.deleteProduct(productId).subscribe(() => {
       this.params.page = 1;
         this.getproducts()

@@ -143,9 +143,13 @@ export const createOrder = async (req, res) => {
     }
 
     // ======================
-    // 1️⃣ GET OR CREATE CLIENT
+    // 1️⃣ GET OR CREATE CLIENT (+ link order branch for clients list / Branch Manager filter)
     // ======================
     let finalClientId = clientId;
+    const orderBranchOid =
+      branch && mongoose.Types.ObjectId.isValid(String(branch))
+        ? new mongoose.Types.ObjectId(String(branch))
+        : null;
 
     if (!finalClientId) {
       let client = await Client.findOne({ phoneNumber: clientPhoneNumber }).session(session);
@@ -157,15 +161,27 @@ export const createOrder = async (req, res) => {
               name: clientName,
               phoneNumber: clientPhoneNumber,
               address: clientAddress,
-              branches: branch ? [branch] : [],
+              branches: orderBranchOid ? [orderBranchOid] : [],
             },
           ],
           { session }
         );
         client = newClient;
+      } else if (orderBranchOid) {
+        await Client.updateOne(
+          { _id: client._id },
+          { $addToSet: { branches: orderBranchOid } },
+          { session }
+        );
       }
 
       finalClientId = client._id;
+    } else if (orderBranchOid) {
+      await Client.updateOne(
+        { _id: finalClientId },
+        { $addToSet: { branches: orderBranchOid } },
+        { session }
+      );
     }
 
     // ======================

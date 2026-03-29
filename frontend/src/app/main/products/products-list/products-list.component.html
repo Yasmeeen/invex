@@ -123,30 +123,21 @@
               <td>{{ product.netPrice }}</td>
               <td>{{ product.discount }}</td>
               <td>
-                <span class="options-menu">
+                <span class="options-menu" *ngIf="canBranchManagerModifyProduct(product)">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div class="border-bottom"></div>
-                    <div
-                      class="single-option"
-                      (click)="deleteProduct(product._id)"
-                    >
+                    <div class="single-option" (click)="deleteProduct(product)">
                       <div class="text-error">
                         {{ "tr_action.delete" | translate }}
                       </div>
                     </div>
-                    <div
-                      class="single-option"
-                      (click)="createOrEditproduct(true, product)"
-                    >
+                    <div class="single-option" (click)="createOrEditproduct(true, product)">
                       {{ "tr_action.edit" | translate }}
                     </div>
-                    <div
-                    class="single-option"
-                    (click)="printbarCode(product.code, product.name)"
-                  >
-                    {{ "print_barcode" | translate }}
-                  </div>
+                    <div class="single-option" (click)="printbarCode(product)">
+                      {{ "print_barcode" | translate }}
+                    </div>
                   </div>
                 </span>
               </td>

@@ -104,8 +104,8 @@ export class OrdersListComponent implements OnInit {
 
   getOrders() {
    this.curentUser = this.authenticationService.getUserFromLocalStorage();
-   if( this.curentUser.role == 'Employee'){
-    this.params.searchBranch = this.curentUser.branch?.name
+   if (this.curentUser.role === 'Employee' || this.curentUser.role === 'Branch Manager') {
+    this.params.searchBranch = this.curentUser.branch?.name;
    }
    if(this.selectedStatus){
     this.params['status'] = this.selectedStatus

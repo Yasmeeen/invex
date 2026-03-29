@@ -260,6 +260,7 @@
   "tr_search_by_national_id": "ابحث بالرقم القومي",
   "tr_search_by_code": "ابحث بالكود",
   "tr_products": "المنتجات",
+  "tr_product_only_own_branch": "يمكنك تعديل أو حذف أو طباعة باركود منتجات فرعك فقط.",
   "tr_total": "المجموع",
   "tr_quantity": "الكمية",
   "tr_price": "السعر",

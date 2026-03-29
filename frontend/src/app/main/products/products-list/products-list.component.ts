@@ -2,18 +2,18 @@ import { CategoriesServce } from './../../../shared/services/categories.service'
 import { MatDialog } from '@angular/material/dialog';
 import { Component, OnInit } from '@angular/core';
 // import { productsSerivce } from '@shared/services/products.services';
-import { PaginationData, User } from '@core/models/users-interfaces.model'
+import { PaginationData } from '@core/models/users-interfaces.model'
 // import { category, product } from '@core/models/products-interface.model'
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
-import { Globals } from '@core/globals';
-import { UserSerivce } from '@shared/services/user.service';
 import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
+import { Globals } from '@core/globals';
+import { isBranchManager } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-products-list',
@@ -63,17 +63,36 @@ export class ProductsListComponent implements OnInit {
     private productsService: ProductsSerivce,
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
-    private globals: Globals,
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
-    private branchesServce: BranchesServce
+    private branchesServce: BranchesServce,
+    private globals: Globals
   ) { }
+
+  /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
+  canBranchManagerModifyProduct(product: Product): boolean {
+    if (!isBranchManager(this.globals.currentUser?.role)) {
+      return true;
+    }
+    if (product?.inWarehouse) {
+      return false;
+    }
+    const myId = this.globals.currentUser?.branch?._id;
+    const pid =
+      product?.branch &&
+      (typeof product.branch === 'object' ? (product.branch as Branch)._id : product.branch);
+    if (!myId || !pid) {
+      return false;
+    }
+    return String(pid) === String(myId);
+  }
 
   ngOnInit(): void {
     this.getproducts();
     this.getcategorys();
     this.getBranches();
   }
+
   getproducts() {
     this.productsLoading = true;
     delete this.params['branchId'];
@@ -155,7 +174,15 @@ export class ProductsListComponent implements OnInit {
   }
 
 
-  deleteProduct(productId: string){
+  deleteProduct(product: Product) {
+    if (!this.canBranchManagerModifyProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    const productId = product._id;
     let confirmationData = {
       title: this.translateService.instant('tr_confirmation_message'),
       buttons: [
@@ -189,7 +216,14 @@ export class ProductsListComponent implements OnInit {
 
 
   }
-  createOrEditproduct(isEdit: boolean, product?: Product){
+  createOrEditproduct(isEdit: boolean, product?: Product) {
+    if (isEdit && product && !this.canBranchManagerModifyProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
     let dialogRef = this.dialog.open(CreateEditProductComponent, {
       width: '850px',
       data: {isEdit:isEdit,product:product, productId: product?._id},
@@ -201,12 +235,16 @@ export class ProductsListComponent implements OnInit {
     }
   })
   }
-  printbarCode(code:string,name:string){
-    this.productsService
-    .getBarcodeImage(code, name)
-    .subscribe((html: any) => {
+  printbarCode(product: Product) {
+    if (!this.canBranchManagerModifyProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    this.productsService.getBarcodeImage(product.code, product.name).subscribe((html: any) => {
       this.printHtml(html);
-
     });
   }
   printHtml(html: string) {

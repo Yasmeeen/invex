@@ -6,6 +6,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { Subscription } from 'rxjs';
+import { isBranchManager } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-client-list',
@@ -35,6 +36,9 @@ export class ClientListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
+      this.params.branch_id = this.globals.currentUser.branch._id;
+    }
     this.getClients();
   }
 

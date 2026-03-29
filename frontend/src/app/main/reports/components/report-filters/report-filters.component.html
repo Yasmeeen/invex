@@ -8,7 +8,7 @@
       <label>{{ 'tr_to' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.to" />
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3" *ngIf="!branchFilterLocked">
       <label>{{ 'tr_report_filter_branch_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -23,6 +23,10 @@
         (change)="onBranchChange()"
       >
       </ng-select>
+    </div>
+    <div class="col-md-3" *ngIf="branchFilterLocked">
+      <label>{{ 'tr_report_filter_branch_id' | translate }}</label>
+      <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
     <div class="col-md-3">
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>

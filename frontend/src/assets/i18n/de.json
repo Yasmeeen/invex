@@ -264,6 +264,7 @@
   "tr_search_by_national_id": "Nach nationaler ID suchen",
   "tr_search_by_code": "Nach Code suchen",
   "tr_products": "Produkte",
+  "tr_product_only_own_branch": "Sie können Produkte in Ihrer Filiale nur bearbeiten, löschen oder Barcodes drucken.",
   "tr_add_product": "Produkt hinzufügen",
   "tr_transfer_product": "Produkt umlagern",
   "tr_transfer": "Umlagern",

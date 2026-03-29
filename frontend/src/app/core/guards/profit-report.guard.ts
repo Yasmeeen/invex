@@ -3,7 +3,7 @@ import { CanActivate, ActivatedRouteSnapshot, Router } from '@angular/router';
 import { AuthenticationService } from '@core/services/authentication.service';
 
 /**
- * Co Admin must not open the profit report (UI + route). Other reports stay allowed.
+ * Co Admin / Branch Manager must not open the profit report. Other reports stay allowed.
  */
 @Injectable({ providedIn: 'root' })
 export class ProfitReportGuard implements CanActivate {
@@ -18,7 +18,7 @@ export class ProfitReportGuard implements CanActivate {
       return true;
     }
     const user = this.authenticationService.getUserFromLocalStorage();
-    if (user?.role === 'Co Admin') {
+    if (user?.role === 'Co Admin' || user?.role === 'Branch Manager') {
       this.router.navigate(['/reports/sales']);
       return false;
     }

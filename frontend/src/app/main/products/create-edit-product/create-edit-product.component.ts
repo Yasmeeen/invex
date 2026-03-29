@@ -20,6 +20,8 @@ import { TranslateService } from '@ngx-translate/core';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
 import { environment } from 'src/environments/environment';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { Globals } from '@core/globals';
+import { isBranchManager } from '@core/utils/role-utils';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -61,9 +63,14 @@ export class CreateEditProductComponent implements OnInit {
     private translateService: TranslateService,
     private branchesServce:BranchesServce ,
     @Inject(MAT_DIALOG_DATA) public data: any,
-    private cloudinaryUpload: CloudinaryUploadService
-
+    private cloudinaryUpload: CloudinaryUploadService,
+    public globals: Globals
   ) {}
+
+  /** New product only: Branch Manager adds to assigned branch (no warehouse/branch UI). */
+  get isBranchManagerNewProduct(): boolean {
+    return !this.isEdit && isBranchManager(this.globals.currentUser?.role);
+  }
 
   ngOnInit() {
     this.productId = this.data.productId
@@ -200,7 +207,21 @@ createProduct() {
     return;
   }
   if (!this.basicInfoForm.valid) return;
-  if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
+
+  const inWarehouse = this.isBranchManagerNewProduct ? false : this.storeInWarehouse;
+  let branchForPayload = this.basicInfoForm.value.branch;
+  if (this.isBranchManagerNewProduct) {
+    const ub = this.globals.currentUser?.branch;
+    branchForPayload =
+      (ub && this.branches?.find((b: Branch) => String(b._id) === String(ub._id))) || ub;
+    if (!branchForPayload?._id) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_branch_required'),
+        'error'
+      );
+      return;
+    }
+  } else if (!inWarehouse && !branchForPayload?._id) {
     this.appNotificationService.push(
       this.translateService.instant('tr_branch_required'),
       'error'
@@ -211,11 +232,13 @@ createProduct() {
   const payload: any = {
     ...this.basicInfoForm.value,
     code: this.codeValue,
-    inWarehouse: this.storeInWarehouse,
+    inWarehouse,
     imageUrl: this.productImageUrl || '',
   };
-  if (this.storeInWarehouse) {
+  if (inWarehouse) {
     delete payload.branch;
+  } else if (this.isBranchManagerNewProduct) {
+    payload.branch = branchForPayload;
   }
 
   this.productsSerivce.createProduct(payload).subscribe(

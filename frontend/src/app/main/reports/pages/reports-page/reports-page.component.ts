@@ -3,6 +3,8 @@ import { ActivatedRoute } from '@angular/router';
 import * as Highcharts from 'highcharts';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
+import { AuthenticationService } from '@core/services/authentication.service';
+import { isBranchManager } from '@core/utils/role-utils';
 import { ReportsService } from '@shared/services/reports.service';
 import { ReportExportService } from '@shared/services/report-export.service';
 
@@ -49,7 +51,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private reportsService: ReportsService,
     private exportService: ReportExportService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private authenticationService: AuthenticationService
   ) {}
 
   ngOnInit(): void {
@@ -62,7 +65,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.route.data.subscribe((d) => {
       this.reportType = d.reportType || 'sales';
       this.reportTitleKey = this.reportTitleKeys[this.reportType] || this.reportTitleKeys.sales;
-      this.loadReport(this.filters);
+      // First paint: wait for report-filters to emit defaults (from/to/branch). Later navigations reuse `filters`.
+      if (Object.keys(this.filters || {}).length > 0) {
+        this.loadReport(this.filters);
+      }
     });
   }
 
@@ -71,11 +77,21 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   onApplyFilters(filters: any): void {
-    this.filters = { ...filters };
+    this.filters = this.mergeBranchScope({ ...filters });
     this.loadReport(this.filters);
   }
 
+  /** Ensure Branch Manager cannot query other branches via API. */
+  private mergeBranchScope(payload: Record<string, unknown>): Record<string, unknown> {
+    const u = this.authenticationService.getUserFromLocalStorage();
+    if (isBranchManager(u?.role) && u?.branch?._id) {
+      return { ...payload, branch_id: String(u.branch._id) };
+    }
+    return payload;
+  }
+
   private loadReport(filters: any): void {
+    const scoped = this.mergeBranchScope({ ...filters });
     this.loading = true;
     const map: any = {
       sales: this.reportsService.getSalesReport.bind(this.reportsService),
@@ -86,7 +102,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       installments: this.reportsService.getInstallmentsReport.bind(this.reportsService),
     };
 
-    map[this.reportType](filters).subscribe(
+    map[this.reportType](scoped).subscribe(
       (res: any) => {
         this.loading = false;
         this.lastReportPayload = res || {};

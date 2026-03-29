@@ -97,6 +97,14 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
   }
 );
 
+/** Branch Manager: like Co Admin but no branches, settings, or users. */
+export const BranchManagerSidebar = CoAdminSidebar.filter(
+  (item) =>
+    item.routerLink !== '/branches' &&
+    item.routerLink !== '/settings' &&
+    item.routerLink !== '/users'
+);
+
 export const  Employee = [
 
   {

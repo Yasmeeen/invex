@@ -262,7 +262,14 @@
                     </div>
                   </div>
 
-                  <div class="col-md-6">
+                  <div class="col-md-12" *ngIf="isBranchManagerNewProduct">
+                    <p class="text-muted size-small m-0">
+                      {{ 'tr_branch' | translate }}:
+                      <strong>{{ globals.currentUser?.branch?.name || '—' }}</strong>
+                    </p>
+                  </div>
+
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct">
                     <div class="form-group">
                       <label>{{ 'tr_product_storage' | translate }}</label>
                       <div class="storage-choice">
@@ -289,7 +296,7 @@
                   </div>
 
                   <!-- Branch -->
-                  <div class="col-md-6" *ngIf="!storeInWarehouse">
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse">
                     <div
                       class="form-group"
                       [class.has-error]="branch.invalid && basicInfoForm.submitted"

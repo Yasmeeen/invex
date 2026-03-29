@@ -264,6 +264,7 @@
   "tr_search_by_national_id": "Search by national id",
   "tr_search_by_code": "Search by code",
   "tr_products": "Products",
+  "tr_product_only_own_branch": "You can only edit, delete, or print barcodes for products in your branch.",
   "tr_add_product": "Add Product",
   "tr_transfer_product": "Transfer Product",
   "tr_transfer": "Transfer",

@@ -27,6 +27,7 @@ export class CreateEditUserComponent implements OnInit {
   roles = [
     'Super Admin',
     'Co Admin',
+    'Branch Manager',
     'Employee',
     'Cashier',
     'Operation Manager',

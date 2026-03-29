@@ -6,7 +6,11 @@
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ "tr_inventory" | translate }}</span>
     <div class="btn-group">
-      <button class="s-btn btn-primary" (click)="openTransferProductForm()">
+      <button
+        *ngIf="canWarehouseTransfer"
+        class="s-btn btn-primary"
+        (click)="openTransferProductForm()"
+      >
         {{ "tr_transfer_product" | translate }}
       </button>
       <button
@@ -70,14 +74,16 @@
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div
+                      *ngIf="canWarehouseTransfer"
                       class="single-option"
                       (click)="openTransferProductForm()"
                     >
                       {{ "tr_transfer" | translate }}
                     </div>
 
-                    <div class="border-bottom"></div>
+                    <div class="border-bottom" *ngIf="canWarehouseTransfer && canDeleteFromWarehouse"></div>
                     <div
+                      *ngIf="canDeleteFromWarehouse"
                       class="single-option"
                       (click)="deleteProduct(product._id)"
                     >

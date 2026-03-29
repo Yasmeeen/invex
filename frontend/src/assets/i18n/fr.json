@@ -264,6 +264,7 @@
   "tr_search_by_national_id": "Rechercher par identifiant national",
   "tr_search_by_code": "Rechercher par code",
   "tr_products": "Produits",
+  "tr_product_only_own_branch": "Vous ne pouvez modifier, supprimer ou imprimer des codes-barres que pour les produits de votre succursale.",
   "tr_add_product": "Ajouter un produit",
   "tr_transfer_product": "Transferer un produit",
   "tr_transfer": "Transferer",

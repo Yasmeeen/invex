@@ -71,7 +71,7 @@ export class UpdatePasswordComponent implements OnInit {
           const role = this.globals.currentUser?.role;
           if (role === 'Operation Manager') {
             this.router.navigate(['inventory']);
-          } else if (role === 'Co Admin') {
+          } else if (role === 'Co Admin' || role === 'Branch Manager') {
             this.router.navigate(['products']);
           } else {
             this.router.navigate(['home']);

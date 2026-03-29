@@ -51,7 +51,94 @@
               <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
               <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
             </div>
+            <div class="card-body" *ngIf="isClientInfoOpen" [formGroup]="clientForm">
     
+              <div class="row">
+                
+                <div
+                  class="col-md-6"
+                  [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
+                >
+                  <div class="form-group">
+                    <label>{{ 'tr_client_phone' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <input type="text" class="s-control width-100" formControlName="phone" />
+                    </div>
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
+                    >
+                      {{ 'tr_client_phone_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  class="col-md-6"
+                  [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
+                >
+                  <div class="form-group">
+                    <label>{{ 'tr_client_name' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <input type="text" class="s-control width-100" formControlName="name" />
+                    </div>
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
+                    >
+                      {{ 'tr_client_name_required' | translate }}
+                    </span>
+                  </div>
+                </div>
+                <div
+                class="col-md-6"
+                [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+              >
+                <div class="form-group mb-0">
+                  <label>{{ 'tr_client_address' | translate }}</label>
+                  <div class="input-with-icon bg-white width-100">
+                    <input type="text" class="s-control width-100" formControlName="address" />
+                  </div>
+                  <span
+                    class="text-error size-small validator"
+                    *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                  >
+                    {{ 'tr_client_address_required' | translate }}
+                  </span>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group card-body--payment mb-md-3">
+                  <label>{{ 'tr_payment_method' | translate }}</label>
+                  <div class="input-with-icon bg-white">
+                    <ng-select
+                      formControlName="paymentMethod"
+                      class="s-control s-select cashier-payment-select width-100"
+                      [items]="paymentMethods"
+                      bindLabel="labelKey"
+                      bindValue="id"
+                      [clearable]="false"
+                      [searchable]="false"
+                    >
+                      <ng-template ng-label-tmp let-item="item">
+                        <span class="payment-option">
+                          <img [src]="item.logo" class="payment-logo" alt="" />
+                          {{ item.labelKey | translate }}
+                        </span>
+                      </ng-template>
+                      <ng-template ng-option-tmp let-item="item">
+                        <span class="payment-option">
+                          <img [src]="item.logo" class="payment-logo" alt="" />
+                          {{ item.labelKey | translate }}
+                        </span>
+                      </ng-template>
+                    </ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
+                </div>
+              </div>
+              </div>
+          
+            </div>
           </div>
 
  

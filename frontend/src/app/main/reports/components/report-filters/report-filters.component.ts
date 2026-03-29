@@ -1,4 +1,7 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { AuthenticationService } from '@core/services/authentication.service';
+import { Globals } from '@core/globals';
+import { isBranchManager } from '@core/utils/role-utils';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 
@@ -12,6 +15,8 @@ export class ReportFiltersComponent implements OnInit {
 
   branches: any[] = [];
   products: any[] = [];
+  /** Branch Manager: fixed to assigned branch (no “all branches”). */
+  branchFilterLocked = false;
 
   filters: any = {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
@@ -24,12 +29,25 @@ export class ReportFiltersComponent implements OnInit {
 
   constructor(
     private branchesServce: BranchesServce,
-    private productsSerivce: ProductsSerivce
+    private productsSerivce: ProductsSerivce,
+    private authenticationService: AuthenticationService,
+    public globals: Globals
   ) {}
 
   ngOnInit(): void {
+    const u = this.authenticationService.getUserFromLocalStorage();
+    if (isBranchManager(u?.role) && u?.branch?._id) {
+      this.branchFilterLocked = true;
+      this.filters.branch_id = String(u.branch._id);
+    }
     this.loadBranches();
     this.loadProducts();
+    queueMicrotask(() => this.applyFilters());
+  }
+
+  get lockedBranchLabel(): string {
+    const b = this.globals.currentUser?.branch;
+    return (b && (b as { name?: string }).name) || '—';
   }
 
   private formatDate(d: Date): string {
@@ -75,7 +93,14 @@ export class ReportFiltersComponent implements OnInit {
   }
 
   reset(): void {
-    this.filters.branch_id = null;
+    if (!this.branchFilterLocked) {
+      this.filters.branch_id = null;
+    } else {
+      const u = this.authenticationService.getUserFromLocalStorage();
+      if (u?.branch?._id) {
+        this.filters.branch_id = String(u.branch._id);
+      }
+    }
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.groupBy = 'daily';

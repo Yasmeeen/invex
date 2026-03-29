@@ -10,16 +10,18 @@
 
   <app-report-filters (apply)="onApplyFilters($event)"></app-report-filters>
 
-  <div class="row cards-row">
-    <div class="col-md-3 mb-3" *ngFor="let card of cards">
-      <app-report-card
-        [titleKey]="card.titleKey"
-        [titleParams]="card.titleParams || {}"
-        [value]="card.value"
-        [hintKey]="card.hintKey || ''"
-        [hintParams]="card.hintParams || {}"
-      ></app-report-card>
-    </div>
+  <div class="reports-page__cards">
+    <app-report-card
+      *ngFor="let card of cards; let i = index"
+      [variantIndex]="i"
+      [titleKey]="card.titleKey"
+      [titleParams]="card.titleParams || {}"
+      [value]="card.value"
+      [hintKey]="card.hintKey || ''"
+      [hintParams]="card.hintParams || {}"
+      [trendLabel]="card.trendLabel || ''"
+      [trendPositive]="card.trendPositive !== false"
+    ></app-report-card>
   </div>
 
   <app-chart-wrapper

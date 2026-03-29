@@ -14,6 +14,10 @@ type ReportCardVM = {
   value: any;
   hintKey?: string;
   hintParams?: Record<string, unknown>;
+  /** Optional trend pill text, e.g. `2.31%` (arrow added by card). */
+  trendLabel?: string;
+  /** false → red/down pill; true/omit → green/up. */
+  trendPositive?: boolean;
 };
 
 @Component({

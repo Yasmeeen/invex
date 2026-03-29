@@ -19,6 +19,38 @@
   gap: 0.5rem;
 }
 
+.reports-page__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  align-items: stretch;
+}
+
+.reports-page__cards app-report-card {
+  flex: 1 1 calc(25% - 0.95rem);
+  min-width: min(100%, 220px);
+  max-width: 100%;
+}
+
+@media (max-width: 1199px) {
+  .reports-page__cards app-report-card {
+    flex: 1 1 calc(33.333% - 0.85rem);
+  }
+}
+
+@media (max-width: 767px) {
+  .reports-page__cards app-report-card {
+    flex: 1 1 calc(50% - 0.65rem);
+  }
+}
+
+@media (max-width: 479px) {
+  .reports-page__cards app-report-card {
+    flex: 1 1 100%;
+  }
+}
+
 @media print {
   :host ::ng-deep .main-sidebar,
   :host ::ng-deep .main-header,

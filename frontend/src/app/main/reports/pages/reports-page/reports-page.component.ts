@@ -293,25 +293,105 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     window.print();
   }
 
+  /** Purple theme (matches report cards / admin primary). */
+  private readonly chartColors = [
+    '#4c1d95',
+    '#5b21b6',
+    '#6d28d9',
+    '#7c3aed',
+    '#8b5cf6',
+    '#a78bfa',
+    '#c026d3',
+  ];
+
+  /** Multi-series lines (profit): revenue, cost, net. */
+  private readonly chartLineContrast = ['#5b21b6', '#94a3b8', '#7c3aed'];
+
+  private chartTitleStyle(text: string): Highcharts.TitleOptions {
+    return {
+      text,
+      style: { color: '#5b21b6', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' },
+    };
+  }
+
+  private lineSeriesColor(index: number, total: number): string {
+    if (total > 1 && index < this.chartLineContrast.length) {
+      return this.chartLineContrast[index];
+    }
+    return this.chartColors[index % this.chartColors.length];
+  }
+
   private lineChart(title: string, categories: string[], series: any[]): Highcharts.Options {
-    const typedSeries = (series || []).map((s) => ({ ...s, type: 'line' as const }));
+    const list = series || [];
+    const n = list.length;
+    const themedSeries = list.map((s, i) => {
+      const c = this.lineSeriesColor(i, n);
+      return {
+        ...s,
+        type: 'line' as const,
+        color: c,
+        marker: {
+          enabled: true,
+          fillColor: '#ffffff',
+          lineWidth: 2,
+          lineColor: c,
+        },
+      };
+    });
     return {
       chart: { type: 'line', backgroundColor: 'transparent' },
-      title: { text: title },
+      colors: this.chartColors,
+      title: this.chartTitleStyle(title),
       credits: { enabled: false },
-      xAxis: { categories },
-      yAxis: { title: { text: '' } },
-      series: typedSeries as any,
+      legend: {
+        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
+        itemHoverStyle: { color: '#6d28d9' },
+      },
+      xAxis: {
+        categories,
+        lineColor: '#e2e8f0',
+        tickColor: '#e2e8f0',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+        gridLineColor: '#f1f5f9',
+      },
+      yAxis: {
+        title: { text: '', style: { color: '#64748b' } },
+        gridLineColor: '#eef2f6',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+      },
+      series: themedSeries as any,
     };
   }
 
   private barChart(title: string, categories: string[], data: number[]): Highcharts.Options {
     return {
       chart: { type: 'column', backgroundColor: 'transparent' },
-      title: { text: title },
+      colors: this.chartColors,
+      title: this.chartTitleStyle(title),
       credits: { enabled: false },
-      xAxis: { categories },
-      yAxis: { title: { text: '' } },
+      legend: {
+        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
+        itemHoverStyle: { color: '#6d28d9' },
+      },
+      xAxis: {
+        categories,
+        lineColor: '#e2e8f0',
+        tickColor: '#e2e8f0',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+        gridLineColor: '#f1f5f9',
+      },
+      yAxis: {
+        title: { text: '', style: { color: '#64748b' } },
+        gridLineColor: '#eef2f6',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+      },
+      plotOptions: {
+        column: {
+          borderRadius: 4,
+          borderWidth: 0,
+          colorByPoint: true,
+        },
+      },
       series: [{ type: 'column' as const, name: title, data }] as any,
     };
   }
@@ -319,13 +399,23 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   private pieChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
     return {
       chart: { type: 'pie', backgroundColor: 'transparent' },
-      title: { text: title },
+      colors: this.chartColors,
+      title: this.chartTitleStyle(title),
       credits: { enabled: false },
+      legend: {
+        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
+        itemHoverStyle: { color: '#6d28d9' },
+      },
       plotOptions: {
         pie: {
           allowPointSelect: true,
           cursor: 'pointer',
-          dataLabels: { enabled: true, format: '<b>{point.name}</b>: {point.percentage:.1f}%' },
+          borderWidth: 0,
+          dataLabels: {
+            enabled: true,
+            format: '<b>{point.name}</b>: {point.percentage:.1f}%',
+            style: { color: '#475569', fontWeight: '500', fontFamily: 'inherit', textOutline: 'none' },
+          },
         },
       },
       series: [{ type: 'pie' as const, name: title, data }] as any,

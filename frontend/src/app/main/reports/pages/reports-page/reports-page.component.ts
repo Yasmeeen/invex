@@ -304,8 +304,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     '#c026d3',
   ];
 
-  /** Multi-series lines (profit): revenue, cost, net. */
-  private readonly chartLineContrast = ['#5b21b6', '#94a3b8', '#7c3aed'];
+  /** Multi-series lines (profit): revenue (violet), cost (slate), net (teal — distinct from revenue). */
+  private readonly chartLineContrast = ['#5b21b6', '#64748b', '#0d9488'];
 
   private chartTitleStyle(text: string): Highcharts.TitleOptions {
     return {

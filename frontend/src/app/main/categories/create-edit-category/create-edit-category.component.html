@@ -46,6 +46,35 @@
                       </span>
                     </div>
                   </div>
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        categoryCode.invalid && categoryForm.submitted
+                      "
+                    >
+                      <label>{{ "tr_category_short_code" | translate }}</label>
+                      <input
+                        #categoryCode="ngModel"
+                        type="text"
+                        class="s-control"
+                        name="code"
+                        ngModel
+                        required
+                        autocomplete="off"
+                        placeholder="ELEC"
+                      />
+                      <p class="text-muted size-small m-0 mt-1">
+                        {{ "tr_category_code_hint" | translate }}
+                      </p>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="categoryCode.invalid && categoryForm.submitted"
+                      >
+                        {{ "tr_category_code_required" | translate }}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>

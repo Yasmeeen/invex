@@ -28,49 +28,6 @@
 
               <form #basicInfoForm="ngForm">
                 <div class="row">
-                        <!-- Code -->
-           <!-- Code -->
-<div class="col-md-12">
-  <div
-    class="form-group"
-    [class.has-error]="code.invalid && basicInfoForm.submitted"
-  >
-    <label>{{ 'tr_code' | translate }}</label>
-    <div class="code-scan-container">
-      <input
-        type="text"
-        name="code"
-        [(ngModel)]="codeValue"
-        [attr.placeholder]="'tr_product_code_placeholder' | translate"
-        #code="ngModel"
-        required
-      />
-      <button type="button" class="scan-btn" (click)="toggleCamera()">
-        <i class="fa fa-camera" aria-hidden="true"></i>
-        {{ 'tr_product_scan_qr' | translate }}
-      </button>
-
-      <button type="button" class="s-btn btn-secondary ml-2" (click)="generateBarcode()">
-        {{ 'tr_product_generate_barcode' | translate }}
-      </button>
-    </div>
-
-    <!-- Overlay الكاميرا -->
-    <div *ngIf="isCameraActive" class="camera-overlay">
-      <video id="video" width="300" height="300"></video>
-    </div>
-
-    <span
-      class="text-error size-small validator"
-      *ngIf="code.invalid && basicInfoForm.submitted"
-    >
-      {{ 'tr_code_required' | translate }}
-    </span>
-  </div>
-</div>
-
-
-
                   <!-- Name -->
                   <div class="col-md-6">
                     <div
@@ -95,7 +52,7 @@
                     </div>
                   </div>
 
-                  <!-- Category -->
+                  <!-- Category (must be selected before product code) -->
                   <div class="col-md-6">
                     <div
                       class="form-group"
@@ -107,13 +64,23 @@
                           class="s-control s-select"
                           placeholder="{{ 'tr_select' | translate }}"
                           bindLabel="name"
-                          [clearable]="false"
-                          ngModel
+                          [compareWith]="categoryCompare"
+                          [clearable]="!isEdit"
+                          appendTo="body"
+                          [(ngModel)]="selectedCategory"
+                          (ngModelChange)="onProductCategoryChange($event)"
                           #category="ngModel"
                           name="category"
-                          [items]="categories"
+                          [items]="categoryDropdownItems"
                           required
-                        ></ng-select>
+                        >
+                          <ng-template ng-option-tmp let-item="item">
+                            <span>{{ item.name }}</span>
+                            <span class="text-muted" *ngIf="item.code"> — {{ item.code }}</span>
+                            <span class="text-warning size-small" *ngIf="!item.code">
+                              ({{ 'tr_category_no_code_tag' | translate }})</span>
+                          </ng-template>
+                        </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
                       <span
@@ -121,6 +88,77 @@
                         *ngIf="category.invalid && basicInfoForm.submitted"
                       >
                         {{ 'tr_category_required' | translate }}
+                      </span>
+                      <p
+                        class="text-muted size-small m-0 mt-1"
+                        *ngIf="!isEdit && categories?.length && !hasAnyCategoryWithCode"
+                      >
+                        {{ 'tr_no_categories_with_code' | translate }}
+                      </p>
+                      <p
+                        class="text-warning size-small m-0 mt-1"
+                        *ngIf="!isEdit && selectedCategory && !hasCategoryCode(selectedCategory)"
+                      >
+                        {{ 'tr_category_needs_code_for_products' | translate }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Product code (enabled only after category with code is selected) -->
+                  <div class="col-md-12">
+                    <div
+                      class="form-group"
+                      [class.has-error]="code.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_code' | translate }}</label>
+                      <p
+                        class="text-muted size-small m-0 mb-2"
+                        *ngIf="!isEdit && !isProductCodeEnabled"
+                      >
+                        {{ 'tr_select_category_first_code' | translate }}
+                      </p>
+                      <div class="code-scan-container">
+                        <input
+                          type="text"
+                          name="code"
+                          [(ngModel)]="codeValue"
+                          [readonly]="!isProductCodeEnabled"
+                          [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                          (blur)="enforceProductCodePrefix()"
+                          #code="ngModel"
+                          required
+                          class="s-control"
+                          [class.code-field-readonly]="!isProductCodeEnabled"
+                        />
+                        <button
+                          type="button"
+                          class="scan-btn"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="toggleCamera()"
+                        >
+                          <i class="fa fa-camera" aria-hidden="true"></i>
+                          {{ 'tr_product_scan_qr' | translate }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary ml-2"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="generateBarcode()"
+                        >
+                          {{ 'tr_product_generate_barcode' | translate }}
+                        </button>
+                      </div>
+
+                      <div *ngIf="isCameraActive" class="camera-overlay">
+                        <video id="video" width="300" height="300"></video>
+                      </div>
+
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="code.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_code_required' | translate }}
                       </span>
                     </div>
                   </div>
@@ -308,6 +346,7 @@
                           placeholder="{{ 'tr_select' | translate }}"
                           bindLabel="name"
                           [clearable]="false"
+                          appendTo="body"
                           ngModel
                           #branch="ngModel"
                           name="branch"

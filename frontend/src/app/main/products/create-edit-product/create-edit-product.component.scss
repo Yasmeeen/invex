@@ -1,3 +1,15 @@
+/* ng-select inside modal: stable items + appendTo body; icon must not steal clicks */
+::ng-deep .complex-modal .input-with-icon {
+  ng-select.ng-select {
+    position: relative;
+    z-index: 3;
+  }
+
+  .input-icon {
+    pointer-events: none;
+  }
+}
+
 .storage-choice {
   display: flex;
   gap: 1rem;
@@ -9,6 +21,11 @@
   gap: 0.35rem;
   cursor: pointer;
   font-weight: normal;
+}
+
+.code-field-readonly {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .code-scan-container {

@@ -19,9 +19,11 @@ constructor(
 getProducts(params: any) {
   return this.http.get(PRODUCTS_URL, { params: params });
 }
-  // Generate automatic barcode
-  generateBarcode(): Observable<{ code: string }> {
-    return this.http.get<{ code: string }>(`${PRODUCTS_URL}/generate-barcode`);
+  /** Next suggested code for the category (e.g. ELEC-001). Requires categoryId. */
+  generateBarcode(categoryId: string): Observable<{ code: string }> {
+    return this.http.get<{ code: string }>(`${PRODUCTS_URL}/generate-barcode`, {
+      params: { categoryId },
+    });
   }
 
   getBarcodeImage(code: string,productName: string){

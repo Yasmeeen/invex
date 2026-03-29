@@ -20,6 +20,8 @@ export interface Product {
 export interface Category {
   _id: string;
   name: string;
+  /** Prefix for product codes (e.g. ELEC → ELEC-001) */
+  code?: string;
   productsCount: number;
   totalItems: number
 }export interface Branch {

@@ -43,6 +43,11 @@ export class CreateEditProductComponent implements OnInit {
   /** When true, product is stored in central warehouse (no branch). */
   storeInWarehouse = false;
   categories: Category [];
+  /** Stable array for ng-select `[items]` (do not use a getter — new refs break selection). */
+  categoryDropdownItems: Category[] = [];
+  /** Bound to category ng-select (category must be chosen before product code). */
+  selectedCategory: Category | null = null;
+  private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false;
   /** Saved Cloudinary (or other HTTPS) URL */
@@ -72,6 +77,42 @@ export class CreateEditProductComponent implements OnInit {
     return !this.isEdit && isBranchManager(this.globals.currentUser?.role);
   }
 
+  hasCategoryCode(c?: Category | null): boolean {
+    return !!(c && String(c.code || '').trim());
+  }
+
+  private refreshCategoryDropdownItems(): void {
+    if (!this.categories?.length) {
+      this.categoryDropdownItems = [];
+      return;
+    }
+    if (this.isEdit) {
+      const list = [...this.categories];
+      const sel = this.selectedCategory;
+      if (sel?._id && !list.some((c) => String(c._id) === String(sel._id))) {
+        list.unshift(sel);
+      }
+      this.categoryDropdownItems = list;
+      return;
+    }
+    this.categoryDropdownItems = [...this.categories];
+  }
+
+  get hasAnyCategoryWithCode(): boolean {
+    return !!(this.categories?.some((c) => this.hasCategoryCode(c)));
+  }
+
+  categoryCompare(a: Category | null, b: Category | null): boolean {
+    if (a == null || b == null) {
+      return a == null && b == null;
+    }
+    return String(a._id) === String(b._id);
+  }
+
+  get isProductCodeEnabled(): boolean {
+    return !!(this.selectedCategory && this.hasCategoryCode(this.selectedCategory));
+  }
+
   ngOnInit() {
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
@@ -97,7 +138,8 @@ export class CreateEditProductComponent implements OnInit {
       'limit': 1000
     }
     this.subscriptions.push(this.categoriesServce.getCategorys(params).subscribe((response: any) => {
-      this.categories = response.categories
+      this.categories = response.categories;
+      this.refreshCategoryDropdownItems();
     },(error:any)=> {
 
       this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
@@ -121,6 +163,10 @@ export class CreateEditProductComponent implements OnInit {
       this.productId = response._id;
       this.storeInWarehouse = !!response.inWarehouse;
       this.codeValue = response.code;
+      this.selectedCategory = response.category || null;
+      this.previousCategoryIdForEdit = this.selectedCategory?._id
+        ? String(this.selectedCategory._id)
+        : null;
       this.basicInfoForm.form.patchValue({
         name: response.name,
         code: response.code,
@@ -132,7 +178,74 @@ export class CreateEditProductComponent implements OnInit {
         branch: response.branch || null,
       });
       this.productImageUrl = response.imageUrl || '';
+      this.refreshCategoryDropdownItems();
     });
+  }
+
+  onProductCategoryChange(cat: Category | null): void {
+    this.selectedCategory = cat;
+    if (!cat) {
+      if (!this.isEdit) {
+        this.codeValue = '';
+        this.isCodeGenerated = false;
+      }
+      return;
+    }
+    if (!this.hasCategoryCode(cat)) {
+      if (!this.isEdit) {
+        this.codeValue = '';
+        this.isCodeGenerated = false;
+      }
+      return;
+    }
+    if (!this.isEdit) {
+      this.codeValue = '';
+      this.isCodeGenerated = false;
+      this.regenerateCodeFromCategory();
+      return;
+    }
+    const newId = String(cat._id);
+    if (this.previousCategoryIdForEdit && this.previousCategoryIdForEdit !== newId) {
+      this.regenerateCodeFromCategory();
+    }
+    this.previousCategoryIdForEdit = newId;
+  }
+
+  private regenerateCodeFromCategory(): void {
+    const cat = this.selectedCategory;
+    if (!cat?._id || !this.hasCategoryCode(cat)) {
+      return;
+    }
+    this.productsSerivce.generateBarcode(String(cat._id)).subscribe({
+      next: (res: { code: string }) => {
+        this.codeValue = res.code;
+        this.isCodeGenerated = true;
+        this.basicInfoForm?.form?.patchValue({ code: res.code });
+      },
+      error: (err: any) => {
+        const msg =
+          err?.error?.error ||
+          this.translateService.instant('tr_barcode_generate_failed');
+        this.appNotificationService.push(msg, 'error');
+      },
+    });
+  }
+
+  enforceProductCodePrefix(): void {
+    const cat = this.selectedCategory;
+    if (!cat || !this.hasCategoryCode(cat)) {
+      return;
+    }
+    const prefix = String(cat.code).trim();
+    let v = (this.codeValue || '').trim();
+    if (!v) {
+      return;
+    }
+    const pu = prefix.toUpperCase();
+    if (!v.toUpperCase().startsWith(pu)) {
+      const join = prefix.endsWith('-') ? '' : '-';
+      this.codeValue = `${prefix}${join}${v}`.replace(/-+/g, '-');
+    }
   }
 
   isCloudinaryConfigured(): boolean {
@@ -188,17 +301,30 @@ export class CreateEditProductComponent implements OnInit {
 
 
 generateBarcode() {
-  this.productsSerivce.generateBarcode().subscribe({
-    next: (res: any) => {
-      this.codeValue = res.code; // ضع الكود في الحقل
-      this.isCodeGenerated = true;  // قفل الحقل
-      this.basicInfoForm.form.patchValue({ code: res.code });
-      this.appNotificationService.push('✅ الكود تم توليده تلقائياً', 'success');
+  const cat = this.selectedCategory;
+  if (!cat?._id || !this.hasCategoryCode(cat)) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_select_category_first_code'),
+      'error'
+    );
+    return;
+  }
+  this.productsSerivce.generateBarcode(String(cat._id)).subscribe({
+    next: (res: { code: string }) => {
+      this.codeValue = res.code;
+      this.isCodeGenerated = true;
+      this.basicInfoForm?.form?.patchValue({ code: res.code });
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_code_generated'),
+        'success'
+      );
     },
-    error: (err:any) => {
-      console.error(err);
-      this.appNotificationService.push('❌ خطأ في توليد الكود', 'error');
-    }
+    error: (err: any) => {
+      const msg =
+        err?.error?.error ||
+        this.translateService.instant('tr_barcode_generate_failed');
+      this.appNotificationService.push(msg, 'error');
+    },
   });
 }
 
@@ -207,6 +333,22 @@ createProduct() {
     return;
   }
   if (!this.basicInfoForm.valid) return;
+  if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_select_category_first_code'),
+      'error'
+    );
+    return;
+  }
+  const codeTrim = String(this.codeValue || '').trim();
+  const prefix = String(this.selectedCategory.code || '').trim();
+  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_product_code_prefix_mismatch'),
+      'error'
+    );
+    return;
+  }
 
   const inWarehouse = this.isBranchManagerNewProduct ? false : this.storeInWarehouse;
   let branchForPayload = this.basicInfoForm.value.branch;
@@ -291,6 +433,22 @@ updateProduct() {
   }
   this.product = this.basicInfoForm.value;
   if (!this.basicInfoForm.valid) return;
+  if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_category_code_missing_on_category'),
+      'error'
+    );
+    return;
+  }
+  const codeTrim = String(this.codeValue || '').trim();
+  const prefix = String(this.selectedCategory.code || '').trim();
+  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_product_code_prefix_mismatch'),
+      'error'
+    );
+    return;
+  }
   if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
     this.appNotificationService.push(
       this.translateService.instant('tr_branch_required'),
@@ -363,6 +521,13 @@ updateProduct() {
   }
 
   toggleCamera() {
+    if (!this.isProductCodeEnabled) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_select_category_first_code'),
+        'error'
+      );
+      return;
+    }
     this.isCameraActive = !this.isCameraActive;
     if (this.isCameraActive) {
       this.startCameraScan();
@@ -394,7 +559,19 @@ updateProduct() {
       return;
     }
 
-    this.basicInfoForm.form.patchValue({ code: code });
+    if (this.selectedCategory && this.hasCategoryCode(this.selectedCategory)) {
+      const p = String(this.selectedCategory.code).trim();
+      if (!code.toUpperCase().startsWith(p.toUpperCase())) {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_scan_code_wrong_prefix'),
+          'error'
+        );
+        return;
+      }
+    }
+
+    this.codeValue = code;
+    this.basicInfoForm?.form?.patchValue({ code });
     this.appNotificationService.push('Code scanned successfully', 'success');
   }
 

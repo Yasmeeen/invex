@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BASE_URL, CATEGORY_CREATE_CATEGORY_URL, CATEGORY_DELETE_CATEGORY_URL, CATEGORY_UPDATE_CATEGORY_URL, CATEGORYS_URL } from '@core/base/urls';
+import { CATEGORY_CREATE_CATEGORY_URL, CATEGORY_DELETE_CATEGORY_URL, CATEGORYS_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
 // import { Category } from '@core/models/categorys.model';
 import { Observable } from 'rxjs';
@@ -27,8 +27,8 @@ getCategory(categoryId: any) {
 createCategory(params: any) {
   return this.http.post(CATEGORY_CREATE_CATEGORY_URL, params);
 }
-updateCategory(category: Category): Observable<Category> {
-  return this.http.put<Category>(CATEGORY_UPDATE_CATEGORY_URL, category).pipe(
+updateCategory(category: Partial<Category>, categoryId: string): Observable<Category> {
+  return this.http.put<Category>(`${CATEGORYS_URL}/${categoryId}`, category).pipe(
     tap({
       error: (errorResponse: Error) => {
         this.appNotificationService.push('Update Category Failed', 'error');

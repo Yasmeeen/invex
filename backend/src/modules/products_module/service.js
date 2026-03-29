@@ -1,6 +1,36 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
+import Category from '../../DB/models/category.model.js';
+
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Ensures product code uses the category prefix; category must have a non-empty code. */
+async function validateProductCodeForCategory(categoryId, productCode) {
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    return { ok: false, error: 'Invalid category' };
+  }
+  const prefix = (cat.code || '').trim();
+  if (!prefix) {
+    return {
+      ok: false,
+      error:
+        'Category has no product code prefix; update the category before adding or editing products',
+    };
+  }
+  const c = String(productCode ?? '').trim();
+  if (!c) {
+    return { ok: false, error: 'Product code is required' };
+  }
+  if (!c.toUpperCase().startsWith(prefix.toUpperCase())) {
+    return {
+      ok: false,
+      error: `Product code must start with "${prefix}"`,
+    };
+  }
+  return { ok: true };
+}
 
 /** Category id from body: `{ _id }`, `{ id }`, plain id string, or ObjectId. */
 const resolveCategoryId = (category) => {
@@ -109,11 +139,46 @@ export const generateBarcodePDF = async (req, res) => {
   }
 };
 
-// توليد كود تلقائي
+// Suggested next product code: {CATEGORY_CODE}-{NNN} for the selected category
 export const generateBarcode = async (req, res) => {
   try {
-    const uniqueCode = `PRD-${Date.now()}`; // فورمات فريد
-    res.json({ code: uniqueCode });
+    const categoryId = req.query.categoryId != null ? String(req.query.categoryId).trim() : '';
+    if (!categoryId || !mongoose.Types.ObjectId.isValid(categoryId)) {
+      return res.status(400).json({ error: 'categoryId query parameter is required' });
+    }
+
+    const cat = await Category.findById(categoryId).lean();
+    if (!cat) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    const rawPrefix = (cat.code || '').trim();
+    if (!rawPrefix) {
+      return res.status(400).json({
+        error: 'Category has no code prefix; edit the category to set a code first',
+      });
+    }
+
+    const base = rawPrefix.replace(/-+$/g, '').toUpperCase();
+    const prefixRe = escapeRegex(base);
+    const products = await Product.find({
+      category: categoryId,
+      code: new RegExp(`^${prefixRe}(-\\d+)$`, 'i'),
+    })
+      .select('code')
+      .lean();
+
+    let max = 0;
+    const re = new RegExp(`^${prefixRe}-(\\d+)$`, 'i');
+    for (const p of products) {
+      const m = String(p.code).match(re);
+      if (m) {
+        max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+
+    const next = max + 1;
+    const code = `${base}-${String(next).padStart(3, '0')}`;
+    res.json({ code });
   } catch (error) {
     console.error('❌ Error generating barcode:', error);
     res.status(500).json({ error: 'Failed to generate barcode' });
@@ -252,7 +317,7 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name')
+        .populate('category', 'name code')
         .populate('branch', 'name')
         .skip(skip)
         .limit(Number(limit)),
@@ -282,7 +347,7 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name')
+      .populate('category', 'name code')
       .populate('branch', 'name');
 
     if (!product) {
@@ -325,6 +390,11 @@ export const createProduct = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    const codeCheck = await validateProductCodeForCategory(categoryId, code);
+    if (!codeCheck.ok) {
+      return res.status(400).json({ error: codeCheck.error });
     }
 
     if (isWarehouse) {
@@ -420,6 +490,11 @@ export const updateProduct = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return res.status(400).json({ error: 'Invalid category' });
+    }
+
+    const codeCheck = await validateProductCodeForCategory(categoryId, code);
+    if (!codeCheck.ok) {
+      return res.status(400).json({ error: codeCheck.error });
     }
 
     if (isWarehouse) {

@@ -6,6 +6,7 @@ import { ProductActiveBooking } from '@core/models/products.model';
 
 export interface CreateProductBookingPayload {
   productId: string;
+  quantity?: number;
   customerName: string;
   customerPhone: string;
   pickupType: 'branch_pickup' | 'online_shipping';
@@ -13,6 +14,17 @@ export interface CreateProductBookingPayload {
   depositAmount: number;
   bookingDate: string;
   userId: string;
+}
+
+export interface ProductBookingsSummary {
+  totalBookedQty: number;
+  stock: number;
+  availableToBook: number;
+}
+
+export interface ProductBookingsForProductResponse {
+  bookings: ProductActiveBooking[];
+  summary: ProductBookingsSummary;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -27,9 +39,10 @@ export class ProductBookingsService {
     return this.http.patch(`${PRODUCT_BOOKINGS_URL}/${bookingId}/cancel`, body);
   }
 
-  getByProductId(productId: string): Observable<{ booking: ProductActiveBooking | null }> {
-    return this.http.get<{ booking: ProductActiveBooking | null }>(
-      `${PRODUCT_BOOKINGS_URL}/product/${productId}`
-    );
+  /** viewerUserId: current user; admins see all bookings on the product, others only their own. */
+  getForProduct(productId: string, viewerUserId: string): Observable<ProductBookingsForProductResponse> {
+    return this.http.get<ProductBookingsForProductResponse>(`${PRODUCT_BOOKINGS_URL}/product/${productId}`, {
+      params: { viewerUserId },
+    });
   }
 }

@@ -28,6 +28,8 @@ const productBookingSchema = new mongoose.Schema(
       required: true,
     },
     shippingAddress: { type: String, default: '', trim: true },
+    /** Units reserved by this booking (SKU quantity). */
+    quantity: { type: Number, required: true, min: 1, default: 1 },
     depositAmount: { type: Number, required: true, min: 0 },
     bookingDate: { type: Date, required: true },
     status: {
@@ -48,10 +50,7 @@ const productBookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-productBookingSchema.index(
-  { product: 1, status: 1 },
-  { unique: true, partialFilterExpression: { status: 'active' } }
-);
+productBookingSchema.index({ product: 1, status: 1 });
 
 const ProductBooking = mongoose.model('ProductBooking', productBookingSchema);
 export default ProductBooking;

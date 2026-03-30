@@ -1,5 +1,5 @@
 <div class="complex-modal">
-  <div class="modal-wrapper">
+  <div class="modal-wrapper view-booking-modal">
     <div class="close-modal-icon" (click)="close()"></div>
     <div class="modal-content">
       <div class="modal-header border-bottom">
@@ -7,31 +7,81 @@
         <p class="size-small text-muted m-0 mt-1">{{ product.name }} — {{ product.code }}</p>
       </div>
       <div class="modal-body weight-medium steel plr-4 ptb-3">
-        <dl class="booking-details">
-          <dt>{{ 'tr_booking_customer_name' | translate }}</dt>
-          <dd>{{ booking.customerName }}</dd>
-          <dt>{{ 'tr_booking_customer_phone' | translate }}</dt>
-          <dd>{{ booking.customerPhone }}</dd>
-          <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
-          <dd>{{ pickupLabel() }}</dd>
-          <ng-container *ngIf="booking.pickupType === 'online_shipping' && booking.shippingAddress">
-            <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
-            <dd>{{ booking.shippingAddress }}</dd>
-          </ng-container>
-          <dt>{{ 'tr_booking_deposit' | translate }}</dt>
-          <dd>{{ booking.depositAmount }}</dd>
-          <dt>{{ 'tr_booking_date' | translate }}</dt>
-          <dd>{{ booking.bookingDate | date : 'mediumDate' }}</dd>
-          <dt *ngIf="booking.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
-          <dd *ngIf="booking.createdBy?.name">{{ booking.createdBy?.name }}</dd>
-        </dl>
+        <div *ngIf="loading" class="text-muted size-small">{{ 'tr_loading' | translate }}…</div>
+        <div *ngIf="!loading && loadError" class="text-error size-small">
+          {{ 'tr_unexpected_error_message' | translate }}
+        </div>
+
+        <ng-container *ngIf="!loading && !loadError && summary">
+          <div class="booking-summary-banner">
+            <i class="fa fa-bookmark booking-summary-banner__icon" aria-hidden="true"></i>
+            <div>
+              <div class="booking-summary-banner__title">
+                {{
+                  'tr_booking_reserved_line'
+                    | translate
+                      : {
+                          booked: summary.totalBookedQty,
+                          stock: summary.stock,
+                          free: summary.availableToBook
+                        }
+                }}
+              </div>
+              <div class="size-small text-muted">
+                {{ 'tr_booking_reserved_hint' | translate }}
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="bookings.length === 0" class="booking-empty size-small text-muted pt-2">
+            {{ 'tr_booking_your_list_empty' | translate }}
+          </div>
+
+          <ul class="booking-cards" *ngIf="bookings.length > 0">
+            <li *ngFor="let b of bookings" class="booking-card">
+              <div class="booking-card__head">
+                <span class="booking-card__qty"
+                  ><i class="fa fa-cubes" aria-hidden="true"></i>
+                  {{ b.quantity ?? 1 }}</span
+                >
+                <button
+                  *ngIf="canCancel(b)"
+                  type="button"
+                  class="s-btn btn-danger btn-sm"
+                  [disabled]="cancellingId === b._id"
+                  (click)="confirmCancel(b)"
+                >
+                  {{ 'tr_product_cancel_booking' | translate }}
+                </button>
+              </div>
+              <dl class="booking-details booking-details--compact">
+                <dt>{{ 'tr_booking_customer_name' | translate }}</dt>
+                <dd>{{ b.customerName }}</dd>
+                <dt>{{ 'tr_booking_customer_phone' | translate }}</dt>
+                <dd>{{ b.customerPhone }}</dd>
+                <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
+                <dd>{{ pickupLabel(b) }}</dd>
+                <ng-container *ngIf="b.pickupType === 'online_shipping' && b.shippingAddress">
+                  <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
+                  <dd>{{ b.shippingAddress }}</dd>
+                </ng-container>
+                <dt>{{ 'tr_booking_deposit' | translate }}</dt>
+                <dd>{{ b.depositAmount }}</dd>
+                <dt>{{ 'tr_booking_date' | translate }}</dt>
+                <dd>{{ b.bookingDate | date : 'mediumDate' }}</dd>
+                <dt *ngIf="b.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
+                <dd *ngIf="b.createdBy?.name">{{ b.createdBy?.name }}</dd>
+              </dl>
+            </li>
+          </ul>
+        </ng-container>
       </div>
-      <div class="modal-footer border-top plr-4 ptb-3">
+      <div class="modal-footer border-top plr-4 ptb-3 booking-footer">
         <button type="button" class="s-btn btn-secondary" (click)="close()">
           {{ 'tr_action.close' | translate }}
         </button>
-        <button type="button" class="s-btn btn-danger" [disabled]="cancelling" (click)="confirmCancel()">
-          {{ 'tr_product_cancel_booking' | translate }}
+        <button type="button" class="s-btn btn-primary" *ngIf="showAddBooking" (click)="openNewBooking()">
+          {{ 'tr_product_book' | translate }}
         </button>
       </div>
     </div>

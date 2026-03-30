@@ -239,7 +239,7 @@ export class CashierComponent implements AfterViewInit {
     if (index > -1) {
       this.orderItems[index].quantity++;
     } else {
-      if (product.bookingStatus === 'active') {
+      if (product.bookingStatus === 'active' || (product.bookedQuantity ?? 0) > 0) {
         this.translate
           .get('tr_cashier_booked_product_warning')
           .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));

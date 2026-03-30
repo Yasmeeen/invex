@@ -7,7 +7,7 @@ import { PaginationData } from '@core/models/users-interfaces.model'
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
-import { Branch, Category, Product, ProductActiveBooking } from '@core/models/products.model';
+import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -16,7 +16,6 @@ import { Globals } from '@core/globals';
 import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
-import { ProductBookingsService } from '@shared/services/product-bookings.service';
 
 @Component({
   selector: 'app-products-list',
@@ -69,8 +68,7 @@ export class ProductsListComponent implements OnInit {
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
     private branchesServce: BranchesServce,
-    private globals: Globals,
-    private productBookingsService: ProductBookingsService
+    private globals: Globals
   ) { }
 
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
@@ -115,6 +113,15 @@ export class ProductsListComponent implements OnInit {
 
   showProductActionsMenu(product: Product): boolean {
     return this.canBranchManagerModifyProduct(product) || this.canBookProduct(product);
+  }
+
+  bookedQty(product: Product): number {
+    return Math.max(0, Math.floor(Number(product.bookedQuantity) || 0));
+  }
+
+  availableToBook(product: Product): number {
+    const stock = Math.max(0, Number(product.stock) || 0);
+    return Math.max(0, stock - this.bookedQty(product));
   }
 
   ngOnInit(): void {
@@ -289,14 +296,15 @@ export class ProductsListComponent implements OnInit {
       this.appNotificationService.push(this.translateService.instant('tr_booking_no_stock'), 'error');
       return;
     }
-    if (product.bookingStatus === 'active') {
-      this.appNotificationService.push(this.translateService.instant('tr_booking_already_active'), 'error');
+    const maxQ = this.availableToBook(product);
+    if (maxQ <= 0) {
+      this.appNotificationService.push(this.translateService.instant('tr_booking_no_capacity'), 'error');
       return;
     }
     this.dialog
       .open(BookProductDialogComponent, {
         width: '640px',
-        data: { product },
+        data: { product, maxQuantity: maxQ },
         disableClose: true,
       })
       .afterClosed()
@@ -315,36 +323,14 @@ export class ProductsListComponent implements OnInit {
       );
       return;
     }
-    const fromList = product.activeBooking as ProductActiveBooking | undefined;
-    if (fromList?._id) {
-      this.openViewBookingDialog(product, fromList);
-      return;
-    }
-    this.productBookingsService.getByProductId(product._id).subscribe({
-      next: (res: { booking: ProductActiveBooking | null }) => {
-        if (res?.booking && (res.booking as ProductActiveBooking)._id) {
-          this.openViewBookingDialog(product, res.booking as ProductActiveBooking);
-        } else {
-          this.appNotificationService.push(
-            this.translateService.instant('tr_booking_not_found'),
-            'error'
-          );
-        }
-      },
-      error: () => {
-        this.appNotificationService.push(
-          this.translateService.instant('tr_unexpected_error_message'),
-          'error'
-        );
-      },
-    });
+    this.openViewBookingDialog(product);
   }
 
-  private openViewBookingDialog(product: Product, booking: ProductActiveBooking): void {
+  private openViewBookingDialog(product: Product): void {
     this.dialog
       .open(ViewProductBookingDialogComponent, {
-        width: '520px',
-        data: { product, booking },
+        width: '680px',
+        data: { product, canAddBooking: this.canBookProduct(product) },
         disableClose: true,
       })
       .afterClosed()

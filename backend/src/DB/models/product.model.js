@@ -60,6 +60,13 @@ const productSchema = new mongoose.Schema(
       enum: ['none', 'active'],
       default: 'none',
     },
+    /** Sum of quantities on all active ProductBooking rows (denormalized). */
+    bookedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ProductBooking',

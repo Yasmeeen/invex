@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import Product from '../../DB/models/product.model.js';
 import Client from '../../DB/models/client.model.js';
+import User from '../../DB/models/user.model.js';
+
+const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
 function digitsOnly(s) {
   return String(s || '').replace(/\D/g, '');
@@ -37,9 +40,6 @@ async function findClientByPhone(raw) {
   return client;
 }
 
-/**
- * Normalize stored phone: prefer 0XXXXXXXXXX when we have 10 digits.
- */
 function canonicalPhoneForStorage(raw) {
   const d = digitsOnly(raw);
   if (d.length >= 10) {
@@ -67,10 +67,43 @@ async function findOrCreateClient({ name, phone, address, branchOid }) {
   return Client.create(doc);
 }
 
+async function sumActiveBookedQuantity(productOid) {
+  const [agg] = await ProductBooking.aggregate([
+    { $match: { product: productOid, status: 'active' } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+  ]);
+  return agg?.total || 0;
+}
+
+async function recalcProductBookingTotals(productId) {
+  const pid = new mongoose.Types.ObjectId(String(productId));
+  const total = await sumActiveBookedQuantity(pid);
+  await Product.updateOne(
+    { _id: pid },
+    {
+      $set: {
+        bookedQuantity: total,
+        bookingStatus: total > 0 ? 'active' : 'none',
+        activeBooking: null,
+      },
+    }
+  );
+  return total;
+}
+
+async function isStoreAdmin(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+    return false;
+  }
+  const u = await User.findById(userId).select('role').lean();
+  return u && ADMIN_ROLES.includes(u.role);
+}
+
 export const createProductBooking = async (req, res) => {
   try {
     const {
       productId,
+      quantity: qtyRaw,
       customerName,
       customerPhone,
       pickupType,
@@ -83,6 +116,7 @@ export const createProductBooking = async (req, res) => {
     if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
       return res.status(400).json({ error: 'Valid productId is required' });
     }
+    const quantity = Math.max(1, Math.floor(Number(qtyRaw)) || 1);
     if (!customerName || !String(customerName).trim()) {
       return res.status(400).json({ error: 'Customer name is required' });
     }
@@ -110,8 +144,12 @@ export const createProductBooking = async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    if (product.bookingStatus === 'active') {
-      return res.status(409).json({ error: 'Product already has an active booking' });
+    const pid = product._id;
+    const alreadyBooked = await sumActiveBookedQuantity(pid);
+    if (alreadyBooked + quantity > product.stock) {
+      return res.status(400).json({
+        error: `Only ${Math.max(0, product.stock - alreadyBooked)} unit(s) available to book`,
+      });
     }
 
     const branchOid = product.branch || null;
@@ -135,12 +173,13 @@ export const createProductBooking = async (req, res) => {
     }
 
     const booking = await ProductBooking.create({
-      product: product._id,
+      product,
       branch: branchOid,
       productInWarehouse: !!product.inWarehouse,
       client: client._id,
       customerName: String(customerName).trim(),
       customerPhone: String(customerPhone).trim(),
+      quantity,
       pickupType,
       shippingAddress: String(shippingAddress || '').trim(),
       depositAmount: dep,
@@ -149,9 +188,7 @@ export const createProductBooking = async (req, res) => {
       createdBy: userId,
     });
 
-    product.bookingStatus = 'active';
-    product.activeBooking = booking._id;
-    await product.save();
+    await recalcProductBookingTotals(pid);
 
     const populated = await ProductBooking.findById(booking._id)
       .populate('createdBy', 'name')
@@ -163,9 +200,6 @@ export const createProductBooking = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ createProductBooking:', error.message);
-    if (error.code === 11000) {
-      return res.status(409).json({ error: 'Product already has an active booking' });
-    }
     return res.status(500).json({ error: 'Failed to create booking' });
   }
 };
@@ -178,26 +212,29 @@ export const cancelProductBooking = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(String(id))) {
       return res.status(400).json({ error: 'Invalid booking id' });
     }
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
 
     const booking = await ProductBooking.findById(id);
     if (!booking || booking.status !== 'active') {
       return res.status(404).json({ error: 'Active booking not found' });
     }
 
+    const admin = await isStoreAdmin(userId);
+    if (!admin && String(booking.createdBy) !== String(userId)) {
+      return res.status(403).json({ error: 'You can only cancel bookings you created' });
+    }
+
     booking.status = 'cancelled';
     booking.cancelledAt = new Date();
-    if (userId && mongoose.Types.ObjectId.isValid(String(userId))) {
-      booking.cancelledBy = userId;
-    }
+    booking.cancelledBy = userId;
     if (reason) {
       booking.cancelReason = String(reason).trim();
     }
     await booking.save();
 
-    await Product.updateOne(
-      { _id: booking.product },
-      { $set: { bookingStatus: 'none', activeBooking: null } }
-    );
+    await recalcProductBookingTotals(booking.product);
 
     return res.json({ message: '✅ Booking cancelled' });
   } catch (error) {
@@ -206,28 +243,55 @@ export const cancelProductBooking = async (req, res) => {
   }
 };
 
+/** Listings filtered: non-admins only see their own active bookings. Summary totals are store-wide. */
 export const getBookingByProductId = async (req, res) => {
   try {
     const { productId } = req.params;
+    const { viewerUserId } = req.query;
+
     if (!mongoose.Types.ObjectId.isValid(String(productId))) {
       return res.status(400).json({ error: 'Invalid product id' });
     }
-
-    const booking = await ProductBooking.findOne({
-      product: productId,
-      status: 'active',
-    })
-      .populate('createdBy', 'name email')
-      .populate('client', 'name phoneNumber address')
-      .lean();
-
-    if (!booking) {
-      return res.json({ booking: null });
+    if (!viewerUserId || !mongoose.Types.ObjectId.isValid(String(viewerUserId))) {
+      return res.status(400).json({ error: 'viewerUserId query is required' });
     }
-    return res.json({ booking });
+
+    const product = await Product.findById(productId).select('stock name code').lean();
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const admin = await isStoreAdmin(viewerUserId);
+    const match = {
+      product: new mongoose.Types.ObjectId(String(productId)),
+      status: 'active',
+    };
+    if (!admin) {
+      match.createdBy = new mongoose.Types.ObjectId(String(viewerUserId));
+    }
+
+    const [bookings, totalBookedQty] = await Promise.all([
+      ProductBooking.find(match)
+        .sort({ createdAt: -1 })
+        .populate('createdBy', 'name _id')
+        .populate('client', 'name phoneNumber address')
+        .lean(),
+      sumActiveBookedQuantity(new mongoose.Types.ObjectId(String(productId))),
+    ]);
+
+    const availableToBook = Math.max(0, (product.stock || 0) - totalBookedQty);
+
+    return res.json({
+      bookings,
+      summary: {
+        totalBookedQty,
+        stock: product.stock,
+        availableToBook,
+      },
+    });
   } catch (error) {
     console.error('❌ getBookingByProductId:', error.message);
-    return res.status(500).json({ error: 'Failed to fetch booking' });
+    return res.status(500).json({ error: 'Failed to fetch bookings' });
   }
 };
 
@@ -269,7 +333,7 @@ export const listProductBookings = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(lim)
-        .populate('product', 'name code price branch inWarehouse')
+        .populate('product', 'name code price branch inWarehouse stock bookedQuantity')
         .populate('createdBy', 'name')
         .populate('client', 'name phoneNumber')
         .lean(),

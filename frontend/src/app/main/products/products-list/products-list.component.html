@@ -109,10 +109,21 @@
                   />
                   <span class="products-list__name-text">{{ product.name }}</span>
                   <span
-                    *ngIf="product.bookingStatus === 'active'"
+                    *ngIf="bookedQty(product) > 0"
                     class="booking-badge"
-                    >{{ 'tr_booking_badge' | translate }}</span
+                    [attr.title]="
+                      'tr_booking_stock_badge'
+                        | translate
+                          : { booked: bookedQty(product), stock: product.stock }
+                    "
                   >
+                    <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
+                    <span class="booking-badge__text">{{
+                      'tr_booking_stock_badge'
+                        | translate
+                          : { booked: bookedQty(product), stock: product.stock }
+                    }}</span>
+                  </span>
                 </span>
               </td>
               <td>
@@ -135,14 +146,14 @@
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
                         class="single-option"
-                        *ngIf="product.bookingStatus !== 'active'"
+                        *ngIf="availableToBook(product) > 0"
                         (click)="openBookProduct(product)"
                       >
                         {{ "tr_product_book" | translate }}
                       </div>
                       <div
                         class="single-option"
-                        *ngIf="product.bookingStatus === 'active'"
+                        *ngIf="bookedQty(product) > 0"
                         (click)="openBookingDetails(product)"
                       >
                         {{ "tr_product_booking_details" | translate }}

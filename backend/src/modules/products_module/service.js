@@ -288,13 +288,6 @@ export const generateBarcodeImage = async (req, res) => {
 
 
 
-const activeBookingPopulate = {
-  path: 'activeBooking',
-  select:
-    'customerName customerPhone pickupType shippingAddress depositAmount bookingDate status createdAt',
-  populate: { path: 'createdBy', select: 'name' },
-};
-
 export const getProducts = async (req, res) => {
   try {
     const {
@@ -351,7 +344,6 @@ export const getProducts = async (req, res) => {
       Product.find(query)
         .populate('category', 'name code')
         .populate('branch', 'name')
-        .populate(activeBookingPopulate)
         .skip(skip)
         .limit(Number(limit)),
       Product.countDocuments(query),
@@ -381,8 +373,7 @@ export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('category', 'name code')
-      .populate('branch', 'name')
-      .populate(activeBookingPopulate);
+      .populate('branch', 'name');
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });

@@ -1,19 +1,101 @@
-.booking-details {
-  margin: 0;
-  dt {
+.view-booking-modal {
+  .booking-summary-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+    border: 1px solid #ffc107;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .booking-summary-banner__icon {
+    font-size: 22px;
+    color: #f57c00;
+    margin-top: 2px;
+  }
+
+  .booking-summary-banner__title {
     font-weight: 600;
-    margin-top: 0.75rem;
-    &:first-child {
-      margin-top: 0;
+    color: #5d4037;
+    line-height: 1.35;
+  }
+
+  .booking-empty {
+    border: 1px dashed #ccc;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .booking-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 48vh;
+    overflow-y: auto;
+  }
+
+  .booking-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: #fafafa;
+  }
+
+  .booking-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .booking-card__qty {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: #6a1b9a;
+    font-size: 15px;
+
+    .fa {
+      opacity: 0.85;
     }
   }
-  dd {
-    margin: 0.25rem 0 0;
-  }
-}
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  .booking-details--compact {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(7rem, 35%) 1fr;
+    gap: 4px 12px;
+    font-size: 13px;
+
+    dt {
+      margin: 0;
+      color: #666;
+      font-weight: 600;
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  .booking-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
 }

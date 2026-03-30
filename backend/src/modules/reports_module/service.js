@@ -417,6 +417,7 @@ export const getBookingsReport = async (req, res) => {
     const rows = bookings.map((b) => ({
       productName: b.product?.name || '',
       productCode: b.product?.code || '',
+      quantity: b.quantity ?? 1,
       customerName: b.customerName,
       customerPhone: b.customerPhone,
       pickupType: b.pickupType,

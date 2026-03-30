@@ -7,7 +7,36 @@
         <p class="size-small text-muted m-0 mt-1">{{ product.name }} — {{ product.code }}</p>
       </div>
       <div class="modal-body weight-medium steel plr-4 ptb-3" [formGroup]="form">
+        <p class="size-small text-muted m-0 mb-2">
+          {{ 'tr_booking_units_available_hint' | translate : { max: maxQuantity } }}
+        </p>
         <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_quantity' | translate }}</label>
+              <input
+                class="s-control width-100"
+                [class.s-control--invalid]="
+                  form.get('quantity')?.invalid && form.get('quantity')?.touched
+                "
+                type="number"
+                min="1"
+                [max]="maxQuantity"
+                formControlName="quantity"
+              />
+              <div
+                class="text-error size-small mt-1"
+                *ngIf="form.get('quantity')?.invalid && form.get('quantity')?.touched"
+              >
+                <span *ngIf="form.get('quantity')?.errors?.['max']">{{
+                  'tr_booking_quantity_too_high' | translate : { max: maxQuantity }
+                }}</span>
+                <span *ngIf="form.get('quantity')?.errors?.['min'] && !form.get('quantity')?.errors?.['max']">{{
+                  'tr_booking_quantity_invalid' | translate
+                }}</span>
+              </div>
+            </div>
+          </div>
           <div class="col-md-6">
             <div class="form-group">
               <label>{{ 'tr_booking_customer_name' | translate }}</label>

@@ -104,7 +104,7 @@ export class OrdersListComponent implements OnInit {
 
   getOrders() {
    this.curentUser = this.authenticationService.getUserFromLocalStorage();
-   if (this.curentUser.role === 'Employee' || this.curentUser.role === 'Branch Manager') {
+   if (this.curentUser.role === 'Cashier' || this.curentUser.role === 'Branch Manager') {
     this.params.searchBranch = this.curentUser.branch?.name;
    }
    if(this.selectedStatus){
@@ -196,7 +196,7 @@ export class OrdersListComponent implements OnInit {
         ? this.selectedBranchId
         : this.globals.currentUser.branch._id,
     }
-    if( this.curentUser.role == 'Employee'){
+    if (this.curentUser.role === 'Cashier') {
       this.params.branch = this.curentUser.branch?._id
      }
 

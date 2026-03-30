@@ -13,7 +13,12 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { Globals } from '@core/globals';
-import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
+import {
+  canBookAnyProduct,
+  canPickBranchRole,
+  isBranchManager,
+  isModerator,
+} from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
 
@@ -71,8 +76,16 @@ export class ProductsListComponent implements OnInit {
     private globals: Globals
   ) { }
 
+  /** Moderator: never create/edit/delete/print products. */
+  get canAddProduct(): boolean {
+    return !isModerator(this.globals.currentUser?.role);
+  }
+
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
   canBranchManagerModifyProduct(product: Product): boolean {
+    if (isModerator(this.globals.currentUser?.role)) {
+      return false;
+    }
     if (!isBranchManager(this.globals.currentUser?.role)) {
       return true;
     }
@@ -89,11 +102,13 @@ export class ProductsListComponent implements OnInit {
     return String(pid) === String(myId);
   }
 
-  /** Super Admin / Co Admin: any product. Branch Manager: own branch only (not warehouse). */
+  /** Admins, Warehouse, Moderator: any product. Branch Manager: own branch only (not warehouse). */
   canBookProduct(product: Product): boolean {
     const role = this.globals.currentUser?.role as string | undefined;
-    if (canPickBranchRole(role)) {
-      return true;
+    if (canBookAnyProduct(role)) {
+      if (!isBranchManager(role)) {
+        return true;
+      }
     }
     if (!isBranchManager(role)) {
       return false;

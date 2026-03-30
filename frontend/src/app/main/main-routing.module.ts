@@ -3,6 +3,10 @@ import { RouterModule, Routes } from '@angular/router';
 import { AuthenticationGuard } from '@core/guards';
 import { MainComponent } from './main.component';
 import { RoleGuard } from '@core/guards/role.guard';
+import { LEGACY_OPERATION_MANAGER } from '@core/utils/role-utils';
+
+/** DB may still store legacy "Operation Manager"; canonical name is Warehouse. */
+const WAREHOUSE = ['Warehouse', LEGACY_OPERATION_MANAGER] as const;
 
 const routes: Routes = [
   {
@@ -20,19 +24,29 @@ const routes: Routes = [
         path: 'products',
         loadChildren: () => import('./products/products.module').then(m => m.ProductsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Operation Manager'] }
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+            'Moderator',
+          ],
+        },
       },
       {
         path: 'branches',
         loadChildren: () => import('./branches/branches.module').then(m => m.BranchesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Operation Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', ...WAREHOUSE] },
       },
       {
         path: 'categories',
         loadChildren: () => import('./categories/categories.module').then(m => m.CategoriesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Operation Manager'] }
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+        },
       },
       {
         path: 'settings',
@@ -44,13 +58,23 @@ const routes: Routes = [
         path: 'reports',
         loadChildren: () => import('./reports/reports.module').then(m => m.ReportsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Operation Manager'] }
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+        },
       },
       {
         path: 'orders',
         loadChildren: () => import('./orders/orders.module').then(m => m.OrdersModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Employee', 'Operation Manager'] }
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+            'Cashier',
+          ],
+        },
       },
       {
         path: 'home',
@@ -62,7 +86,14 @@ const routes: Routes = [
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Operation Manager'] }
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+          ],
+        },
       },
       {
         path: 'clients',
@@ -86,7 +117,7 @@ const routes: Routes = [
         path: 'cashier',
         loadChildren:() => import('./cashier/cashier.module').then(m => m.CashierModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Employee', 'Cashier'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'] },
       },
 
 

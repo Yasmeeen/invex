@@ -28,9 +28,9 @@ export class CreateEditUserComponent implements OnInit {
     'Super Admin',
     'Co Admin',
     'Branch Manager',
-    'Employee',
     'Cashier',
-    'Operation Manager',
+    'Warehouse',
+    'Moderator',
   ];
 
   private subscriptions: Subscription[] = [];

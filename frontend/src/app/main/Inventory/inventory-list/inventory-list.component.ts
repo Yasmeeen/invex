@@ -12,7 +12,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
-import { isBranchManager } from '@core/utils/role-utils';
+import { isBranchManager, isModerator } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-inventory-list',
@@ -64,11 +64,24 @@ export class InventoryListComponent implements OnInit {
   ) { }
 
   get canWarehouseTransfer(): boolean {
-    return !isBranchManager(this.globals.currentUser?.role);
+    const r = this.globals.currentUser?.role;
+    if (isModerator(r)) {
+      return false;
+    }
+    return !isBranchManager(r);
   }
 
   get canDeleteFromWarehouse(): boolean {
-    return !isBranchManager(this.globals.currentUser?.role);
+    const r = this.globals.currentUser?.role;
+    if (isModerator(r)) {
+      return false;
+    }
+    return !isBranchManager(r);
+  }
+
+  /** Show ⋮ actions only when at least one action exists. */
+  get canInventoryRowActions(): boolean {
+    return this.canWarehouseTransfer || this.canDeleteFromWarehouse;
   }
 
   ngOnInit(): void {

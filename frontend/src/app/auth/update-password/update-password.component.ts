@@ -7,6 +7,7 @@ import { FormGroup, FormBuilder, FormControl, Validators, NgForm } from '@angula
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
 import { Globals } from 'src/app/core/globals';
 import { Role } from '@core/base/enum';
+import { isModerator, isWarehouse } from '@core/utils/role-utils';
 
 @Component({
     selector: 'update-password-components',
@@ -69,7 +70,7 @@ export class UpdatePasswordComponent implements OnInit {
         this.authenticationService.updatePassword(user).subscribe(() => {
           this.appNotificationService.push(this.translateService.instant('tr_password_updated_successfuly'),'success')
           const role = this.globals.currentUser?.role;
-          if (role === 'Operation Manager') {
+          if (isWarehouse(role) || isModerator(role)) {
             this.router.navigate(['inventory']);
           } else if (role === 'Co Admin' || role === 'Branch Manager') {
             this.router.navigate(['products']);

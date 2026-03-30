@@ -49,9 +49,9 @@ export class LoginComponent implements OnInit {
         }
         this.authenticationService.login(user).subscribe(() => {
           const role = this.globals.currentUser.role;
-          if (role === 'Employee' || role === 'Cashier') {
+          if (role === 'Cashier') {
             this.router.navigate(['orders']);
-          } else if (role === 'Operation Manager') {
+          } else if (role === 'Moderator' || role === 'Warehouse' || role === 'Operation Manager') {
             this.router.navigate(['products']);
           } else if (role === 'Co Admin' || role === 'Branch Manager') {
             this.router.navigate(['products']);

@@ -9,7 +9,11 @@
       <span class="text-primary">{{totalNumberOfProducts}}-</span>
       {{ "tr_products" | translate }}</span>
     <div class="btn-group">
-      <button class="s-btn btn-primary" (click)="createOrEditproduct(false)">
+      <button
+        *ngIf="canAddProduct"
+        class="s-btn btn-primary"
+        (click)="createOrEditproduct(false)"
+      >
         {{ "tr_add_product" | translate }}
       </button>
       <button

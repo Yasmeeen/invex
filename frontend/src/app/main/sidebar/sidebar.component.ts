@@ -5,9 +5,10 @@ import {
   BranchManagerSidebar,
   Cashier,
   CoAdminSidebar,
-  Employee,
-  OperationManager,
+  ModeratorSidebar,
+  Warehouse,
 } from '@shared/resources';
+import { isModerator, isWarehouse } from '@core/utils/role-utils';
 import { Globals } from 'src/app/core/globals';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -33,14 +34,12 @@ export class SidebarComponent implements OnInit {
       private authenticationService: AuthenticationService
   ) {
     globals.currentUser = this.authenticationService.getUserFromLocalStorage();
-    if(globals.currentUser.role == 'Employee'){
-      this.appSidebar = Employee;
-      
-    }
-    else if(globals.currentUser.role == 'Operation Manager'){ 
-      this.appSidebar = OperationManager; 
-    }
-    else if(globals.currentUser.role == 'Cashier'){
+    const role = globals.currentUser?.role;
+    if (isModerator(role)) {
+      this.appSidebar = ModeratorSidebar;
+    } else if (isWarehouse(role)) {
+      this.appSidebar = Warehouse;
+    } else if (globals.currentUser.role == 'Cashier'){
       this.appSidebar = Cashier;
     }
     else if (globals.currentUser.role === 'Co Admin') {

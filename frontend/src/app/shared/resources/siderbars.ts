@@ -105,21 +105,7 @@ export const BranchManagerSidebar = CoAdminSidebar.filter(
     item.routerLink !== '/users'
 );
 
-export const  Employee = [
-
-  {
-    name: 'tr_orders',
-    routerLink: '/orders',
-    icon: 'fa fa-list-alt icon',
-  },
-  {
-    name: 'tr_cashier.TITLE',
-    routerLink: '/cashier',
-    icon: 'fa fa-credit-card icon',
-  },
-
-];
-export const  Cashier = [
+export const Cashier = [
 
   {
     name: 'tr_orders',
@@ -134,7 +120,8 @@ export const  Cashier = [
 
 ];
 
-export const  OperationManager = [
+/** Formerly Operation Manager — orders, inventory, products, branches, categories, reports. */
+export const Warehouse = [
 
   {
     name: 'tr_orders',
@@ -177,3 +164,14 @@ export const  OperationManager = [
 
 ];
 
+/** View products only; bookings allowed from products list. */
+export const ModeratorSidebar = [
+  {
+    name: 'tr_products',
+    routerLink: '/products',
+    icon: 'fa fa-cube icon',
+  },
+];
+
+/** @deprecated Use Warehouse */
+export const OperationManager = Warehouse;

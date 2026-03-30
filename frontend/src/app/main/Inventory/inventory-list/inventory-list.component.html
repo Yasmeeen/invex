@@ -70,7 +70,7 @@
               <td>{{ product.stock }}</td>
               <td>{{ product.price }}</td>
               <td>
-                <span class="options-menu">
+                <span class="options-menu" *ngIf="canInventoryRowActions">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div

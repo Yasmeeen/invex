@@ -44,15 +44,33 @@
                   ><i class="fa fa-cubes" aria-hidden="true"></i>
                   {{ b.quantity ?? 1 }}</span
                 >
-                <button
-                  *ngIf="canCancel(b)"
-                  type="button"
-                  class="s-btn btn-danger btn-sm"
-                  [disabled]="cancellingId === b._id"
-                  (click)="confirmCancel(b)"
-                >
-                  {{ 'tr_product_cancel_booking' | translate }}
-                </button>
+                <span *ngIf="b.confirmed" class="booking-card__badge booking-card__badge--ok">
+                  <i class="fa fa-check-circle" aria-hidden="true"></i>
+                  {{ 'tr_booking_confirmed_status' | translate }}
+                  <ng-container *ngIf="b.confirmedBy?.name">
+                    — {{ b.confirmedBy?.name }}</ng-container
+                  >
+                </span>
+                <div class="booking-card__actions" *ngIf="canConfirm(b) || canCancel(b)">
+                  <button
+                    *ngIf="canConfirm(b)"
+                    type="button"
+                    class="s-btn btn-primary btn-sm"
+                    [disabled]="confirmingId === b._id || cancellingId === b._id"
+                    (click)="confirmBooking(b)"
+                  >
+                    {{ 'tr_booking_confirm_action' | translate }}
+                  </button>
+                  <button
+                    *ngIf="canCancel(b)"
+                    type="button"
+                    class="s-btn btn-danger btn-sm"
+                    [disabled]="cancellingId === b._id || confirmingId === b._id"
+                    (click)="confirmCancel(b)"
+                  >
+                    {{ 'tr_product_cancel_booking' | translate }}
+                  </button>
+                </div>
               </div>
               <dl class="booking-details booking-details--compact">
                 <dt>{{ 'tr_booking_customer_name' | translate }}</dt>

@@ -36,6 +36,11 @@ export interface ProductActiveBooking {
   status?: string;
   createdAt?: string;
   createdBy?: { _id?: string; name?: string };
+  /** Informational: manager approved the booking */
+  confirmed?: boolean;
+  confirmedAt?: string;
+  confirmedBy?: { _id?: string; name?: string };
+  productInWarehouse?: boolean;
 }
 export interface Category {
   _id: string;

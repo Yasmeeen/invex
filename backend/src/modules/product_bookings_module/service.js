@@ -9,6 +9,35 @@ import Branch from '../../DB/models/branch.model.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
+function bookingListMatchForViewer({ productId, product, viewerUserId, viewer }) {
+  const pidOid = new mongoose.Types.ObjectId(String(productId));
+  const viewerOid = new mongoose.Types.ObjectId(String(viewerUserId));
+  const match = {
+    product: pidOid,
+    status: 'active',
+  };
+
+  if (viewer && ADMIN_ROLES.includes(viewer.role)) {
+    return match;
+  }
+
+  if (viewer?.role === 'Branch Manager' && viewer.branch) {
+    const ub = String(viewer.branch);
+    if (product?.inWarehouse) {
+      match.createdBy = viewerOid;
+      return match;
+    }
+    const pBranch = product?.branch ? String(product.branch) : '';
+    if (pBranch && pBranch === ub) {
+      match.branch = new mongoose.Types.ObjectId(ub);
+      return match;
+    }
+  }
+
+  match.createdBy = viewerOid;
+  return match;
+}
+
 function digitsOnly(s) {
   return String(s || '').replace(/\D/g, '');
 }
@@ -100,6 +129,42 @@ async function isStoreAdmin(userId) {
   }
   const u = await User.findById(userId).select('role').lean();
   return u && ADMIN_ROLES.includes(u.role);
+}
+
+/** Super Admin / Co Admin: any booking. Branch Manager: branch stock only (not central warehouse). */
+async function assertUserMayConfirmBooking(userId, booking) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  const u = await User.findById(userId).select('role branch name').lean();
+  if (!u) {
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  if (ADMIN_ROLES.includes(u.role)) {
+    return u;
+  }
+  if (u.role !== 'Branch Manager') {
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  if (booking.productInWarehouse) {
+    const err = new Error('BRANCH_ONLY');
+    err.code = 'BRANCH_ONLY';
+    throw err;
+  }
+  const bid = booking.branch ? String(booking.branch) : '';
+  const ub = u.branch ? String(u.branch) : '';
+  if (!bid || !ub || bid !== ub) {
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
+    throw err;
+  }
+  return u;
 }
 
 export const createProductBooking = async (req, res) => {
@@ -253,6 +318,99 @@ export const createProductBooking = async (req, res) => {
   }
 };
 
+export const confirmProductBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid booking id' });
+    }
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const booking = await ProductBooking.findById(id);
+    if (!booking || booking.status !== 'active') {
+      return res.status(404).json({ error: 'Active booking not found' });
+    }
+    if (booking.confirmed) {
+      return res.status(400).json({ error: 'Booking already confirmed' });
+    }
+
+    let actor;
+    try {
+      actor = await assertUserMayConfirmBooking(userId, booking);
+    } catch (e) {
+      if (e.code === 'BRANCH_ONLY') {
+        return res.status(403).json({
+          error: 'Only store admins can confirm warehouse bookings',
+        });
+      }
+      return res.status(403).json({ error: 'You are not allowed to confirm this booking' });
+    }
+
+    booking.confirmed = true;
+    booking.confirmedAt = new Date();
+    booking.confirmedBy = userId;
+    await booking.save();
+
+    const populated = await ProductBooking.findById(booking._id)
+      .populate('confirmedBy', 'name')
+      .populate('createdBy', 'name')
+      .lean();
+
+    const product = await Product.findById(booking.product).select('name code branch inWarehouse').lean();
+
+    const creatorId = booking.createdBy ? String(booking.createdBy) : '';
+    if (creatorId && creatorId !== String(userId)) {
+      try {
+        const branchId = product?.branch || booking.branch || null;
+        const branchName = branchId
+          ? (await Branch.findById(branchId).select('name').lean())?.name || null
+          : null;
+        const locationLabel = product?.inWarehouse
+          ? 'Warehouse'
+          : branchName || 'Branch';
+
+        const confirmerName = (actor && actor.name) || 'Manager';
+
+        const notification = await Notification.create({
+          type: 'booking_confirmed',
+          title: 'Booking confirmed',
+          body: `${product?.name || 'Product'} — confirmed by ${confirmerName} (${locationLabel})`,
+          data: {
+            bookingId: booking._id,
+            productId: product?._id,
+            productName: product?.name,
+            productCode: product?.code,
+            confirmedById: userId,
+            confirmedByName: confirmerName,
+            branchId,
+            branchName,
+            inWarehouse: !!product?.inWarehouse,
+            quantity: booking.quantity,
+          },
+          recipients: [booking.createdBy],
+          readBy: [],
+        });
+
+        emitToUsers([booking.createdBy], 'notification:new', { notification });
+      } catch (notifyErr) {
+        console.warn('⚠️ booking confirm notification:', notifyErr?.message || notifyErr);
+      }
+    }
+
+    return res.json({
+      message: '✅ Booking confirmed',
+      booking: populated,
+    });
+  } catch (error) {
+    console.error('❌ confirmProductBooking:', error.message);
+    return res.status(500).json({ error: 'Failed to confirm booking' });
+  }
+};
+
 export const cancelProductBooking = async (req, res) => {
   try {
     const { id } = req.params;
@@ -305,24 +463,26 @@ export const getBookingByProductId = async (req, res) => {
       return res.status(400).json({ error: 'viewerUserId query is required' });
     }
 
-    const product = await Product.findById(productId).select('stock name code').lean();
+    const product = await Product.findById(productId)
+      .select('stock name code branch inWarehouse')
+      .lean();
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const admin = await isStoreAdmin(viewerUserId);
-    const match = {
-      product: new mongoose.Types.ObjectId(String(productId)),
-      status: 'active',
-    };
-    if (!admin) {
-      match.createdBy = new mongoose.Types.ObjectId(String(viewerUserId));
-    }
+    const viewer = await User.findById(viewerUserId).select('role branch').lean();
+    const match = bookingListMatchForViewer({
+      productId,
+      product,
+      viewerUserId,
+      viewer,
+    });
 
     const [bookings, totalBookedQty] = await Promise.all([
       ProductBooking.find(match)
         .sort({ createdAt: -1 })
         .populate('createdBy', 'name _id')
+        .populate('confirmedBy', 'name _id')
         .populate('client', 'name phoneNumber address')
         .lean(),
       sumActiveBookedQuantity(new mongoose.Types.ObjectId(String(productId))),

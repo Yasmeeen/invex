@@ -132,8 +132,18 @@ export class HeaderComponent implements OnInit {
     });
   }
 
+  notificationIconClass(n: NotificationItem): string {
+    if (n?.type === 'booking_confirmed') {
+      return 'fa-check-circle';
+    }
+    if (n?.type === 'booking_created') {
+      return 'fa-bookmark';
+    }
+    return 'fa-bell';
+  }
+
   private navigateFromNotification(n: NotificationItem): void {
-    if (n.type !== 'booking_created') {
+    if (n.type !== 'booking_created' && n.type !== 'booking_confirmed') {
       return;
     }
     const productId = n?.data?.productId;

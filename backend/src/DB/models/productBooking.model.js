@@ -46,6 +46,10 @@ const productBookingSchema = new mongoose.Schema(
     cancelledAt: { type: Date },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     cancelReason: { type: String, trim: true },
+    /** Set when Super Admin / Co Admin / Branch Manager confirms the reservation (informational). */
+    confirmed: { type: Boolean, default: false, index: true },
+    confirmedAt: { type: Date },
+    confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );

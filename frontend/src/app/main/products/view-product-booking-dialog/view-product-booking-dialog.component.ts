@@ -6,7 +6,7 @@ import { Product, ProductActiveBooking } from '@core/models/products.model';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { ProductBookingsService, ProductBookingsSummary } from '@shared/services/product-bookings.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
-import { canPickBranchRole } from '@core/utils/role-utils';
+import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 
 @Component({
@@ -25,6 +25,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
   summary: ProductBookingsSummary | null = null;
 
   cancellingId: string | null = null;
+  confirmingId: string | null = null;
   private refreshParent = false;
 
   constructor(
@@ -95,6 +96,34 @@ export class ViewProductBookingDialogComponent implements OnInit {
     return !!creatorId && String(creatorId) === String(u._id);
   }
 
+  /**
+   * Super Admin / Co Admin: any active unconfirmed booking.
+   * Branch Manager: same branch only, not central warehouse stock.
+   */
+  canConfirm(booking: ProductActiveBooking): boolean {
+    if (booking.confirmed || booking.status === 'cancelled') {
+      return false;
+    }
+    const u = this.auth.getUserFromLocalStorage();
+    if (!u?._id) {
+      return false;
+    }
+    if (canPickBranchRole(u.role)) {
+      return true;
+    }
+    if (!isBranchManager(u.role)) {
+      return false;
+    }
+    if (this.product.inWarehouse) {
+      return false;
+    }
+    const pb = this.product.branch as { _id?: string } | string | undefined;
+    const pid = typeof pb === 'object' && pb ? String(pb._id) : pb ? String(pb) : '';
+    const ub = u.branch as { _id?: string } | string | undefined;
+    const uid = typeof ub === 'object' && ub ? String(ub._id) : ub ? String(ub) : '';
+    return !!pid && !!uid && pid === uid;
+  }
+
   openNewBooking(): void {
     const max = this.summary?.availableToBook ?? 0;
     if (max < 1) {
@@ -143,6 +172,60 @@ export class ViewProductBookingDialogComponent implements OnInit {
           this.doCancel(booking._id);
         }
       });
+  }
+
+  confirmBooking(b: ProductActiveBooking): void {
+    const confirmationData = {
+      title: this.translate.instant('tr_booking_confirm_dialog_title'),
+      buttons: [
+        {
+          label: this.translate.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary',
+        },
+        {
+          label: this.translate.instant('tr_booking_confirm_action'),
+          actionCallback: 'confirm',
+          type: 'btn-primary',
+        },
+      ],
+    };
+    this.dialog
+      .open(ConfirmationDialogComponent, {
+        width: '450px',
+        data: confirmationData,
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'confirm') {
+          this.doConfirm(b._id);
+        }
+      });
+  }
+
+  private doConfirm(bookingId: string): void {
+    const user = this.auth.getUserFromLocalStorage();
+    const uid = user?._id;
+    if (!uid) {
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      return;
+    }
+    this.confirmingId = bookingId;
+    this.bookingsApi.confirmBooking(bookingId, { userId: uid }).subscribe({
+      next: () => {
+        this.confirmingId = null;
+        this.refreshParent = true;
+        this.notify.push(this.translate.instant('tr_booking_confirmed_toast'), 'success');
+        this.reload();
+      },
+      error: (err) => {
+        this.confirmingId = null;
+        const msg =
+          err?.error?.error || this.translate.instant('tr_booking_confirm_failed');
+        this.notify.push(msg, 'error');
+      },
+    });
   }
 
   private doCancel(bookingId: string): void {

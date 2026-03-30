@@ -62,7 +62,7 @@
           >
             <div class="notification-row">
               <div class="notification-icon" aria-hidden="true">
-                <i class="fa fa-bell"></i>
+                <i class="fa" [ngClass]="notificationIconClass(n)"></i>
               </div>
               <div class="notification-content">
                 <div class="weight-medium steel">

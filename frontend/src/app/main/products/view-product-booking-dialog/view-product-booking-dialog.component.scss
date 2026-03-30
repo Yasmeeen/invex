@@ -50,10 +50,39 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid #eee;
+  }
+
+  .booking-card__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+
+    .fa {
+      font-size: 14px;
+    }
+  }
+
+  .booking-card__badge--ok {
+    color: #1b5e20;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+  }
+
+  .booking-card__actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
   }
 
   .booking-card__qty {

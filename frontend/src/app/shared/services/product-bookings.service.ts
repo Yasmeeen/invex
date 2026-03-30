@@ -39,6 +39,10 @@ export class ProductBookingsService {
     return this.http.patch(`${PRODUCT_BOOKINGS_URL}/${bookingId}/cancel`, body);
   }
 
+  confirmBooking(bookingId: string, body: { userId: string }): Observable<unknown> {
+    return this.http.patch(`${PRODUCT_BOOKINGS_URL}/${bookingId}/confirm`, body);
+  }
+
   /** viewerUserId: current user; admins see all bookings on the product, others only their own. */
   getForProduct(productId: string, viewerUserId: string): Observable<ProductBookingsForProductResponse> {
     return this.http.get<ProductBookingsForProductResponse>(`${PRODUCT_BOOKINGS_URL}/product/${productId}`, {

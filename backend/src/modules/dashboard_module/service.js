@@ -177,6 +177,36 @@ export const getCategoriesStatistics = async (req, res) => {
 /**
  * 🛒 3. Get Orders Statistics by Status
  */
+/** Active product bookings count, grouped by warehouse vs branch name. */
+export const getBookedProductsStats = async (req, res) => {
+  try {
+    const { branch } = req.query;
+    const q = { bookingStatus: 'active' };
+    if (branch && mongoose.Types.ObjectId.isValid(String(branch))) {
+      q.branch = new mongoose.Types.ObjectId(String(branch));
+    }
+
+    const products = await Product.find(q)
+      .populate('branch', 'name')
+      .select('inWarehouse branch')
+      .lean();
+
+    const byBranch = {};
+    for (const p of products) {
+      const label = p.inWarehouse ? 'Warehouse' : p.branch?.name || 'Branch';
+      byBranch[label] = (byBranch[label] || 0) + 1;
+    }
+
+    return res.status(200).json({
+      totalBooked: products.length,
+      byBranch: Object.entries(byBranch).map(([branchName, count]) => ({ branchName, count })),
+    });
+  } catch (error) {
+    console.error('❌ getBookedProductsStats:', error);
+    return res.status(500).json({ error: 'Failed to fetch booking stats' });
+  }
+};
+
 export const getOrdersStatisticsByStatus = async (req, res) => {
   try {
     const { branch } = req.query;

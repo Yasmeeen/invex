@@ -14,8 +14,25 @@ export interface Product {
   isApplyDiscount?: boolean;
   /** Central warehouse (no branch) */
   inWarehouse?: boolean;
+  /** Product reservation: cashier shows warning only; sale is not blocked */
+  bookingStatus?: 'none' | 'active';
+  /** Populated when bookingStatus is active */
+  activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
   imageUrl?: string;
+}
+
+export interface ProductActiveBooking {
+  _id: string;
+  customerName: string;
+  customerPhone: string;
+  pickupType: 'branch_pickup' | 'online_shipping';
+  shippingAddress?: string;
+  depositAmount: number;
+  bookingDate: string;
+  status?: string;
+  createdAt?: string;
+  createdBy?: { name?: string };
 }
 export interface Category {
   _id: string;

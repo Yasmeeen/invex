@@ -1,0 +1,39 @@
+<div class="complex-modal">
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="close()"></div>
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">{{ 'tr_product_booking_details' | translate }}</h3>
+        <p class="size-small text-muted m-0 mt-1">{{ product.name }} — {{ product.code }}</p>
+      </div>
+      <div class="modal-body weight-medium steel plr-4 ptb-3">
+        <dl class="booking-details">
+          <dt>{{ 'tr_booking_customer_name' | translate }}</dt>
+          <dd>{{ booking.customerName }}</dd>
+          <dt>{{ 'tr_booking_customer_phone' | translate }}</dt>
+          <dd>{{ booking.customerPhone }}</dd>
+          <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
+          <dd>{{ pickupLabel() }}</dd>
+          <ng-container *ngIf="booking.pickupType === 'online_shipping' && booking.shippingAddress">
+            <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
+            <dd>{{ booking.shippingAddress }}</dd>
+          </ng-container>
+          <dt>{{ 'tr_booking_deposit' | translate }}</dt>
+          <dd>{{ booking.depositAmount }}</dd>
+          <dt>{{ 'tr_booking_date' | translate }}</dt>
+          <dd>{{ booking.bookingDate | date : 'mediumDate' }}</dd>
+          <dt *ngIf="booking.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
+          <dd *ngIf="booking.createdBy?.name">{{ booking.createdBy?.name }}</dd>
+        </dl>
+      </div>
+      <div class="modal-footer border-top plr-4 ptb-3">
+        <button type="button" class="s-btn btn-secondary" (click)="close()">
+          {{ 'tr_action.close' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-danger" [disabled]="cancelling" (click)="confirmCancel()">
+          {{ 'tr_product_cancel_booking' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

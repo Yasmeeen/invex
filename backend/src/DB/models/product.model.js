@@ -54,6 +54,17 @@ const productSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    /** Product reservation / booking (see ProductBooking). */
+    bookingStatus: {
+      type: String,
+      enum: ['none', 'active'],
+      default: 'none',
+    },
+    activeBooking: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductBooking',
+      default: null,
+    },
   },
   {
     timestamps: true,

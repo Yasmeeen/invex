@@ -3,6 +3,7 @@ import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
+import ProductBooking from '../../DB/models/productBooking.model.js';
 
 const toDate = (value, fallback) => {
   const d = value ? new Date(value) : fallback;
@@ -387,3 +388,61 @@ export const getInstallmentsReport = async (req, res) => {
   }
 };
 
+/** Online / branch pickup bookings in date range (default: active only). */
+export const getBookingsReport = async (req, res) => {
+  try {
+    const f = parseCommonFilters(req.query);
+    const status = String(req.query.booking_status || 'active');
+    const match = {
+      bookingDate: { $gte: f.from, $lte: f.to },
+    };
+    if (status === 'all') {
+      // no status filter
+    } else if (status === 'cancelled') {
+      match.status = 'cancelled';
+    } else {
+      match.status = 'active';
+    }
+    if (f.branchId) {
+      match.branch = f.branchId;
+    }
+
+    const bookings = await ProductBooking.find(match)
+      .sort({ bookingDate: -1 })
+      .limit(500)
+      .populate('product', 'name code')
+      .populate('createdBy', 'name')
+      .lean();
+
+    const rows = bookings.map((b) => ({
+      productName: b.product?.name || '',
+      productCode: b.product?.code || '',
+      customerName: b.customerName,
+      customerPhone: b.customerPhone,
+      pickupType: b.pickupType,
+      shippingAddress: b.shippingAddress || '',
+      depositAmount: b.depositAmount,
+      bookingDate: b.bookingDate,
+      status: b.status,
+      createdByName: b.createdBy?.name || '',
+    }));
+
+    const pickupBreakdown = rows.reduce((acc, r) => {
+      acc[r.pickupType] = (acc[r.pickupType] || 0) + 1;
+      return acc;
+    }, {});
+
+    return res.json({
+      filters: f,
+      summary: {
+        totalBookings: rows.length,
+        branchPickup: pickupBreakdown.branch_pickup || 0,
+        onlineShipping: pickupBreakdown.online_shipping || 0,
+      },
+      rows,
+    });
+  } catch (error) {
+    console.error('getBookingsReport:', error);
+    return res.status(500).json({ error: 'Failed to generate bookings report' });
+  }
+};

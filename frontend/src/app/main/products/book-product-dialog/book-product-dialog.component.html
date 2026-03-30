@@ -1,0 +1,62 @@
+<div class="complex-modal">
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="close()"></div>
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">{{ 'tr_product_book' | translate }}</h3>
+        <p class="size-small text-muted m-0 mt-1">{{ product.name }} — {{ product.code }}</p>
+      </div>
+      <div class="modal-body weight-medium steel plr-4 ptb-3" [formGroup]="form">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_customer_name' | translate }}</label>
+              <input class="s-control width-100" formControlName="customerName" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_customer_phone' | translate }}</label>
+              <input class="s-control width-100" formControlName="customerPhone" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_pickup_type' | translate }}</label>
+              <select class="s-control width-100" formControlName="pickupType">
+                <option value="branch_pickup">{{ 'tr_booking_branch_pickup' | translate }}</option>
+                <option value="online_shipping">{{ 'tr_booking_online_shipping' | translate }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-6" *ngIf="form.get('pickupType')?.value === 'online_shipping'">
+            <div class="form-group">
+              <label>{{ 'tr_booking_shipping_address' | translate }}</label>
+              <input class="s-control width-100" formControlName="shippingAddress" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_deposit' | translate }}</label>
+              <input class="s-control width-100" type="number" min="0" step="0.01" formControlName="depositAmount" />
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>{{ 'tr_booking_date' | translate }}</label>
+              <input class="s-control width-100" type="date" formControlName="bookingDate" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-top plr-4 ptb-3">
+        <button type="button" class="s-btn btn-secondary" (click)="close()">
+          {{ 'tr_action.cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" [disabled]="saving" (click)="submit()">
+          {{ 'tr_booking_save' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

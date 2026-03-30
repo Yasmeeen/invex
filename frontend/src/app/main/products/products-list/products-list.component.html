@@ -108,6 +108,11 @@
                     alt=""
                   />
                   <span class="products-list__name-text">{{ product.name }}</span>
+                  <span
+                    *ngIf="product.bookingStatus === 'active'"
+                    class="booking-badge"
+                    >{{ 'tr_booking_badge' | translate }}</span
+                  >
                 </span>
               </td>
               <td>
@@ -123,21 +128,39 @@
               <td>{{ product.netPrice }}</td>
               <td>{{ product.discount }}</td>
               <td>
-                <span class="options-menu" *ngIf="canBranchManagerModifyProduct(product)">
+                <span class="options-menu" *ngIf="showProductActionsMenu(product)">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div class="border-bottom"></div>
-                    <div class="single-option" (click)="deleteProduct(product)">
-                      <div class="text-error">
-                        {{ "tr_action.delete" | translate }}
+                    <ng-container *ngIf="canBookProduct(product)">
+                      <div
+                        class="single-option"
+                        *ngIf="product.bookingStatus !== 'active'"
+                        (click)="openBookProduct(product)"
+                      >
+                        {{ "tr_product_book" | translate }}
                       </div>
-                    </div>
-                    <div class="single-option" (click)="createOrEditproduct(true, product)">
-                      {{ "tr_action.edit" | translate }}
-                    </div>
-                    <div class="single-option" (click)="printbarCode(product)">
-                      {{ "print_barcode" | translate }}
-                    </div>
+                      <div
+                        class="single-option"
+                        *ngIf="product.bookingStatus === 'active'"
+                        (click)="openBookingDetails(product)"
+                      >
+                        {{ "tr_product_booking_details" | translate }}
+                      </div>
+                    </ng-container>
+                    <ng-container *ngIf="canBranchManagerModifyProduct(product)">
+                      <div class="single-option" (click)="deleteProduct(product)">
+                        <div class="text-error">
+                          {{ "tr_action.delete" | translate }}
+                        </div>
+                      </div>
+                      <div class="single-option" (click)="createOrEditproduct(true, product)">
+                        {{ "tr_action.edit" | translate }}
+                      </div>
+                      <div class="single-option" (click)="printbarCode(product)">
+                        {{ "print_barcode" | translate }}
+                      </div>
+                    </ng-container>
                   </div>
                 </span>
               </td>

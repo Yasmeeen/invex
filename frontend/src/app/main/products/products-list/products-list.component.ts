@@ -7,13 +7,16 @@ import { PaginationData } from '@core/models/users-interfaces.model'
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
-import { Branch, Category, Product } from '@core/models/products.model';
+import { Branch, Category, Product, ProductActiveBooking } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { Globals } from '@core/globals';
-import { isBranchManager } from '@core/utils/role-utils';
+import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
+import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
+import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
+import { ProductBookingsService } from '@shared/services/product-bookings.service';
 
 @Component({
   selector: 'app-products-list',
@@ -66,7 +69,8 @@ export class ProductsListComponent implements OnInit {
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
     private branchesServce: BranchesServce,
-    private globals: Globals
+    private globals: Globals,
+    private productBookingsService: ProductBookingsService
   ) { }
 
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
@@ -85,6 +89,32 @@ export class ProductsListComponent implements OnInit {
       return false;
     }
     return String(pid) === String(myId);
+  }
+
+  /** Super Admin / Co Admin: any product. Branch Manager: own branch only (not warehouse). */
+  canBookProduct(product: Product): boolean {
+    const role = this.globals.currentUser?.role as string | undefined;
+    if (canPickBranchRole(role)) {
+      return true;
+    }
+    if (!isBranchManager(role)) {
+      return false;
+    }
+    if (product?.inWarehouse) {
+      return false;
+    }
+    const myId = this.globals.currentUser?.branch?._id;
+    const pid =
+      product?.branch &&
+      (typeof product.branch === 'object' ? (product.branch as Branch)._id : product.branch);
+    if (!myId || !pid) {
+      return false;
+    }
+    return String(pid) === String(myId);
+  }
+
+  showProductActionsMenu(product: Product): boolean {
+    return this.canBranchManagerModifyProduct(product) || this.canBookProduct(product);
   }
 
   ngOnInit(): void {
@@ -247,6 +277,84 @@ export class ProductsListComponent implements OnInit {
       this.printHtml(html);
     });
   }
+  openBookProduct(product: Product): void {
+    if (!this.canBookProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    if (product.stock === 0) {
+      this.appNotificationService.push(this.translateService.instant('tr_booking_no_stock'), 'error');
+      return;
+    }
+    if (product.bookingStatus === 'active') {
+      this.appNotificationService.push(this.translateService.instant('tr_booking_already_active'), 'error');
+      return;
+    }
+    this.dialog
+      .open(BookProductDialogComponent, {
+        width: '640px',
+        data: { product },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((ok) => {
+        if (ok) {
+          this.getproducts();
+        }
+      });
+  }
+
+  openBookingDetails(product: Product): void {
+    if (!this.canBookProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    const fromList = product.activeBooking as ProductActiveBooking | undefined;
+    if (fromList?._id) {
+      this.openViewBookingDialog(product, fromList);
+      return;
+    }
+    this.productBookingsService.getByProductId(product._id).subscribe({
+      next: (res: { booking: ProductActiveBooking | null }) => {
+        if (res?.booking && (res.booking as ProductActiveBooking)._id) {
+          this.openViewBookingDialog(product, res.booking as ProductActiveBooking);
+        } else {
+          this.appNotificationService.push(
+            this.translateService.instant('tr_booking_not_found'),
+            'error'
+          );
+        }
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      },
+    });
+  }
+
+  private openViewBookingDialog(product: Product, booking: ProductActiveBooking): void {
+    this.dialog
+      .open(ViewProductBookingDialogComponent, {
+        width: '520px',
+        data: { product, booking },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((ok) => {
+        if (ok) {
+          this.getproducts();
+        }
+      });
+  }
+
   printHtml(html: string) {
     const printWindow = window.open('', '_blank', 'width=600,height=400');
     

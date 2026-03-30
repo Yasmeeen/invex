@@ -13,6 +13,7 @@ import purchasingRoutes from './modules/purchasing_module/router.js';
 import settingsRoutes from './modules/settings_module/router.js';
 import uploadRoutes from './modules/uploads_module/router.js';
 import reportsRoutes from './modules/reports_module/router.js';
+import productBookingsRoutes from './modules/product_bookings_module/router.js';
 
 
 const PORT = process.env.PORT || 3000;
@@ -55,6 +56,7 @@ const bootstrap = (app, express) => {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/uploads', uploadRoutes);
   app.use('/api/reports', reportsRoutes);
+  app.use('/api/product-bookings', productBookingsRoutes);
 
   // Start server
   app.listen(PORT, () => {

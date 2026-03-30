@@ -288,20 +288,48 @@ export const generateBarcodeImage = async (req, res) => {
 
 
 
+const activeBookingPopulate = {
+  path: 'activeBooking',
+  select:
+    'customerName customerPhone pickupType shippingAddress depositAmount bookingDate status createdAt',
+  populate: { path: 'createdBy', select: 'name' },
+};
+
 export const getProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', branchId, warehouseOnly, excludeWarehouse } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      branchId,
+      warehouseOnly,
+      excludeWarehouse,
+      booked,
+    } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     // Build query
     const query = {};
+    const andParts = [];
 
-    // Optional search
+    if (booked === 'true' || booked === true) {
+      query.bookingStatus = 'active';
+    } else if (booked === 'false' || booked === false) {
+      andParts.push({
+        $or: [
+          { bookingStatus: { $ne: 'active' } },
+          { bookingStatus: { $exists: false } },
+        ],
+      });
+    }
+
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { code: { $regex: search, $options: 'i' } },
-      ];
+      andParts.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { code: { $regex: search, $options: 'i' } },
+        ],
+      });
     }
 
     if (warehouseOnly === 'true' || warehouseOnly === true) {
@@ -315,10 +343,15 @@ export const getProducts = async (req, res) => {
       query.branch = safeBranchId;
     }
 
+    if (andParts.length) {
+      query.$and = andParts;
+    }
+
     const [products, total] = await Promise.all([
       Product.find(query)
         .populate('category', 'name code')
         .populate('branch', 'name')
+        .populate(activeBookingPopulate)
         .skip(skip)
         .limit(Number(limit)),
       Product.countDocuments(query),
@@ -348,7 +381,8 @@ export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('category', 'name code')
-      .populate('branch', 'name');
+      .populate('branch', 'name')
+      .populate(activeBookingPopulate);
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });

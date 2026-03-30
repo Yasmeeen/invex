@@ -6,6 +6,7 @@ import {
   getStockReport,
   getCustomersReport,
   getInstallmentsReport,
+  getBookingsReport,
 } from './service.js';
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.get('/products', getProductsReport);
 router.get('/stock', getStockReport);
 router.get('/customers', getCustomersReport);
 router.get('/installments', getInstallmentsReport);
+router.get('/bookings', getBookingsReport);
 
 export default router;
 

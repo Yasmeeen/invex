@@ -7,11 +7,13 @@ import {
     getOrdersStatisticsByStatus,
     getUpcomingUnpaidInstallments,
     markInstallmentPaid,
-    getPastUnpaidInstallments
+    getPastUnpaidInstallments,
+    getBookedProductsStats,
   } from './service.js';
   
 
-router.get('/getOrdersStatstics', getOrdersStatstics);  
+router.get('/getOrdersStatstics', getOrdersStatstics);
+router.get('/booked-products-stats', getBookedProductsStats);
 router.get('/invoicesPerMonth', getInvoicesPerMonth);  // GET all with pagination/search
 router.get('/categoriesStats', getCategoriesStatistics);  // GET all with pagination/search
 router.get('/getOrdersStatusStats', getOrdersStatisticsByStatus);

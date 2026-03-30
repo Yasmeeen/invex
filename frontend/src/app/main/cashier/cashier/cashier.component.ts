@@ -236,10 +236,18 @@ export class CashierComponent implements AfterViewInit {
     if(product.stock == 0)
       return
     const index = this.orderItems.findIndex(i => i.productId === product._id);
-    if (index > -1) this.orderItems[index].quantity++;
-    else this.orderItems.push({ ...product, quantity: 1, productId: product._id });
+    if (index > -1) {
+      this.orderItems[index].quantity++;
+    } else {
+      if (product.bookingStatus === 'active') {
+        this.translate
+          .get('tr_cashier_booked_product_warning')
+          .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));
+      }
+      this.orderItems.push({ ...product, quantity: 1, productId: product._id });
+    }
 
-    this.focusBarcodeInput(); 
+    this.focusBarcodeInput();
   }
 
   scanProduct(code: string) {

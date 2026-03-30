@@ -121,6 +121,79 @@ $forest: #6c5ce7;
   position: relative;
 }
 
+.app-topbar__notify-count {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ff5252;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #fff;
+  pointer-events: none;
+}
+
+.app-topbar__icon-btn--ring i.fa-bell-o {
+  transform-origin: 50% 0%;
+  animation: bellRing 0.9s ease-in-out infinite;
+}
+
+@keyframes bellRing {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(12deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Notifications dropdown items */
+.options-menu.notifications-menu {
+  .single-notification {
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+
+    &:hover {
+      background: rgba(108, 92, 231, 0.08);
+    }
+
+    &.unread {
+      background: rgba(253, 203, 110, 0.14);
+    }
+  }
+
+  .notification-row {
+    display: grid;
+    grid-template-columns: 34px 1fr 18px;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .notification-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(108, 92, 231, 0.12);
+    color: #6c5ce7;
+    flex-shrink: 0;
+  }
+
+  .notification-chevron {
+    color: #b0b0b0;
+    justify-self: end;
+  }
+}
+
 .app-topbar__notify-dot {
   position: absolute;
   top: 8px;

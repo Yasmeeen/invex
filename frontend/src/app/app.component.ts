@@ -5,6 +5,7 @@ import { Globals } from './core/globals';
 import { UserSerivce } from '@shared/services/user.service';
 import { environment } from 'src/environments/environment';
 import { VersionCheckService } from '@shared/services/version-check.service';
+import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
 
 @Component({
   selector: 'app-root',
@@ -20,12 +21,14 @@ export class AppComponent {
     constructor(
         private globals: Globals,
         private versionCheckService: VersionCheckService,
-        private translate: TranslateService
+        private translate: TranslateService,
+        private realtimeNotifications: RealtimeNotificationsService
     ) {
     }
 
     ngOnInit() {
       this.translate.use('en');
+      this.realtimeNotifications.init();
         if (environment.env === 'production') {
             this.versionCheckService.initVersionCheck('version.json');
         }

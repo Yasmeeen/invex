@@ -5,6 +5,12 @@ import { LanguageSwitcherComponent } from '@shared/components/language-switcher/
 import { Globals } from 'src/app/core/globals';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { NotificationsService, NotificationItem } from '@shared/services/notifications.service';
+import { AppNotificationService } from '@shared/services/app-notification.service';
+import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
+import { ProductsSerivce } from '@shared/services/products.service';
+import { ViewProductBookingDialogComponent } from '../products/view-product-booking-dialog/view-product-booking-dialog.component';
+import { Product } from '@core/models/products.model';
 
 @Component({
   selector: 'app-header',
@@ -24,12 +30,16 @@ export class HeaderComponent implements OnInit {
   userMenuOpen = false;
 
   constructor(
-    private globals: Globals,
+    public globals: Globals,
     private translate: TranslateService,
     private authenticationService: AuthenticationService,
     private dialog: MatDialog,
     private hostEl: ElementRef<HTMLElement>,
-    public storeSettings: StoreSettingsService
+    public storeSettings: StoreSettingsService,
+    private notificationsApi: NotificationsService,
+    private notify: AppNotificationService,
+    private realtime: RealtimeNotificationsService,
+    private productsService: ProductsSerivce
   ) { }
 
   get userDisplayName(): string {
@@ -56,6 +66,106 @@ export class HeaderComponent implements OnInit {
     this.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.setUserLanguage();
+    this.refreshNotifications();
+    this.realtime.newNotification$.subscribe((n) => {
+      // Prepend so it shows immediately (no refresh needed)
+      this.notifications = [n, ...(this.notifications || [])].slice(0, 20);
+    });
+  }
+
+  notificationsLoading = false;
+  notifications: NotificationItem[] = [];
+
+  private get userId(): string | null {
+    const u: any = this.authenticationService.getUserFromLocalStorage();
+    return u?._id ? String(u._id) : null;
+  }
+
+  refreshNotifications(): void {
+    const uid = this.userId;
+    if (!uid) return;
+    this.notificationsLoading = true;
+    this.notificationsApi.list(uid, 1, 20).subscribe({
+      next: (res) => {
+        this.notifications = res.notifications || [];
+        this.notificationsLoading = false;
+        this.notificationsApi.unreadCount(uid).subscribe({
+          next: (r) => (this.globals.unseenNotificationsCount = Number(r?.unreadCount) || 0),
+          error: () => {},
+        });
+      },
+      error: () => {
+        this.notificationsLoading = false;
+      },
+    });
+  }
+
+  isUnread(n: NotificationItem): boolean {
+    const uid = this.userId;
+    if (!uid) return false;
+    return !(n.readBy || []).some((x: any) => String(x) === String(uid));
+  }
+
+  openNotification(n: NotificationItem): void {
+    const uid = this.userId;
+    if (!uid) return;
+    const afterRead = () => this.navigateFromNotification(n);
+
+    if (!this.isUnread(n)) {
+      afterRead();
+      return;
+    }
+
+    this.notificationsApi.markRead(n._id, uid).subscribe({
+      next: () => {
+        this.globals.unseenNotificationsCount = Math.max(
+          0,
+          (this.globals.unseenNotificationsCount || 0) - 1
+        );
+        // Update local item state quickly
+        n.readBy = [...(n.readBy || []), uid];
+        afterRead();
+      },
+      error: () => {
+        afterRead();
+      },
+    });
+  }
+
+  private navigateFromNotification(n: NotificationItem): void {
+    if (n.type !== 'booking_created') {
+      return;
+    }
+    const productId = n?.data?.productId;
+    if (!productId) {
+      return;
+    }
+    this.productsService.getProduct(productId).subscribe({
+      next: (p: any) => {
+        const product = p as Product;
+        this.dialog.open(ViewProductBookingDialogComponent, {
+          width: '680px',
+          data: { product, canAddBooking: true },
+          disableClose: true,
+        });
+      },
+      error: () => {},
+    });
+  }
+
+  markAllNotificationsRead(): void {
+    const uid = this.userId;
+    if (!uid) return;
+    this.notificationsApi.markAllRead(uid).subscribe({
+      next: () => {
+        this.globals.unseenNotificationsCount = 0;
+        this.notify.push(this.translate.instant('tr_marked_all_read'), 'success');
+        this.refreshNotifications();
+      },
+      error: () => {
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
   }
 
   setUserLanguage() {

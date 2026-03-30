@@ -3,6 +3,9 @@ import ProductBooking from '../../DB/models/productBooking.model.js';
 import Product from '../../DB/models/product.model.js';
 import Client from '../../DB/models/client.model.js';
 import User from '../../DB/models/user.model.js';
+import Notification from '../../DB/models/notification.model.js';
+import { emitToUsers } from '../../realtime/socket.js';
+import Branch from '../../DB/models/branch.model.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -193,6 +196,52 @@ export const createProductBooking = async (req, res) => {
     const populated = await ProductBooking.findById(booking._id)
       .populate('createdBy', 'name')
       .populate('client', 'name phoneNumber');
+
+    // Persist + emit notification (Super Admin / Co Admin / all Branch Managers)
+    try {
+      const recipients = await User.find({
+        role: { $in: ['Super Admin', 'Co Admin', 'Branch Manager'] },
+      })
+        .select('_id role branch')
+        .lean();
+      const recipientIds = recipients.map((u) => u._id);
+
+      const branchId = product.branch || null;
+      const branchName = branchId
+        ? (await Branch.findById(branchId).select('name').lean())?.name || null
+        : null;
+      const locationLabel = product.inWarehouse
+        ? 'Warehouse'
+        : branchName
+          ? branchName
+          : 'Branch';
+
+      const notification = await Notification.create({
+        type: 'booking_created',
+        title: 'New booking',
+        body: `${product.name} ×${quantity} (${locationLabel})`,
+        data: {
+          bookingId: booking._id,
+          productId: product._id,
+          productName: product.name,
+          productCode: product.code,
+          quantity,
+          branchId,
+          branchName,
+          inWarehouse: !!product.inWarehouse,
+          createdById: userId,
+          bookingDate: booking.bookingDate,
+        },
+        recipients: recipientIds,
+        readBy: [],
+      });
+
+      emitToUsers(recipientIds, 'notification:new', {
+        notification,
+      });
+    } catch (notifyErr) {
+      console.warn('⚠️ booking notification:', notifyErr?.message || notifyErr);
+    }
 
     return res.status(201).json({
       message: '✅ Booking created',

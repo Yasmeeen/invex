@@ -18,14 +18,72 @@
   </div>
 
   <div class="app-topbar__right">
-    <button
-      type="button"
-      class="app-topbar__icon-btn app-topbar__icon-btn--ghost hidden-mobile"
-      [attr.aria-label]="'tr_notifications' | translate"
-    >
-      <span class="app-topbar__notify-dot app-topbar__notify-dot--warn" aria-hidden="true"></span>
-      <i class="fa fa-bell-o" aria-hidden="true"></i>
-    </button>
+    <span class="options-menu notifications-menu hidden-mobile">
+      <button
+        type="button"
+        class="app-topbar__icon-btn app-topbar__icon-btn--ghost"
+        [class.app-topbar__icon-btn--ring]="globals.unseenNotificationsCount > 0"
+        [attr.aria-label]="'tr_notifications' | translate"
+      >
+        <span
+          class="app-topbar__notify-dot app-topbar__notify-dot--warn"
+          *ngIf="globals.unseenNotificationsCount > 0"
+          aria-hidden="true"
+        ></span>
+        <span class="app-topbar__notify-count" *ngIf="globals.unseenNotificationsCount > 0">
+          {{ globals.unseenNotificationsCount }}
+        </span>
+        <i class="fa fa-bell-o" aria-hidden="true"></i>
+      </button>
+      <div class="options-menu-container p-0">
+        <div class="notifications-header flex-space-between">
+          <div class="weight-medium steel">{{ 'tr_notifications' | translate }}</div>
+          <button
+            type="button"
+            class="s-btn btn-secondary btn-sm close-notifications-menu"
+            (click)="markAllNotificationsRead()"
+            [disabled]="notificationsLoading || notifications.length === 0"
+          >
+            {{ 'tr_mark_all_read' | translate }}
+          </button>
+        </div>
+        <div class="notifications-body">
+          <div class="ptb-4 text-center text-muted" *ngIf="notificationsLoading">
+            {{ 'tr_loading' | translate }}…
+          </div>
+          <div class="ptb-4 text-center text-muted" *ngIf="!notificationsLoading && notifications.length === 0">
+            {{ 'tr_no_notifications' | translate }}
+          </div>
+          <div
+            class="single-notification plr-4 ptb-3 border-bottom"
+            *ngFor="let n of notifications"
+            [class.unread]="isUnread(n)"
+            (click)="openNotification(n)"
+          >
+            <div class="notification-row">
+              <div class="notification-icon" aria-hidden="true">
+                <i class="fa fa-bell"></i>
+              </div>
+              <div class="notification-content">
+                <div class="weight-medium steel">
+                  {{ n.title || ('tr_notifications' | translate) }}
+                </div>
+                <div class="size-small text-muted mt-1">{{ n.body }}</div>
+                <div class="size-small text-muted mt-1">{{ n.createdAt | date : 'short' }}</div>
+              </div>
+              <div class="notification-chevron" aria-hidden="true">
+                <i class="fa fa-angle-right"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="notifications-footer">
+          <button type="button" class="s-btn btn-secondary btn-sm" (click)="refreshNotifications()">
+            {{ 'tr_refresh' | translate }}
+          </button>
+        </div>
+      </div>
+    </span>
 
     <button
       type="button"

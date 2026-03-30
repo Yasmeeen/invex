@@ -232,18 +232,44 @@ export class CashierComponent implements AfterViewInit {
     );
   }
 
+  /** Active reservation count on this SKU (from API). */
+  bookedQty(product: Product | any): number {
+    return Math.max(0, Math.floor(Number(product?.bookedQuantity ?? 0)));
+  }
+
+  /** Units sellable without touching reserved quantity. */
+  freeSellableQty(product: Product | any): number {
+    const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
+    return Math.max(0, stock - this.bookedQty(product));
+  }
+
+  private maybePushBookingWarning(product: Product | any, newLineQuantity: number): void {
+    if (this.bookedQty(product) <= 0) {
+      return;
+    }
+    if (newLineQuantity <= this.freeSellableQty(product)) {
+      return;
+    }
+    this.translate
+      .get('tr_cashier_booked_product_warning')
+      .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));
+  }
+
   addProduct(product: any) {
     if(product.stock == 0)
       return
     const index = this.orderItems.findIndex(i => i.productId === product._id);
     if (index > -1) {
-      this.orderItems[index].quantity++;
-    } else {
-      if (product.bookingStatus === 'active' || (product.bookedQuantity ?? 0) > 0) {
-        this.translate
-          .get('tr_cashier_booked_product_warning')
-          .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));
+      const item = this.orderItems[index];
+      const maxStock = Math.max(0, Math.floor(Number(product.stock ?? item.stock ?? 0)));
+      if (item.quantity >= maxStock) {
+        this.focusBarcodeInput();
+        return;
       }
+      item.quantity++;
+      this.maybePushBookingWarning(item, item.quantity);
+    } else {
+      this.maybePushBookingWarning(product, 1);
       this.orderItems.push({ ...product, quantity: 1, productId: product._id });
     }
 
@@ -257,7 +283,17 @@ export class CashierComponent implements AfterViewInit {
     this.barcode = '';
   }
 
-  increaseQty(i: number) { this.orderItems[i].quantity++; this.focusBarcodeInput(); }
+  increaseQty(i: number) {
+    const item = this.orderItems[i];
+    const maxStock = Math.max(0, Math.floor(Number(item.stock ?? 0)));
+    if (item.quantity >= maxStock) {
+      this.focusBarcodeInput();
+      return;
+    }
+    item.quantity++;
+    this.maybePushBookingWarning(item, item.quantity);
+    this.focusBarcodeInput();
+  }
   decreaseQty(i: number) { 
     if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; 
     this.focusBarcodeInput();

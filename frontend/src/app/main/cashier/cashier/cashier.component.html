@@ -159,6 +159,17 @@
             </div>
           </div>
            <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
+          <div *ngIf="bookedQty(product) > 0" class="cashier-booking-hint">
+            {{
+              'tr_cashier_booking_on_card'
+                | translate
+                  : {
+                      booked: bookedQty(product),
+                      free: freeSellableQty(product),
+                      stock: product.stock
+                    }
+            }}
+          </div>
           <div class="product-name">{{ product.name }}</div>
           <div class="product-price">{{ product.price |  currency:'EGP ':'symbol':'1.2-2' }}</div>
         </div>

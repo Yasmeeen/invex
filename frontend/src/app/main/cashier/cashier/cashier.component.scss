@@ -201,6 +201,19 @@
         font-size: 0.85rem;
         color: #2c3e50;
       }
+
+      .cashier-booking-hint {
+        font-size: 0.65rem;
+        line-height: 1.25;
+        color: #7b1fa2;
+        background: #f3e5f5;
+        border: 1px solid #ce93d8;
+        border-radius: 4px;
+        padding: 4px 6px;
+        margin: 0 4px 6px;
+        text-align: center;
+        pointer-events: none;
+      }
     }
   }
   

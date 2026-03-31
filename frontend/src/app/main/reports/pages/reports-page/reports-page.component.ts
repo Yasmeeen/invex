@@ -54,6 +54,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   upcomingColumns: { key: string; labelKey: string }[] = [];
   upcomingRows: any[] = [];
 
+  /** Sales report: breakdown by cash / card / application payment types. */
+  salesPaymentColumns: { key: string; labelKey: string }[] = [];
+  salesPaymentRows: any[] = [];
+
   private lastReportPayload: any = null;
   private langSub?: Subscription;
 
@@ -154,6 +158,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.bookingsMeta = null;
           this.topProductsRows = [];
           this.upcomingRows = [];
+          this.salesPaymentColumns = [];
+          this.salesPaymentRows = [];
         }
       );
       return;
@@ -183,6 +189,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.tableColumns = [];
         this.tableRows = [];
         this.chartOptions = null;
+        this.salesPaymentColumns = [];
+        this.salesPaymentRows = [];
       }
     );
   }
@@ -191,6 +199,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.chartRedrawKey++;
     this.chartBranchRedrawKey++;
     this.secondaryChartOptions = null;
+    this.salesPaymentColumns = [];
+    this.salesPaymentRows = [];
     const t = (key: string, params?: object) => this.translate.instant(key, params);
 
     if (this.reportType === 'bookings') {
@@ -216,6 +226,35 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         (res.salesOverTime || []).map((x: any) => x.period),
         [{ name: t('tr_report_series_sales'), data: (res.salesOverTime || []).map((x: any) => Number(x.totalSales || 0)) }]
       );
+
+      const paymentCats = res.salesByPaymentCategory || [];
+      const categoryOrder = ['cash', 'card', 'application'];
+      const catLabelKey: Record<string, string> = {
+        cash: 'tr_report_payment_category_cash',
+        card: 'tr_report_payment_category_card',
+        application: 'tr_report_payment_category_application',
+      };
+      const sortedPayment = [...paymentCats].sort(
+        (a: any, b: any) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category)
+      );
+      this.salesPaymentColumns = [
+        { key: 'paymentType', labelKey: 'tr_report_col_payment_type' },
+        { key: 'totalSales', labelKey: 'tr_report_col_sales' },
+        { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
+      ];
+      this.salesPaymentRows = sortedPayment.map((x: any) => ({
+        paymentType: t(catLabelKey[x.category] || x.category),
+        totalSales: x.totalSales,
+        totalOrders: x.totalOrders,
+      }));
+      const piePay = sortedPayment
+        .filter((x: any) => Number(x.totalSales || 0) > 0)
+        .map((x: any) => ({
+          name: t(catLabelKey[x.category] || x.category),
+          y: Number(x.totalSales || 0),
+        }));
+      this.secondaryChartOptions =
+        piePay.length > 0 ? this.pieChart(t('tr_report_chart_sales_by_payment'), piePay) : null;
       return;
     }
 

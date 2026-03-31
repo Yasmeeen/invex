@@ -56,6 +56,26 @@ const getDateGroupExpr = (groupBy) =>
     ? { $dateToString: { format: '%Y-%m', date: '$createdAt' } }
     : { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
 
+/** Cash; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
+const salesPaymentCategoryExpr = {
+  $cond: [
+    { $in: [{ $toLower: { $ifNull: ['$paymentMethod', 'cash'] } }, ['', 'cash']] },
+    'cash',
+    {
+      $cond: [
+        {
+          $in: [
+            { $toLower: { $ifNull: ['$paymentMethod', 'cash'] } },
+            ['visa', 'mastercard', 'meeza'],
+          ],
+        },
+        'card',
+        'application',
+      ],
+    },
+  ],
+};
+
 export const getSalesReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
@@ -106,11 +126,33 @@ export const getSalesReport = async (req, res) => {
       { $sort: { totalSales: -1 } },
     ]);
 
+    const salesByPaymentCategory = await Order.aggregate([
+      { $match: baseMatch },
+      { $addFields: { paymentCategory: salesPaymentCategoryExpr } },
+      {
+        $group: {
+          _id: '$paymentCategory',
+          totalSales: { $sum: '$totalPrice' },
+          totalOrders: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          category: '$_id',
+          totalSales: { $round: ['$totalSales', 2] },
+          totalOrders: 1,
+        },
+      },
+    ]);
+
     return res.json({
       filters: f,
       summary: summary || { totalSales: 0, totalOrders: 0, averageOrderValue: 0 },
       salesOverTime,
       salesPerBranch,
+      salesByPaymentCategory,
     });
   } catch (error) {
     console.error('getSalesReport:', error);

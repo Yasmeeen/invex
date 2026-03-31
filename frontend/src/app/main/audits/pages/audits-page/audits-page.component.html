@@ -1,0 +1,62 @@
+<div class="reports-page audits-page">
+  <div class="reports-page__head">
+    <h2 class="reports-page__title">{{ 'tr_audit_title' | translate }}</h2>
+  </div>
+
+  <div class="audits-filters bg-white plr-8 ptb-8">
+    <div class="row">
+      <div class="col-md-3 mb-2">
+        <label>{{ 'tr_audit_filter_from' | translate }}</label>
+        <input class="form-control" type="date" [(ngModel)]="from" />
+      </div>
+      <div class="col-md-3 mb-2">
+        <label>{{ 'tr_audit_filter_to' | translate }}</label>
+        <input class="form-control" type="date" [(ngModel)]="to" />
+      </div>
+      <div class="col-md-2 mb-2">
+        <label>{{ 'tr_audit_filter_module' | translate }}</label>
+        <input class="form-control" [(ngModel)]="module" placeholder="orders / products / bookings" />
+      </div>
+      <div class="col-md-2 mb-2">
+        <label>{{ 'tr_audit_filter_action' | translate }}</label>
+        <input class="form-control" [(ngModel)]="action" placeholder="create / update / delete" />
+      </div>
+      <div class="col-md-2 mb-2">
+        <label>{{ 'tr_audit_filter_actor' | translate }}</label>
+        <input class="form-control" [(ngModel)]="actorUserId" placeholder="User ID" />
+      </div>
+      <div class="col-md-3 mb-2">
+        <label>{{ 'tr_audit_filter_entity_id' | translate }}</label>
+        <input class="form-control" [(ngModel)]="entityId" placeholder="Entity ID" />
+      </div>
+      <div class="col-md-9 mb-2 d-flex align-items-end justify-content-end gap-2">
+        <button class="s-btn btn-secondary" type="button" (click)="clearFilters()">
+          {{ 'tr_clear' | translate }}
+        </button>
+        <button class="s-btn btn-primary" type="button" (click)="applyFilters()">
+          {{ 'tr_apply' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3">
+    <div class="text-muted size-small mb-2" *ngIf="!loading">
+      {{ 'tr_audit_total' | translate }}: {{ totalCount }}
+    </div>
+    <app-report-table [columns]="columns" [rows]="rows"></app-report-table>
+  </div>
+
+  <div class="reports-page__pagination mt-2" *ngIf="totalPages > 1">
+    <button type="button" class="s-btn btn-secondary btn-sm" [disabled]="page <= 1" (click)="prev()">
+      {{ 'tr_previous' | translate }}
+    </button>
+    <span class="size-small text-muted">
+      {{ 'tr_page' | translate }} {{ page }} / {{ totalPages }}
+    </span>
+    <button type="button" class="s-btn btn-secondary btn-sm" [disabled]="page >= totalPages" (click)="next()">
+      {{ 'tr_next' | translate }}
+    </button>
+  </div>
+</div>
+

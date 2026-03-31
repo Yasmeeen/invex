@@ -5,6 +5,7 @@ import Client from "../../DB/models/client.model.js";
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
+import { auditLog } from '../audit_module/audit.service.js';
 
 export const getOrders = async (req, res) => {
   try {
@@ -282,6 +283,22 @@ export const createOrder = async (req, res) => {
       console.error('⚠️ Failed to log sale stock movement:', movementError.message);
     }
 
+    await auditLog(req, {
+      action: 'create',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: newOrder?._id,
+      message: `Order created #${newOrder?.orderNumber ?? ''}`.trim(),
+      metadata: {
+        orderNumber: newOrder?.orderNumber,
+        totalPrice: newOrder?.totalPrice,
+        numberOfProducts: newOrder?.numberOfProducts,
+        paymentMethod: newOrder?.paymentMethod,
+        branch: newOrder?.branch,
+        status: newOrder?.status,
+      },
+    });
+
     res.status(201).json({
       message: "✅ Order created successfully",
       newOrder,
@@ -352,6 +369,7 @@ export const updateOrder = async (req, res) => {
 export const restoreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
+    const actorUserId = req.body?.userId || req.query?.userId;
 
     // ✅ Get order directly (no populate)
     const order = await Order.findById(orderId);
@@ -402,6 +420,15 @@ export const restoreOrder = async (req, res) => {
     order.status = 'restored';
     await order.save();
 
+    await auditLog(req, {
+      action: 'restore',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order?._id,
+      message: `Order restored #${order?.orderNumber ?? ''}`.trim(),
+      metadata: { orderNumber: order?.orderNumber, branch: order?.branch, status: order?.status, actorUserId },
+    });
+
     res.json({
       message: '✅ Order restored successfully',
       restoredOrder: order,
@@ -424,6 +451,20 @@ export const deleteOrder = async (req, res) => {
     if (!deletedOrder) {
       return res.status(404).json({ error: 'Order not found' });
     }
+
+    await auditLog(req, {
+      action: 'delete',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: deletedOrder?._id,
+      message: `Order deleted #${deletedOrder?.orderNumber ?? ''}`.trim(),
+      metadata: { orderNumber: deletedOrder?.orderNumber, branch: deletedOrder?.branch },
+      before: {
+        orderNumber: deletedOrder?.orderNumber,
+        totalPrice: deletedOrder?.totalPrice,
+        status: deletedOrder?.status,
+      },
+    });
 
     res.json({ message: '✅ Order deleted' });
   } catch (err) {

@@ -22,16 +22,21 @@ export class CloudinaryUploadService {
     });
   }
 
-  uploadProductImage(file: File): Observable<string> {
+  /**
+   * Upload image via backend (Cloudinary or local /uploads).
+   * @param folder Subfolder under CLOUDINARY_FOLDER root, e.g. `products`, `booking-deposits`.
+   */
+  uploadProductImage(file: File, folder?: string): Observable<string> {
     const cfg = environment.cloudinary;
     if (!cfg?.cloudName) {
       return throwError(() => new Error('Cloudinary cloud name is missing in environment.'));
     }
+    const resolvedFolder = (folder && folder.trim()) || cfg.folder || 'products';
     return from(this.toDataUrl(file)).pipe(
       switchMap((fileDataUrl) =>
         this.http.post<{ secure_url: string }>(UPLOAD_PRODUCT_IMAGE_URL, {
           fileDataUrl,
-          folder: cfg.folder || 'products',
+          folder: resolvedFolder,
         })
       ),
       map((res) => res?.secure_url || ''),

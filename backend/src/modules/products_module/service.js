@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import Category from '../../DB/models/category.model.js';
+import { auditLog } from '../audit_module/audit.service.js';
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -442,6 +443,21 @@ export const createProduct = async (req, res) => {
         imageUrl: imageUrlNorm,
       });
 
+      await auditLog(req, {
+        action: 'create',
+        module: 'products',
+        entityType: 'Product',
+        entityId: createdProduct?._id,
+        message: `Product created (warehouse) ${createdProduct?.code || ''}`.trim(),
+        after: {
+          _id: createdProduct?._id,
+          code: createdProduct?.code,
+          name: createdProduct?.name,
+          stock: createdProduct?.stock,
+          inWarehouse: true,
+        },
+      });
+
       return res.status(201).json({ message: '✅ Product created', createdProduct });
     }
 
@@ -469,6 +485,22 @@ export const createProduct = async (req, res) => {
       branch: branch._id,
       inWarehouse: false,
       imageUrl: imageUrlNorm,
+    });
+
+    await auditLog(req, {
+      action: 'create',
+      module: 'products',
+      entityType: 'Product',
+      entityId: createdProduct?._id,
+      message: `Product created ${createdProduct?.code || ''}`.trim(),
+      after: {
+        _id: createdProduct?._id,
+        code: createdProduct?.code,
+        name: createdProduct?.name,
+        stock: createdProduct?.stock,
+        branch: createdProduct?.branch,
+        inWarehouse: false,
+      },
     });
 
     res.status(201).json({ message: '✅ Product created', createdProduct });
@@ -547,11 +579,24 @@ export const updateProduct = async (req, res) => {
         updateDoc.imageUrl = imageUrlNorm;
       }
 
+      const before = await Product.findById(req.params.id).lean();
       const product = await Product.findByIdAndUpdate(req.params.id, updateDoc, { new: true });
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
       }
+
+      await auditLog(req, {
+        action: 'update',
+        module: 'products',
+        entityType: 'Product',
+        entityId: product?._id,
+        message: `Product updated (warehouse) ${product?.code || ''}`.trim(),
+        before: before
+          ? { code: before.code, name: before.name, stock: before.stock, price: before.price, netPrice: before.netPrice }
+          : undefined,
+        after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
+      });
 
       return res.json({ message: '✅ Product updated', product });
     }
@@ -589,11 +634,24 @@ export const updateProduct = async (req, res) => {
       updateDocBranch.imageUrl = imageUrlNorm;
     }
 
+    const before = await Product.findById(req.params.id).lean();
     const product = await Product.findByIdAndUpdate(req.params.id, updateDocBranch, { new: true });
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
+
+    await auditLog(req, {
+      action: 'update',
+      module: 'products',
+      entityType: 'Product',
+      entityId: product?._id,
+      message: `Product updated ${product?.code || ''}`.trim(),
+      before: before
+        ? { code: before.code, name: before.name, stock: before.stock, price: before.price, netPrice: before.netPrice }
+        : undefined,
+      after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
+    });
 
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
@@ -617,6 +675,15 @@ export const deleteProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
+
+    await auditLog(req, {
+      action: 'delete',
+      module: 'products',
+      entityType: 'Product',
+      entityId: product?._id,
+      message: `Product deleted ${product?.code || ''}`.trim(),
+      before: { code: product?.code, name: product?.name, stock: product?.stock, branch: product?.branch, inWarehouse: product?.inWarehouse },
+    });
 
     res.json({ message: '✅ Product deleted' });
   } catch (error) {

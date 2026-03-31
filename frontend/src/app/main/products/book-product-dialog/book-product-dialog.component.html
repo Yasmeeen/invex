@@ -70,6 +70,38 @@
               <input class="s-control width-100" type="number" min="0" step="0.01" formControlName="depositAmount" />
             </div>
           </div>
+          <div class="col-md-12">
+            <div class="form-group">
+              <label>{{ 'tr_booking_deposit_transfer_image' | translate }}</label>
+              <p class="size-small text-muted m-0 mb-2">{{ 'tr_booking_deposit_transfer_image_hint' | translate }}</p>
+              <div class="booking-deposit-proof-row">
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="s-control"
+                  [disabled]="isUploadingDepositProof || !isCloudinaryConfigured()"
+                  (change)="onDepositProofSelected($event)"
+                />
+                <button
+                  type="button"
+                  class="s-btn btn-secondary btn-sm"
+                  *ngIf="depositProofUrl"
+                  (click)="clearDepositProof()"
+                >
+                  {{ 'tr_clear' | translate }}
+                </button>
+              </div>
+              <div *ngIf="isUploadingDepositProof" class="size-small text-muted mt-1">
+                {{ 'tr_booking_deposit_proof_uploading' | translate }}…
+              </div>
+              <div *ngIf="depositProofUrl" class="booking-deposit-proof-preview mt-2">
+                <a [href]="depositProofUrl" target="_blank" rel="noopener noreferrer">{{
+                  'tr_booking_deposit_proof_open' | translate
+                }}</a>
+                <img [src]="depositProofUrl" alt="" />
+              </div>
+            </div>
+          </div>
           <div class="col-md-6">
             <div class="form-group">
               <label>{{ 'tr_booking_date' | translate }}</label>
@@ -82,7 +114,12 @@
         <button type="button" class="s-btn btn-secondary" (click)="close()">
           {{ 'tr_action.cancel' | translate }}
         </button>
-        <button type="button" class="s-btn btn-primary" [disabled]="saving" (click)="submit()">
+        <button
+          type="button"
+          class="s-btn btn-primary"
+          [disabled]="saving || isUploadingDepositProof"
+          (click)="submit()"
+        >
           {{ 'tr_booking_save' | translate }}
         </button>
       </div>

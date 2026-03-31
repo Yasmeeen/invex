@@ -398,6 +398,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       { key: 'customerPhone', labelKey: 'tr_booking_customer_phone' },
       { key: 'pickup', labelKey: 'tr_booking_pickup_type' },
       { key: 'depositAmount', labelKey: 'tr_booking_deposit' },
+      { key: 'depositProof', labelKey: 'tr_booking_deposit_proof' },
       { key: 'createdBy', labelKey: 'tr_requested_by' },
       { key: 'status', labelKey: 'tr_report_col_request_status' },
       { key: 'confirmed', labelKey: 'tr_bookings_report_col_confirmed' },
@@ -417,6 +418,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           ? t('tr_booking_online_shipping')
           : t('tr_booking_branch_pickup'),
       depositAmount: b.depositAmount ?? 0,
+      depositProof:
+        b.depositTransferImageUrl && String(b.depositTransferImageUrl).trim()
+          ? String(b.depositTransferImageUrl).trim()
+          : '—',
       createdBy:
         (typeof b.createdBy === 'object' && b.createdBy?.name ? b.createdBy.name : b.createdBy) || '',
       status: b.status ?? '',
@@ -613,42 +618,21 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     };
   }
 
-  private pieChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
+  /** Donut (pie with inner hole) — used for all circular report charts. */
+  private donutChart(
+    title: string,
+    data: { name: string; y: number }[],
+    colors: string[],
+    legendHoverColor: string
+  ): Highcharts.Options {
     return {
       chart: { type: 'pie', backgroundColor: 'transparent' },
-      colors: this.chartColors,
+      colors,
       title: this.chartTitleStyle(title),
       credits: { enabled: false },
       legend: {
         itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
-        itemHoverStyle: { color: '#6d28d9' },
-      },
-      plotOptions: {
-        pie: {
-          allowPointSelect: true,
-          cursor: 'pointer',
-          borderWidth: 0,
-          dataLabels: {
-            enabled: true,
-            format: '<b>{point.name}</b>: {point.percentage:.1f}%',
-            style: { color: '#475569', fontWeight: '500', fontFamily: 'inherit', textOutline: 'none' },
-          },
-        },
-      },
-      series: [{ type: 'pie' as const, name: title, data }] as any,
-    };
-  }
-
-  /** Donut chart for bookings by branch — mauve light/dark slices. */
-  private bookingsBranchDonutChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
-    return {
-      chart: { type: 'pie', backgroundColor: 'transparent' },
-      colors: this.bookingsDonutColors,
-      title: this.chartTitleStyle(title),
-      credits: { enabled: false },
-      legend: {
-        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
-        itemHoverStyle: { color: '#5b21b6' },
+        itemHoverStyle: { color: legendHoverColor },
       },
       plotOptions: {
         pie: {
@@ -667,5 +651,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       },
       series: [{ type: 'pie' as const, name: title, data }] as any,
     };
+  }
+
+  private pieChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
+    return this.donutChart(title, data, this.chartColors, '#6d28d9');
+  }
+
+  /** Bookings by branch — alternating mauve palette. */
+  private bookingsBranchDonutChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
+    return this.donutChart(title, data, this.bookingsDonutColors, '#5b21b6');
   }
 }

@@ -82,6 +82,12 @@ export const AdminSidebar = [
     ],
   },
 
+  {
+    name: 'tr_audit_title',
+    routerLink: '/audits',
+    icon: 'fa fa-history icon',
+  },
+
 
 ];
 

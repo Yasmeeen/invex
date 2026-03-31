@@ -15,6 +15,7 @@ import uploadRoutes from './modules/uploads_module/router.js';
 import reportsRoutes from './modules/reports_module/router.js';
 import productBookingsRoutes from './modules/product_bookings_module/router.js';
 import notificationsRoutes from './modules/notifications_module/router.js';
+import auditRoutes from './modules/audit_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -56,6 +57,7 @@ const bootstrap = (app, express) => {
   app.use('/api/reports', reportsRoutes);
   app.use('/api/product-bookings', productBookingsRoutes);
   app.use('/api/notifications', notificationsRoutes);
+  app.use('/api/audits', auditRoutes);
 
   return app;
 };

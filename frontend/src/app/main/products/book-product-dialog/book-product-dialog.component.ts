@@ -2,9 +2,11 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
+import { environment } from 'src/environments/environment';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Product } from '@core/models/products.model';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
 
 @Component({
@@ -15,6 +17,9 @@ import { ProductBookingsService } from '@shared/services/product-bookings.servic
 export class BookProductDialogComponent implements OnInit {
   form: FormGroup;
   saving = false;
+  isUploadingDepositProof = false;
+  readonly maxImageBytes = 5 * 1024 * 1024;
+  readonly depositProofFolder = 'booking-deposits';
   product: Product;
   readonly maxQuantity: number;
 
@@ -23,6 +28,7 @@ export class BookProductDialogComponent implements OnInit {
     private dialogRef: MatDialogRef<BookProductDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA) public data: { product: Product; maxQuantity: number },
     private auth: AuthenticationService,
+    private cloudinaryUpload: CloudinaryUploadService,
     private bookings: ProductBookingsService,
     private notify: AppNotificationService,
     private translate: TranslateService
@@ -43,6 +49,7 @@ export class BookProductDialogComponent implements OnInit {
       pickupType: ['branch_pickup', Validators.required],
       shippingAddress: [''],
       depositAmount: [0, [Validators.required, Validators.min(0)]],
+      depositTransferImageUrl: [''],
       bookingDate: [`${y}-${m}-${d}`, Validators.required],
     });
   }
@@ -64,8 +71,59 @@ export class BookProductDialogComponent implements OnInit {
     this.dialogRef.close(false);
   }
 
+  isCloudinaryConfigured(): boolean {
+    return !!environment.cloudinary?.cloudName;
+  }
+
+  onDepositProofSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.notify.push(this.translate.instant('tr_product_image_invalid_type'), 'error');
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.notify.push(this.translate.instant('tr_product_image_too_large'), 'error');
+      input.value = '';
+      return;
+    }
+    if (!this.isCloudinaryConfigured()) {
+      this.notify.push(this.translate.instant('tr_cloudinary_not_configured'), 'error');
+      input.value = '';
+      return;
+    }
+    this.isUploadingDepositProof = true;
+    this.cloudinaryUpload.uploadProductImage(file, this.depositProofFolder).subscribe({
+      next: (url) => {
+        this.isUploadingDepositProof = false;
+        this.form.patchValue({ depositTransferImageUrl: url || '' });
+        if (url) {
+          this.notify.push(this.translate.instant('tr_booking_deposit_proof_upload_ok'), 'success');
+        }
+        input.value = '';
+      },
+      error: () => {
+        this.isUploadingDepositProof = false;
+        this.notify.push(this.translate.instant('tr_product_image_upload_failed'), 'error');
+        input.value = '';
+      },
+    });
+  }
+
+  clearDepositProof(): void {
+    this.form.patchValue({ depositTransferImageUrl: '' });
+  }
+
+  get depositProofUrl(): string {
+    return String(this.form.get('depositTransferImageUrl')?.value || '').trim();
+  }
+
   submit(): void {
-    if (this.saving) {
+    if (this.saving || this.isUploadingDepositProof) {
       return;
     }
     this.form.markAllAsTouched();
@@ -110,6 +168,7 @@ export class BookProductDialogComponent implements OnInit {
         pickupType: v.pickupType,
         shippingAddress: v.pickupType === 'online_shipping' ? String(v.shippingAddress || '').trim() : '',
         depositAmount: Number(v.depositAmount),
+        depositTransferImageUrl: String(v.depositTransferImageUrl || '').trim() || undefined,
         bookingDate: v.bookingDate,
         userId: uid,
       })

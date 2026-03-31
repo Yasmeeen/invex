@@ -7,18 +7,24 @@ import { ReportsRoutingModule } from './reports-routing.module';
 import { ReportsPageComponent } from './pages/reports-page/reports-page.component';
 import { ReportFiltersComponent } from './components/report-filters/report-filters.component';
 import { ReportCardComponent } from './components/report-card/report-card.component';
-import { ReportTableComponent } from './components/report-table/report-table.component';
 import { ChartWrapperComponent } from './components/chart-wrapper/chart-wrapper.component';
+import { ReportTableModule } from './report-table.module';
 
 @NgModule({
   declarations: [
     ReportsPageComponent,
     ReportFiltersComponent,
     ReportCardComponent,
-    ReportTableComponent,
     ChartWrapperComponent,
   ],
-  imports: [CommonModule, FormsModule, SharedModule, HighchartsChartModule, ReportsRoutingModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SharedModule,
+    HighchartsChartModule,
+    ReportTableModule,
+    ReportsRoutingModule,
+  ],
 })
 export class ReportsModule {}
 

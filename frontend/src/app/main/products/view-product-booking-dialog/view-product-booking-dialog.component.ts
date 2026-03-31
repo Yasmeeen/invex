@@ -57,7 +57,14 @@ export class ViewProductBookingDialogComponent implements OnInit {
     this.loadError = false;
     this.bookingsApi.getForProduct(this.product._id, uid).subscribe({
       next: (res) => {
-        this.bookings = res.bookings || [];
+        this.bookings = (res.bookings || []).map((b: ProductActiveBooking) => {
+          const row = b as ProductActiveBooking & { deposit_transfer_image_url?: string };
+          const urlRaw =
+            row.depositTransferImageUrl ??
+            (typeof row.deposit_transfer_image_url === 'string' ? row.deposit_transfer_image_url : '');
+          const url = String(urlRaw || '').trim();
+          return { ...b, depositTransferImageUrl: url || undefined };
+        });
         this.summary = res.summary;
         this.loading = false;
       },
@@ -81,6 +88,12 @@ export class ViewProductBookingDialogComponent implements OnInit {
     return b.pickupType === 'online_shipping'
       ? this.translate.instant('tr_booking_online_shipping')
       : this.translate.instant('tr_booking_branch_pickup');
+  }
+
+  /** Deposit transfer proof URL (normalized for template). */
+  depositProofUrl(b: ProductActiveBooking): string {
+    const u = String(b.depositTransferImageUrl || '').trim();
+    return u;
   }
 
   canCancel(booking: ProductActiveBooking): boolean {

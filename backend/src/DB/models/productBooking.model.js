@@ -31,6 +31,8 @@ const productBookingSchema = new mongoose.Schema(
     /** Units reserved by this booking (SKU quantity). */
     quantity: { type: Number, required: true, min: 1, default: 1 },
     depositAmount: { type: Number, required: true, min: 0 },
+    /** Proof of deposit transfer (e.g. Cloudinary or local /uploads URL). */
+    depositTransferImageUrl: { type: String, default: '', trim: true },
     bookingDate: { type: Date, required: true },
     status: {
       type: String,

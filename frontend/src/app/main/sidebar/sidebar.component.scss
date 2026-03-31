@@ -7,10 +7,10 @@ $shell-purple: #6c5ce7;
 $shell-purple-soft: rgba(108, 92, 231, 0.14);
 $shell-text: #2d3436;
 $shell-muted: #636e72;
-/* Icons: hint of purple, quieter than text */
-$shell-icon: mix($shell-purple, $shell-muted, 22%);
-$shell-icon-hover: mix($shell-purple, $shell-muted, 48%);
-$shell-icon-active: mix($shell-purple, $shell-muted, 52%);
+/* Sidebar icons */
+$shell-icon: #837ac6;
+$shell-icon-hover: lighten($shell-icon, 6%);
+$shell-icon-active: darken($shell-icon, 6%);
 
 :host {
     display: flex;

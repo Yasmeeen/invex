@@ -3,7 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { IUserLogin, User } from '@core/models/users-interfaces.model';
-import { USER_LOGIN_URL,USER_REGISTER_URL,USER_UPDATE_PASSWORD_URL  } from '@core/base/urls';
+import {
+  USER_LOGIN_URL,
+  USER_LOGOUT_URL,
+  USER_REGISTER_URL,
+  USER_UPDATE_PASSWORD_URL,
+} from '@core/base/urls';
 import { tap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { Globals } from '@core/globals';
@@ -77,7 +82,14 @@ export class AuthenticationService {
   }
 
 
-  logout(){
+  logout() {
+    const u = this.getUserFromLocalStorage();
+    if (u?._id) {
+      this.http.post(USER_LOGOUT_URL, { userId: u._id }).subscribe({
+        next: () => {},
+        error: () => {},
+      });
+    }
     this.userSubject.next(new User());
     localStorage.removeItem(USER_KEY);
     this.router.navigate(['login']);

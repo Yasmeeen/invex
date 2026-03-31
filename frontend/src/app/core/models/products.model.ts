@@ -32,6 +32,8 @@ export interface ProductActiveBooking {
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   depositAmount: number;
+  /** Screenshot / receipt of deposit transfer (URL). */
+  depositTransferImageUrl?: string;
   bookingDate: string;
   status?: string;
   createdAt?: string;

@@ -12,6 +12,7 @@ export interface CreateProductBookingPayload {
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   depositAmount: number;
+  depositTransferImageUrl?: string;
   bookingDate: string;
   userId: string;
 }

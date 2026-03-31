@@ -6,6 +6,7 @@ export const BASE_URL = 'http://localhost:3000/api'
 
 
 export const USER_LOGIN_URL = BASE_URL + '/users/login';
+export const USER_LOGOUT_URL = BASE_URL + '/users/logout';
 export const USER_REGISTER_URL = BASE_URL + '/users/register';
 export const USER_UPDATE_PASSWORD_URL = BASE_URL + '/users/updatePassword';
 
@@ -56,4 +57,6 @@ export const REPORTS_URL = BASE_URL + '/reports';
 
 export const PRODUCT_BOOKINGS_URL = BASE_URL + '/product-bookings';
 export const NOTIFICATIONS_URL = BASE_URL + '/notifications';
+
+export const AUDITS_URL = BASE_URL + '/audits';
 

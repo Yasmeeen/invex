@@ -1,5 +1,6 @@
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import { auditLog } from '../audit_module/audit.service.js';
 
 import bcrypt from 'bcryptjs';
 
@@ -179,11 +180,30 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email }).populate("branch", "name _id storeAddress");
 
     if (!user) {
+      await auditLog(req, {
+        action: 'login_failed',
+        module: 'auth',
+        message: 'Login failed: user not found',
+        metadata: { email: String(email).trim().slice(0, 120) },
+        statusCode: 404,
+      });
       return res.status(404).json({ message: "User not found" });
     }
 
     // ⚠️ Replace with bcrypt.compare in production
     if (user.password !== password) {
+      await auditLog(req, {
+        action: 'login_failed',
+        module: 'auth',
+        entityType: 'User',
+        entityId: String(user._id),
+        actorUserId: user._id,
+        actorName: user.name,
+        actorRole: user.role,
+        actorBranchId: user.branch?._id || user.branch,
+        message: 'Login failed: invalid password',
+        statusCode: 401,
+      });
       return res.status(401).json({ message: "Invalid password" });
     }
 
@@ -205,6 +225,20 @@ export const loginUser = async (req, res) => {
       updatedAt: user.updatedAt,
     };
 
+    await auditLog(req, {
+      action: 'login',
+      module: 'auth',
+      entityType: 'User',
+      entityId: String(user._id),
+      actorUserId: user._id,
+      actorName: user.name,
+      actorRole: user.role,
+      actorBranchId: user.branch?._id || user.branch,
+      message: 'Login successful',
+      metadata: { email: user.email },
+      statusCode: 200,
+    });
+
     res.json({ message: "✅ Login successful", user: formattedUser });
   } catch (error) {
     console.error("❌ Login error:", error);
@@ -217,8 +251,15 @@ export const loginUser = async (req, res) => {
 // Logout user
 export const logoutUser = async (req, res) => {
   try {
-    // With JWT, logout is handled client-side (by deleting the token)
-    // But you can still send a confirmation response
+    const bodyUserId = req.body?.userId || req.body?.user_id;
+    await auditLog(req, {
+      action: 'logout',
+      module: 'auth',
+      entityType: 'User',
+      entityId: bodyUserId != null ? String(bodyUserId) : undefined,
+      message: 'Logout',
+      statusCode: 200,
+    });
     res.json({ message: '✅ Logout successful' });
   } catch (error) {
     console.error('❌ Error during logout:', error.message);

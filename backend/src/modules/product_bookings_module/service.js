@@ -6,8 +6,18 @@ import User from '../../DB/models/user.model.js';
 import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
 import Branch from '../../DB/models/branch.model.js';
+import { auditLog } from '../audit_module/audit.service.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
+
+/** Allow https (Cloudinary) or http (local /uploads in dev). */
+const normalizeDepositProofUrl = (raw) => {
+  if (raw == null || raw === '') return '';
+  const s = String(raw).trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) return '';
+  return s.slice(0, 2048);
+};
 
 function bookingListMatchForViewer({ productId, product, viewerUserId, viewer }) {
   const pidOid = new mongoose.Types.ObjectId(String(productId));
@@ -177,6 +187,7 @@ export const createProductBooking = async (req, res) => {
       pickupType,
       shippingAddress,
       depositAmount,
+      depositTransferImageUrl,
       bookingDate,
       userId,
     } = req.body;
@@ -200,6 +211,14 @@ export const createProductBooking = async (req, res) => {
     const dep = Number(depositAmount);
     if (Number.isNaN(dep) || dep < 0) {
       return res.status(400).json({ error: 'Valid deposit amount is required' });
+    }
+    const depositProofUrl = normalizeDepositProofUrl(depositTransferImageUrl);
+    if (
+      depositTransferImageUrl != null &&
+      String(depositTransferImageUrl).trim() !== '' &&
+      !depositProofUrl
+    ) {
+      return res.status(400).json({ error: 'Invalid deposit transfer image URL' });
     }
     if (!bookingDate) {
       return res.status(400).json({ error: 'Booking date is required' });
@@ -241,7 +260,7 @@ export const createProductBooking = async (req, res) => {
     }
 
     const booking = await ProductBooking.create({
-      product,
+      product: pid,
       branch: branchOid,
       productInWarehouse: !!product.inWarehouse,
       client: client._id,
@@ -251,6 +270,7 @@ export const createProductBooking = async (req, res) => {
       pickupType,
       shippingAddress: String(shippingAddress || '').trim(),
       depositAmount: dep,
+      depositTransferImageUrl: depositProofUrl || '',
       bookingDate: new Date(bookingDate),
       status: 'active',
       createdBy: userId,
@@ -307,6 +327,24 @@ export const createProductBooking = async (req, res) => {
     } catch (notifyErr) {
       console.warn('⚠️ booking notification:', notifyErr?.message || notifyErr);
     }
+
+    await auditLog(req, {
+      action: 'create',
+      module: 'bookings',
+      entityType: 'ProductBooking',
+      entityId: booking?._id,
+      message: 'Booking created',
+      metadata: {
+        productId: pid,
+        quantity,
+        pickupType,
+        depositAmount: dep,
+        bookingDate: booking.bookingDate,
+        branchId: branchOid,
+        inWarehouse: !!product.inWarehouse,
+      },
+      after: { status: booking.status, confirmed: booking.confirmed || false },
+    });
 
     return res.status(201).json({
       message: '✅ Booking created',
@@ -401,6 +439,16 @@ export const confirmProductBooking = async (req, res) => {
       }
     }
 
+    await auditLog(req, {
+      action: 'confirm',
+      module: 'bookings',
+      entityType: 'ProductBooking',
+      entityId: booking?._id,
+      message: 'Booking confirmed',
+      metadata: { productId: booking.product, quantity: booking.quantity },
+      after: { confirmed: true, confirmedAt: booking.confirmedAt, confirmedBy: booking.confirmedBy },
+    });
+
     return res.json({
       message: '✅ Booking confirmed',
       booking: populated,
@@ -442,6 +490,16 @@ export const cancelProductBooking = async (req, res) => {
     await booking.save();
 
     await recalcProductBookingTotals(booking.product);
+
+    await auditLog(req, {
+      action: 'cancel',
+      module: 'bookings',
+      entityType: 'ProductBooking',
+      entityId: booking?._id,
+      message: 'Booking cancelled',
+      metadata: { reason: booking.cancelReason || '', productId: booking.product, quantity: booking.quantity },
+      after: { status: booking.status, cancelledAt: booking.cancelledAt, cancelledBy: booking.cancelledBy },
+    });
 
     return res.json({ message: '✅ Booking cancelled' });
   } catch (error) {

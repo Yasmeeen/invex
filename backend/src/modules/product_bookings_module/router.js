@@ -4,11 +4,13 @@ import {
   cancelProductBooking,
   confirmProductBooking,
   getBookingByProductId,
+  getBookingsReport,
   listProductBookings,
 } from './service.js';
 
 const router = express.Router();
 
+router.get('/report', getBookingsReport);
 router.get('/', listProductBookings);
 router.get('/product/:productId', getBookingByProductId);
 router.post('/', createProductBooking);

@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
@@ -11,6 +11,9 @@ import { ProductsSerivce } from '@shared/services/products.service';
   styleUrls: ['./report-filters.component.scss'],
 })
 export class ReportFiltersComponent implements OnInit {
+  /** When `bookings`, show booking-specific filters and hide group-by. */
+  @Input() reportType = '';
+
   @Output() apply = new EventEmitter<any>();
 
   branches: any[] = [];
@@ -25,6 +28,10 @@ export class ReportFiltersComponent implements OnInit {
     product_id: null as string | null,
     customer_phone: '',
     groupBy: 'daily',
+    booking_status: 'all',
+    booking_confirmed: 'all',
+    warehouse_only: false,
+    booking_search: '',
   };
 
   constructor(
@@ -78,7 +85,7 @@ export class ReportFiltersComponent implements OnInit {
   }
 
   private normalizeFilterPayload(): Record<string, string> {
-    return {
+    const base: Record<string, string> = {
       from: this.filters.from || '',
       to: this.filters.to || '',
       branch_id: this.filters.branch_id ? String(this.filters.branch_id) : '',
@@ -86,6 +93,18 @@ export class ReportFiltersComponent implements OnInit {
       customer_phone: (this.filters.customer_phone || '').trim(),
       groupBy: this.filters.groupBy || 'daily',
     };
+    if (this.reportType === 'bookings') {
+      base.status = this.filters.booking_status || 'all';
+      base.confirmed = this.filters.booking_confirmed || 'all';
+      if (this.filters.warehouse_only) {
+        base.warehouse_only = 'true';
+      }
+      const bs = (this.filters.booking_search || '').trim();
+      if (bs) {
+        base.search = bs;
+      }
+    }
+    return base;
   }
 
   applyFilters(): void {
@@ -104,6 +123,10 @@ export class ReportFiltersComponent implements OnInit {
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.groupBy = 'daily';
+    this.filters.booking_status = 'all';
+    this.filters.booking_confirmed = 'all';
+    this.filters.warehouse_only = false;
+    this.filters.booking_search = '';
     this.loadProducts();
     this.applyFilters();
   }

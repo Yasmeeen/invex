@@ -27,6 +27,31 @@ export interface ProductBookingsForProductResponse {
   summary: ProductBookingsSummary;
 }
 
+export interface BookingsReportSummary {
+  totalBookings: number;
+  totalUnits: number;
+  totalDeposits: number;
+  activeCount: number;
+  cancelledCount: number;
+  confirmedActive: number;
+  pendingConfirmation: number;
+}
+
+export interface BookingsReportResponse {
+  summary: BookingsReportSummary;
+  byBranch: { branchName: string; totalBookings: number; totalUnits: number }[];
+  topProducts: {
+    productName?: string;
+    productCode?: string;
+    bookingCount: number;
+    totalQty: number;
+  }[];
+  bookingsOverTime: { period: string; count: number; units: number }[];
+  upcoming: unknown[];
+  bookings: unknown[];
+  meta: { totalCount: number; page: number; limit: number };
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductBookingsService {
   constructor(private http: HttpClient) {}
@@ -47,6 +72,20 @@ export class ProductBookingsService {
   getForProduct(productId: string, viewerUserId: string): Observable<ProductBookingsForProductResponse> {
     return this.http.get<ProductBookingsForProductResponse>(`${PRODUCT_BOOKINGS_URL}/product/${productId}`, {
       params: { viewerUserId },
+    });
+  }
+
+  /** Report analytics + paginated rows; use branch_id from branch ng-select. */
+  getReport(params: Record<string, unknown>): Observable<BookingsReportResponse> {
+    const httpParams: Record<string, string> = {};
+    Object.keys(params).forEach((k) => {
+      const v = params[k];
+      if (v !== undefined && v !== null && String(v) !== '') {
+        httpParams[k] = String(v);
+      }
+    });
+    return this.http.get<BookingsReportResponse>(`${PRODUCT_BOOKINGS_URL}/report`, {
+      params: httpParams,
     });
   }
 }

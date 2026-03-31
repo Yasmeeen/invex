@@ -504,6 +504,240 @@ export const getBookingByProductId = async (req, res) => {
   }
 };
 
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildBookingsReportMatch(query) {
+  const {
+    from,
+    to,
+    branch_id: branchId,
+    product_id: productId,
+    customer_phone: customerPhone,
+    status,
+    confirmed,
+    warehouse_only: warehouseOnly,
+    search,
+  } = query;
+
+  const match = {};
+  if (from || to) {
+    match.bookingDate = {};
+    if (from) {
+      match.bookingDate.$gte = new Date(from);
+    }
+    if (to) {
+      const t = new Date(to);
+      t.setHours(23, 59, 59, 999);
+      match.bookingDate.$lte = t;
+    }
+  }
+  if (branchId && mongoose.Types.ObjectId.isValid(String(branchId))) {
+    match.branch = new mongoose.Types.ObjectId(String(branchId));
+  }
+  if (productId && mongoose.Types.ObjectId.isValid(String(productId))) {
+    match.product = new mongoose.Types.ObjectId(String(productId));
+  }
+  if (status === 'active' || status === 'cancelled') {
+    match.status = status;
+  }
+  if (confirmed === 'true') {
+    match.confirmed = true;
+  }
+  if (confirmed === 'false') {
+    match.confirmed = false;
+  }
+  if (warehouseOnly === 'true' || warehouseOnly === true) {
+    match.productInWarehouse = true;
+  }
+
+  const extraAnd = [];
+  if (customerPhone && String(customerPhone).trim()) {
+    extraAnd.push({
+      customerPhone: new RegExp(escapeRegex(String(customerPhone).trim()), 'i'),
+    });
+  }
+  if (search && String(search).trim()) {
+    const s = escapeRegex(String(search).trim());
+    extraAnd.push({
+      $or: [{ customerPhone: new RegExp(s, 'i') }, { customerName: new RegExp(s, 'i') }],
+    });
+  }
+  if (extraAnd.length === 1) {
+    Object.assign(match, extraAnd[0]);
+  } else if (extraAnd.length > 1) {
+    match.$and = [...(match.$and || []), ...extraAnd];
+  }
+
+  return match;
+}
+
+/** Analytics + paginated rows for reports UI (branch from ng-select → branch_id). */
+export const getBookingsReport = async (req, res) => {
+  try {
+    const match = buildBookingsReportMatch(req.query);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+    const skip = (page - 1) * limit;
+
+    const [agg] = await ProductBooking.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalBookings: { $sum: 1 },
+          totalUnits: { $sum: { $ifNull: ['$quantity', 1] } },
+          totalDeposits: { $sum: { $ifNull: ['$depositAmount', 0] } },
+          activeCount: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+          cancelledCount: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
+          confirmedActive: {
+            $sum: {
+              $cond: [{ $and: [{ $eq: ['$status', 'active'] }, '$confirmed'] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const summary = agg
+      ? {
+          totalBookings: agg.totalBookings || 0,
+          totalUnits: agg.totalUnits || 0,
+          totalDeposits: agg.totalDeposits || 0,
+          activeCount: agg.activeCount || 0,
+          cancelledCount: agg.cancelledCount || 0,
+          confirmedActive: agg.confirmedActive || 0,
+          pendingConfirmation: Math.max(
+            0,
+            (agg.activeCount || 0) - (agg.confirmedActive || 0)
+          ),
+        }
+      : {
+          totalBookings: 0,
+          totalUnits: 0,
+          totalDeposits: 0,
+          activeCount: 0,
+          cancelledCount: 0,
+          confirmedActive: 0,
+          pendingConfirmation: 0,
+        };
+
+    const byBranch = await ProductBooking.aggregate([
+      { $match: match },
+      { $lookup: { from: 'branches', localField: 'branch', foreignField: '_id', as: 'b' } },
+      {
+        $addFields: {
+          branchLabel: {
+            $cond: [
+              '$productInWarehouse',
+              'Warehouse',
+              { $ifNull: [{ $arrayElemAt: ['$b.name', 0] }, '—'] },
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$branchLabel',
+          totalBookings: { $sum: 1 },
+          totalUnits: { $sum: { $ifNull: ['$quantity', 1] } },
+        },
+      },
+      { $sort: { totalBookings: -1 } },
+      { $project: { branchName: '$_id', totalBookings: 1, totalUnits: 1, _id: 0 } },
+    ]);
+
+    const topProducts = await ProductBooking.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$product',
+          bookingCount: { $sum: 1 },
+          totalQty: { $sum: { $ifNull: ['$quantity', 1] } },
+        },
+      },
+      { $sort: { totalQty: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'p' } },
+      {
+        $project: {
+          productName: { $arrayElemAt: ['$p.name', 0] },
+          productCode: { $arrayElemAt: ['$p.code', 0] },
+          bookingCount: 1,
+          totalQty: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    const bookingsOverTime = await ProductBooking.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$bookingDate' } },
+          count: { $sum: 1 },
+          units: { $sum: { $ifNull: ['$quantity', 1] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+      { $project: { period: '$_id', count: 1, units: 1, _id: 0 } },
+    ]);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const upcomingMatch = {
+      status: 'active',
+      bookingDate: { $gte: todayStart },
+    };
+    if (match.branch) upcomingMatch.branch = match.branch;
+    if (match.product) upcomingMatch.product = match.product;
+    if (match.productInWarehouse === true) upcomingMatch.productInWarehouse = true;
+    if (match.customerPhone) upcomingMatch.customerPhone = match.customerPhone;
+    if (match.confirmed === true || match.confirmed === false) {
+      upcomingMatch.confirmed = match.confirmed;
+    }
+
+    const upcoming = await ProductBooking.find(upcomingMatch)
+      .sort({ bookingDate: 1 })
+      .limit(15)
+      .populate('product', 'name code')
+      .populate('branch', 'name')
+      .lean();
+
+    const [bookings, totalCount] = await Promise.all([
+      ProductBooking.find(match)
+        .sort({ bookingDate: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('product', 'name code inWarehouse')
+        .populate('branch', 'name')
+        .populate('createdBy', 'name')
+        .populate('confirmedBy', 'name')
+        .populate('client', 'name phoneNumber')
+        .lean(),
+      ProductBooking.countDocuments(match),
+    ]);
+
+    return res.json({
+      summary,
+      byBranch,
+      topProducts,
+      bookingsOverTime,
+      upcoming,
+      bookings,
+      meta: {
+        totalCount,
+        page,
+        limit,
+      },
+    });
+  } catch (error) {
+    console.error('❌ getBookingsReport:', error.message);
+    return res.status(500).json({ error: 'Failed to build bookings report' });
+  }
+};
+
 export const listProductBookings = async (req, res) => {
   try {
     const {

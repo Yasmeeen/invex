@@ -7,6 +7,10 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { isBranchManager } from '@core/utils/role-utils';
 import { ReportsService } from '@shared/services/reports.service';
 import { ReportExportService } from '@shared/services/report-export.service';
+import {
+  BookingsReportResponse,
+  ProductBookingsService,
+} from '@shared/services/product-bookings.service';
 
 type ReportCardVM = {
   titleKey: string;
@@ -38,6 +42,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   chartOptions: Highcharts.Options | null = null;
   /** Bumped after each load so Highcharts is recreated (line ↔ pie updates are unreliable with chart.update). */
   chartRedrawKey = 0;
+  chartBranchRedrawKey = 0;
+  /** Bookings report: branch distribution pie. */
+  secondaryChartOptions: Highcharts.Options | null = null;
+
+  bookingsPage = 1;
+  bookingsLimit = 100;
+  bookingsMeta: { totalCount: number; page: number; limit: number } | null = null;
+  topProductsColumns: { key: string; labelKey: string }[] = [];
+  topProductsRows: any[] = [];
+  upcomingColumns: { key: string; labelKey: string }[] = [];
+  upcomingRows: any[] = [];
 
   private lastReportPayload: any = null;
   private langSub?: Subscription;
@@ -49,6 +64,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     stock: 'tr_report_title_stock',
     customers: 'tr_report_title_customers',
     installments: 'tr_report_title_installments',
+    bookings: 'tr_report_title_bookings',
   };
 
   constructor(
@@ -56,7 +72,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     private reportsService: ReportsService,
     private exportService: ReportExportService,
     private translate: TranslateService,
-    private authenticationService: AuthenticationService
+    private authenticationService: AuthenticationService,
+    private productBookingsService: ProductBookingsService
   ) {}
 
   ngOnInit(): void {
@@ -69,6 +86,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.route.data.subscribe((d) => {
       this.reportType = d.reportType || 'sales';
       this.reportTitleKey = this.reportTitleKeys[this.reportType] || this.reportTitleKeys.sales;
+      this.bookingsPage = 1;
+      this.secondaryChartOptions = null;
       // First paint: wait for report-filters to emit defaults (from/to/branch). Later navigations reuse `filters`.
       if (Object.keys(this.filters || {}).length > 0) {
         this.loadReport(this.filters);
@@ -82,6 +101,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
   onApplyFilters(filters: any): void {
     this.filters = this.mergeBranchScope({ ...filters });
+    if (this.reportType === 'bookings') {
+      this.bookingsPage = 1;
+    }
     this.loadReport(this.filters);
   }
 
@@ -94,7 +116,49 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     return payload;
   }
 
+  setBookingsPage(page: number): void {
+    this.bookingsPage = Math.max(1, page);
+    if (Object.keys(this.filters || {}).length > 0) {
+      this.loadReport(this.filters);
+    }
+  }
+
+  get bookingsTotalPages(): number {
+    const m = this.bookingsMeta;
+    if (!m || !m.limit) return 1;
+    return Math.max(1, Math.ceil((m.totalCount || 0) / m.limit));
+  }
+
   private loadReport(filters: any): void {
+    if (this.reportType === 'bookings') {
+      const scoped = this.mergeBranchScope({
+        ...filters,
+        page: this.bookingsPage,
+        limit: this.bookingsLimit,
+      });
+      this.loading = true;
+      this.productBookingsService.getReport(scoped).subscribe(
+        (res: BookingsReportResponse) => {
+          this.loading = false;
+          this.lastReportPayload = res;
+          this.bindReportData(res);
+        },
+        () => {
+          this.loading = false;
+          this.lastReportPayload = null;
+          this.cards = [];
+          this.tableColumns = [];
+          this.tableRows = [];
+          this.chartOptions = null;
+          this.secondaryChartOptions = null;
+          this.bookingsMeta = null;
+          this.topProductsRows = [];
+          this.upcomingRows = [];
+        }
+      );
+      return;
+    }
+
     const scoped = this.mergeBranchScope({ ...filters });
     this.loading = true;
     const map: any = {
@@ -125,7 +189,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
   private bindReportData(res: any): void {
     this.chartRedrawKey++;
+    this.chartBranchRedrawKey++;
+    this.secondaryChartOptions = null;
     const t = (key: string, params?: object) => this.translate.instant(key, params);
+
+    if (this.reportType === 'bookings') {
+      this.bindBookingsReportData(res as BookingsReportResponse, t);
+      return;
+    }
 
     if (this.reportType === 'sales') {
       const s = res.summary || {};
@@ -262,7 +333,102 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { name: t('tr_paid'), y: Number(s.paidAmount || 0) },
         { name: t('tr_unpaid'), y: Number(s.unpaidAmount || 0) },
       ]);
+      return;
     }
+  }
+
+  private bindBookingsReportData(res: BookingsReportResponse, t: (key: string, params?: object) => string): void {
+    const s = res.summary || ({} as BookingsReportResponse['summary']);
+    this.bookingsMeta = res.meta || null;
+    this.cards = [
+      { titleKey: 'tr_bookings_report_card_total', value: s.totalBookings || 0 },
+      { titleKey: 'tr_bookings_report_card_units', value: s.totalUnits || 0 },
+      { titleKey: 'tr_bookings_report_card_deposits', value: s.totalDeposits || 0 },
+      { titleKey: 'tr_bookings_report_card_active', value: s.activeCount || 0 },
+      { titleKey: 'tr_bookings_report_card_cancelled', value: s.cancelledCount || 0 },
+      { titleKey: 'tr_bookings_report_card_confirmed', value: s.confirmedActive || 0 },
+      { titleKey: 'tr_bookings_report_card_pending_confirm', value: s.pendingConfirmation || 0 },
+    ];
+    this.tableColumns = [
+      { key: 'bookingDate', labelKey: 'tr_booking_date' },
+      { key: 'productName', labelKey: 'tr_report_col_product' },
+      { key: 'productCode', labelKey: 'tr_bookings_report_col_code' },
+      { key: 'quantity', labelKey: 'tr_report_col_qty' },
+      { key: 'location', labelKey: 'tr_bookings_report_col_location' },
+      { key: 'customerName', labelKey: 'tr_booking_customer_name' },
+      { key: 'customerPhone', labelKey: 'tr_booking_customer_phone' },
+      { key: 'pickup', labelKey: 'tr_booking_pickup_type' },
+      { key: 'depositAmount', labelKey: 'tr_booking_deposit' },
+      { key: 'createdBy', labelKey: 'tr_requested_by' },
+      { key: 'status', labelKey: 'tr_report_col_request_status' },
+      { key: 'confirmed', labelKey: 'tr_bookings_report_col_confirmed' },
+      { key: 'confirmedBy', labelKey: 'tr_bookings_report_col_confirmed_by' },
+    ];
+    const rows = (res.bookings || []) as any[];
+    this.tableRows = rows.map((b) => ({
+      bookingDate: b.bookingDate ? new Date(b.bookingDate).toLocaleDateString() : '',
+      productName: b.product?.name ?? '',
+      productCode: b.product?.code ?? '',
+      quantity: b.quantity ?? 1,
+      location: b.productInWarehouse ? t('tr_bookings_report_warehouse') : b.branch?.name || '—',
+      customerName: b.customerName ?? '',
+      customerPhone: b.customerPhone ?? '',
+      pickup:
+        b.pickupType === 'online_shipping'
+          ? t('tr_booking_online_shipping')
+          : t('tr_booking_branch_pickup'),
+      depositAmount: b.depositAmount ?? 0,
+      createdBy:
+        (typeof b.createdBy === 'object' && b.createdBy?.name ? b.createdBy.name : b.createdBy) || '',
+      status: b.status ?? '',
+      confirmed: b.confirmed ? t('tr_yes') : t('tr_no'),
+      confirmedBy:
+        (typeof b.confirmedBy === 'object' && b.confirmedBy?.name ? b.confirmedBy.name : b.confirmedBy) || '—',
+    }));
+
+    this.topProductsColumns = [
+      { key: 'productName', labelKey: 'tr_report_col_product' },
+      { key: 'productCode', labelKey: 'tr_bookings_report_col_code' },
+      { key: 'bookingCount', labelKey: 'tr_bookings_report_col_booking_count' },
+      { key: 'totalQty', labelKey: 'tr_bookings_report_col_qty_sum' },
+    ];
+    this.topProductsRows = (res.topProducts || []).map((x) => ({
+      productName: x.productName ?? '',
+      productCode: x.productCode ?? '',
+      bookingCount: x.bookingCount,
+      totalQty: x.totalQty,
+    }));
+
+    this.upcomingColumns = [
+      { key: 'bookingDate', labelKey: 'tr_booking_date' },
+      { key: 'productName', labelKey: 'tr_report_col_product' },
+      { key: 'quantity', labelKey: 'tr_report_col_qty' },
+      { key: 'customerName', labelKey: 'tr_booking_customer_name' },
+      { key: 'phone', labelKey: 'tr_booking_customer_phone' },
+    ];
+    this.upcomingRows = ((res.upcoming || []) as any[]).map((u) => ({
+      bookingDate: u.bookingDate ? new Date(u.bookingDate).toLocaleDateString() : '',
+      productName: u.product?.name ?? '',
+      quantity: u.quantity ?? 1,
+      customerName: u.customerName ?? '',
+      phone: u.customerPhone ?? '',
+    }));
+
+    const over = res.bookingsOverTime || [];
+    this.chartOptions = this.lineChart(
+      t('tr_bookings_chart_over_time'),
+      over.map((x) => x.period),
+      [{ name: t('tr_bookings_series_count'), data: over.map((x) => Number(x.count || 0)) }]
+    );
+
+    const byBr = res.byBranch || [];
+    this.secondaryChartOptions =
+      byBr.length > 0
+        ? this.bookingsBranchDonutChart(
+            t('tr_bookings_chart_by_branch'),
+            byBr.map((x) => ({ name: String(x.branchName), y: Number(x.totalBookings || 0) }))
+          )
+        : null;
   }
 
   exportExcel(): void {
@@ -306,6 +472,18 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
   /** Multi-series lines (profit): revenue (violet), cost (slate), net (teal — distinct from revenue). */
   private readonly chartLineContrast = ['#5b21b6', '#64748b', '#0d9488'];
+
+  /** Light / dark mauve alternation for bookings-by-branch donut (readable contrast). */
+  private readonly bookingsDonutColors = [
+    '#e9d5ff',
+    '#5b21b6',
+    '#ddd6fe',
+    '#6d28d9',
+    '#f3e8ff',
+    '#4c1d95',
+    '#c4b5fd',
+    '#7e22ce',
+  ];
 
   private chartTitleStyle(text: string): Highcharts.TitleOptions {
     return {
@@ -415,6 +593,36 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             enabled: true,
             format: '<b>{point.name}</b>: {point.percentage:.1f}%',
             style: { color: '#475569', fontWeight: '500', fontFamily: 'inherit', textOutline: 'none' },
+          },
+        },
+      },
+      series: [{ type: 'pie' as const, name: title, data }] as any,
+    };
+  }
+
+  /** Donut chart for bookings by branch — mauve light/dark slices. */
+  private bookingsBranchDonutChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
+    return {
+      chart: { type: 'pie', backgroundColor: 'transparent' },
+      colors: this.bookingsDonutColors,
+      title: this.chartTitleStyle(title),
+      credits: { enabled: false },
+      legend: {
+        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
+        itemHoverStyle: { color: '#5b21b6' },
+      },
+      plotOptions: {
+        pie: {
+          innerSize: '58%',
+          allowPointSelect: true,
+          cursor: 'pointer',
+          borderWidth: 2,
+          borderColor: '#ffffff',
+          dataLabels: {
+            enabled: true,
+            distance: 18,
+            format: '<b>{point.name}</b><br/><span style="opacity:0.9">{point.percentage:.1f}%</span>',
+            style: { color: '#334155', fontWeight: '500', fontFamily: 'inherit', textOutline: 'none' },
           },
         },
       },

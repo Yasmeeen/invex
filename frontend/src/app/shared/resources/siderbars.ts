@@ -78,6 +78,7 @@ export const AdminSidebar = [
       { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
       { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
       { name: 'tr_reports_installments', routerLink: '/reports/installments', icon: 'fa fa-calendar icon' },
+      { name: 'tr_reports_bookings', routerLink: '/reports/bookings', icon: 'fa fa-bookmark icon' },
     ],
   },
 
@@ -159,6 +160,7 @@ export const Warehouse = [
       { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
       { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
       { name: 'tr_reports_installments', routerLink: '/reports/installments', icon: 'fa fa-calendar icon' },
+      { name: 'tr_reports_bookings', routerLink: '/reports/bookings', icon: 'fa fa-bookmark icon' },
     ],
   },
 

@@ -21,3 +21,16 @@
   font-size: 0.9em;
 }
 
+.report-filters__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 1.5rem;
+
+  input {
+    cursor: pointer;
+  }
+}
+

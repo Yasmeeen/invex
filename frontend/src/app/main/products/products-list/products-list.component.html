@@ -55,6 +55,21 @@
           </select>
         </div>
       </div>
+      <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_products_booking_filter' | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="bookingFilter"
+            name="bookingFilter"
+            (change)="getproducts()"
+          >
+            <option value="all">{{ 'tr_products_booking_filter_all' | translate }}</option>
+            <option value="with_bookings">{{ 'tr_products_booking_filter_with' | translate }}</option>
+            <option value="without_bookings">{{ 'tr_products_booking_filter_without' | translate }}</option>
+          </select>
+        </div>
+      </div>
       <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
         <div class="form-group">
           <label>{{ 'tr_branches' | translate }}</label>

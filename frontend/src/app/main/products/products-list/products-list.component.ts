@@ -43,6 +43,8 @@ export class ProductsListComponent implements OnInit {
   branches: Branch [] = [];
   /** all | warehouse | branches */
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
+  /** all | with_bookings | without_bookings — maps to API `booked` */
+  bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
   totalNumberOfProducts: number;
 
   currentOrder: any = {
@@ -150,6 +152,13 @@ export class ProductsListComponent implements OnInit {
     delete this.params['branchId'];
     delete this.params['warehouseOnly'];
     delete this.params['excludeWarehouse'];
+    delete this.params['booked'];
+
+    if (this.bookingFilter === 'with_bookings') {
+      this.params['booked'] = 'true';
+    } else if (this.bookingFilter === 'without_bookings') {
+      this.params['booked'] = 'false';
+    }
 
     if (this.locationFilter === 'warehouse') {
       this.params['warehouseOnly'] = true;

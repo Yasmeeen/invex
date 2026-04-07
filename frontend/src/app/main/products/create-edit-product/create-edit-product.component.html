@@ -162,6 +162,27 @@
                       </span>
                     </div>
                   </div>
+
+                  <!-- Dynamic category attributes -->
+                  <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
+                    <div class="border-top pt-3 mt-2">
+                      <h4 class="m-0 mb-2">{{ 'tr_category_attributes' | translate }}</h4>
+                      <div class="row" *ngFor="let d of categoryAttributeDefs">
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label>{{ d.label }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="attributeValues[d.key]"
+                              [ngModelOptions]="{ standalone: true }"
+                              autocomplete="off"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <!-- Price -->
                   <div class="col-md-6">
         

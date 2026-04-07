@@ -53,6 +53,30 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
+const normalizeAttrKey = (raw) =>
+  String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+const normalizeAttributesForCategory = async (categoryId, raw) => {
+  if (raw == null) return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cat = await Category.findById(categoryId).select('attributeDefs').lean();
+  const defs = Array.isArray(cat?.attributeDefs) ? cat.attributeDefs : [];
+  if (!defs.length) return {};
+  const allowed = new Set(defs.map((d) => normalizeAttrKey(d?.key)));
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const key = normalizeAttrKey(k);
+    if (!key || !allowed.has(key)) continue;
+    const val = String(v ?? '').trim();
+    if (val === '') continue;
+    out[key] = val.slice(0, 500);
+  }
+  return out;
+};
+
 /** Safe branch ObjectId from query string (rejects literal "undefined", invalid ids). */
 const parseBranchIdFilter = (branchId) => {
   const branchIdStr = branchId != null ? String(branchId).trim() : '';
@@ -299,6 +323,9 @@ export const getProducts = async (req, res) => {
       warehouseOnly,
       excludeWarehouse,
       booked,
+      categoryId,
+      attrKey,
+      attrValue,
     } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -337,6 +364,20 @@ export const getProducts = async (req, res) => {
       query.branch = safeBranchId;
     }
 
+    if (categoryId && mongoose.Types.ObjectId.isValid(String(categoryId))) {
+      query.category = String(categoryId);
+    }
+
+    if (attrKey && attrValue) {
+      const k = String(attrKey).trim().toLowerCase().replace(/\s+/g, '_');
+      const v = String(attrValue).trim();
+      if (k && v) {
+        andParts.push({
+          [`attributes.${k}`]: { $regex: v, $options: 'i' },
+        });
+      }
+    }
+
     if (andParts.length) {
       query.$and = andParts;
     }
@@ -373,7 +414,7 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name code')
+      .populate('category', 'name code attributeDefs')
       .populate('branch', 'name');
 
     if (!product) {
@@ -390,7 +431,8 @@ export const getProductById = async (req, res) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes } =
+      req.body;
     const imageUrlNorm = normalizeImageUrl(imageUrl);
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
@@ -418,6 +460,11 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: 'Invalid category' });
     }
 
+    const attrs = await normalizeAttributesForCategory(categoryId, attributes);
+    if (attrs === null) {
+      return res.status(400).json({ error: 'attributes must be an object' });
+    }
+
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
       return res.status(400).json({ error: codeCheck.error });
@@ -441,6 +488,7 @@ export const createProduct = async (req, res) => {
         branch: null,
         inWarehouse: true,
         imageUrl: imageUrlNorm,
+        attributes: attrs,
       });
 
       await auditLog(req, {
@@ -485,6 +533,7 @@ export const createProduct = async (req, res) => {
       branch: branch._id,
       inWarehouse: false,
       imageUrl: imageUrlNorm,
+      attributes: attrs,
     });
 
     await auditLog(req, {
@@ -520,7 +569,7 @@ export const createProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes } = req.body;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
     const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
@@ -549,6 +598,11 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: 'Invalid category' });
     }
 
+    const attrs = await normalizeAttributesForCategory(categoryId, attributes);
+    if (attrs === null) {
+      return res.status(400).json({ error: 'attributes must be an object' });
+    }
+
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
       return res.status(400).json({ error: codeCheck.error });
@@ -574,6 +628,7 @@ export const updateProduct = async (req, res) => {
         inWarehouse: true,
         stock: stockNum,
         discount: discount ?? 0,
+        attributes: attrs,
       };
       if (imageUrlNorm !== undefined) {
         updateDoc.imageUrl = imageUrlNorm;
@@ -629,6 +684,7 @@ export const updateProduct = async (req, res) => {
       inWarehouse: false,
       stock: stockNum,
       discount: discount ?? 0,
+      attributes: attrs,
     };
     if (imageUrlNorm !== undefined) {
       updateDocBranch.imageUrl = imageUrlNorm;

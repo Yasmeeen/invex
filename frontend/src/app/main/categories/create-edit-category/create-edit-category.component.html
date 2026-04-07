@@ -76,6 +76,36 @@
                     </div>
                   </div>
                 </div>
+
+                <div class="mt-3">
+                  <div class="flex flex-space-between flex-middle mb-2">
+                    <label class="m-0">{{ 'tr_category_attributes' | translate }}</label>
+                    <button type="button" class="s-btn btn-secondary prevent-flex-shrink" (click)="addAttributeRow()">
+                      {{ 'tr_add_field' | translate }}
+                    </button>
+                  </div>
+
+                  <div class="row" *ngFor="let a of attributeDefs; let i = index">
+                    <div class="col-md-5">
+                      <div class="form-group mb-2">
+                        <label class="size-small">{{ 'tr_attribute_key' | translate }}</label>
+                        <input
+                          type="text"
+                          class="s-control"
+                          [(ngModel)]="attributeDefs[i]"
+                          [ngModelOptions]="{ standalone: true }"
+                          placeholder="e.g. color"
+
+                        />
+                      </div>
+                    </div>
+                    <div class="col-md-2 flex flex-middle">
+                      <button type="button" class="s-btn btn-danger mt-3" (click)="removeAttributeRow(i)">
+                        {{ 'tr_remove' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </form>
             </div>
           </div>

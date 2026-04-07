@@ -39,6 +39,21 @@ div {
     color: $text;
 }
 
+/* Arabic UI: prefer Tajawal when app sets RTL. */
+body[dir="rtl"] input,
+body[dir="rtl"] textarea,
+body[dir="rtl"] label,
+body[dir="rtl"] p,
+body[dir="rtl"] h1,
+body[dir="rtl"] h2,
+body[dir="rtl"] h3,
+body[dir="rtl"] h4,
+body[dir="rtl"] h5,
+body[dir="rtl"] h6,
+body[dir="rtl"] div {
+    font-family: $fontFamilyAr;
+}
+
 a,
 a:hover {
     color: inherit;

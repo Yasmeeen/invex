@@ -12,6 +12,30 @@ const normalizeCategoryCode = (raw) => {
   return t.toUpperCase().replace(/-+$/, '');
 };
 
+const normalizeAttrKey = (raw) =>
+  String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+const normalizeAttributeDefs = (raw) => {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) return null;
+  const out = [];
+  const seen = new Set();
+  for (const r of raw) {
+    // Accept: [{key,label?}] or ["color","storage"]
+    const key = normalizeAttrKey(typeof r === 'string' ? r : r?.key);
+    const label =
+      typeof r === 'string' ? '' : String(r?.label || '').trim();
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label: label || key });
+  }
+  return out;
+};
+
 /** Plain object for API: always include `code` (JSON omits undefined). */
 const toCategoryResponse = (doc, extra = {}) => {
   const o = doc && typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
@@ -93,7 +117,7 @@ export const getCategoryById = async (req, res) => {
 // Create category
 export const createCategory = async (req, res) => {
   try {
-    const { name, code } = req.body;
+    const { name, code, attributeDefs } = req.body;
     const codeNorm = normalizeCategoryCode(code);
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
@@ -112,7 +136,16 @@ export const createCategory = async (req, res) => {
       return res.status(409).json({ error: 'Category code already in use' });
     }
 
-    const newCategory = await Category.create({ name: name.trim(), code: codeNorm });
+    const attr = normalizeAttributeDefs(attributeDefs);
+    if (attr === null) {
+      return res.status(400).json({ error: 'attributeDefs must be an array' });
+    }
+
+    const newCategory = await Category.create({
+      name: name.trim(),
+      code: codeNorm,
+      attributeDefs: attr,
+    });
 
     res.status(201).json({
       message: '✅ Category created',
@@ -130,7 +163,7 @@ export const createCategory = async (req, res) => {
 // Update category
 export const updateCategory = async (req, res) => {
   try {
-    const { name, code } = req.body;
+    const { name, code, attributeDefs } = req.body;
     const updates = {};
 
     if (name != null && String(name).trim() !== '') {
@@ -152,6 +185,14 @@ export const updateCategory = async (req, res) => {
         return res.status(409).json({ error: 'Category code already in use' });
       }
       updates.code = codeNorm;
+    }
+
+    if (attributeDefs !== undefined) {
+      const attr = normalizeAttributeDefs(attributeDefs);
+      if (attr === null) {
+        return res.status(400).json({ error: 'attributeDefs must be an array' });
+      }
+      updates.attributeDefs = attr;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -33,6 +33,9 @@ export class ProductsListComponent implements OnInit {
   paginationPerPage:number = 10;
   categorys: Category[] = [];
   selectedcategory: string;
+  selectedAttributeKey = '';
+  selectedAttributeValue = '';
+  attributeKeyOptions: string[] = [];
   productsList: Product[] = [];
   categorysLoading: boolean = false;
   fullscreenEnabled = false;
@@ -62,6 +65,7 @@ export class ProductsListComponent implements OnInit {
   paginationData: PaginationData
   categorysPagination: PaginationData
   searchTimeout: any;
+  attributeSearchTimeout: any;
   nameSearchTerm: string
   numberSearchTerm: string
   nationalId: string
@@ -153,6 +157,16 @@ export class ProductsListComponent implements OnInit {
     delete this.params['warehouseOnly'];
     delete this.params['excludeWarehouse'];
     delete this.params['booked'];
+    delete this.params['categoryId'];
+    delete this.params['attrKey'];
+    delete this.params['attrValue'];
+    if (this.selectedcategory) {
+      this.params['categoryId'] = this.selectedcategory;
+    }
+    if (this.selectedAttributeKey && this.selectedAttributeValue) {
+      this.params['attrKey'] = this.selectedAttributeKey;
+      this.params['attrValue'] = this.selectedAttributeValue;
+    }
 
     if (this.bookingFilter === 'with_bookings') {
       this.params['booked'] = 'true';
@@ -204,6 +218,7 @@ export class ProductsListComponent implements OnInit {
     this.subscriptions.push(this.CategoriesServce.getCategorys(this.categorysParams).subscribe((response: any) => {
       this.categorysPagination = response.meta;
       this.categorys = this.categorys.concat(response.categories);
+      this.refreshAttributeKeyOptions();
       this.categorysLoading = false
     },(error:any)=> {
       if(error.status == 403) {
@@ -211,6 +226,34 @@ export class ProductsListComponent implements OnInit {
        this.categorysLoading = false
       }
     }))
+  }
+
+  onCategoryFilterChange(): void {
+    this.selectedAttributeKey = '';
+    this.selectedAttributeValue = '';
+    this.refreshAttributeKeyOptions();
+    this.params.page = 1;
+    this.getproducts();
+  }
+
+  private refreshAttributeKeyOptions(): void {
+    const c = this.categorys?.find((x) => String(x._id) === String(this.selectedcategory));
+    const defs = Array.isArray((c as any)?.attributeDefs) ? (c as any).attributeDefs : [];
+    this.attributeKeyOptions = defs
+      .map((d: any) => String(d?.key ?? d ?? '').trim())
+      .filter((k: string) => !!k);
+  }
+
+  applyAttributeSearch(): void {
+    this.params.page = 1;
+    this.getproducts();
+  }
+
+  applyAttributeSearchDebounced(): void {
+    clearTimeout(this.attributeSearchTimeout);
+    this.attributeSearchTimeout = setTimeout(() => {
+      this.applyAttributeSearch();
+    }, 350);
   }
   nextBatch() {
     if (this.categorysPagination.nextPage) {

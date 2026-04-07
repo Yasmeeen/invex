@@ -47,6 +47,8 @@ export class CreateEditProductComponent implements OnInit {
   categoryDropdownItems: Category[] = [];
   /** Bound to category ng-select (category must be chosen before product code). */
   selectedCategory: Category | null = null;
+  categoryAttributeDefs: Array<{ key: string; label: string }> = [];
+  attributeValues: Record<string, string> = {};
   private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false;
@@ -125,6 +127,45 @@ export class CreateEditProductComponent implements OnInit {
 
   }
 
+  private normalizeAttrKey(raw: any): string {
+    return String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_');
+  }
+
+  private setCategoryAttributeDefsFromSelected(): void {
+    const defs = Array.isArray((this.selectedCategory as any)?.attributeDefs)
+      ? ((this.selectedCategory as any).attributeDefs as any[])
+      : [];
+    this.categoryAttributeDefs = defs
+      .map((d) => ({ key: this.normalizeAttrKey(d?.key), label: String(d?.label || '').trim() }))
+      .filter((d) => d.key && d.label);
+
+    // Keep only values that still exist in defs
+    const allowed = new Set(this.categoryAttributeDefs.map((d) => d.key));
+    const next: Record<string, string> = {};
+    for (const [k, v] of Object.entries(this.attributeValues || {})) {
+      const nk = this.normalizeAttrKey(k);
+      if (!allowed.has(nk)) continue;
+      next[nk] = String(v ?? '');
+    }
+    this.attributeValues = next;
+  }
+
+  private buildAttributesPayload(): Record<string, string> {
+    const allowed = new Set(this.categoryAttributeDefs.map((d) => d.key));
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(this.attributeValues || {})) {
+      const key = this.normalizeAttrKey(k);
+      if (!allowed.has(key)) continue;
+      const val = String(v ?? '').trim();
+      if (!val) continue;
+      out[key] = val;
+    }
+    return out;
+  }
+
   setStorageMode(warehouse: boolean) {
     this.storeInWarehouse = warehouse;
     if (warehouse && this.basicInfoForm?.form) {
@@ -164,6 +205,17 @@ export class CreateEditProductComponent implements OnInit {
       this.storeInWarehouse = !!response.inWarehouse;
       this.codeValue = response.code;
       this.selectedCategory = response.category || null;
+      this.setCategoryAttributeDefsFromSelected();
+      const attrsRaw = response?.attributes;
+      if (attrsRaw && typeof attrsRaw === 'object' && !Array.isArray(attrsRaw)) {
+        const next: Record<string, string> = {};
+        for (const [k, v] of Object.entries(attrsRaw)) {
+          next[this.normalizeAttrKey(k)] = String(v ?? '');
+        }
+        this.attributeValues = next;
+      } else {
+        this.attributeValues = {};
+      }
       this.previousCategoryIdForEdit = this.selectedCategory?._id
         ? String(this.selectedCategory._id)
         : null;
@@ -184,6 +236,7 @@ export class CreateEditProductComponent implements OnInit {
 
   onProductCategoryChange(cat: Category | null): void {
     this.selectedCategory = cat;
+    this.setCategoryAttributeDefsFromSelected();
     if (!cat) {
       if (!this.isEdit) {
         this.codeValue = '';
@@ -376,6 +429,7 @@ createProduct() {
     code: this.codeValue,
     inWarehouse,
     imageUrl: this.productImageUrl || '',
+    attributes: this.buildAttributesPayload(),
   };
   if (inWarehouse) {
     delete payload.branch;
@@ -462,6 +516,7 @@ updateProduct() {
     code: this.codeValue,
     inWarehouse: this.storeInWarehouse,
     imageUrl: this.productImageUrl,
+    attributes: this.buildAttributesPayload(),
   };
   if (this.storeInWarehouse) {
     delete payload.branch;

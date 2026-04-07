@@ -41,6 +41,49 @@
         </div>
       </div>
       <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_category' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [(ngModel)]="selectedcategory"
+              name="categoryId"
+              [items]="categorys"
+              [clearable]="true"
+              (change)="onCategoryFilterChange()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4" *ngIf="selectedcategory && attributeKeyOptions?.length">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_category_attributes' | translate }}</label>
+          <div class="row">
+            <div class="col-md-5">
+              <select class="s-control width-100" [(ngModel)]="selectedAttributeKey" name="attrKey">
+                <option value="">{{ 'tr_select' | translate }}</option>
+                <option *ngFor="let k of attributeKeyOptions" [value]="k">{{ k }}</option>
+              </select>
+            </div>
+            <div class="col-md-7">
+              <input
+                class="s-control width-100"
+                type="text"
+                [(ngModel)]="selectedAttributeValue"
+                name="attrValue"
+                placeholder="{{ 'tr_search' | translate }}"
+                (keyup)="applyAttributeSearchDebounced()"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
         <div class="form-group">
           <label>{{ 'tr_location_filter' | translate }}</label>
           <select

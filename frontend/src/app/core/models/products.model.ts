@@ -49,6 +49,8 @@ export interface Category {
   name: string;
   /** Prefix for product codes (e.g. ELEC → ELEC-001) */
   code?: string;
+  /** Dynamic attributes definition (new format: string keys; legacy: objects with key/label). */
+  attributeDefs?: string[] | Array<{ key: string; label?: string }>;
   productsCount: number;
   totalItems: number
 }export interface Branch {

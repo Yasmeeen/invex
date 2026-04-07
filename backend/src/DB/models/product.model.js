@@ -72,6 +72,12 @@ const productSchema = new mongoose.Schema(
       ref: 'ProductBooking',
       default: null,
     },
+    /** Dynamic category attributes (values keyed by Category.attributeDefs.key). */
+    attributes: {
+      type: Map,
+      of: String,
+      default: {},
+    },
   },
   {
     timestamps: true,

@@ -16,6 +16,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   categoryId: string;
   isEdit: boolean;
   @ViewChild('categoryForm') categoryForm: NgForm;
+  attributeDefs: string[] = [];
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
@@ -41,7 +42,47 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
         name: c.name,
         code: c.code || '',
       });
+      this.attributeDefs = Array.isArray((c as any).attributeDefs)
+        ? (c as any).attributeDefs.map((x: any) => String(x?.key ?? x ?? ''))
+        : [];
+      if (!this.attributeDefs.length) {
+        this.attributeDefs = [''];
+      }
     }
+    if (!this.isEdit && !this.attributeDefs.length) {
+      this.attributeDefs = [''];
+    }
+  }
+
+  addAttributeRow(): void {
+    this.attributeDefs.push('');
+  }
+
+  removeAttributeRow(i: number): void {
+    this.attributeDefs.splice(i, 1);
+    if (!this.attributeDefs.length) {
+      this.attributeDefs = [''];
+    }
+  }
+
+  private normalizeKey(raw: any): string {
+    return String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_');
+  }
+
+  private buildAttributeDefsPayload(): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of this.attributeDefs || []) {
+      const key = this.normalizeKey(raw);
+      if (!key) continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+    }
+    return out;
   }
 
   submitForm(): void {
@@ -53,9 +94,11 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       );
       return;
     }
+    const attrPayload = this.buildAttributeDefsPayload();
     const payload = {
       name: this.category.name,
       code: (this.category as any).code,
+      attributeDefs: attrPayload,
     };
 
     if (this.isEdit && this.categoryId) {

@@ -49,6 +49,7 @@ export class ProductsListComponent implements OnInit {
   /** all | with_bookings | without_bookings — maps to API `booked` */
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
   totalNumberOfProducts: number;
+  viewMode: 'table' | 'cards' = 'cards';
 
   currentOrder: any = {
     name: '',
@@ -146,9 +147,37 @@ export class ProductsListComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    const saved = localStorage.getItem('products.viewMode');
+    this.viewMode = saved === 'table' ? 'table' : 'cards';
     this.getproducts();
     this.getcategorys();
     this.getBranches();
+  }
+
+  setViewMode(mode: 'table' | 'cards'): void {
+    this.viewMode = mode;
+    localStorage.setItem('products.viewMode', mode);
+  }
+
+  productAttributesPairs(p: Product): Array<{ key: string; value: string }> {
+    const raw: any = (p as any)?.attributes;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return [];
+    }
+    const out: Array<{ key: string; value: string }> = [];
+    for (const [k, v] of Object.entries(raw)) {
+      const key = String(k || '').trim();
+      const val = String(v ?? '').trim();
+      if (!key || !val) continue;
+      out.push({ key, value: val });
+    }
+    return out.slice(0, 8);
+  }
+
+  productAttributesSummary(p: Product): string {
+    const pairs = this.productAttributesPairs(p);
+    if (!pairs.length) return '—';
+    return pairs.map((x) => `${x.key}: ${x.value}`).join(' • ');
   }
 
   getproducts() {

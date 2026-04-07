@@ -134,6 +134,40 @@
           <i class="fa fa-language steel" aria-hidden="true"></i>
           {{ 'tr_language' | translate }}
         </button>
+
+        <div class="app-topbar__dropdown-section">
+          <div class="app-topbar__dropdown-title">
+            <i class="fa fa-text-height steel" aria-hidden="true"></i>
+            {{ 'tr_font_size' | translate }}
+          </div>
+          <div class="font-size-pills" role="group" [attr.aria-label]="'tr_font_size' | translate">
+            <button
+              type="button"
+              class="font-pill font-pill--sm"
+              [class.is-active]="fontSizeChoice === 'small'"
+              (click)="setFontSize('small')"
+            >
+              {{ 'tr_font_small' | translate }}
+            </button>
+            <button
+              type="button"
+              class="font-pill font-pill--md"
+              [class.is-active]="fontSizeChoice === 'medium'"
+              (click)="setFontSize('medium')"
+            >
+              {{ 'tr_font_medium' | translate }}
+            </button>
+            <button
+              type="button"
+              class="font-pill font-pill--lg"
+              [class.is-active]="fontSizeChoice === 'large'"
+              (click)="setFontSize('large')"
+            >
+              {{ 'tr_font_large' | translate }}
+            </button>
+          </div>
+        </div>
+
         <button type="button" class="app-topbar__dropdown-item app-topbar__dropdown-item--danger" (click)="logout(); closeUserMenu()">
           <i class="fa fa-sign-out" aria-hidden="true"></i>
           {{ 'tr_signin.logout' | translate }}

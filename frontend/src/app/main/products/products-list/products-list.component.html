@@ -10,6 +10,22 @@
       {{ "tr_products" | translate }}</span>
     <div class="btn-group">
       <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        [class.btn-primary]="viewMode === 'table'"
+        (click)="setViewMode('table')"
+      >
+        <i class="fa fa-table" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        [class.btn-primary]="viewMode === 'cards'"
+        (click)="setViewMode('cards')"
+      >
+        <i class="fa fa-th-large" aria-hidden="true"></i>
+      </button>
+      <button
         *ngIf="canAddProduct"
         class="s-btn btn-primary"
         (click)="createOrEditproduct(false)"
@@ -141,7 +157,7 @@
       <div
         class="table-container products-list"
         id="table-container"
-        *ngIf="productsList.length > 0"
+        *ngIf="productsList.length > 0 && viewMode === 'table'"
       >
         <table class="s-table table layout-fixed products-list">
           <thead>
@@ -152,9 +168,12 @@
               <th>{{ "tr_code" | translate }}</th>
               <th>{{ "tr_category" | translate }}</th>
               <th>{{ "tr_stock" | translate }}</th>
+              <th>{{ "tr_booked" | translate }}</th>
+              <th>{{ "tr_available" | translate }}</th>
               <th>{{ "tr_sell_price" | translate }}</th>
               <th>{{ "tr_net_price" | translate }}</th>
               <th>{{ "tr_discount" | translate }}</th>
+              <th>{{ "tr_category_attributes" | translate }}</th>
               <th></th>
             </tr>
           </thead>
@@ -197,9 +216,12 @@
               <td>{{ product.code }}</td>
               <td>{{ product.category?.name }}</td>
               <td>{{ product.stock }}</td>
+              <td>{{ bookedQty(product) }}</td>
+              <td>{{ availableToBook(product) }}</td>
               <td>{{ product.price }}</td>
               <td>{{ product.netPrice }}</td>
               <td>{{ product.discount }}</td>
+              <td class="products-list__attrs">{{ productAttributesSummary(product) }}</td>
               <td>
                 <span class="options-menu" *ngIf="showProductActionsMenu(product)">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
@@ -240,6 +262,95 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="products-cards" *ngIf="productsList.length > 0 && viewMode === 'cards'">
+        <div class="product-card" *ngFor="let product of productsList">
+          <div class="product-card__top">
+            <img
+              *ngIf="product.imageUrl"
+              class="product-card__img"
+              [src]="product.imageUrl"
+              alt=""
+            />
+            <div *ngIf="!product.imageUrl" class="product-card__img product-card__img--placeholder">
+              <i class="fa fa-cube" aria-hidden="true"></i>
+            </div>
+
+            <div class="product-card__title">
+              <div class="product-card__name">{{ product.name }}</div>
+              <div class="product-card__meta">
+                <span class="muted">{{ product.code }}</span>
+                <span class="dot">•</span>
+                <span class="muted">{{ product.category?.name }}</span>
+              </div>
+            </div>
+
+            <span class="options-menu" *ngIf="showProductActionsMenu(product)">
+              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+              <div class="options-menu-container p-0">
+                <div class="border-bottom"></div>
+                <ng-container *ngIf="canBookProduct(product)">
+                  <div
+                    class="single-option"
+                    *ngIf="availableToBook(product) > 0"
+                    (click)="openBookProduct(product)"
+                  >
+                    {{ "tr_product_book" | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="bookedQty(product) > 0"
+                    (click)="openBookingDetails(product)"
+                  >
+                    {{ "tr_product_booking_details" | translate }}
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="canBranchManagerModifyProduct(product)">
+                  <div class="single-option" (click)="createOrEditproduct(true, product)">
+                    {{ "tr_action.edit" | translate }}
+                  </div>
+                  <div class="single-option" (click)="printbarCode(product)">
+                    {{ "print_barcode" | translate }}
+                  </div>
+                  <div class="single-option" (click)="deleteProduct(product)">
+                    <div class="text-error">{{ "tr_action.delete" | translate }}</div>
+                  </div>
+                </ng-container>
+              </div>
+            </span>
+          </div>
+
+          <div class="product-card__stats">
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_stock' | translate }}</div>
+              <div class="stat__value">{{ product.stock }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_booked' | translate }}</div>
+              <div class="stat__value">{{ bookedQty(product) }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_available' | translate }}</div>
+              <div class="stat__value">{{ availableToBook(product) }}</div>
+            </div>
+          </div>
+
+          <div class="product-card__row">
+            <span class="badge" *ngIf="product.inWarehouse">{{ "tr_warehouse" | translate }}</span>
+            <span class="muted" *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
+          </div>
+
+          <div class="product-card__prices">
+            <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
+            <div><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
+            <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
+          </div>
+
+          <div class="product-card__attrs" *ngIf="productAttributesPairs(product).length">
+            <span class="chip" *ngFor="let a of productAttributesPairs(product)">{{ a.key }}: {{ a.value }}</span>
+          </div>
+        </div>
       </div>
 
       <div

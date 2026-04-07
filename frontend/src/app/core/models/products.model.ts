@@ -10,6 +10,8 @@ export interface Product {
   price: number;
   netPrice: number;
   discount: number;
+  /** Dynamic attributes values keyed by category attribute keys. */
+  attributes?: Record<string, string>;
   quantity?: number;
   isApplyDiscount?: boolean;
   /** Central warehouse (no branch) */

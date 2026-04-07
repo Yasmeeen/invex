@@ -28,6 +28,7 @@ export class HeaderComponent implements OnInit {
   userInfo: any;
 
   userMenuOpen = false;
+  fontSizeChoice: 'small' | 'medium' | 'large' = 'medium';
 
   constructor(
     public globals: Globals,
@@ -66,6 +67,7 @@ export class HeaderComponent implements OnInit {
     this.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     this.setUserLanguage();
+    this.loadAndApplyFontSize();
     this.refreshNotifications();
     this.realtime.newNotification$.subscribe((n) => {
       // Prepend so it shows immediately (no refresh needed)
@@ -182,6 +184,35 @@ export class HeaderComponent implements OnInit {
     const userLocal =   this.currentUser.locale
     document.querySelector('body')?.setAttribute('dir', userLocal == 'ar' ? 'rtl' : 'ltr');
     this.translate.use(userLocal);
+  }
+
+  private fontSizeStorageKey(): string {
+    const uid = this.userId;
+    return uid ? `ui.fontSize.${uid}` : 'ui.fontSize.guest';
+  }
+
+  loadAndApplyFontSize(): void {
+    const raw = localStorage.getItem(this.fontSizeStorageKey());
+    const v = raw === 'small' || raw === 'medium' || raw === 'large' ? raw : 'medium';
+    this.fontSizeChoice = v;
+    this.applyFontSize(v);
+  }
+
+  setFontSize(choice: 'small' | 'medium' | 'large'): void {
+    this.fontSizeChoice = choice;
+    localStorage.setItem(this.fontSizeStorageKey(), choice);
+    this.applyFontSize(choice);
+  }
+
+  private applyFontSize(choice: 'small' | 'medium' | 'large'): void {
+    const px = choice === 'small' ? '14px' : choice === 'large' ? '18px' : '16px';
+    document.documentElement.style.setProperty('--app-font-size', px);
+
+    // Keep sidebar readable when font is larger.
+    const sidebarPx =
+      choice === 'small' ? '250px' : choice === 'large' ? '310px' : '280px';
+    document.documentElement.style.setProperty('--app-sidebar-width', sidebarPx);
+    document.documentElement.style.setProperty('--app-sidebar-collapsed-width', '86px');
   }
 
   logout() {

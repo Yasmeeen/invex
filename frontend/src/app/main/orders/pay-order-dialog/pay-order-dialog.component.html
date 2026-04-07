@@ -1,0 +1,57 @@
+<div class="pay-order-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">{{ 'tr_add_payment' | translate }}</h3>
+    <button class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <div class="mb-3 size-small text-muted">
+    <div>
+      {{ 'tr_order_number' | translate }}: <b>{{ order?.orderNumber }}</b>
+    </div>
+    <div>
+      {{ 'tr_final_after_extra_discount' | translate }}:
+      <b>{{ order?.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
+    </div>
+    <div>
+      {{ 'tr_paid' | translate }}:
+      <b>{{ (order?.amountPaid || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
+    </div>
+    <div>
+      {{ 'tr_remaining' | translate }}:
+      <b>{{ remaining() | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
+    </div>
+  </div>
+
+  <div [formGroup]="form">
+    <div class="form-group mb-3">
+      <label>{{ 'tr_payment_amount' | translate }}</label>
+      <input
+        class="s-control width-100"
+        type="number"
+        min="0"
+        step="0.01"
+        formControlName="amount"
+      />
+    </div>
+
+    <div class="form-group mb-3">
+      <label>{{ 'tr_payment_date' | translate }}</label>
+      <input class="s-control width-100" type="date" formControlName="paidAt" />
+    </div>
+
+    <div class="form-group mb-3">
+      <label>{{ 'tr_payment_note' | translate }}</label>
+      <input class="s-control width-100" type="text" formControlName="note" />
+    </div>
+  </div>
+
+  <div class="flex flex-end gap-2">
+    <button class="s-btn btn-secondary" [disabled]="saving" (click)="close()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button class="s-btn btn-primary" [disabled]="saving" (click)="submit()">
+      {{ 'tr_action.save' | translate }}
+    </button>
+  </div>
+</div>
+

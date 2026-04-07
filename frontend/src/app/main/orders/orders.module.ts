@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { OrdersRoutingModule } from './orders-routing.module';
 import { OrdersListComponent } from './orders-list/orders-list.component';
 import { AddOrderComponent } from './add-order/add-order.component';
+import { PayOrderDialogComponent } from './pay-order-dialog/pay-order-dialog.component';
 import { SharedModule } from '@shared/shared.module';
 import { OrdersSerivce } from '@shared/services/orders.service';
 
@@ -11,7 +12,8 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 @NgModule({
   declarations: [
     OrdersListComponent,
-    AddOrderComponent
+    AddOrderComponent,
+    PayOrderDialogComponent
   ],
   imports: [
     CommonModule,

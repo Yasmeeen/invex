@@ -56,7 +56,7 @@ const getDateGroupExpr = (groupBy) =>
     ? { $dateToString: { format: '%Y-%m', date: '$createdAt' } }
     : { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
 
-/** Cash; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
+/** Cash; credit; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
 const salesPaymentCategoryExpr = {
   $cond: [
     { $in: [{ $toLower: { $ifNull: ['$paymentMethod', 'cash'] } }, ['', 'cash']] },
@@ -70,7 +70,13 @@ const salesPaymentCategoryExpr = {
           ],
         },
         'card',
-        'application',
+        {
+          $cond: [
+            { $eq: [{ $toLower: { $ifNull: ['$paymentMethod', ''] } }, 'credit'] },
+            'credit',
+            'application',
+          ],
+        },
       ],
     },
   ],

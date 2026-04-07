@@ -285,9 +285,17 @@
     .order-summary {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-end;
+      gap: 1rem;
       font-size: 1.1rem;
       font-weight: bold;
+
+      .order-summary__lines {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.95rem;
+        font-weight: normal;
+      }
   
       .pay-btn {
         padding: 0.5rem 1rem;

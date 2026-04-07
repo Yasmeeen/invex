@@ -1,4 +1,10 @@
-import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  ViewChild,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
@@ -32,6 +38,12 @@ export class CashierComponent implements AfterViewInit {
   orderItems: any[] = [];
   todayDate = new Date();
   createdOrder:any;
+  /** How the cashier enters invoice-level discount: %, fixed amount, or target final total. */
+  invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
+  /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
+  invoiceExtraValue = 0;
+  /** For credit sales: amount paid now (EGP). */
+  paidNowAmount = 0;
 
   searchTerm = '';
   barcode = '';
@@ -49,6 +61,7 @@ export class CashierComponent implements AfterViewInit {
 
   readonly paymentMethods: CashierPaymentMethod[] = [
     { id: 'cash', labelKey: 'tr_pay_cash', logo: 'assets/images/payment/cash.svg' },
+    { id: 'credit', labelKey: 'tr_pay_credit', logo: 'assets/images/payment/cash.svg' },
     { id: 'visa', labelKey: 'tr_pay_visa', logo: 'assets/images/payment/visa.svg' },
     { id: 'mastercard', labelKey: 'tr_pay_mastercard', logo: 'assets/images/payment/mastercard.svg' },
     { id: 'meeza', labelKey: 'tr_pay_meeza', logo: 'assets/images/payment/meeza.svg' },
@@ -72,7 +85,8 @@ export class CashierComponent implements AfterViewInit {
     private appNotificationService: AppNotificationService,
     private fb: FormBuilder,
     private translate: TranslateService,
-    public storeSettings: StoreSettingsService
+    public storeSettings: StoreSettingsService,
+    private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
     if (canPickBranchRole(this.curentUser?.role)) {
@@ -300,17 +314,104 @@ export class CashierComponent implements AfterViewInit {
   }
   removeItem(i: number) { this.orderItems.splice(i, 1); this.focusBarcodeInput(); }
 
+  /** Unit price after product-level discount (matches backend). */
+  lineUnitPrice(item: any): number {
+    let p = Number(item?.price) || 0;
+    if (item?.isApplyDiscount && Number(item?.discount) > 0) {
+      p = p - (p * Number(item.discount)) / 100;
+    }
+    return Math.round(p * 10000) / 10000;
+  }
+
+  /** Sum of lines after product discounts, before invoice extra discount. */
+  orderSubtotal(): number {
+    return this.orderItems.reduce(
+      (acc, item) => acc + this.lineUnitPrice(item) * Number(item.quantity || 0),
+      0
+    );
+  }
+
+  /** Invoice extra discount in EGP (derived from current mode + input). */
+  appliedInvoiceDiscount(): number {
+    const sub = Math.round(this.orderSubtotal() * 100) / 100;
+    if (sub <= 0) return 0;
+    const v = Number(this.invoiceExtraValue);
+    if (!Number.isFinite(v)) return 0;
+
+    switch (this.invoiceDiscountMode) {
+      case 'percent': {
+        if (v <= 0) return 0;
+        const p = Math.min(100, Math.max(0, v));
+        return Math.round(((sub * p) / 100) * 100) / 100;
+      }
+      case 'amount': {
+        if (v <= 0) return 0;
+        return Math.min(Math.round(v * 100) / 100, sub);
+      }
+      case 'final': {
+        const target = Math.min(Math.max(0, Math.round(v * 100) / 100), sub);
+        return Math.round((sub - target) * 100) / 100;
+      }
+      default:
+        return 0;
+    }
+  }
+
+  finalOrderTotal(): number {
+    const sub = Math.round(this.orderSubtotal() * 100) / 100;
+    return Math.round((sub - this.appliedInvoiceDiscount()) * 100) / 100;
+  }
+
+  /** Same as applied discount / subtotal * 100 (for display when user typed amount or final). */
+  invoiceDiscountPercentEquivalent(): number {
+    const sub = Math.round(this.orderSubtotal() * 100) / 100;
+    if (sub <= 0) return 0;
+    const d = this.appliedInvoiceDiscount();
+    if (d <= 0) return 0;
+    return Math.round((d / sub) * 10000) / 100;
+  }
+
+  onInvoiceDiscountModeChange(): void {
+    this.invoiceExtraValue = 0;
+  }
+
+  /** Max value for the number input (percent 0–100, else subtotal). */
+  invoiceExtraInputMax(): number {
+    if (this.invoiceDiscountMode === 'percent') return 100;
+    return Math.max(0, Math.round(this.orderSubtotal() * 100) / 100);
+  }
+
+  onInvoiceExtraValueChange(): void {
+    const sub = Math.round(this.orderSubtotal() * 100) / 100;
+    let v = Number(this.invoiceExtraValue);
+    if (!Number.isFinite(v)) return;
+
+    if (this.invoiceDiscountMode === 'percent') {
+      if (v < 0) v = 0;
+      if (v > 100) v = 100;
+    } else if (this.invoiceDiscountMode === 'amount') {
+      if (v < 0) v = 0;
+      if (v > sub) v = sub;
+    } else {
+      if (v < 0) v = 0;
+      if (v > sub) v = sub;
+    }
+    this.invoiceExtraValue = Math.round(v * 100) / 100;
+  }
+
   getTotal() { 
-    return this.orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0); 
+    return this.orderSubtotal(); 
   }
   getDiscountAmount() {
     return this.orderItems.reduce((acc, item) => {
-      const discountPercent = item.discount || 0; 
-      return acc + (item.price * discountPercent / 100) * item.quantity;
+      if (!item?.isApplyDiscount || Number(item.discount) <= 0) return acc;
+      const base = Number(item.price) || 0;
+      const unitDisc = (base * Number(item.discount)) / 100;
+      return acc + unitDisc * Number(item.quantity || 0);
     }, 0);
   }
   getTotalAfterDiscount() {
-    return this.getTotal() - this.getDiscountAmount();
+    return this.finalOrderTotal();
   }
   getAverageDiscountPercent() {
     if (!this.orderItems || this.orderItems.length === 0) return 0;
@@ -360,11 +461,28 @@ export class CashierComponent implements AfterViewInit {
       paymentMethod,
       branch: selectedBranchId,
       status: 'completed',
-      userId: this.curentUser._id
+      userId: this.curentUser._id,
+      invoiceDiscountAmount: this.appliedInvoiceDiscount(),
+      paidAmount:
+        paymentMethod === 'credit'
+          ? Math.round(Number(this.paidNowAmount || 0) * 100) / 100
+          : undefined,
     };
 
-    this.ordersSerivce.createOrder(orderData).subscribe((res:any) => {
-      this.createdOrder = res.newOrder;
+    const receiptSubtotal = Math.round(this.orderSubtotal() * 100) / 100;
+    const receiptInvoiceDisc = Math.round(this.appliedInvoiceDiscount() * 100) / 100;
+    const receiptFinal =
+      Math.round((receiptSubtotal - receiptInvoiceDisc) * 100) / 100;
+
+    this.ordersSerivce.createOrder(orderData).subscribe((res: any) => {
+      const base = res?.newOrder ?? {};
+      // Receipt must show invoice-level discount even if API omits fields or CD lags.
+      this.createdOrder = {
+        ...base,
+        subtotalPrice: receiptSubtotal,
+        invoiceDiscountAmount: receiptInvoiceDisc,
+        totalPrice: receiptFinal,
+      };
       this.printInvoice();
 
       this.loadProducts();
@@ -379,10 +497,49 @@ export class CashierComponent implements AfterViewInit {
 
   printInvoice() {
     setTimeout(() => {
+      this.cdr.detectChanges();
       window.print();
       this.orderItems = [];
+      this.paidNowAmount = 0;
+      this.invoiceDiscountMode = 'percent';
+      this.invoiceExtraValue = 0;
       this.clearClientInformationAfterCheckout();
     }, 300);
+  }
+
+  receiptLinesSubtotal(): number {
+    const o = this.createdOrder;
+    const raw = o?.subtotalPrice;
+    if (
+      o &&
+      raw != null &&
+      raw !== '' &&
+      Number.isFinite(Number(raw))
+    ) {
+      return Math.round(Number(raw) * 100) / 100;
+    }
+    if (!o?.products?.length) return 0;
+    const sum = o.products.reduce(
+      (s: number, item: any) => s + Number(item.price || 0) * Number(item.quantity || 0),
+      0
+    );
+    return Math.round(sum * 100) / 100;
+  }
+
+  receiptInvoiceExtraDiscount(): number {
+    const d = Number(this.createdOrder?.invoiceDiscountAmount);
+    if (!Number.isFinite(d) || d <= 0) return 0;
+    return Math.round(d * 100) / 100;
+  }
+
+  receiptFinalTotal(): number {
+    const t = Number(this.createdOrder?.totalPrice);
+    if (Number.isFinite(t)) {
+      return Math.round(t * 100) / 100;
+    }
+    const sub = this.receiptLinesSubtotal();
+    const disc = this.receiptInvoiceExtraDiscount();
+    return Math.round((sub - disc) * 100) / 100;
   }
 
   openCashier() {

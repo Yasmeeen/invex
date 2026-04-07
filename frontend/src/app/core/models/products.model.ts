@@ -69,7 +69,20 @@ export interface Order {
   clientAddress: string
   branch?:  Branch;
   numberOfProducts? : number;
+  /** After line-item discounts, before invoice-level discount (new orders). */
+  subtotalPrice?: number;
+  /** Extra cashier discount on the whole bill. */
+  invoiceDiscountAmount?: number;
   totalPrice?: number;
+  /** Credit sales tracking */
+  amountPaid?: number;
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  payments?: Array<{
+    amount: number;
+    paidAt: string;
+    paidByUserId?: string;
+    note?: string;
+  }>;
   products?: Product [];
   orderNumber?: number;
   paymentMethod?: string;

@@ -27,6 +27,10 @@ createOrder(params: any) {
   return this.http.post(ORDER_CREATE_URL, params);
 }
 
+addPayment(orderId: string, payload: { amount: number; paidAt?: string; userId?: string; note?: string }) {
+  return this.http.post(`${ORDERS_URL}/${orderId}/payments`, payload);
+}
+
 restoreOrder(orderId: string): Observable<any> {
   return this.http.put(`${ORDERS_URL}/${orderId}/restore`, {});
 }

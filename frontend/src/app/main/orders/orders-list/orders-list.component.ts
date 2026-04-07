@@ -13,6 +13,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { Branch, Order } from '@core/models/products.model';
 import { AddOrderComponent } from '../add-order/add-order.component';
+import { PayOrderDialogComponent } from '../pay-order-dialog/pay-order-dialog.component';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
@@ -86,6 +87,36 @@ export class OrdersListComponent implements OnInit {
     private branchesServce: BranchesServce
   ) { }
 
+  orderPaid(order: Order): number {
+    return Math.max(0, Number(order.amountPaid) || 0);
+  }
+
+  orderRemaining(order: Order): number {
+    const total = Number(order.totalPrice) || 0;
+    const paid = this.orderPaid(order);
+    return Math.max(0, Math.round((total - paid) * 100) / 100);
+  }
+
+  canPayOrder(order: Order): boolean {
+    if (!order?._id) return false;
+    if (order.status === 'restored') return false;
+    return this.orderRemaining(order) > 0;
+  }
+
+  openPayDialog(order: Order): void {
+    const ref = this.dialog.open(PayOrderDialogComponent, {
+      width: '520px',
+      data: { order },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.getOrders();
+        this.getOrderStatistics();
+      }
+    });
+  }
+
 
   ngOnInit(): void {
     this.getOrders();
@@ -154,6 +185,21 @@ export class OrdersListComponent implements OnInit {
   onPaymentMethodFilterChange(): void {
     this.params.page = 1;
     this.getOrders();
+  }
+
+  /** Subtotal after line discounts, before invoice-level discount (legacy orders: falls back to total). */
+  orderSubtotalForList(order: Order): number {
+    const s = order.subtotalPrice;
+    if (s != null && Number.isFinite(Number(s))) {
+      return Number(s);
+    }
+    return Number(order.totalPrice) || 0;
+  }
+
+  orderInvoiceExtraDiscount(order: Order): number {
+    const d = order.invoiceDiscountAmount;
+    if (d == null || !Number.isFinite(Number(d))) return 0;
+    return Math.max(0, Number(d));
   }
 
   /** Translate stored order.paymentMethod id for display. */

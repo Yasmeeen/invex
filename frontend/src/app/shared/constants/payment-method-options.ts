@@ -6,6 +6,7 @@ export interface PaymentMethodOption {
 
 export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
   { id: 'cash', labelKey: 'tr_pay_cash' },
+  { id: 'credit', labelKey: 'tr_pay_credit' },
   { id: 'visa', labelKey: 'tr_pay_visa' },
   { id: 'mastercard', labelKey: 'tr_pay_mastercard' },
   { id: 'meeza', labelKey: 'tr_pay_meeza' },

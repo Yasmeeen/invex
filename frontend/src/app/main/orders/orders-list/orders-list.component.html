@@ -196,7 +196,11 @@
               <th>{{ "tr_client_name" | translate }}</th>
               <th> {{"tr_phone_number" | translate}}</th>
               <th>{{ "tr_branch" | translate }}</th>
-              <th>{{ "tr_price" | translate }}</th>
+              <th>{{ "tr_order_subtotal" | translate }}</th>
+              <th>{{ "tr_invoice_extra_discount" | translate }}</th>
+              <th>{{ "tr_final_after_extra_discount" | translate }}</th>
+              <th>{{ "tr_paid" | translate }}</th>
+              <th>{{ "tr_remaining" | translate }}</th>
               <th>{{ "tr_payment_method" | translate}}</th>
               <th>{{ "tr_created_at" | translate}}</th>
               <th>{{ "tr_status" | translate}}</th>
@@ -210,8 +214,16 @@
               <td>{{ order.clientName }}</td>
               <td>{{ order.clientPhoneNumber}}</td>
               <td>{{ order.branch?.name }}</td>
-   
-              <td>{{ order.totalPrice }}</td>
+              <td>{{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <ng-container *ngIf="orderInvoiceExtraDiscount(order) > 0; else noExtraDisc">
+                  {{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </ng-container>
+                <ng-template #noExtraDisc>—</ng-template>
+              </td>
+              <td>{{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>{{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
               <td>{{ order.createdAt  | date: 'dd/M/YYYY'}}</td>
               <td>{{ order.status }}</td>
@@ -227,6 +239,13 @@
                 <span class="options-menu" *ngIf="order.status != 'restored'">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
+                    <div
+                      class="single-option"
+                      *ngIf="canPayOrder(order)"
+                      (click)="openPayDialog(order)"
+                    >
+                      {{ "tr_add_payment" | translate }}
+                    </div>
                     <div
                       class="single-option"
                       (click)="restoreOrder( order._id!)"

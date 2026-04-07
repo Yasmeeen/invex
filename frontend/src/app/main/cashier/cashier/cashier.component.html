@@ -209,16 +209,82 @@
               {{ item.quantity }}
               <button (click)="increaseQty(i)">+</button>
             </td>
-            <td>{{ item.price | currency:'EGP ':'symbol':'1.2-2' }}</td>
-            <td>{{ item.price * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
+            <td>{{ lineUnitPrice(item) | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ lineUnitPrice(item) * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
             <td><button (click)="removeItem(i)">x</button></td>
           </tr>
         </tbody>
       </table>
 
       <div class="order-summary">
-        <div>
-          {{ "tr_cashier.TOTAL" | translate }}: {{ getTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+        <div class="order-summary__lines">
+          <div>
+            {{ "tr_order_subtotal" | translate }}:
+            {{ orderSubtotal() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+          <div class="form-group mb-0 mt-2">
+            <label class="size-small">{{ "tr_invoice_discount_mode" | translate }}</label>
+            <select
+              class="s-control width-100"
+              [(ngModel)]="invoiceDiscountMode"
+              (ngModelChange)="onInvoiceDiscountModeChange()"
+            >
+              <option value="percent">{{ "tr_invoice_discount_mode_percent" | translate }}</option>
+              <option value="amount">{{ "tr_invoice_discount_mode_amount" | translate }}</option>
+              <option value="final">{{ "tr_invoice_discount_mode_final" | translate }}</option>
+            </select>
+          </div>
+          <div class="form-group mb-0 mt-2">
+            <label *ngIf="invoiceDiscountMode === 'percent'" class="size-small">{{
+              "tr_invoice_discount_input_percent" | translate
+            }}</label>
+            <label *ngIf="invoiceDiscountMode === 'amount'" class="size-small">{{
+              "tr_invoice_discount_input_amount" | translate
+            }}</label>
+            <label *ngIf="invoiceDiscountMode === 'final'" class="size-small">{{
+              "tr_invoice_discount_input_final" | translate
+            }}</label>
+            <input
+              type="number"
+              class="s-control width-100"
+              min="0"
+              [max]="invoiceExtraInputMax()"
+              step="0.01"
+              [(ngModel)]="invoiceExtraValue"
+              (ngModelChange)="onInvoiceExtraValueChange()"
+            />
+          </div>
+          <div *ngIf="invoiceDiscountMode === 'percent' && appliedInvoiceDiscount() > 0" class="size-small text-muted mt-1">
+            {{ "tr_invoice_discount_derived_amount" | translate }}:
+            {{ appliedInvoiceDiscount() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+          <div *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() > 0" class="size-small text-muted mt-1">
+            {{ "tr_invoice_discount_derived_percent" | translate }}:
+            {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
+          </div>
+          <div class="weight-bold mt-2">
+            {{ "tr_final_after_extra_discount" | translate }}:
+            {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+
+          <div
+            class="form-group mb-0 mt-2"
+            *ngIf="clientForm.get('paymentMethod')?.value === 'credit'"
+          >
+            <label class="size-small">{{ "tr_paid_now_amount" | translate }}</label>
+            <input
+              type="number"
+              class="s-control width-100"
+              min="0"
+              [max]="finalOrderTotal()"
+              step="0.01"
+              [(ngModel)]="paidNowAmount"
+            />
+            <div class="size-small text-muted mt-1">
+              {{ "tr_remaining_amount" | translate }}:
+              {{ (finalOrderTotal() - (paidNowAmount || 0)) | currency:'EGP ':'symbol':'1.2-2' }}
+            </div>
+          </div>
         </div>
         <button class="pay-btn" (click)="checkout()">
           {{ "tr_cashier.PAY" | translate }}
@@ -304,23 +370,19 @@
       </tr>
     </table>
 
-    <!-- Totals -->
+    <!-- Totals (from saved order; includes invoice-level extra discount) -->
     <table class="invoice-table totals-table">
       <tr class="bold">
-        <td>{{ 'tr_total_invoice' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ getTotal() | number:'1.2-2' }}</td>
+        <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ receiptLinesSubtotal() | number:'1.2-2' }}</td>
       </tr>
-      <tr>
-        <td>{{ 'tr_discount_percent' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ getAverageDiscountPercent() | number:'1.2-2' }}%</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_discount_amount' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ getDiscountAmount() | number:'1.2-2' }}</td>
+      <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
+        <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ -receiptInvoiceExtraDiscount() | number:'1.2-2' }}</td>
       </tr>
       <tr class="bold">
         <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ getTotalAfterDiscount() | number:'1.2-2' }}</td>
+        <td>{{ receiptFinalTotal() | number:'1.2-2' }}</td>
       </tr>
     </table>
 
@@ -328,7 +390,7 @@
 
     <div class="final-total center bold">
       {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
-      {{ getTotalAfterDiscount() | number:'1.2-2' }}
+      {{ receiptFinalTotal() | number:'1.2-2' }}
     </div>
 
     <div class="separator double-border"></div>

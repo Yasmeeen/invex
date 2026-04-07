@@ -67,7 +67,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber clientName clientPhoneNumber clientAddress sellerName paymentMethod totalPrice numberOfProducts status createdAt branch products'
+          'orderNumber clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt branch products'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -129,7 +129,9 @@ export const createOrder = async (req, res) => {
       branch,
       products,
       status,
-      userId
+      userId,
+      invoiceDiscountAmount: invoiceDiscountRaw,
+      paidAmount: paidAmountRaw,
     } = req.body;
 
     // validation
@@ -227,6 +229,40 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    const subtotalPrice = Math.round(totalPrice * 100) / 100;
+    let invoiceDiscountAmount = Number(invoiceDiscountRaw);
+    if (!Number.isFinite(invoiceDiscountAmount) || invoiceDiscountAmount < 0) {
+      invoiceDiscountAmount = 0;
+    }
+    invoiceDiscountAmount = Math.min(
+      Math.round(invoiceDiscountAmount * 100) / 100,
+      subtotalPrice
+    );
+    totalPrice = Math.round((subtotalPrice - invoiceDiscountAmount) * 100) / 100;
+
+    let paidAmount = Number(paidAmountRaw);
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
+    paidAmount = Math.min(Math.round(paidAmount * 100) / 100, totalPrice);
+
+    const payments = [];
+    if (paidAmount > 0) {
+      payments.push({
+        amount: paidAmount,
+        paidAt: new Date(),
+        paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
+          ? new mongoose.Types.ObjectId(String(userId))
+          : undefined,
+        note: 'Initial payment (cashier)',
+      });
+    }
+
+    const paymentStatus =
+      paidAmount >= totalPrice
+        ? 'paid'
+        : paidAmount > 0
+        ? 'partial'
+        : 'unpaid';
+
     // ======================
     // 3️⃣ GENERATE ORDER NUMBER
     // ======================
@@ -249,7 +285,12 @@ export const createOrder = async (req, res) => {
           branch,
           products: orderProducts,
           numberOfProducts,
+          subtotalPrice,
+          invoiceDiscountAmount,
           totalPrice,
+          amountPaid: paidAmount,
+          paymentStatus,
+          payments,
           status,
           cashierId: userId, 
           },
@@ -291,6 +332,8 @@ export const createOrder = async (req, res) => {
       message: `Order created #${newOrder?.orderNumber ?? ''}`.trim(),
       metadata: {
         orderNumber: newOrder?.orderNumber,
+        subtotalPrice: newOrder?.subtotalPrice,
+        invoiceDiscountAmount: newOrder?.invoiceDiscountAmount,
         totalPrice: newOrder?.totalPrice,
         numberOfProducts: newOrder?.numberOfProducts,
         paymentMethod: newOrder?.paymentMethod,
@@ -299,15 +342,74 @@ export const createOrder = async (req, res) => {
       },
     });
 
+    const newOrderPlain =
+      typeof newOrder?.toObject === 'function' ? newOrder.toObject() : newOrder;
+
     res.status(201).json({
       message: "✅ Order created successfully",
-      newOrder,
+      newOrder: newOrderPlain,
     });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
     console.error("❌ Error creating order:", err);
     res.status(500).json({ error: "Server error", details: err.message });
+  }
+};
+
+export const addOrderPayment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { amount, paidAt, userId, note } = req.body || {};
+    const payAmount = Number(amount);
+    if (!Number.isFinite(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ error: 'Valid amount is required' });
+    }
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'restored') return res.status(400).json({ error: 'Order is restored' });
+
+    const total = Number(order.totalPrice) || 0;
+    const alreadyPaid = Number(order.amountPaid) || 0;
+    const remaining = Math.max(0, Math.round((total - alreadyPaid) * 100) / 100);
+    const applied = Math.min(Math.round(payAmount * 100) / 100, remaining);
+    if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
+
+    const dt = paidAt ? new Date(paidAt) : new Date();
+    if (Number.isNaN(dt.getTime())) return res.status(400).json({ error: 'Invalid paidAt date' });
+
+    order.payments = order.payments || [];
+    order.payments.push({
+      amount: applied,
+      paidAt: dt,
+      paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
+        ? new mongoose.Types.ObjectId(String(userId))
+        : undefined,
+      note: String(note || '').trim(),
+    });
+
+    order.amountPaid = Math.round((alreadyPaid + applied) * 100) / 100;
+    if (order.amountPaid >= total) {
+      order.paymentStatus = 'paid';
+    } else {
+      order.paymentStatus = order.amountPaid > 0 ? 'partial' : 'unpaid';
+    }
+
+    await order.save();
+
+    await auditLog(req, {
+      action: 'payment',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      message: `Order payment ${applied}`,
+      metadata: { amount: applied, amountPaid: order.amountPaid, totalPrice: total },
+    });
+
+    res.json({ message: '✅ Payment added', order });
+  } catch (error) {
+    console.error('addOrderPayment:', error);
+    res.status(500).json({ error: 'Failed to add payment' });
   }
 };
 

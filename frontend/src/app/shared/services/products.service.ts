@@ -1,11 +1,48 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
+import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
 import { Product } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+export type ProductsImportMetadata = {
+  branches: Array<{ _id: string; name: string }>;
+  categories: Array<{
+    _id: string;
+    name: string;
+    code: string;
+    attributeDefs: Array<{ key: string; label?: string }>;
+  }>;
+};
+
+export type ProductsImportError = {
+  rowNumber: number;
+  sheetName: string;
+  code?: string;
+  field?: string;
+  message: string;
+};
+
+export type ProductsImportResult = {
+  createdCount: number;
+  failedCount: number;
+  errors: ProductsImportError[];
+};
+
+export type ImportExcelRow = {
+  sheetBranchName: string;
+  categoryName: string;
+  name: string;
+  code?: string;
+  price: any;
+  discount?: any;
+  netPrice?: any;
+  stock: any;
+  inWarehouse?: any;
+  imageUrl?: string;
+  attributes?: Record<string, any>;
+};
 
 @Injectable({
   providedIn: 'root',
@@ -46,6 +83,17 @@ getProduct(productId: any) {
 
 createProduct(params: any) {
   return this.http.post(PRODUCT_CREATE_PRODUCT_URL, params);
+}
+
+getProductsImportMetadata(): Observable<ProductsImportMetadata> {
+  return this.http.get<ProductsImportMetadata>(PRODUCTS_IMPORT_METADATA_URL);
+}
+
+importProductsFromExcelRows(payload: {
+  rows: ImportExcelRow[];
+  options?: { allowPartial?: boolean; autoComputeNetPrice?: boolean };
+}): Observable<ProductsImportResult> {
+  return this.http.post<ProductsImportResult>(PRODUCTS_IMPORT_EXCEL_URL, payload);
 }
 updateProduct(product: Product, productId: string): Observable<Product> {
   return this.http.put<Product>(PRODUCT_UPDATE_PRODUCT_URL + `/${productId}`, product).pipe(

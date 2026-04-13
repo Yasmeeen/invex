@@ -17,6 +17,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   isEdit: boolean;
   @ViewChild('categoryForm') categoryForm: NgForm;
   attributeDefs: string[] = [];
+  loadingCategory = false;
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
@@ -33,23 +34,50 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.categoryId = this.data.categoryId;
     this.isEdit = this.data.isEdit;
+
+    if (this.isEdit && this.categoryId) {
+      this.loadingCategory = true;
+      this.categoriesServce.getCategory(this.categoryId).subscribe({
+        next: (c: any) => {
+          this.loadingCategory = false;
+          this.applyCategoryToForm(c as Category);
+        },
+        error: () => {
+          this.loadingCategory = false;
+          // fallback to passed data if available
+          if (this.data.category) {
+            this.applyCategoryToForm(this.data.category as Category);
+          }
+        },
+      });
+    }
   }
 
   ngAfterViewInit(): void {
     if (this.isEdit && this.data.category && this.categoryForm?.form) {
-      const c = this.data.category;
-      this.categoryForm.form.patchValue({
-        name: c.name,
-        code: c.code || '',
-      });
-      this.attributeDefs = Array.isArray((c as any).attributeDefs)
-        ? (c as any).attributeDefs.map((x: any) => String(x?.key ?? x ?? ''))
-        : [];
-      if (!this.attributeDefs.length) {
-        this.attributeDefs = [''];
-      }
+      // initial fast patch while API loads
+      this.applyCategoryToForm(this.data.category as Category);
     }
     if (!this.isEdit && !this.attributeDefs.length) {
+      this.attributeDefs = [''];
+    }
+  }
+
+  trackByIndex(i: number): number {
+    return i;
+  }
+
+  private applyCategoryToForm(c: Category): void {
+    if (!c || !this.categoryForm?.form) {
+      return;
+    }
+    this.categoryForm.form.patchValue({
+      name: (c as any).name,
+      code: (c as any).code || '',
+    });
+    const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
+    this.attributeDefs = defs.map((x: any) => String(x?.key ?? x ?? ''));
+    if (!this.attributeDefs.length) {
       this.attributeDefs = [''];
     }
   }

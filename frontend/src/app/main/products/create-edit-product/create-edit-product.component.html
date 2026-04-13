@@ -213,20 +213,20 @@
                       class="form-group"
                       [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ 'tr_net_price' | translate }}</label>
+                      <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ 'tr_net_price_optional' | translate }}</span></label>
                       <input
                         type="number"
                         class="s-control"
                         name="netPrice"
                         #netPrice="ngModel"
                         ngModel
-                        required
+                        min="0"
                       />
                       <span
                         class="text-error size-small validator"
-                        *ngIf="netPrice.invalid && basicInfoForm.submitted"
+                        *ngIf="netPrice.invalid && basicInfoForm.submitted && netPrice.errors?.min"
                       >
-                        {{ 'tr_price_required' | translate }}
+                        {{ 'tr_net_price_invalid' | translate }}
                       </span>
                     </div>
                   </div>

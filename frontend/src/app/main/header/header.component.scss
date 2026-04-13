@@ -171,7 +171,7 @@ $forest: #6c5ce7;
 
   .notification-row {
     display: grid;
-    grid-template-columns: 34px 1fr 18px;
+    grid-template-columns: 34px 1fr;
     gap: 10px;
     align-items: center;
   }
@@ -188,10 +188,6 @@ $forest: #6c5ce7;
     flex-shrink: 0;
   }
 
-  .notification-chevron {
-    color: #b0b0b0;
-    justify-self: end;
-  }
 }
 
 .app-topbar__notify-dot {

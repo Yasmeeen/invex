@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import Category from '../../DB/models/category.model.js';
+import Branch from '../../DB/models/branch.model.js';
 import { auditLog } from '../audit_module/audit.service.js';
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -53,6 +54,18 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
+/** If netPrice omitted/empty, use price - discount (clamped to >= 0). */
+const resolveNetPrice = (priceNum, discountNum, netPriceRaw) => {
+  const d = Number(discountNum);
+  const disc = Number.isFinite(d) && d >= 0 ? d : 0;
+  if (netPriceRaw === undefined || netPriceRaw === null || String(netPriceRaw).trim() === '') {
+    return Math.max(0, priceNum - disc);
+  }
+  const n = Number(netPriceRaw);
+  if (Number.isNaN(n)) return NaN;
+  return n;
+};
+
 const normalizeAttrKey = (raw) =>
   String(raw || '')
     .trim()
@@ -89,6 +102,329 @@ const parseBranchIdFilter = (branchId) => {
     return null;
   }
   return branchIdStr;
+};
+
+export const getProductsImportMetadata = async (_req, res) => {
+  try {
+    const [branches, categories] = await Promise.all([
+      Branch.find({}).select('name').sort({ name: 1 }).lean(),
+      Category.find({})
+        .select('name code attributeDefs')
+        .sort({ name: 1 })
+        .lean(),
+    ]);
+
+    const categoriesOut = (categories || []).map((c) => ({
+      _id: c._id,
+      name: c.name,
+      code: (c.code || '').trim(),
+      attributeDefs: Array.isArray(c.attributeDefs) ? c.attributeDefs : [],
+    }));
+
+    const branchesOut = (branches || []).map((b) => ({ _id: b._id, name: b.name }));
+
+    return res.json({ branches: branchesOut, categories: categoriesOut });
+  } catch (error) {
+    console.error('getProductsImportMetadata:', error);
+    return res.status(500).json({ error: 'Failed to load import metadata' });
+  }
+};
+
+const normalizeNameKey = (raw) =>
+  String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const parseLooseBool = (v) => {
+  if (v === true) return true;
+  if (v === false) return false;
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s) return false;
+  return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+};
+
+export const importProductsFromExcelRows = async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+    const options = req.body?.options || {};
+    const allowPartial = options?.allowPartial !== false;
+    const autoComputeNetPrice = options?.autoComputeNetPrice !== false;
+
+    if (!rows) {
+      return res.status(400).json({ error: 'rows must be an array' });
+    }
+    if (rows.length === 0) {
+      return res.json({ createdCount: 0, failedCount: 0, errors: [] });
+    }
+    if (rows.length > 5000) {
+      return res.status(400).json({ error: 'Too many rows (max 5000)' });
+    }
+
+    // Preload all branches/categories for fast lookup by name.
+    const [branches, categories] = await Promise.all([
+      Branch.find({}).select('_id name').lean(),
+      Category.find({}).select('_id name code attributeDefs').lean(),
+    ]);
+    const branchByName = new Map();
+    for (const b of branches || []) {
+      branchByName.set(normalizeNameKey(b?.name), b);
+    }
+    const categoryByName = new Map();
+    for (const c of categories || []) {
+      categoryByName.set(normalizeNameKey(c?.name), c);
+    }
+
+    const errors = [];
+    const valid = [];
+
+    // Cache for auto-generated codes per category.
+    const codeCache = new Map(); // categoryId -> { base, re, next }
+
+    const ensureNextCodeForCategory = async (categoryId) => {
+      const cached = codeCache.get(categoryId);
+      if (cached) return cached;
+
+      const cat = await Category.findById(categoryId).lean();
+      if (!cat) return null;
+      const rawPrefix = (cat.code || '').trim();
+      if (!rawPrefix) return null;
+
+      const base = rawPrefix.replace(/-+$/g, '').toUpperCase();
+      const prefixRe = escapeRegex(base);
+
+      const products = await Product.find({
+        category: categoryId,
+        code: new RegExp(`^${prefixRe}(-\\d+)$`, 'i'),
+      })
+        .select('code')
+        .lean();
+
+      let max = 0;
+      const re = new RegExp(`^${prefixRe}-(\\d+)$`, 'i');
+      for (const p of products || []) {
+        const m = String(p?.code || '').match(re);
+        if (m) {
+          max = Math.max(max, parseInt(m[1], 10));
+        }
+      }
+
+      const obj = { base, prefixRe, next: max + 1 };
+      codeCache.set(categoryId, obj);
+      return obj;
+    };
+
+    // First pass: validate + normalize inputs (no DB writes).
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || {};
+      const sheetName = String(r.sheetBranchName || '').trim();
+      const rowNumber = Number(r.rowNumber) || i + 2; // +2: header row + 1-index
+
+      const categoryName = String(r.categoryName || '').trim();
+      const name = String(r.name || '').trim();
+      const priceNum = Number(r.price);
+      const stockNum = Number(r.stock);
+      const discountNum = r.discount === '' || r.discount == null ? 0 : Number(r.discount);
+      const netRaw = r.netPrice;
+      const netNum = netRaw === '' || netRaw == null ? NaN : Number(netRaw);
+      const inWarehouse = parseLooseBool(r.inWarehouse);
+      const imageUrlNorm = normalizeImageUrl(r.imageUrl);
+
+      if (!categoryName) {
+        errors.push({ rowNumber, sheetName, field: 'categoryName', message: 'categoryName is required' });
+        continue;
+      }
+      if (!name) {
+        errors.push({ rowNumber, sheetName, field: 'name', message: 'name is required' });
+        continue;
+      }
+      if (Number.isNaN(priceNum) || priceNum < 0) {
+        errors.push({ rowNumber, sheetName, field: 'price', message: 'price must be a number >= 0' });
+        continue;
+      }
+      if (Number.isNaN(stockNum) || stockNum < 0) {
+        errors.push({ rowNumber, sheetName, field: 'stock', message: 'stock must be a number >= 0' });
+        continue;
+      }
+      if (Number.isNaN(discountNum) || discountNum < 0) {
+        errors.push({ rowNumber, sheetName, field: 'discount', message: 'discount must be a number >= 0' });
+        continue;
+      }
+
+      const cat = categoryByName.get(normalizeNameKey(categoryName));
+      if (!cat?._id) {
+        errors.push({ rowNumber, sheetName, field: 'categoryName', message: 'Category not found' });
+        continue;
+      }
+
+      let branchId = null;
+      if (!inWarehouse) {
+        const br = branchByName.get(normalizeNameKey(sheetName));
+        if (!br?._id) {
+          errors.push({ rowNumber, sheetName, field: 'sheetBranchName', message: 'Branch not found (sheet name must match branch name)' });
+          continue;
+        }
+        branchId = String(br._id);
+      }
+
+      let code = String(r.code || '').trim();
+      if (!code) {
+        const cc = await ensureNextCodeForCategory(String(cat._id));
+        if (!cc) {
+          errors.push({
+            rowNumber,
+            sheetName,
+            field: 'code',
+            message: 'Cannot auto-generate code (category has no prefix code)',
+          });
+          continue;
+        }
+        code = `${cc.base}-${String(cc.next).padStart(3, '0')}`;
+        cc.next += 1;
+      }
+
+      const codeCheck = await validateProductCodeForCategory(String(cat._id), code);
+      if (!codeCheck.ok) {
+        errors.push({ rowNumber, sheetName, field: 'code', code, message: codeCheck.error });
+        continue;
+      }
+
+      let finalNet = netNum;
+      if (Number.isNaN(finalNet)) {
+        if (autoComputeNetPrice) {
+          finalNet = Math.max(0, priceNum - discountNum);
+        } else {
+          errors.push({ rowNumber, sheetName, field: 'netPrice', code, message: 'netPrice is required' });
+          continue;
+        }
+      }
+      if (Number.isNaN(finalNet) || finalNet < 0) {
+        errors.push({ rowNumber, sheetName, field: 'netPrice', code, message: 'netPrice must be a number >= 0' });
+        continue;
+      }
+
+      const attrs = await normalizeAttributesForCategory(String(cat._id), r.attributes);
+      if (attrs === null) {
+        errors.push({ rowNumber, sheetName, field: 'attributes', code, message: 'attributes must be an object' });
+        continue;
+      }
+
+      valid.push({
+        rowNumber,
+        sheetName,
+        categoryId: String(cat._id),
+        branchId,
+        inWarehouse,
+        payload: {
+          name,
+          code,
+          price: priceNum,
+          netPrice: finalNet,
+          stock: stockNum,
+          discount: discountNum,
+          category: String(cat._id),
+          branch: branchId,
+          inWarehouse,
+          imageUrl: imageUrlNorm,
+          attributes: attrs,
+        },
+      });
+    }
+
+    if (!allowPartial && errors.length) {
+      return res.json({ createdCount: 0, failedCount: rows.length, errors });
+    }
+
+    let createdCount = 0;
+    let createFailedCount = 0;
+    const invalidCount = rows.length - valid.length;
+
+    for (const v of valid) {
+      try {
+        const code = v.payload.code;
+        if (v.inWarehouse) {
+          const existingWh = await Product.findOne({ code, branch: null }).select('_id').lean();
+          if (existingWh) {
+            createFailedCount += 1;
+            errors.push({
+              rowNumber: v.rowNumber,
+              sheetName: v.sheetName,
+              field: 'code',
+              code,
+              message: 'Product code already exists in warehouse',
+            });
+            continue;
+          }
+        } else {
+          const existingBr = await Product.findOne({ code, branch: v.branchId }).select('_id').lean();
+          if (existingBr) {
+            createFailedCount += 1;
+            errors.push({
+              rowNumber: v.rowNumber,
+              sheetName: v.sheetName,
+              field: 'code',
+              code,
+              message: 'Product code already exists in this branch',
+            });
+            continue;
+          }
+        }
+
+        const createdProduct = await Product.create({
+          name: v.payload.name,
+          code: v.payload.code,
+          price: v.payload.price,
+          netPrice: v.payload.netPrice,
+          stock: v.payload.stock,
+          discount: v.payload.discount ?? 0,
+          category: v.categoryId,
+          branch: v.inWarehouse ? null : v.branchId,
+          inWarehouse: v.inWarehouse,
+          imageUrl: v.payload.imageUrl,
+          attributes: v.payload.attributes,
+        });
+
+        createdCount += 1;
+
+        await auditLog(req, {
+          action: 'create',
+          module: 'products',
+          entityType: 'Product',
+          entityId: createdProduct?._id,
+          message: `Product imported ${createdProduct?.code || ''}`.trim(),
+          after: {
+            _id: createdProduct?._id,
+            code: createdProduct?.code,
+            name: createdProduct?.name,
+            stock: createdProduct?.stock,
+            inWarehouse: createdProduct?.inWarehouse,
+          },
+        });
+      } catch (e) {
+        createFailedCount += 1;
+        const msg =
+          e?.code === 11000
+            ? 'Duplicate product code (unique per branch/warehouse)'
+            : e?.message || 'Failed to create product';
+        errors.push({
+          rowNumber: v.rowNumber,
+          sheetName: v.sheetName,
+          field: 'row',
+          code: v?.payload?.code,
+          message: msg,
+        });
+      }
+    }
+
+    return res.json({
+      createdCount,
+      failedCount: invalidCount + createFailedCount,
+      errors,
+    });
+  } catch (error) {
+    console.error('importProductsFromExcelRows:', error);
+    return res.status(500).json({ error: 'Failed to import products' });
+  }
 };
 
 // Get all products (with pagination and optional search)
@@ -439,15 +775,22 @@ export const createProduct = async (req, res) => {
 
     const categoryId = resolveCategoryId(category);
     const priceNum = Number(price);
-    const netNum = Number(netPrice);
     const stockNum = Number(stock);
+    const discountNum =
+      discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
+    if (Number.isNaN(discountNum) || discountNum < 0) {
+      return res.status(400).json({ error: 'Invalid discount' });
+    }
+    const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
+    if (Number.isNaN(netNum) || netNum < 0) {
+      return res.status(400).json({ error: 'Invalid net price' });
+    }
 
     if (
       !name ||
       code == null ||
       String(code).trim() === '' ||
       Number.isNaN(priceNum) ||
-      Number.isNaN(netNum) ||
       !categoryId ||
       stock === undefined ||
       stock === null ||
@@ -483,7 +826,7 @@ export const createProduct = async (req, res) => {
         price: priceNum,
         netPrice: netNum,
         stock: stockNum,
-        discount: discount ?? 0,
+        discount: discountNum,
         category: categoryId,
         branch: null,
         inWarehouse: true,
@@ -528,7 +871,7 @@ export const createProduct = async (req, res) => {
       price: priceNum,
       netPrice: netNum,
       stock: stockNum,
-      discount: discount ?? 0,
+      discount: discountNum,
       category: categoryId,
       branch: branch._id,
       inWarehouse: false,
@@ -577,15 +920,22 @@ export const updateProduct = async (req, res) => {
 
     const categoryId = resolveCategoryId(category);
     const priceNum = Number(price);
-    const netNum = Number(netPrice);
     const stockNum = Number(stock);
+    const discountNum =
+      discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
+    if (Number.isNaN(discountNum) || discountNum < 0) {
+      return res.status(400).json({ error: 'Invalid discount' });
+    }
+    const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
+    if (Number.isNaN(netNum) || netNum < 0) {
+      return res.status(400).json({ error: 'Invalid net price' });
+    }
 
     if (
       !name ||
       code == null ||
       String(code).trim() === '' ||
       Number.isNaN(priceNum) ||
-      Number.isNaN(netNum) ||
       !categoryId ||
       stock === undefined ||
       stock === null ||
@@ -627,7 +977,7 @@ export const updateProduct = async (req, res) => {
         branch: null,
         inWarehouse: true,
         stock: stockNum,
-        discount: discount ?? 0,
+        discount: discountNum,
         attributes: attrs,
       };
       if (imageUrlNorm !== undefined) {
@@ -683,7 +1033,7 @@ export const updateProduct = async (req, res) => {
       branch: branch._id,
       inWarehouse: false,
       stock: stockNum,
-      discount: discount ?? 0,
+      discount: discountNum,
       attributes: attrs,
     };
     if (imageUrlNorm !== undefined) {

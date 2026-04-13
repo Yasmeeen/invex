@@ -1,0 +1,83 @@
+<div class="import-products-dialog">
+  <h2 class="size-body mb-4">{{ 'tr_upload_excel_sheet' | translate }}</h2>
+
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <button class="s-btn btn-secondary" (click)="downloadTemplate()">
+        {{ 'tr_excel_sheet' | translate }} Template
+      </button>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <input
+        type="file"
+        accept=".xlsx,.xls"
+        (change)="onFileSelected($any($event.target).files?.[0] || null)"
+      />
+      <div class="muted mt-2" *ngIf="fileName">{{ fileName }}</div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <label class="checkbox-row">
+        <input type="checkbox" [(ngModel)]="allowPartial" />
+        <span>Allow partial import (skip invalid rows)</span>
+      </label>
+    </div>
+    <div class="col-md-6">
+      <label class="checkbox-row">
+        <input type="checkbox" [(ngModel)]="autoComputeNetPrice" />
+        <span>Auto compute netPrice when empty</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="alert alert-danger mb-4" *ngIf="parseErrors?.length">
+    <div *ngFor="let e of parseErrors">
+      <strong *ngIf="e.sheetName">{{ e.sheetName }}:</strong>
+      {{ e.message }}
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <button class="s-btn btn-primary" [disabled]="parsing || importing || !parsedRows?.length" (click)="importNow()">
+        Import ({{ parsedRows?.length || 0 }} rows)
+      </button>
+      <button class="s-btn btn-secondary ml-2" (click)="close()">Close</button>
+    </div>
+  </div>
+
+  <div class="result-card" *ngIf="result">
+    <div class="mb-2"><strong>Created:</strong> {{ result.createdCount }}</div>
+    <div class="mb-2"><strong>Failed:</strong> {{ result.failedCount }}</div>
+
+    <div *ngIf="result.errors?.length">
+      <div class="import-errors__header mb-3">
+        <div class="import-errors__title">
+          <span class="import-errors__badge">!</span>
+          <strong>Import has errors</strong>
+          <span class="muted">({{ result.errors.length }} total)</span>
+        </div>
+        <button class="s-btn btn-secondary" (click)="downloadErrorReport()">Download error report</button>
+      </div>
+
+      <div class="errors-table">
+        <div class="error-row" *ngFor="let e of result.errors | slice:0:50">
+          <div class="error-cell sheet">{{ e.sheetName }}</div>
+          <div class="error-cell row">#{{ e.rowNumber }}</div>
+          <div class="error-cell field">{{ e.field || '-' }}</div>
+          <div class="error-cell msg">{{ e.message }}</div>
+        </div>
+        <div class="import-errors__notice mt-3" *ngIf="result.errors.length > 50">
+          <strong>Notice:</strong> Showing first <strong>50</strong> errors only.
+          Please use <strong>Download error report</strong> to see the full list ({{ result.errors.length }}).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

@@ -9,6 +9,7 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { CreateEditProductComponent } from './create-edit-product/create-edit-product.component';
 import { BookProductDialogComponent } from './book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from './view-product-booking-dialog/view-product-booking-dialog.component';
+import { ImportProductsDialogComponent } from './import-products-dialog/import-products-dialog.component';
 
 
 @NgModule({
@@ -17,6 +18,7 @@ import { ViewProductBookingDialogComponent } from './view-product-booking-dialog
     CreateEditProductComponent,
     BookProductDialogComponent,
     ViewProductBookingDialogComponent,
+    ImportProductsDialogComponent,
   ],
   imports: [
     CommonModule,

@@ -460,6 +460,8 @@
   "tr_expenses": "Dépenses",
   "tr_sell_price": "Prix de vente",
   "tr_net_price": "Prix net",
+  "tr_net_price_optional": "(facultatif — si vide : prix − remise)",
+  "tr_net_price_invalid": "Le prix net doit être ≥ 0",
   "tr_new_branch": "Nouvelle succursale",
   "tr_total_number_of_invoices": "Nombre total de factures",
   "tr_today": "Aujourd'hui",

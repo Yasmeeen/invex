@@ -1262,6 +1262,14 @@ body,
     border-radius: 0 !important;
 }
 
+/* Allow specific dialogs to render with a solid container background. */
+.import-products-dialog-panel {
+  .mat-dialog-container,
+  .mat-mdc-dialog-container {
+    background: transparent !important; /* wrapper handles background */
+  }
+}
+
 .modal-open {
     overflow: hidden;
 

@@ -27,6 +27,13 @@
       </button>
       <button
         *ngIf="canAddProduct"
+        class="s-btn btn-secondary"
+        (click)="openImportDialog()"
+      >
+        {{ 'tr_upload_excel_sheet' | translate }}
+      </button>
+      <button
+        *ngIf="canAddProduct"
         class="s-btn btn-primary"
         (click)="createOrEditproduct(false)"
       >

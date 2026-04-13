@@ -34,14 +34,23 @@
     &:nth-child(7){
       width: 7rem;
   } 
-  
   &:nth-child(8){
     width: 7rem;
+} 
+  
+  &:nth-child(9){
+    width: 7rem;
    }
-   &:nth-child(9){
+   &:nth-child(10){
     width: 7rem;
 }
-      &:nth-child(10){
+&:nth-child(11){
+  width: 5rem;
+}
+&:nth-child(12){
+  width: 7rem;
+}
+      &:nth-child(13){
         width: 2rem;
     }
    }
@@ -57,7 +66,7 @@
 .products-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
+  gap: 2rem;
 }
 
 .product-card {

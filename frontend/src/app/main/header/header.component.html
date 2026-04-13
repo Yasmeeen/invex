@@ -25,11 +25,6 @@
         [class.app-topbar__icon-btn--ring]="globals.unseenNotificationsCount > 0"
         [attr.aria-label]="'tr_notifications' | translate"
       >
-        <span
-          class="app-topbar__notify-dot app-topbar__notify-dot--warn"
-          *ngIf="globals.unseenNotificationsCount > 0"
-          aria-hidden="true"
-        ></span>
         <span class="app-topbar__notify-count" *ngIf="globals.unseenNotificationsCount > 0">
           {{ globals.unseenNotificationsCount }}
         </span>
@@ -71,9 +66,6 @@
                 <div class="size-small text-muted mt-1">{{ n.body }}</div>
                 <div class="size-small text-muted mt-1">{{ n.createdAt | date : 'short' }}</div>
               </div>
-              <div class="notification-chevron" aria-hidden="true">
-                <i class="fa fa-angle-right"></i>
-              </div>
             </div>
           </div>
         </div>
@@ -106,15 +98,6 @@
     >
       {{ 'tr_contact_us' | translate }}
     </a>
-
-    <button
-      type="button"
-      class="app-topbar__icon-btn hidden-mobile"
-      (click)="logout()"
-      [attr.aria-label]="('tr_signin.logout' | translate)"
-    >
-      <i class="fa fa-power-off" aria-hidden="true"></i>
-    </button>
 
     <div class="app-topbar__user" [class.app-topbar__user--open]="userMenuOpen">
       <button

@@ -4,7 +4,7 @@
     <div class="modal-content" #modalContent>
       <div class="modal-header border-bottom">
         <h3 class="steel weight-medium size-default m-0">
-          {{ "tr_new_category" | translate }}
+          {{ (isEdit ? "tr_edit_category" : "tr_new_category") | translate }}
         </h3>
       </div>
       <div class="modal-body weight-medium steel">
@@ -85,7 +85,7 @@
                     </button>
                   </div>
 
-                  <div class="row" *ngFor="let a of attributeDefs; let i = index">
+                  <div class="row" *ngFor="let a of attributeDefs; let i = index; trackBy: trackByIndex">
                     <div class="col-md-5">
                       <div class="form-group mb-2">
                         <label class="size-small">{{ 'tr_attribute_key' | translate }}</label>

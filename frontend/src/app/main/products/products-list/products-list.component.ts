@@ -21,6 +21,8 @@ import {
 } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
+import { ImportProductsDialogComponent } from '../import-products-dialog/import-products-dialog.component';
+import { ProductsImportMetadata } from '@shared/services/products.service';
 
 @Component({
   selector: 'app-products-list',
@@ -30,7 +32,7 @@ import { ViewProductBookingDialogComponent } from '../view-product-booking-dialo
 export class ProductsListComponent implements OnInit {
   productsLoading: boolean = true;
   isFilterOpen: boolean = true;
-  paginationPerPage:number = 10;
+  paginationPerPage:number = 20;
   categorys: Category[] = [];
   selectedcategory: string;
   selectedAttributeKey = '';
@@ -152,6 +154,23 @@ export class ProductsListComponent implements OnInit {
     this.getproducts();
     this.getcategorys();
     this.getBranches();
+  }
+
+  openImportDialog(): void {
+    if (!this.canAddProduct) return;
+    this.productsService.getProductsImportMetadata().subscribe({
+      next: (metadata: ProductsImportMetadata) => {
+        this.dialog.open(ImportProductsDialogComponent, {
+          width: '900px',
+          maxWidth: '95vw',
+          panelClass: 'import-products-dialog-panel',
+          data: { metadata },
+        });
+      },
+      error: () => {
+        this.appNotificationService.push('Failed to load import metadata', 'error');
+      },
+    });
   }
 
   setViewMode(mode: 'table' | 'cards'): void {

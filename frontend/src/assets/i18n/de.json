@@ -460,6 +460,8 @@
   "tr_expenses": "Ausgaben",
   "tr_sell_price": "Verkaufspreis",
   "tr_net_price": "Nettopreis",
+  "tr_net_price_optional": "(optional — wenn leer: Preis − Rabatt)",
+  "tr_net_price_invalid": "Nettopreis muss ≥ 0 sein",
   "tr_new_branch": "Neue Filiale",
   "tr_total_number_of_invoices": "Gesamtzahl der Rechnungen",
   "tr_today": "Heute",

@@ -27,10 +27,11 @@ export const getUsers = async (req, res) => {
       User.countDocuments(query),
     ]);
 
-    // Convert branch object to plain name
-    const usersWithBranchName = users.map((u) => ({
-      ...u.toObject()
-    }));
+    const usersWithBranchName = users.map((u) => {
+      const o = u.toObject();
+      delete o.password;
+      return o;
+    });
 
     const totalPages = Math.ceil(total / limit);
 
@@ -58,9 +59,8 @@ export const getUserById = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const formattedUser = {
-      ...user.toObject()
-    };
+    const formattedUser = user.toObject();
+    delete formattedUser.password;
 
     res.json(formattedUser);
   } catch (error) {
@@ -95,6 +95,7 @@ export const createUser = async (req, res) => {
       name,
       email,
       password,
+      mustChangePassword: true,
       role,
       branch: {
         _id: branch._id,
@@ -108,6 +109,7 @@ export const createUser = async (req, res) => {
       ...populatedUser.toObject(),
       branch: populatedUser.branch?.name || null,
     };
+    delete formattedUser.password;
 
     res.status(201).json({ message: '✅ User created', user: formattedUser });
   } catch (error) {
@@ -121,7 +123,11 @@ export const updateUser = async (req, res) => {
   try {
     const { name, email, password, role, branchId, locale } = req.body;
 
-    const updates = { name, email, password, role, locale };
+    const updates = { name, email, role, locale };
+    if (password !== undefined) {
+      updates.password = password;
+      updates.mustChangePassword = true;
+    }
 
     if (branchId) {
       const branch = await Branch.findById(branchId);
@@ -143,6 +149,7 @@ export const updateUser = async (req, res) => {
       ...updatedUser.toObject(),
       branch: updatedUser.branch?.name || null,
     };
+    delete formattedUser.password;
 
     res.json({ message: '✅ User updated', user: formattedUser });
   } catch (error) {
@@ -235,6 +242,7 @@ export const loginUser = async (req, res) => {
       email: user.email,
       role: user.role,
       locale: user.locale,
+      mustChangePassword: !!user.mustChangePassword,
       branch: user.branch
         ? {
             _id: user.branch._id,
@@ -285,6 +293,53 @@ export const logoutUser = async (req, res) => {
   } catch (error) {
     console.error('❌ Error during logout:', error.message);
     res.status(500).json({ error: 'Failed to logout' });
+  }
+};
+
+export const updatePassword = async (req, res) => {
+  try {
+    const { id, email, password, confirmPassword } = req.body || {};
+    if (!id || !email || !password || !confirmPassword) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    if (String(password) !== String(confirmPassword)) {
+      return res.status(400).json({ error: 'Password does not match' });
+    }
+
+    const user = await User.findById(id).populate('branch', 'name _id storeAddress');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (String(user.email).toLowerCase() !== String(email).trim().toLowerCase()) {
+      return res.status(403).json({ error: 'Email mismatch' });
+    }
+
+    user.password = String(password);
+    user.mustChangePassword = false;
+    await user.save();
+
+    const formattedUser = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      locale: user.locale,
+      mustChangePassword: !!user.mustChangePassword,
+      branch: user.branch
+        ? {
+            _id: user.branch._id,
+            name: user.branch.name,
+            storeAddress: user.branch.storeAddress,
+          }
+        : null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    return res.json(formattedUser);
+  } catch (error) {
+    console.error('❌ Error updating password:', error.message);
+    return res.status(500).json({ error: 'Failed to update password' });
   }
 };
 

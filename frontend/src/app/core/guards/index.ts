@@ -1,1 +1,1 @@
-export { AuthenticationGuard as AuthenticationGuard } from './authentication.guard';
+export { AuthenticationGuard } from './authentication.guard';

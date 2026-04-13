@@ -92,7 +92,7 @@ export class AuthenticationService {
     }
     this.userSubject.next(new User());
     localStorage.removeItem(USER_KEY);
-    this.router.navigate(['login']);
+    this.router.navigate(['/login']);
   }
 
   private setUserToLocalStorage(user:User){

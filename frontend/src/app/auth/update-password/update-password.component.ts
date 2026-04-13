@@ -71,11 +71,11 @@ export class UpdatePasswordComponent implements OnInit {
           this.appNotificationService.push(this.translateService.instant('tr_password_updated_successfuly'),'success')
           const role = this.globals.currentUser?.role;
           if (isWarehouse(role) || isModerator(role)) {
-            this.router.navigate(['inventory']);
+            this.router.navigate(['/inventory']);
           } else if (role === 'Co Admin' || role === 'Branch Manager') {
-            this.router.navigate(['products']);
+            this.router.navigate(['/products']);
           } else {
-            this.router.navigate(['home']);
+            this.router.navigate(['/home']);
           }
           });
     }

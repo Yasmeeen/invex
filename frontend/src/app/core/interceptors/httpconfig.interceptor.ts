@@ -65,7 +65,7 @@ export class HttpConfigInterceptor implements HttpInterceptor {
                 }
                 if (error.status === 406) {
                   this.returnUrl = this.returnUrl ? this.returnUrl : this.router.url;
-                  this.router.navigate(['update-password'], { queryParams: { returnUrl: this.returnUrl } });
+                  this.router.navigate(['/login', 'update-password'], { queryParams: { returnUrl: this.returnUrl } });
                   return EMPTY;
 
                 }

@@ -1,24 +1,25 @@
 import { Injectable } from '@angular/core';
-import { Router, CanActivateChild, ActivatedRouteSnapshot, RouterStateSnapshot, CanActivate } from '@angular/router';
+import { Router, CanActivateChild, ActivatedRouteSnapshot, RouterStateSnapshot, CanActivate, UrlTree } from '@angular/router';
 
 @Injectable()
 export class AuthenticationGuard implements CanActivate, CanActivateChild {
 
     constructor(private router: Router) { }
 
-    canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+    canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean | UrlTree {
         if (localStorage.getItem('currentUser')) {
             return true;
         }
-        this.router.navigate(['login']);
-        return false;
+        return this.router.createUrlTree(['login'], { relativeTo: this.router.routerState.root });
     }
-    canActivateChild(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+    canActivateChild(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean | UrlTree {
         if (localStorage.getItem('currentUser')) {
             return true;
         }
-        this.router.navigate(['login'], { queryParams: { returnUrl: state.url } })
-        return false;
+        return this.router.createUrlTree(['login'], {
+            relativeTo: this.router.routerState.root,
+            queryParams: { returnUrl: state.url },
+        });
     }
 
 }

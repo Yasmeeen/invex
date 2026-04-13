@@ -48,7 +48,7 @@ export function HttpLoaderFactory(http: HttpClient): TranslateHttpLoader {
     })
   ],
 
-  providers: [Globals,AuthenticationGuard,AuthenticationService,UserSerivce,UploadFilesWithPreSignedUrlService],
+  providers: [Globals, AuthenticationGuard, AuthenticationService, UserSerivce, UploadFilesWithPreSignedUrlService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

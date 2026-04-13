@@ -47,16 +47,20 @@ export class LoginComponent implements OnInit {
           email: this.user.email ,
           password: this.user.password
         }
-        this.authenticationService.login(user).subscribe(() => {
+        this.authenticationService.login(user).subscribe((res: any) => {
+          if (res?.user?.mustChangePassword) {
+            this.router.navigate(['/login', 'update-password']);
+            return;
+          }
           const role = this.globals.currentUser.role;
           if (role === 'Cashier') {
-            this.router.navigate(['orders']);
+            this.router.navigate(['/orders']);
           } else if (role === 'Moderator' || role === 'Warehouse' || role === 'Operation Manager') {
-            this.router.navigate(['products']);
+            this.router.navigate(['/products']);
           } else if (role === 'Co Admin' || role === 'Branch Manager') {
-            this.router.navigate(['products']);
+            this.router.navigate(['/products']);
           } else {
-            this.router.navigate(['home']);
+            this.router.navigate(['/home']);
           }
           });
     }

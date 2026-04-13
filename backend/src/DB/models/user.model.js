@@ -5,6 +5,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true }, // hashed via hooks below
+  /** Force user to change admin-created password on first login. */
+  mustChangePassword: { type: Boolean, default: false },
   role: { type: String, required: true },
   locale: { type: String, enum: ['en', 'ar'], default: 'en' }, // 👈 added field
   branch: {

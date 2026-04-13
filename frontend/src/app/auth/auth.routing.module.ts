@@ -12,7 +12,7 @@ const routes: Routes = [
     {
       path: 'update-password',
       component: UpdatePasswordComponent,
-      canActivateChild: [AuthenticationGuard],
+      canActivate: [AuthenticationGuard],
   }
 ]
 

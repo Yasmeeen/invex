@@ -34,6 +34,7 @@ export async function seedDefaultSuperAdmin() {
     name,
     email,
     password,
+    mustChangePassword: true,
     role: 'Super Admin',
     locale: 'en',
     branch: branchDoc._id,

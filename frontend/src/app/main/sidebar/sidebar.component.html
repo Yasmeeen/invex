@@ -41,10 +41,10 @@
             (click)="closeSidebar()"
           >
             <div class="link-content">
-              <span class="main-icon-text">{{ link.name | translate }}</span>
               <span class="link-content__icon-wrap" aria-hidden="true">
                 <span [class]="link.icon"></span>
               </span>
+              <span class="main-icon-text">{{ link.name | translate }}</span>
             </div>
           </a>
           <div
@@ -56,10 +56,10 @@
             (keydown.enter)="toggleParentSection($event)"
             (keydown.space)="$event.preventDefault(); toggleParentSection($event)"
           >
-            <span class="main-icon-text">{{ link.name | translate }}</span>
             <span class="link-content__icon-wrap" aria-hidden="true">
               <span [class]="link.icon"></span>
             </span>
+            <span class="main-icon-text">{{ link.name | translate }}</span>
           </div>
         </div>
         <span

@@ -190,8 +190,29 @@ export const loginUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ⚠️ Replace with bcrypt.compare in production
-    if (user.password !== password) {
+    const storedPw = String(user.password || '');
+    const rawPw = String(password || '');
+    const isBcrypt = /^\$2[aby]\$/.test(storedPw);
+
+    let ok = false;
+    if (isBcrypt) {
+      ok = await bcrypt.compare(rawPw, storedPw);
+    } else {
+      // Backward compatibility for existing plaintext passwords:
+      // allow login, then upgrade to bcrypt hash.
+      ok = storedPw === rawPw;
+      if (ok) {
+        try {
+          const salt = await bcrypt.genSalt(10);
+          user.password = await bcrypt.hash(rawPw, salt);
+          await user.save();
+        } catch {
+          // If upgrade fails, still allow login (avoid lockout).
+        }
+      }
+    }
+
+    if (!ok) {
       await auditLog(req, {
         action: 'login_failed',
         module: 'auth',

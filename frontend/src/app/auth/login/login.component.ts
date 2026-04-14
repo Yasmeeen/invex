@@ -7,6 +7,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
 import { Globals } from 'src/app/core/globals';
 import { Role } from '@core/base/enum';
+import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
 
 @Component({
     selector: 'login-components',
@@ -29,8 +30,9 @@ export class LoginComponent implements OnInit {
     constructor(
         private router: Router,
         public globals: Globals,
-        private authenticationService:AuthenticationService,
-        private appNotificationService: AppNotificationService
+        private authenticationService: AuthenticationService,
+        private appNotificationService: AppNotificationService,
+        private realtimeNotifications: RealtimeNotificationsService
     ) {
         document.querySelector('body')?.setAttribute('dir', 'ltr');
     }
@@ -49,9 +51,11 @@ export class LoginComponent implements OnInit {
         }
         this.authenticationService.login(user).subscribe((res: any) => {
           if (res?.user?.mustChangePassword) {
+            this.realtimeNotifications.init();
             this.router.navigate(['/login', 'update-password']);
             return;
           }
+          this.realtimeNotifications.init();
           const role = this.globals.currentUser.role;
           if (role === 'Cashier') {
             this.router.navigate(['/orders']);

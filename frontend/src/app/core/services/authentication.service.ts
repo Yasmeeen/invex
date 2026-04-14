@@ -1,6 +1,6 @@
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
+import { Injectable, Injector } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { IUserLogin, User } from '@core/models/users-interfaces.model';
 import {
@@ -12,6 +12,7 @@ import {
 import { tap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { Globals } from '@core/globals';
+import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
 
 
 
@@ -29,7 +30,8 @@ export class AuthenticationService {
      private http:HttpClient,
      private appNotificationService:AppNotificationService,
      private router: Router,
-     private globals: Globals
+     private globals: Globals,
+     private injector: Injector
      ) {
     this.userObservable = this.userSubject.asObservable();
   }
@@ -83,6 +85,11 @@ export class AuthenticationService {
 
 
   logout() {
+    try {
+      this.injector.get(RealtimeNotificationsService).disconnect();
+    } catch {
+      /* optional in tests */
+    }
     const u = this.getUserFromLocalStorage();
     if (u?._id) {
       this.http.post(USER_LOGOUT_URL, { userId: u._id }).subscribe({

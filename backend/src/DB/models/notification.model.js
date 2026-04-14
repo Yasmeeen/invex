@@ -7,15 +7,15 @@ const notificationSchema = new mongoose.Schema(
     body: { type: String, default: '', trim: true },
     data: { type: Object, default: {} },
     recipients: [
-      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     ],
-    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }],
+    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true }
 );
 
+/** Single-array indexes only: MongoDB forbids compound indexes on two array fields (parallel arrays). */
 notificationSchema.index({ recipients: 1, createdAt: -1 });
-notificationSchema.index({ recipients: 1, readBy: 1, createdAt: -1 });
 
 const Notification = mongoose.model('Notification', notificationSchema);
 export default Notification;

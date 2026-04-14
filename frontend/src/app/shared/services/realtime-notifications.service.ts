@@ -17,6 +17,8 @@ function socketBaseUrl(apiBaseUrl: string): string {
 export class RealtimeNotificationsService {
   private socket: Socket | null = null;
   private connected = false;
+  /** Last user id the socket was opened for (string, for comparison). */
+  private lastConnectedUserId: string | null = null;
   /** Emits newly received notifications for UI to update immediately. */
   readonly newNotification$ = new Subject<NotificationItem>();
 
@@ -28,22 +30,45 @@ export class RealtimeNotificationsService {
     private notificationsApi: NotificationsService
   ) {}
 
+  /** Tear down socket (e.g. on logout). */
+  disconnect(): void {
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.connected = false;
+    this.lastConnectedUserId = null;
+  }
+
+  /**
+   * Connect WebSocket for the current user. Safe to call after login.
+   * On first app load from /login there is no user yet — call again after successful login.
+   */
   init(): void {
     const user = this.auth.getUserFromLocalStorage();
-    const userId = user?._id;
+    const userId = user?._id != null ? String(user._id) : '';
     if (!userId) {
+      this.disconnect();
       return;
     }
 
-    // Load unread count at startup
+    if (this.connected && this.lastConnectedUserId === userId && this.socket?.connected) {
+      return;
+    }
+
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.connected = false;
+    this.lastConnectedUserId = userId;
+
     this.notificationsApi.unreadCount(userId).subscribe({
       next: (r) => (this.globals.unseenNotificationsCount = Number(r?.unreadCount) || 0),
       error: () => {},
     });
-
-    if (this.connected) {
-      return;
-    }
 
     const base = socketBaseUrl(BASE_URL);
 

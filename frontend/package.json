@@ -4,8 +4,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "npm install --force && ng build --configuration production",
-    "heroku-postbuild": "ng build --prod"
+    "build": "npm install --force && NODE_OPTIONS=--openssl-legacy-provider ng build --configuration production",
+    "heroku-postbuild": "NODE_OPTIONS=--openssl-legacy-provider ng build --prod"
   },
   "private": true,
   "dependencies": {

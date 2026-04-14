@@ -1,7 +1,7 @@
 import { environment } from "src/environments/environment.prod";
 
-// export const BASE_URL = environment.apiUrl
-export const BASE_URL = 'http://localhost:3000/api'
+export const BASE_URL = environment.apiUrl
+// export const BASE_URL = 'http://localhost:3000/api'
 
 
 
@@ -64,4 +64,3 @@ export const AUDITS_URL = BASE_URL + '/audits';
 
 // AI assistant (Vixa)
 export const AI_CHAT_URL = BASE_URL + '/ai/chat';
-

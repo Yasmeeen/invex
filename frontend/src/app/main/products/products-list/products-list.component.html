@@ -11,15 +11,17 @@
     <div class="btn-group">
       <button
         type="button"
-        class="s-btn btn-secondary size-body"
+        class="s-btn  size-body"
         [class.btn-primary]="viewMode === 'table'"
+        [class.btn-secondary]="viewMode !== 'table'"
         (click)="setViewMode('table')"
       >
         <i class="fa fa-table" aria-hidden="true"></i>
       </button>
       <button
         type="button"
-        class="s-btn btn-secondary size-body"
+        class="s-btn size-body"
+        [class.btn-secondary]="viewMode !== 'cards'"
         [class.btn-primary]="viewMode === 'cards'"
         (click)="setViewMode('cards')"
       >

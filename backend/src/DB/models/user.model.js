@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',
     required: false // optional; set to true if every user must belong to a branch
-  }
+  },
 }, { timestamps: true });
 
 function looksHashed(pw) {

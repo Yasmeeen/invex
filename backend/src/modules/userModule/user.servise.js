@@ -124,8 +124,10 @@ export const updateUser = async (req, res) => {
     const { name, email, password, role, branchId, locale } = req.body;
 
     const updates = { name, email, role, locale };
-    if (password !== undefined) {
-      updates.password = password;
+    const pw =
+      password !== undefined && password !== null ? String(password).trim() : '';
+    if (pw) {
+      updates.password = pw;
       updates.mustChangePassword = true;
     }
 

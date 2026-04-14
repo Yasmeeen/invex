@@ -76,11 +76,20 @@ export class CreateEditUserComponent implements OnInit {
 
 
   getUserData() {
-    this.userSerivce.getUser(this.userId).subscribe((response:any)=> {
-      this.userId = response._id
-      response.branchId = response.branch;
-      this.basicInfoForm.form.patchValue(response);
-    })
+    this.userSerivce.getUser(this.userId).subscribe((response: any) => {
+      this.userId = response._id;
+      const v = { ...response };
+      v.branchId = v.branch?._id ?? v.branch;
+      const apply = () => {
+        if (this.basicInfoForm?.form) {
+          this.basicInfoForm.form.patchValue(v);
+        }
+      };
+      apply();
+      if (!this.basicInfoForm?.form) {
+        setTimeout(apply, 0);
+      }
+    });
   }
 
   basicInfoFormSubmitted() {}
@@ -101,12 +110,17 @@ export class CreateEditUserComponent implements OnInit {
   }
 
   updateUser() {
-    this.user = this.basicInfoForm.value;
     if (!this.basicInfoForm.valid) {
       return;
     }
+    const raw = this.basicInfoForm.value as any;
+    this.user = { ...raw };
+    const p = this.user.password;
+    if (p == null || String(p).trim() === '') {
+      delete (this.user as any).password;
+    }
 
-    this.userSerivce.updateUser(this.userId,this.user).subscribe(() => {
+    this.userSerivce.updateUser(this.userId, this.user).subscribe(() => {
       // localStorage.setItem('currentUser', JSON.stringify(this.user));
 
       this.appNotificationService.push('user updated successfully', 'sucess');

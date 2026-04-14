@@ -9,7 +9,7 @@ import {
   deleteUser,
   loginUser,
   logoutUser,
-  updatePassword
+  updatePassword,
 } from './user.servise.js';
 
 router.get('/', getUsers);                  // GET all with pagination/search

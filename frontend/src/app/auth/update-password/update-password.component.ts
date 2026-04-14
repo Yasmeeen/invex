@@ -1,13 +1,8 @@
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
-import { IUserLogin, User, UserDetailsLogin } from '@core/models/users-interfaces.model';
-import { Component, OnInit, NgZone, ElementRef, ViewChild } from '@angular/core';
-import { Router, ActivatedRoute } from '@angular/router';
-import { FormGroup, FormBuilder, FormControl, Validators, NgForm } from '@angular/forms';
+import { IUserLogin, UserDetailsLogin } from '@core/models/users-interfaces.model';
+import { Component, OnInit } from '@angular/core';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
-import { Globals } from 'src/app/core/globals';
-import { Role } from '@core/base/enum';
-import { isModerator, isWarehouse } from '@core/utils/role-utils';
 
 @Component({
     selector: 'update-password-components',
@@ -17,20 +12,14 @@ import { isModerator, isWarehouse } from '@core/utils/role-utils';
 export class UpdatePasswordComponent implements OnInit {
     triedToLogin: boolean = false;
     returnUrl: string;
-    protected aFormGroup?: FormGroup;
-    loginValidationForm?:  FormGroup;
     formSubmitted: boolean = false;
     user: IUserLogin  = new UserDetailsLogin();
     isLoading: boolean = true;
     loginError:boolean = false;
     errorMessage?: string;
     show:boolean = false;
-    roleEnum = Role;
-
     constructor(
-        private router: Router,
-        public globals: Globals,
-        private authenticationService:AuthenticationService,
+        private authenticationService: AuthenticationService,
         private appNotificationService: AppNotificationService,
         private translateService: TranslateService
     ) {
@@ -68,15 +57,11 @@ export class UpdatePasswordComponent implements OnInit {
 
         }
         this.authenticationService.updatePassword(user).subscribe(() => {
-          this.appNotificationService.push(this.translateService.instant('tr_password_updated_successfuly'),'success')
-          const role = this.globals.currentUser?.role;
-          if (isWarehouse(role) || isModerator(role)) {
-            this.router.navigate(['/inventory']);
-          } else if (role === 'Co Admin' || role === 'Branch Manager') {
-            this.router.navigate(['/products']);
-          } else {
-            this.router.navigate(['/home']);
-          }
-          });
+          this.appNotificationService.push(
+            this.translateService.instant('tr_password_updated_successfuly'),
+            'success'
+          );
+          this.authenticationService.logout();
+        });
     }
 }

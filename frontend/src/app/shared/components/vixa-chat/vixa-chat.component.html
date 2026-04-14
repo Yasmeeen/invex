@@ -1,0 +1,64 @@
+<div class="vixa">
+  <button
+    type="button"
+    class="vixa__fab"
+    (click)="toggle()"
+    [attr.aria-label]="'tr_vixa' | translate"
+    [attr.title]="'tr_vixa' | translate"
+  >
+    <i class="fa fa-comments"></i>
+  </button>
+
+  <section class="vixa__panel" *ngIf="open" role="dialog" aria-modal="false">
+    <header class="vixa__head">
+      <div class="vixa__title">
+        <strong>{{ 'tr_vixa' | translate }}</strong>
+        <span class="vixa__sub">{{ 'tr_vixa_subtitle' | translate }}</span>
+      </div>
+      <div class="vixa__actions">
+        <button type="button" class="vixa__icon" (click)="clear()" [attr.title]="'tr_clear' | translate">
+          <i class="fa fa-trash"></i>
+        </button>
+        <button type="button" class="vixa__icon" (click)="close()" [attr.title]="'tr_close' | translate">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="vixa__body">
+      <div class="vixa__msg" *ngFor="let m of messages" [class.vixa__msg--user]="m.role === 'user'">
+        <div class="vixa__bubble">
+          <div class="vixa__text">{{ m.text }}</div>
+          <div class="vixa__sources" *ngIf="m.sources?.length">
+            <div class="vixa__sources-title">{{ 'tr_vixa_disclaimer_sources' | translate }}</div>
+            <a
+              *ngFor="let s of m.sources"
+              class="vixa__source"
+              [href]="s.url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ s.title || s.url }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="vixa__thinking" *ngIf="loading">{{ 'tr_vixa_thinking' | translate }}</div>
+    </div>
+
+    <footer class="vixa__foot">
+      <input
+        class="vixa__input"
+        type="text"
+        [(ngModel)]="input"
+        [placeholder]="'tr_vixa_placeholder' | translate"
+        (keyup.enter)="send()"
+      />
+      <button class="vixa__send" type="button" (click)="send()" [disabled]="loading">
+        <i class="fa fa-paper-plane"></i>
+      </button>
+    </footer>
+  </section>
+</div>
+

@@ -18,6 +18,7 @@ import { MatDatepickerModule} from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { NotAuthorizedComponent } from './components/not-authorized/not-authorized.component';
 import { ReceiptTranslatePipe } from './pipes/receipt-translate.pipe';
+import { VixaChatComponent } from './components/vixa-chat/vixa-chat.component';
 
 
 
@@ -31,6 +32,7 @@ import { ReceiptTranslatePipe } from './pipes/receipt-translate.pipe';
     ImagePreloadDirective,
     NotAuthorizedComponent,
     ReceiptTranslatePipe,
+    VixaChatComponent,
   ],
   imports: [
     CommonModule,
@@ -58,6 +60,7 @@ import { ReceiptTranslatePipe } from './pipes/receipt-translate.pipe';
     MatNativeDateModule,
     NotAuthorizedComponent,
     ReceiptTranslatePipe,
+    VixaChatComponent,
   ],
   providers: [VersionCheckService,UpdateService]
 })

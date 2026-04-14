@@ -62,3 +62,6 @@ export const NOTIFICATIONS_URL = BASE_URL + '/notifications';
 
 export const AUDITS_URL = BASE_URL + '/audits';
 
+// AI assistant (Vixa)
+export const AI_CHAT_URL = BASE_URL + '/ai/chat';
+

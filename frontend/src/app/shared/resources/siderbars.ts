@@ -87,6 +87,11 @@ export const AdminSidebar = [
     routerLink: '/audits',
     icon: 'fa fa-history icon',
   },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
+  },
 
 
 ];
@@ -123,6 +128,11 @@ export const Cashier = [
     name: 'tr_cashier.TITLE',
     routerLink: '/cashier',
     icon: 'fa fa-credit-card icon',
+  },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
   },
 
 ];
@@ -169,6 +179,11 @@ export const Warehouse = [
       { name: 'tr_reports_bookings', routerLink: '/reports/bookings', icon: 'fa fa-bookmark icon' },
     ],
   },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
+  },
 
 ];
 
@@ -178,6 +193,11 @@ export const ModeratorSidebar = [
     name: 'tr_products',
     routerLink: '/products',
     icon: 'fa fa-cube icon',
+  },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
   },
 ];
 

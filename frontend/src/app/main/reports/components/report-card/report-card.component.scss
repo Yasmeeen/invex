@@ -130,9 +130,7 @@
 .report-card__value,
 .report-card__note {
   font-family: inherit;
-}
-
-@media print {
+}@media print {
   .report-card {
     box-shadow: none;
     break-inside: avoid;

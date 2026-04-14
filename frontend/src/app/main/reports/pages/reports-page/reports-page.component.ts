@@ -260,17 +260,37 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
     if (this.reportType === 'profit') {
       const s = res.summary || {};
+      const bo = s.branchOverhead;
       this.cards = [
-        { titleKey: 'tr_report_card_revenue', value: s.totalRevenue || 0 },
-        { titleKey: 'tr_report_card_cost', value: s.totalCost || 0 },
-        { titleKey: 'tr_net_profit', value: s.netProfit || 0 },
-        { titleKey: 'tr_report_card_margin', value: s.profitMargin || 0 },
+        { titleKey: 'tr_report_card_revenue', value: s.totalRevenue ?? 0 },
+        { titleKey: 'tr_report_card_cost', value: s.totalCost ?? 0 },
+        { titleKey: 'tr_report_card_trading_profit', value: s.tradingProfit ?? 0 },
+        {
+          titleKey: 'tr_report_card_branch_overhead',
+          value: s.branchOperatingCost ?? 0,
+          hintKey: bo ? 'tr_report_branch_overhead_hint' : undefined,
+          hintParams: bo
+            ? {
+                monthly: bo.monthlyFixedTotal,
+                daily: bo.dailyRate,
+                days: bo.daysInPeriod,
+                divisor: bo.divisorDays,
+              }
+            : undefined,
+        },
+        { titleKey: 'tr_net_profit', value: s.netProfit ?? 0 },
+        {
+          titleKey: 'tr_report_card_margin',
+          value: s.profitMargin != null ? `${Number(s.profitMargin).toFixed(2)}%` : '0%',
+        },
       ];
       this.tableColumns = [
         { key: 'period', labelKey: 'tr_report_col_period' },
         { key: 'revenue', labelKey: 'tr_report_col_revenue' },
         { key: 'cost', labelKey: 'tr_report_col_cost' },
-        { key: 'netProfit', labelKey: 'tr_report_col_net_profit' },
+        { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit' },
+        { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead' },
+        { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch' },
       ];
       this.tableRows = res.profitOverTime || [];
       this.chartOptions = this.lineChart(
@@ -279,7 +299,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         [
           { name: t('tr_report_series_revenue'), data: (res.profitOverTime || []).map((x: any) => Number(x.revenue || 0)) },
           { name: t('tr_report_series_cost'), data: (res.profitOverTime || []).map((x: any) => Number(x.cost || 0)) },
-          { name: t('tr_report_series_net'), data: (res.profitOverTime || []).map((x: any) => Number(x.netProfit || 0)) },
+          { name: t('tr_report_series_net_after_branch'), data: (res.profitOverTime || []).map((x: any) => Number(x.netProfit || 0)) },
         ]
       );
       return;

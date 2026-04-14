@@ -68,8 +68,8 @@ export const createBranch = async (req, res) => {
       storeAddress,
       rent: Number(rent) || 0,
       employeesSalary: Number(employeesSalary) || 0,
-      branchInvoices,
-      expenses,
+      branchInvoices: Number(branchInvoices) || 0,
+      expenses: Number(expenses) || 0,
     };
 
     const newBranch = await Branch.create(newBranchData);
@@ -96,12 +96,14 @@ export const updateBranch = async (req, res) => {
 
     const updatedBranch = await Branch.findByIdAndUpdate(
       req.params.id,
-      { name,
+      {
+        name,
         storeAddress,
-        rent,
-        employeesSalary,
-        branchInvoices,
-        expenses, },
+        rent: Number(rent) || 0,
+        employeesSalary: Number(employeesSalary) || 0,
+        branchInvoices: Number(branchInvoices) || 0,
+        expenses: Number(expenses) || 0,
+      },
       { new: true }
     );
 

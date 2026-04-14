@@ -4,6 +4,76 @@ import Product from '../../DB/models/product.model.js';
 import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
+import Branch from '../../DB/models/branch.model.js';
+
+/** Monthly branch fixed costs (rent + salaries + invoices + expenses) spread over this many days for daily rate. */
+const BRANCH_OVERHEAD_MONTHLY_DAYS = 30;
+
+const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+function branchMonthlyFixed(doc) {
+  if (!doc) {
+    return { total: 0, rent: 0, employeesSalary: 0, branchInvoices: 0, expenses: 0 };
+  }
+  const rent = Number(doc.rent) || 0;
+  const employeesSalary = Number(doc.employeesSalary) || 0;
+  const branchInvoices = Number(doc.branchInvoices) || 0;
+  const expenses = Number(doc.expenses) || 0;
+  return {
+    total: rent + employeesSalary + branchInvoices + expenses,
+    rent,
+    employeesSalary,
+    branchInvoices,
+    expenses,
+  };
+}
+
+async function getBranchOverheadForReport(branchIdFilter) {
+  let branches = [];
+  if (branchIdFilter) {
+    const b = await Branch.findById(branchIdFilter).lean();
+    if (b) branches = [b];
+  } else {
+    branches = await Branch.find({}).lean();
+  }
+  const breakdown = { rent: 0, employeesSalary: 0, branchInvoices: 0, expenses: 0 };
+  let monthlyTotal = 0;
+  for (const br of branches) {
+    const m = branchMonthlyFixed(br);
+    monthlyTotal += m.total;
+    breakdown.rent += m.rent;
+    breakdown.employeesSalary += m.employeesSalary;
+    breakdown.branchInvoices += m.branchInvoices;
+    breakdown.expenses += m.expenses;
+  }
+  const dailyRate = monthlyTotal / BRANCH_OVERHEAD_MONTHLY_DAYS;
+  return { monthlyTotal, dailyRate, breakdown, branchCount: branches.length };
+}
+
+/** Inclusive calendar days between two dates (local). */
+function calendarDaysInclusive(from, to) {
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  const diff = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+  return Math.max(1, diff);
+}
+
+/** Days of a YYYY-MM month overlapping [rangeFrom, rangeTo] (inclusive). */
+function daysInMonthOverlappingRange(periodKey, rangeFrom, rangeTo) {
+  const parts = String(periodKey).split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (!y || !m) return 0;
+  const monthLastDay = new Date(y, m, 0).getDate();
+  const monthStart = new Date(y, m - 1, 1);
+  const monthEnd = new Date(y, m - 1, monthLastDay, 23, 59, 59, 999);
+  const rf = new Date(rangeFrom.getFullYear(), rangeFrom.getMonth(), rangeFrom.getDate());
+  const rt = new Date(rangeTo.getFullYear(), rangeTo.getMonth(), rangeTo.getDate(), 23, 59, 59, 999);
+  const overlapFrom = monthStart > rf ? monthStart : rf;
+  const overlapEnd = monthEnd < rt ? monthEnd : rt;
+  if (overlapFrom > overlapEnd) return 0;
+  return calendarDaysInclusive(overlapFrom, overlapEnd);
+}
 
 const toDate = (value, fallback) => {
   const d = value ? new Date(value) : fallback;
@@ -175,7 +245,11 @@ export const getProfitReport = async (req, res) => {
     if (f.productId) match['products.productId'] = f.productId;
     const unwindMatch = f.productId ? { 'products.productId': f.productId } : {};
 
-    const [summary] = await Order.aggregate([
+    const overhead = await getBranchOverheadForReport(f.branchId);
+    const daysInPeriod = calendarDaysInclusive(f.from, f.to);
+    const branchOperatingCostTotal = overhead.dailyRate * daysInPeriod;
+
+    const [aggSummary] = await Order.aggregate([
       { $match: match },
       { $unwind: '$products' },
       { $match: unwindMatch },
@@ -191,19 +265,41 @@ export const getProfitReport = async (req, res) => {
           _id: 0,
           totalRevenue: { $round: ['$totalRevenue', 2] },
           totalCost: { $round: ['$totalCost', 2] },
-          netProfit: { $round: [{ $subtract: ['$totalRevenue', '$totalCost'] }, 2] },
-          profitMargin: {
-            $cond: [
-              { $gt: ['$totalRevenue', 0] },
-              { $round: [{ $multiply: [{ $divide: [{ $subtract: ['$totalRevenue', '$totalCost'] }, '$totalRevenue'] }, 100] }, 2] },
-              0,
-            ],
-          },
+          tradingProfit: { $round: [{ $subtract: ['$totalRevenue', '$totalCost'] }, 2] },
         },
       },
     ]);
 
-    const profitOverTime = await Order.aggregate([
+    const totalRevenue = aggSummary?.totalRevenue ?? 0;
+    const totalCost = aggSummary?.totalCost ?? 0;
+    const tradingProfit = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
+    const netProfitAfterBranch = round2(tradingProfit - branchOperatingCostTotal);
+    const profitMargin =
+      totalRevenue > 0 ? round2((netProfitAfterBranch / totalRevenue) * 100) : 0;
+
+    const summary = {
+      totalRevenue,
+      totalCost,
+      tradingProfit,
+      branchOperatingCost: round2(branchOperatingCostTotal),
+      netProfit: netProfitAfterBranch,
+      profitMargin,
+      branchOverhead: {
+        monthlyFixedTotal: round2(overhead.monthlyTotal),
+        dailyRate: round2(overhead.dailyRate),
+        daysInPeriod,
+        divisorDays: BRANCH_OVERHEAD_MONTHLY_DAYS,
+        breakdown: {
+          rent: round2(overhead.breakdown.rent),
+          employeesSalary: round2(overhead.breakdown.employeesSalary),
+          branchInvoices: round2(overhead.breakdown.branchInvoices),
+          expenses: round2(overhead.breakdown.expenses),
+        },
+        branchCount: overhead.branchCount,
+      },
+    };
+
+    const profitOverTimeRaw = await Order.aggregate([
       { $match: match },
       { $unwind: '$products' },
       { $match: unwindMatch },
@@ -221,14 +317,34 @@ export const getProfitReport = async (req, res) => {
           period: '$_id',
           revenue: { $round: ['$revenue', 2] },
           cost: { $round: ['$cost', 2] },
-          netProfit: { $round: [{ $subtract: ['$revenue', '$cost'] }, 2] },
         },
       },
     ]);
 
+    const profitOverTime = (profitOverTimeRaw || []).map((row) => {
+      const revenue = Number(row.revenue) || 0;
+      const cost = Number(row.cost) || 0;
+      const trading = round2(revenue - cost);
+      let overheadAlloc = 0;
+      if (f.groupBy === 'monthly') {
+        const d = daysInMonthOverlappingRange(row.period, f.from, f.to);
+        overheadAlloc = round2(overhead.dailyRate * d);
+      } else {
+        overheadAlloc = round2(overhead.dailyRate);
+      }
+      return {
+        period: row.period,
+        revenue,
+        cost,
+        tradingProfit: trading,
+        branchOverheadAllocated: overheadAlloc,
+        netProfit: round2(trading - overheadAlloc),
+      };
+    });
+
     return res.json({
       filters: f,
-      summary: summary || { totalRevenue: 0, totalCost: 0, netProfit: 0, profitMargin: 0 },
+      summary,
       profitOverTime,
     });
   } catch (error) {

@@ -4,6 +4,12 @@ import { auditLog } from '../audit_module/audit.service.js';
 
 import bcrypt from 'bcryptjs';
 
+const GLOBAL_ADMIN_ROLES = ['Super Admin', 'Co Admin'];
+
+function isGlobalAdminRole(role) {
+  return GLOBAL_ADMIN_ROLES.includes(String(role || '').trim());
+}
+
 // Get all users (with pagination and optional search)
 export const getUsers = async (req, res) => {
   try {
@@ -54,7 +60,7 @@ export const getUsers = async (req, res) => {
 // Get user by ID
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(req.params.id).populate('branch', 'name storeAddress');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -74,8 +80,12 @@ export const createUser = async (req, res) => {
   try {
     const { name, email, password, role, branchId } = req.body;
 
-    if (!name || !email || !password || !role || !branchId ) {
+    if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!isGlobalAdminRole(role) && !branchId) {
+      return res.status(400).json({ error: 'Branch is required for this role' });
     }
 
     const existing = await User.findOne({ email });
@@ -83,25 +93,22 @@ export const createUser = async (req, res) => {
       return res.status(409).json({ error: 'Email already in use' });
     }
 
-    let branch = null;
-    if (branchId) {
-      branch = await Branch.findById(branchId); 
+    let branchRef = null;
+    if (!isGlobalAdminRole(role)) {
+      const branch = await Branch.findById(branchId);
       if (!branch) {
         return res.status(404).json({ error: 'Branch not found' });
       }
+      branchRef = branch._id;
     }
-  
+
     const createdUser = await User.create({
       name,
       email,
       password,
       mustChangePassword: true,
       role,
-      branch: {
-        _id: branch._id,
-        name: branch.name,
-        storeAddress: branch.storeAddress
-      },
+      branch: branchRef,
     });
 
     const populatedUser = await createdUser.populate('branch', 'name -_id');
@@ -131,7 +138,9 @@ export const updateUser = async (req, res) => {
       updates.mustChangePassword = true;
     }
 
-    if (branchId) {
+    if (isGlobalAdminRole(role)) {
+      updates.branch = null;
+    } else if (branchId) {
       const branch = await Branch.findById(branchId);
       if (!branch) {
         return res.status(404).json({ error: 'Branch not found' });

@@ -229,4 +229,17 @@ export class AddOrderComponent implements OnInit {
     window.print();
     this.closeModal(true)
   }
+
+  /**
+   * Receipt print formatting: compact numbers (no commas, no decimals) to avoid wrapping on 58mm paper.
+   */
+  formatReceiptAmount(value: any): string {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    const rounded = Math.round(n);
+    return new Intl.NumberFormat('en-US', {
+      useGrouping: false,
+      maximumFractionDigits: 0,
+    }).format(rounded);
+  }
 }

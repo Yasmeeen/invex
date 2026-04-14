@@ -54,40 +54,6 @@
                     <div
                       class="form-group"
                       [class.has-error]="
-                        branch.invalid && basicInfoForm.submitted
-                      "
-                    >
-                      <label>{{ 'tr_branches' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          bindValue="_id"
-                          [clearable]="false"
-                          ngModel
-                          #branch="ngModel"
-                          name="branchId"
-                          [items]="branches"
-                          required
-                        >
-                        </ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="branch.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_branch_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="
                         email.invalid && basicInfoForm.submitted
                       "
                     >
@@ -113,7 +79,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="
-                        role.invalid && basicInfoForm.submitted
+                        roleNg.invalid && basicInfoForm.submitted
                       "
                     >
                       <label>{{ 'tr_role' | translate }}</label>
@@ -123,10 +89,48 @@
                           placeholder="{{ 'tr_select' | translate }}"
                           [clearable]="false"
                           ngModel
-                          #role="ngModel"
+                          #roleNg="ngModel"
                           name="role"
                           [items]="roles"
                           required
+                          (ngModelChange)="onRoleChange($event)"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <p class="size-small steel mt-2 mb-0" *ngIf="isGlobalAdminRole(roleNg.value)">
+                        {{ 'tr_user_all_branches_access_hint' | translate }}
+                      </p>
+
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="roleNg.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_role_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6" *ngIf="showBranchField(roleNg.value)">
+                    <div
+                      class="form-group"
+                      [class.has-error]="
+                        branch.invalid && basicInfoForm.submitted
+                      "
+                    >
+                      <label>{{ 'tr_branches' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [clearable]="false"
+                          ngModel
+                          #branch="ngModel"
+                          name="branchId"
+                          [items]="branches"
+                          [required]="showBranchField(roleNg.value)"
                         >
                         </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
@@ -134,9 +138,9 @@
 
                       <span
                         class="text-error size-small validator"
-                        *ngIf="role.invalid && basicInfoForm.submitted"
+                        *ngIf="branch.invalid && basicInfoForm.submitted"
                       >
-                        {{ 'tr_role_required' | translate }}
+                        {{ 'tr_branch_required' | translate }}
                       </span>
                     </div>
                   </div>

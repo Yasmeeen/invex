@@ -33,6 +33,23 @@ export class CreateEditUserComponent implements OnInit {
     'Moderator',
   ];
 
+  /** Super Admin / Co Admin — no single branch; API stores branch = null. */
+  isGlobalAdminRole(role: string | null | undefined): boolean {
+    const r = String(role || '').trim();
+    return r === 'Super Admin' || r === 'Co Admin';
+  }
+
+  /** Show branch picker only when the role is tied to one branch. */
+  showBranchField(role: string | null | undefined): boolean {
+    return !!role && !this.isGlobalAdminRole(role);
+  }
+
+  onRoleChange(role: string): void {
+    if (this.isGlobalAdminRole(role) && this.basicInfoForm?.form) {
+      this.basicInfoForm.form.patchValue({ branchId: null });
+    }
+  }
+
   private subscriptions: Subscription[] = [];
 
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
@@ -99,8 +116,12 @@ export class CreateEditUserComponent implements OnInit {
     if (!this.basicInfoForm.valid) {
       return;
     }
+    const payload: any = { ...this.user };
+    if (this.isGlobalAdminRole(payload.role)) {
+      delete payload.branchId;
+    }
 
-    this.userSerivce.createUser(this.user).subscribe(() => {
+    this.userSerivce.createUser(payload).subscribe(() => {
       this.appNotificationService.push('user created successfully', 'sucess');
       this.closeModal(true);
     }, error=> {
@@ -118,6 +139,9 @@ export class CreateEditUserComponent implements OnInit {
     const p = this.user.password;
     if (p == null || String(p).trim() === '') {
       delete (this.user as any).password;
+    }
+    if (this.isGlobalAdminRole((this.user as any).role)) {
+      delete (this.user as any).branchId;
     }
 
     this.userSerivce.updateUser(this.userId, this.user).subscribe(() => {

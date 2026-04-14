@@ -209,9 +209,14 @@
     </div>
 
     <!-- Invoice (labels follow store receipt language) -->
-    <div class="invoice-container" id="print-container">
+    <div
+      class="invoice-container"
+      id="print-container"
+      [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
+    >
       <ng-container *ngIf="storeSettings.settings$ | async as st">
         <div class="center">
+          <img *ngIf="st.logoUrl" class="invoice-logo" [src]="st.logoUrl" alt="" />
           <div class="bold">{{ st.storeName }}</div>
         </div>
 
@@ -256,10 +261,10 @@
             <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
           </tr>
           <tr *ngFor="let item of orderProducts">
-            <td>{{ item.totalPrice }}</td>
+            <td>{{ formatReceiptAmount(item.totalPrice) }}</td>
             <td>{{ item.quantity }}</td>
             <td>{{ item.selectedProduct.isApplyDiscount ? item.selectedProduct.discount : 0 }} %</td>
-            <td>{{ item.selectedProduct.price }}</td>
+            <td>{{ formatReceiptAmount(item.selectedProduct.price) }}</td>
             <td>{{ item.selectedProduct.name }}</td>
           </tr>
         </table>
@@ -269,7 +274,7 @@
         <table>
           <tr class="total">
             <td>{{ 'tr_total_invoice' | receiptTranslate: st.receiptLanguage }}</td>
-            <td>{{ createdOrder?.totalPrice }}</td>
+            <td>{{ formatReceiptAmount(createdOrder?.totalPrice) }}</td>
           </tr>
           <tr>
             <td>{{ 'tr_discount_percent' | receiptTranslate: st.receiptLanguage }}</td>
@@ -284,7 +289,7 @@
         <div class="double-border"></div>
         <div class="final-total">
           {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}<br />{{
-            createdOrder?.totalPrice
+            formatReceiptAmount(createdOrder?.totalPrice)
           }}
         </div>
         <div class="double-border"></div>

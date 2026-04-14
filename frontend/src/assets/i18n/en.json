@@ -364,6 +364,7 @@
   "tr_edit_user": "Edit user",
   "tr_login_password_hint": "Forgot your password? A Super Admin or Co Admin can set a new one from Users.",
   "tr_password_optional_edit": "Leave blank to keep the current password.",
+  "tr_user_all_branches_access_hint": "This role works across all branches — no branch is stored on the user.",
   "tr_branch_name": "Branch Name",
   "tr_new_btanch": "New Branch",
   "tr_category_name": "Category Name",

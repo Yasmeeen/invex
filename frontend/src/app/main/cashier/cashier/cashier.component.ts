@@ -47,7 +47,7 @@ export class CashierComponent implements AfterViewInit {
 
   searchTerm = '';
   barcode = '';
-  isCashierFullScreen: boolean = false;
+  isCashierFullScreen: boolean = true;
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string
@@ -540,6 +540,19 @@ export class CashierComponent implements AfterViewInit {
     const sub = this.receiptLinesSubtotal();
     const disc = this.receiptInvoiceExtraDiscount();
     return Math.round((sub - disc) * 100) / 100;
+  }
+
+  /**
+   * Receipt print formatting: compact numbers (no commas, no decimals) to avoid wrapping on 58mm paper.
+   */
+  formatReceiptAmount(value: any): string {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    const rounded = Math.round(n);
+    return new Intl.NumberFormat('en-US', {
+      useGrouping: false,
+      maximumFractionDigits: 0,
+    }).format(rounded);
   }
 
   openCashier() {

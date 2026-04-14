@@ -360,6 +360,7 @@
   "tr_edit_user": "Benutzer bearbeiten",
   "tr_login_password_hint": "Passwort vergessen? Ein Super-Admin oder Co-Admin kann in Benutzern ein neues setzen.",
   "tr_password_optional_edit": "Leer lassen, um das aktuelle Passwort beizubehalten.",
+  "tr_user_all_branches_access_hint": "Diese Rolle gilt für alle Filialen — es wird keine Filiale am Benutzer gespeichert.",
   "tr_branch_name": "Filialname",
   "tr_new_btanch": "Neue Filiale",
   "tr_category_name": "Kategoriename",

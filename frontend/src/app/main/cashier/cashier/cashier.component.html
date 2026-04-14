@@ -296,8 +296,17 @@
 
   
 <!-- Invoice (labels follow store receipt language, not UI language) -->
-<div class="invoice-container" id="print-container">
+<div
+  class="invoice-container"
+  id="print-container"
+  [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
+>
   <ng-container *ngIf="storeSettings.settings$ | async as st">
+    <!-- Store logo (from Settings) -->
+    <div class="center mtb-2" *ngIf="st.logoUrl">
+      <img class="invoice-logo" [src]="st.logoUrl" alt="" />
+    </div>
+
     <!-- Store Name -->
     <div class="store-name center mtb-4 bold">
       {{ st.storeName }}
@@ -365,8 +374,8 @@
       <tr *ngFor="let item of createdOrder?.products">
         <td class="item-name">{{ item.name }}</td>
         <td>{{ item.quantity }}</td>
-        <td>{{ item.price | number:'1.2-2' }}</td>
-        <td>{{ (item.price * item.quantity ) | number:'1.2-2' }}</td>
+        <td>{{ formatReceiptAmount(item.price) }}</td>
+        <td>{{ formatReceiptAmount(item.price * item.quantity) }}</td>
       </tr>
     </table>
 
@@ -374,15 +383,15 @@
     <table class="invoice-table totals-table">
       <tr class="bold">
         <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ receiptLinesSubtotal() | number:'1.2-2' }}</td>
+        <td>{{ formatReceiptAmount(receiptLinesSubtotal()) }}</td>
       </tr>
       <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
         <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ -receiptInvoiceExtraDiscount() | number:'1.2-2' }}</td>
+        <td>{{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}</td>
       </tr>
       <tr class="bold">
         <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ receiptFinalTotal() | number:'1.2-2' }}</td>
+        <td>{{ formatReceiptAmount(receiptFinalTotal()) }}</td>
       </tr>
     </table>
 
@@ -390,7 +399,7 @@
 
     <div class="final-total center bold">
       {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
-      {{ receiptFinalTotal() | number:'1.2-2' }}
+      {{ formatReceiptAmount(receiptFinalTotal()) }}
     </div>
 
     <div class="separator double-border"></div>

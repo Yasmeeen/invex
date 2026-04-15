@@ -5,25 +5,103 @@
   z-index: 9999;
   font-family: inherit;
 
+  &--page {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: 100%;
+  }
+
   &__fab {
-    width: 52px;
-    height: 52px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     border: none;
     cursor: pointer;
-    background: #5b21b6;
-    color: #fff;
+    background: transparent;
+    padding: 0;
     box-shadow: 0 10px 24px rgba(17, 24, 39, 0.22);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    overflow: hidden;
+    animation: vixa-float 3.2s ease-in-out infinite;
+  }
+
+  &__fab-label {
+    display: none;
+  }
+
+  /* Desktop: show label next to avatar */
+  @media (min-width: 768px) {
+    &__fab {
+      width: auto;
+      height: 72px;
+      border-radius: 999px;
+      padding: 8px 12px 8px 8px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+
+    &__fab-avatar {
+      width: 56px;
+      height: 56px;
+      flex: 0 0 56px;
+    }
+
+    &__fab-label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      line-height: 1.1;
+      padding-right: 4px;
+    }
+    &__fab-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #111827;
+    }
+    &__fab-sub {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+      white-space: nowrap;
+    }
+  }
+
+  &__fab-avatar {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #0b1220;
+    display: block;
+  }
+  &__fab-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.08);
+  }
+  /* Simple "blink" eyelid overlay (works as cute animation even without true background removal) */
+  &__fab-avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 18, 32, 0.75);
+    transform: translateY(-110%);
+    animation: vixa-blink 5.5s ease-in-out infinite;
+    pointer-events: none;
   }
 
   &__panel {
     position: absolute;
     right: 0;
-    bottom: 64px;
+    bottom: 112px;
     width: 360px;
     max-width: calc(100vw - 36px);
     height: 520px;
@@ -37,6 +115,16 @@
     flex-direction: column;
   }
 
+  &__panel--page {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    height: calc(100vh - 210px);
+    max-height: none;
+    border-radius: 16px;
+  }
+
   &__head {
     padding: 12px 12px 10px;
     border-bottom: 1px solid #eef2f7;
@@ -47,9 +135,12 @@
   }
 
   &__title {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
     strong {
       font-size: 14px;
       color: #111827;
@@ -58,6 +149,33 @@
   &__sub {
     font-size: 12px;
     color: #6b7280;
+  }
+
+  &__avatar {
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #0b1220;
+    box-shadow: 0 8px 18px rgba(17, 24, 39, 0.18);
+    position: relative;
+    animation: vixa-wave 4.5s ease-in-out infinite;
+  }
+  &__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scale(1.08);
+  }
+  &__avatar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 18, 32, 0.65);
+    transform: translateY(-110%);
+    animation: vixa-blink 6.2s ease-in-out infinite;
+    pointer-events: none;
   }
 
   &__actions {
@@ -168,6 +286,49 @@
   &__send[disabled] {
     opacity: 0.65;
     cursor: not-allowed;
+  }
+}
+
+@keyframes vixa-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes vixa-blink {
+  0%,
+  92%,
+  100% {
+    transform: translateY(-110%);
+  }
+  94% {
+    transform: translateY(0%);
+  }
+  96% {
+    transform: translateY(-110%);
+  }
+}
+
+@keyframes vixa-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  92% {
+    transform: rotate(0deg);
+  }
+  94% {
+    transform: rotate(-10deg);
+  }
+  96% {
+    transform: rotate(10deg);
+  }
+  98% {
+    transform: rotate(0deg);
   }
 }
 

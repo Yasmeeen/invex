@@ -20,6 +20,8 @@ export class MainComponent implements OnInit {
 
   /** Narrow sidebar mode — synced from sidebar collapse control */
   sidebarCollapsed = false;
+  /** Hide floating Vixa widget on /vixa page (page has its own full chat). */
+  showFloatingVixa = true;
 
   constructor(
       private router:Router,
@@ -45,6 +47,7 @@ export class MainComponent implements OnInit {
   // Shows and hides the loading spinner during RouterEvent changes
   navigationInterceptor(event: RouterEvent): void {
     if (event instanceof NavigationEnd) {
+          this.showFloatingVixa = !String(event.urlAfterRedirects || event.url || '').startsWith('/vixa');
           document.body.classList.remove('sidebar-active')
           let activeRouterMenus = document.querySelectorAll('.anchor-container');
           for (let i = 0; i < activeRouterMenus.length; i++) {

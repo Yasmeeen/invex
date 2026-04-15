@@ -1,17 +1,33 @@
-<div class="vixa">
+<div class="vixa" [class.vixa--page]="mode === 'page'">
   <button
+    *ngIf="mode === 'floating'"
     type="button"
     class="vixa__fab"
     (click)="toggle()"
     [attr.aria-label]="'tr_vixa' | translate"
     [attr.title]="'tr_vixa' | translate"
   >
-    <i class="fa fa-comments"></i>
+    <span class="vixa__fab-avatar" aria-hidden="true">
+      <img src="/assets/images/vixa.png" alt="" />
+    </span>
+    <span class="vixa__fab-label">
+      <span class="vixa__fab-title">{{ 'tr_vixa' | translate }}</span>
+      <span class="vixa__fab-sub">{{ 'tr_vixa_smart_assistant' | translate }}</span>
+    </span>
   </button>
 
-  <section class="vixa__panel" *ngIf="open" role="dialog" aria-modal="false">
+  <section
+    class="vixa__panel"
+    [class.vixa__panel--page]="mode === 'page'"
+    *ngIf="open || mode === 'page'"
+    role="dialog"
+    aria-modal="false"
+  >
     <header class="vixa__head">
       <div class="vixa__title">
+        <span class="vixa__avatar" aria-hidden="true">
+          <img src="/assets/images/vixa.png" alt="" />
+        </span>
         <strong>{{ 'tr_vixa' | translate }}</strong>
         <span class="vixa__sub">{{ 'tr_vixa_subtitle' | translate }}</span>
       </div>
@@ -19,7 +35,13 @@
         <button type="button" class="vixa__icon" (click)="clear()" [attr.title]="'tr_clear' | translate">
           <i class="fa fa-trash"></i>
         </button>
-        <button type="button" class="vixa__icon" (click)="close()" [attr.title]="'tr_close' | translate">
+        <button
+          *ngIf="mode === 'floating'"
+          type="button"
+          class="vixa__icon"
+          (click)="close()"
+          [attr.title]="'tr_close' | translate"
+        >
           <i class="fa fa-times"></i>
         </button>
       </div>

@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, Input, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -18,6 +18,11 @@ type VixaMessage = {
   styleUrls: ['./vixa-chat.component.scss'],
 })
 export class VixaChatComponent implements OnInit, OnDestroy {
+  /** floating = global widget; page = full-page layout (no FAB) */
+  @Input() mode: 'floating' | 'page' = 'floating';
+  /** When mode=page, show panel by default. */
+  @Input() startOpen = false;
+
   open = false;
   input = '';
   loading = false;
@@ -34,6 +39,10 @@ export class VixaChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.restore();
+    if (this.mode === 'page' && this.startOpen) {
+      this.open = true;
+      this.ensureGreeting();
+    }
   }
 
   ngOnDestroy(): void {
@@ -69,6 +78,9 @@ export class VixaChatComponent implements OnInit, OnDestroy {
 
   toggle(): void {
     this.open = !this.open;
+    if (this.open) {
+      this.ensureGreeting();
+    }
   }
 
   close(): void {
@@ -80,6 +92,23 @@ export class VixaChatComponent implements OnInit, OnDestroy {
     this.persist();
   }
 
+  private ensureGreeting(): void {
+    if (this.messages?.length) return;
+    const ar = String(this.translate.currentLang || this.translate.defaultLang || 'en')
+      .toLowerCase()
+      .startsWith('ar');
+    this.messages = [
+      {
+        role: 'assistant',
+        text: ar
+          ? 'Hi! أنا Vixa. اسأليني عن الفواتير/المبيعات النهارده، الحجوزات، أو الأرباح بتاريخ محدد.'
+          : 'Hi! I am Vixa. Ask me about invoices/sales today, bookings, or profit for a date range.',
+        createdAt: Date.now(),
+      },
+    ];
+    this.persist();
+  }
+
   @HostListener('document:keydown.escape')
   onEscape(): void {
     if (this.open) this.close();
@@ -88,6 +117,7 @@ export class VixaChatComponent implements OnInit, OnDestroy {
   @HostListener('document:click', ['$event'])
   onDocClick(ev: MouseEvent): void {
     if (!this.open) return;
+    if (this.mode === 'page') return;
     const t = ev.target as HTMLElement | null;
     if (!t) return;
     const inside = t.closest('.vixa');

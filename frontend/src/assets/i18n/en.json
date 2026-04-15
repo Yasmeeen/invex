@@ -366,6 +366,7 @@
   "tr_password_optional_edit": "Leave blank to keep the current password.",
   "tr_user_all_branches_access_hint": "This role works across all branches — no branch is stored on the user.",
   "tr_vixa": "Vixa",
+  "tr_vixa_smart_assistant": "Your smart assistant",
   "tr_vixa_subtitle": "Ask about reports, bookings, and more.",
   "tr_vixa_page_hint": "Use the chat icon to open Vixa anywhere.",
   "tr_vixa_placeholder": "Ask Vixa… (e.g. Sales today, bookings today, profit this week)",

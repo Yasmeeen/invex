@@ -362,6 +362,7 @@
   "tr_password_optional_edit": "Laisser vide pour conserver le mot de passe actuel.",
   "tr_user_all_branches_access_hint": "Ce rôle couvre toutes les succursales — aucune succursale n’est enregistrée sur l’utilisateur.",
   "tr_vixa": "Vixa",
+  "tr_vixa_smart_assistant": "Votre assistant intelligent",
   "tr_vixa_subtitle": "Posez des questions sur les rapports, les réservations, etc.",
   "tr_vixa_page_hint": "Utilisez l’icône de chat pour ouvrir Vixa partout.",
   "tr_vixa_placeholder": "Demandez à Vixa… (ex. ventes aujourd’hui, réservations aujourd’hui, profit cette semaine)",

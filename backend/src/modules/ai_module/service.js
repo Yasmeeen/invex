@@ -12,9 +12,38 @@ function todayRangeISO() {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
+/** Monday–Sunday range for the current calendar week (local time). */
+function thisWeekRangeISO() {
+  const now = new Date();
+  const dayFromMonday = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayFromMonday);
+  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6, 23, 59, 59, 999);
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
+
 function pickIsoDate(s) {
   const m = String(s || '').match(/\b(\d{4}-\d{2}-\d{2})\b/g);
   return m || [];
+}
+
+/** English / Arabic cues for “this week” (UI quick actions, natural chat). */
+function messageImpliesCurrentWeek(message) {
+  const raw = String(message || '');
+  if (/\bweek\b/i.test(raw) || /\bweekly\b/i.test(raw)) return true;
+  const n = raw
+    .replace(/[؟?!.،,:;()"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/ة/g, 'ه')
+    .replace(/[أإآٱ]/g, 'ا');
+  return (
+    n.includes('اسبوع') ||
+    n.includes('الاسبوع') ||
+    n.includes('هذا الاسبوع') ||
+    n.includes('الاسبوع دا') ||
+    n.includes('الاسبوع ده')
+  );
 }
 
 function inferRange({ message, from, to }) {
@@ -22,6 +51,7 @@ function inferRange({ message, from, to }) {
   const dates = pickIsoDate(message);
   if (dates.length >= 2) return { from: dates[0], to: dates[1] };
   if (dates.length === 1) return { from: dates[0], to: dates[0] };
+  if (messageImpliesCurrentWeek(message)) return thisWeekRangeISO();
   // default: today
   return todayRangeISO();
 }
@@ -37,7 +67,20 @@ function intent(message) {
   const has = (arr) => arr.some((w) => t.includes(w) || tArNorm.includes(String(w).replace(/ة/g, 'ه')));
   if (has(['سعر', 'تسعير', 'market', 'price', 'range'])) return 'pricing';
   if (has(['حجز', 'حجوز', 'booking', 'booked'])) return 'bookings';
-  if (has(['مكسب', 'ربح', 'profit', 'net', 'margin'])) return 'profit';
+  // Profit: include plural "أرباح" — it does NOT contain the substring "ربح" (أ ر ب ا ح vs ر ب ح).
+  if (
+    has([
+      'مكسب',
+      'ربح',
+      'أرباح',
+      'ارباح',
+      'صافي',
+      'profit',
+      'net',
+      'margin',
+    ])
+  )
+    return 'profit';
   // Sales / invoices keywords: accept common Arabic spellings (ة/ه) + plural forms.
   if (
     has([

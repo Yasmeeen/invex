@@ -8,7 +8,7 @@ $shell-purple-soft: rgba(108, 92, 231, 0.14);
 $shell-text: #2d3436;
 $shell-muted: #636e72;
 /* Sidebar icons */
-$shell-icon: #837ac6;
+$shell-icon: #5a4ad2;
 $shell-icon-hover: lighten($shell-icon, 6%);
 $shell-icon-active: darken($shell-icon, 6%);
 
@@ -44,6 +44,7 @@ $shell-icon-active: darken($shell-icon, 6%);
     background-color: transparent;
     border-radius: 0;
     z-index: 9;
+    box-shadow: 0 20px 55px rgba(108, 92, 231, 0.14);
 
     .text-lavander {
         color: $shell-purple;
@@ -61,14 +62,15 @@ $shell-icon-active: darken($shell-icon, 6%);
         flex: 1 1 auto;
         width: 100%;
         min-height: 0;
-        background-color: #fff;
+        background: linear-gradient(45deg,#f4efff,  #fff);
+       
         overflow-x: hidden;
         overflow-y: auto;
         z-index: 1;
         display: flex;
         flex-direction: column;
         border-radius: 0;
-        box-shadow: none;
+        box-shadow: 0 14px 30px rgba(108, 92, 231, 0.10);
         border: none;
         border-inline-end: 1px solid rgba(108, 92, 231, 0.12);
 
@@ -165,6 +167,7 @@ $shell-icon-active: darken($shell-icon, 6%);
                         min-width: 0;
                         flex: 1 1 auto;
                         overflow: hidden;
+                    
                         text-overflow: ellipsis;
                         white-space: nowrap;
                     }

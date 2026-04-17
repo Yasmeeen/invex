@@ -29,6 +29,11 @@ export class VixaChatComponent implements OnInit, OnDestroy {
   messages: VixaMessage[] = [];
 
   private subs: Subscription[] = [];
+  readonly quickActions = [
+    { labelKey: 'tr_vixa_quick_sales_today', prompt: 'tr_vixa_prompt_sales_today' },
+    { labelKey: 'tr_vixa_quick_profit_week', prompt: 'tr_vixa_prompt_profit_week' },
+    { labelKey: 'tr_vixa_quick_bookings_today', prompt: 'tr_vixa_prompt_bookings_today' },
+  ];
 
   constructor(
     private auth: AuthenticationService,
@@ -101,12 +106,33 @@ export class VixaChatComponent implements OnInit, OnDestroy {
       {
         role: 'assistant',
         text: ar
-          ? 'Hi! أنا Vixa. اسأليني عن الفواتير/المبيعات النهارده، الحجوزات، أو الأرباح بتاريخ محدد.'
-          : 'Hi! I am Vixa. Ask me about invoices/sales today, bookings, or profit for a date range.',
+          ? 'أهلًا! أنا Vixa — مساعدك الذكي. اسأليني عن الفواتير/المبيعات النهارده، الحجوزات، أو الأرباح بتاريخ محدد.'
+          : 'Hi! I am Vixa — your smart assistant. Ask me about invoices/sales today, bookings, or profit for a date range.',
         createdAt: Date.now(),
       },
     ];
     this.persist();
+  }
+
+  /** Quick actions use i18n keys; translate in TS (pipes are not allowed in `(click)` expressions). */
+  sendQuickPrompt(promptKey: string): void {
+    const text = String(this.translate.instant(promptKey || '') || '').trim();
+    this.input = text;
+    this.send();
+  }
+
+  get currentUserInitials(): string {
+    const u: any = this.auth.getUserFromLocalStorage();
+    const name = String(u?.name || u?.email || '').trim();
+    if (!name) return 'U';
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  get currentUserName(): string {
+    const u: any = this.auth.getUserFromLocalStorage();
+    return String(u?.name || u?.email || this.translate.instant('tr_users') || 'User').trim();
   }
 
   @HostListener('document:keydown.escape')

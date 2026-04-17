@@ -23,6 +23,32 @@
     role="dialog"
     aria-modal="false"
   >
+    <div class="vixa__hero" *ngIf="mode === 'page'">
+      <div class="vixa__hero-inner">
+        <div class="vixa__hero-avatar" aria-hidden="true">
+          <img src="/assets/images/vixa.png" alt="" />
+        </div>
+        <div class="vixa__hero-copy">
+          <div class="vixa__hero-title">
+            {{ 'tr_vixa_hero_title' | translate : { name: currentUserName } }}
+          </div>
+          <div class="vixa__hero-sub">
+            {{ 'tr_vixa_hero_sub' | translate }}
+          </div>
+          <div class="vixa__quick">
+            <button
+              type="button"
+              class="vixa__quick-btn"
+              *ngFor="let a of quickActions"
+              (click)="sendQuickPrompt(a.prompt)"
+            >
+              {{ a.labelKey | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <header class="vixa__head">
       <div class="vixa__title">
         <span class="vixa__avatar" aria-hidden="true">
@@ -49,7 +75,8 @@
 
     <div class="vixa__body">
       <div class="vixa__msg" *ngFor="let m of messages" [class.vixa__msg--user]="m.role === 'user'">
-        <div class="vixa__bubble">
+        <div class="vixa__row">
+          <div class="vixa__bubble">
           <div class="vixa__text">{{ m.text }}</div>
           <div class="vixa__sources" *ngIf="m.sources?.length">
             <div class="vixa__sources-title">{{ 'tr_vixa_disclaimer_sources' | translate }}</div>
@@ -62,6 +89,15 @@
             >
               {{ s.title || s.url }}
             </a>
+          </div>
+          </div>
+          <div class="vixa__msg-avatar" aria-hidden="true">
+            <ng-container *ngIf="m.role === 'assistant'; else userAvatar">
+              <img src="/assets/images/vixa.png" alt="" />
+            </ng-container>
+            <ng-template #userAvatar>
+              <span class="vixa__user-initials">{{ currentUserInitials }}</span>
+            </ng-template>
           </div>
         </div>
       </div>

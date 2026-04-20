@@ -6,6 +6,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { environment } from 'src/environments/environment';
 import { VersionCheckService } from '@shared/services/version-check.service';
 import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
+import { applyUiLanguage } from './core/i18n/ui-language';
 
 @Component({
   selector: 'app-root',
@@ -27,7 +28,8 @@ export class AppComponent {
     }
 
     ngOnInit() {
-      this.translate.use('en');
+      this.translate.setDefaultLang('en');
+      applyUiLanguage(this.translate);
       this.realtimeNotifications.init();
         if (environment.env === 'production') {
             this.versionCheckService.initVersionCheck('version.json');

@@ -4,6 +4,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Globals } from 'src/app/core/globals';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
 import { UserSerivce } from './user.service';
+import { applyUiLanguage } from '@core/i18n/ui-language';
 
 
 @Injectable({
@@ -30,7 +31,7 @@ export class LanguagesService {
         }
         this.userService.updateUser(user_id, params).subscribe((response: any) => {
             if(user_id === this.currentUser.id) {
-                this.translate.use(selectedLanguage);
+                applyUiLanguage(this.translate, selectedLanguage);
                 this.globals.currentUser = response;
                 localStorage.setItem('currentUser', JSON.stringify(this.globals.currentUser))
                 document.querySelector('body')?.setAttribute('dir', selectedLanguage == 'ar' ? 'rtl' : 'ltr');

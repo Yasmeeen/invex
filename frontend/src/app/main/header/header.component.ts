@@ -8,6 +8,7 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { NotificationsService, NotificationItem } from '@shared/services/notifications.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
+import { applyUiLanguage } from '@core/i18n/ui-language';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { ViewProductBookingDialogComponent } from '../products/view-product-booking-dialog/view-product-booking-dialog.component';
 import { Product } from '@core/models/products.model';
@@ -181,9 +182,7 @@ export class HeaderComponent implements OnInit {
   }
 
   setUserLanguage() {
-    const userLocal =   this.currentUser.locale
-    document.querySelector('body')?.setAttribute('dir', userLocal == 'ar' ? 'rtl' : 'ltr');
-    this.translate.use(userLocal);
+    applyUiLanguage(this.translate, this.currentUser?.locale);
   }
 
   private fontSizeStorageKey(): string {

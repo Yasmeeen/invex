@@ -32,6 +32,8 @@ export class ReceiptTranslatePipe implements PipeTransform {
       }
     }
 
-    return this.translate.instant(key);
+    // Do not use translate.instant — it follows *UI* language and mixes with receipt lang.
+    const last = enPack ? this.translate.getParsedResult(enPack, key) : null;
+    return last != null && last !== key ? (last as string) : key;
   }
 }

@@ -374,8 +374,12 @@
       <tr *ngFor="let item of createdOrder?.products">
         <td class="item-name">{{ item.name }}</td>
         <td>{{ item.quantity }}</td>
-        <td>{{ formatReceiptAmount(item.price) }}</td>
-        <td>{{ formatReceiptAmount(item.price * item.quantity) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+        <td class="money">
+          {{ formatReceiptAmount(item.price * item.quantity) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
       </tr>
     </table>
 
@@ -383,15 +387,22 @@
     <table class="invoice-table totals-table">
       <tr class="bold">
         <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ formatReceiptAmount(receiptLinesSubtotal()) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptLinesSubtotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
       </tr>
       <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
         <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
       </tr>
       <tr class="bold">
         <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ formatReceiptAmount(receiptFinalTotal()) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
       </tr>
     </table>
 
@@ -399,7 +410,9 @@
 
     <div class="final-total center bold">
       {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
-      {{ formatReceiptAmount(receiptFinalTotal()) }}
+      <span class="money">
+        {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+      </span>
     </div>
 
     <div class="separator double-border"></div>

@@ -555,6 +555,13 @@ export class CashierComponent implements AfterViewInit {
     }).format(rounded);
   }
 
+  /** Receipt currency suffix for 58mm print. */
+  receiptCurrencyLabel(receiptLanguage: string | null | undefined): string {
+    const l = String(receiptLanguage || '').toLowerCase();
+    // Keep it short to avoid wrapping in narrow columns.
+    return l.startsWith('ar') ? 'ج.م' : 'LE';
+  }
+
   openCashier() {
     this.isCashierFullScreen = true;
     setTimeout(() => this.focusBarcodeInput(), 100);

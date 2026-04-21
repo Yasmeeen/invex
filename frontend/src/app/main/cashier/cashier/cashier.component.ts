@@ -25,6 +25,8 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
+import { toDataURL as qrToDataUrl } from 'qrcode';
+import { environment } from 'src/environments/environment';
 
 @Component({
   selector: 'app-cashier-order',
@@ -38,6 +40,8 @@ export class CashierComponent implements AfterViewInit {
   orderItems: any[] = [];
   todayDate = new Date();
   createdOrder:any;
+  /** Data URL for Innovation website QR on printed receipt. */
+  invoiceQrDataUrl: string | null = null;
   /** How the cashier enters invoice-level discount: %, fixed amount, or target final total. */
   invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
   /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
@@ -211,6 +215,19 @@ export class CashierComponent implements AfterViewInit {
 
   ngAfterViewInit() {
     this.focusBarcodeInput();
+    const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
+    qrToDataUrl(qrUrl, {
+      width: 240,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    })
+      .then((dataUrl) => {
+        this.invoiceQrDataUrl = dataUrl;
+        this.cdr.detectChanges();
+      })
+      .catch(() => {
+        this.invoiceQrDataUrl = null;
+      });
   }
 
   focusBarcodeInput() {

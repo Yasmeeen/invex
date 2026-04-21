@@ -2,7 +2,19 @@
     zoom: 1;
   }
 
-   .course-navigation, .s-btn, .main-header, .section-title, .course-tab,.app-notification, #app-notifications-container,#main-sidebar {
+   .course-navigation,
+   .s-btn,
+   .main-header,
+   .section-title,
+   .course-tab,
+   .app-notification,
+   #app-notifications-container,
+   #main-sidebar,
+   /* Vixa chat must never appear on receipts/invoices */
+   app-vixa-chat,
+   .vixa,
+   .vixa__panel,
+   .vixa__fab {
     display: none !important;
     visibility:hidden;
   }

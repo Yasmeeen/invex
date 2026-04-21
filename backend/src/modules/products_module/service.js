@@ -576,7 +576,7 @@ export const generateBarcodeImage = async (req, res) => {
               <style>
            @page {
           size: 38mm 25mm;
-          margin: 0; 
+          margin: 0 3mm;
         }
 
       html, body {
@@ -585,18 +585,22 @@ export const generateBarcodeImage = async (req, res) => {
         margin: 0;
         padding: 0;
         display: flex;
-        justify-content: center; /* يضع الاستيكر في منتصف الصفحة عرضياً */
-        align-items: center;     /* يضع الاستيكر في منتصف الصفحة طولياً */
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
       }
 
-      .sticker {
-        width: 38mm;   /* نفس عرض الاستيكر */
-        height: 25mm;  /* نفس طول الاستيكر */
+      .sticker-name {
+        width: 100%;
+        max-width: 100%;
+        min-height: 25mm;
         display: flex;
         flex-direction: column;
-        justify-content: center; /* يوسّط المحتوى طولياً داخل الاستيكر */
-        align-items: center;     /* يوسّط المحتوى عرضياً داخل الاستيكر */
+        justify-content: center;
+        align-items: center;
         box-sizing: border-box;
+        /* احتياطي للمتصفحات اللي ما تطبقش @page margin كويس */
+        padding: 0 2mm;
       }
 
       .product-name {

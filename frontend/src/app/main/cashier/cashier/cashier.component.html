@@ -181,7 +181,7 @@
       <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
 
  
-      <table class="products-table ">
+      <table class="products-table-casheier ">
         <thead>
           <tr>
             <th>{{ "tr_cashier.PRODUCT" | translate }}</th>
@@ -303,7 +303,7 @@
 >
   <ng-container *ngIf="storeSettings.settings$ | async as st">
     <!-- Store logo (from Settings) -->
-    <div class="center mtb-2" *ngIf="st.logoUrl">
+    <div class="center mb-2" *ngIf="st.logoUrl">
       <img class="invoice-logo" [src]="st.logoUrl" alt="" />
     </div>
 
@@ -421,6 +421,10 @@
       <div class="bold">{{ st.storeName }}</div>
       <div>{{ st.storePhoneNumber }}</div>
     </div>
+
+    <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
+      <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
+      <div class="invoice-qr__caption">innovation-tec.com</div>
+    </div>
   </ng-container>
 </div>
-

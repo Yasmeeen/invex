@@ -29,7 +29,12 @@
       pointer-events: all;
     }
   }
-  
+  .products-table-casheier{
+    td{
+      font-size: 14px;
+    }
+
+  }
   /* Header */
   .cashier-header {
     display: flex;
@@ -347,180 +352,17 @@
     background-color: #e74c3c;
   }
 
-  .invoice-container {
-    font-family: "Courier New", Courier, monospace;
-    width: 100%;
-    box-sizing: border-box;
-    direction: ltr;
-    text-align: left;
-    background-color: white;
-    color: black;
-
-  }
-  .center {
-    text-align: center;
-    margin-bottom: 10px;
-  }
-  .dashed {
-    border-top: 1px dashed black;
-    margin: 10px 0;
-  }
-  .products-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-    font-size: 16px;
-    td, th {
-      padding: 4px;
-      text-align: left;
-    }
-
-    col.products-table__col-name {
-      width: 40%;
-    }
-    col.products-table__col-qty {
-      width: 19%;
-    }
-    col.products-table__col-price {
-      width: 22%;
-    }
-    col.products-table__col-total {
-      width: 20%;
-    }
-  }
-
-  #print-container[dir="rtl"] .products-table td,
-  #print-container[dir="rtl"] .products-table th {
-    text-align: right;
-  }
-
-  .total, .bold {
-    font-weight: bold;
-  }
-  .double-border {
-    border-top: 2px solid black;
-    border-bottom: 2px solid black;
-    margin: 10px 0;
-  }
-  .final-total {
-    font-size: 12px;
-    font-weight: bold;
-    text-align: center;
-  }
+  // (refactor) old duplicate invoice styles removed; keep single receipt block below.
+  $receiptWidth: 80mm;
+  $receiptHeight: 200mm;
 
   .invoice-container {
-    font-family: "Courier New", Courier, monospace;
-    width: 100%;
-    box-sizing: border-box;
-    direction: ltr;
-    text-align: left;
-    background-color: white;
-    color: black;
-    font-size: 10px;
-  }
-
-  /* Receipt language direction */
-  #print-container[dir="rtl"] {
-    direction: rtl;
-    text-align: right;
-  }
-  
-  .invoice-client-block {
-    margin: 6px 0 8px;
-    padding: 4px 2px 6px;
-    border-top: 1px dashed #000;
-    border-bottom: 1px dashed #000;
-  }
-
-  .invoice-client-block__title {
-    font-weight: 700;
-    font-size: 10px;
-    text-align: center;
-    margin-bottom: 4px;
-    letter-spacing: 0.02em;
-  }
-
-  .invoice-client-block__table td {
-    font-size: 8px;
-    padding: 2px 4px;
-  }
-
-  .invoice-client-block__label {
-    font-weight: 700;
-    white-space: nowrap;
-    width: 40%;
-  }
-
-  .store-name {
-    font-size: 12px;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-
-  .invoice-logo {
-    display: block;
-    margin: 0 auto 2px;
-    max-height: 48px;
-    max-width: 100%;
-    object-fit: contain;
-  }
-  
-  .center {
-    text-align: center;
-  }
-  
-  .dashed {
-    border-top: 1px dashed black;
-    margin: 8px 0;
-  }
-  
-  .invoice-table {
-    width: 100%;
-    border-collapse: collapse;
-  
-    td {
-      padding: 3px 2px;
-      text-align: left;
-      vertical-align: top;
-    }
-  }
-  
-  .meta-table td:first-child,
-  .totals-table td:first-child {
-    font-weight: bold;
-  }
-  
-  .products-table .header td {
-    border-bottom: 1px solid black;
-    padding-bottom: 4px;
-  }
-
-  .bold {
-    font-weight: bold;
-  }
-  
-  .double-border {
-    border-top: 2px solid black;
-    border-bottom: 2px solid black;
-    margin: 8px 0;
-  }
-  
-  .final-total {
-    font-size: 11px;
-    font-weight: bold;
-    text-align: center;
-  }
-  
-  .footer {
-    font-size: 9px;
-    margin-top: 6px;
-  }
-  .invoice-container {
-    width: 58mm;
+    width: $receiptWidth;
     font-family: Arial, sans-serif;
     font-size: 10px;
     color: #000;
-    padding: 10px;
+    padding: 2mm 2mm 10mm;
+    box-sizing: border-box;
   
     .center {
       text-align: center;
@@ -532,6 +374,46 @@
   
     .mtb-4 {
       margin: 10px 0;
+    }
+
+    .store-name {
+      font-size: 12px;
+      font-weight: 700;
+      margin: 6px 0;
+    }
+
+    .invoice-logo {
+      display: block;
+      margin: 0 auto 2mm;
+      max-height: 58px;
+      max-width: 100%;
+      object-fit: contain;
+    }
+
+    .invoice-client-block {
+      margin: 6px 0 8px;
+      padding: 4px 2px 6px;
+      border-top: 1px dashed #000;
+      border-bottom: 1px dashed #000;
+    }
+
+    .invoice-client-block__title {
+      font-weight: 700;
+      font-size: 10px;
+      text-align: center;
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .invoice-client-block__table td {
+      font-size: 8px;
+      padding: 2px 4px;
+    }
+
+    .invoice-client-block__label {
+      font-weight: 700;
+      white-space: nowrap;
+      width: 40%;
     }
   
     .invoice-table {
@@ -572,6 +454,7 @@
         &:nth-child(3),
         &:nth-child(4) {
           text-align: right;
+          white-space: nowrap;
         }
       }
 
@@ -583,6 +466,7 @@
 
     .totals-table td {
       text-align: right;
+      white-space: nowrap;
     }
   
     .separator {
@@ -598,16 +482,51 @@
     .final-total {
       font-size: 11px;
       margin: 5px 0;
+      text-align: center;
+      font-weight: 700;
     }
   
     .footer {
       margin-top: 10px;
       font-size: 9px;
     }
+
+    .invoice-qr {
+      margin-top: 10px;
+      padding: 4px 3mm 0;
+      box-sizing: border-box;
+
+      &__img {
+        width: 96px;
+        height: 96px;
+        display: inline-block;
+        vertical-align: top;
+        image-rendering: pixelated;
+      }
+
+      &__caption {
+        font-size: 8px;
+        color: #333;
+        margin-top: 3px;
+        letter-spacing: 0.02em;
+      }
+    }
   }
   
   /* Print Styles */
   @media print {
+    @page {
+      size: $receiptWidth $receiptHeight;
+      margin: 0;
+    }
+
+    html,
+    body {
+      width: $receiptWidth;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
     body *, .cashier {
       visibility: hidden;
       display: none !important;
@@ -618,6 +537,15 @@
     #main-sidebar,
     .app-sidebar {
       display: none !important;
+    }
+
+    /* Never print Vixa chat widget/panel even if positioned fixed. */
+    app-vixa-chat,
+    .vixa,
+    .vixa__panel,
+    .vixa__fab {
+      display: none !important;
+      visibility: hidden !important;
     }
   
     #print-container,
@@ -630,9 +558,19 @@
       position: absolute;
       left: 0;
       top: 0;
-      width: 58mm;
+      width: $receiptWidth;
       height: auto;
       overflow: visible;
+    }
+  }
+
+  /* Receipt language direction */
+  #print-container[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+
+    .invoice-table td {
+      text-align: right;
     }
   }
   

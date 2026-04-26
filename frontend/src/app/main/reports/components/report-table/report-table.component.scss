@@ -2,6 +2,41 @@
   border: 1px solid #e8ede9;
   border-radius: 14px;
   overflow: auto;
+
+  &--roomy {
+    table {
+      table-layout: auto;
+      td,
+      th {
+        padding: 12px 14px !important;
+        line-height: 1.35;
+        vertical-align: middle;
+      }
+      /* Keep headers on a single line; allow horizontal scroll instead of wrapping. */
+      th {
+        white-space: nowrap;
+      }
+      /* Body cells can wrap based on content. */
+      td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      /* Give Product column more room in bookings table. */
+      th[data-col='productName'],
+      td[data-col='productName'] {
+        min-width: 220px;
+      }
+      td {
+        height: auto;
+      }
+    }
+
+    .report-img-thumb {
+      width: 64px;
+      height: 64px;
+    }
+  }
 }
 
 .report-img-btn {

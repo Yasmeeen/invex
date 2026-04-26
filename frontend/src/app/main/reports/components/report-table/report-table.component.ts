@@ -8,6 +8,8 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 export class ReportTableComponent {
   @Input() columns: { key: string; labelKey: string }[] = [];
   @Input() rows: any[] = [];
+  /** Larger padding / row height (used for bookings table). */
+  @Input() roomy = false;
 
   previewUrl: string | null = null;
 

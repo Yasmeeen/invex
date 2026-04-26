@@ -109,40 +109,60 @@ export class ReportExportService {
       }
     }
 
-    autoTable(doc, {
-      startY: y + 8,
-      head: [columns],
-      body: (rows || []).map((row) => columns.map((col) => String(row[col] ?? ''))),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [91, 33, 182] },
-      // Make space for thumbnails when present.
-      bodyStyles: { minCellHeight: 36 },
-      didParseCell: (data) => {
-        if (data.section !== 'body') return;
-        const raw = String(data.cell.raw ?? '').trim();
-        if (raw && imageUrlToDataUrl[raw] && this.isImageUrl(raw)) {
-          // We'll draw the image manually in didDrawCell.
-          data.cell.text = [''];
-        }
-      },
-      didDrawCell: (data) => {
-        if (data.section !== 'body') return;
-        const raw = String(data.cell.raw ?? '').trim();
-        const dataUrl = raw && imageUrlToDataUrl[raw] ? imageUrlToDataUrl[raw] : '';
-        if (!dataUrl) return;
-        try {
-          const pad = 3;
-          const w = Math.max(10, data.cell.width - pad * 2);
-          const h = Math.max(10, data.cell.height - pad * 2);
-          const size = Math.min(w, h);
-          const x = data.cell.x + pad + (w - size) / 2;
-          const yy = data.cell.y + pad + (h - size) / 2;
-          doc.addImage(dataUrl, 'PNG', x, yy, size, size);
-        } catch {
-          // ignore
-        }
-      },
-    });
+    const renderTable = (cols: string[], startY: number): number => {
+      autoTable(doc, {
+        startY,
+        head: [cols],
+        body: (rows || []).map((row) => cols.map((col) => String(row?.[col] ?? ''))),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [91, 33, 182] },
+        // Make space for thumbnails when present.
+        bodyStyles: { minCellHeight: 36 },
+        didParseCell: (data) => {
+          if (data.section !== 'body') return;
+          const raw = String(data.cell.raw ?? '').trim();
+          if (raw && imageUrlToDataUrl[raw] && this.isImageUrl(raw)) {
+            // We'll draw the image manually in didDrawCell.
+            data.cell.text = [''];
+          }
+        },
+        didDrawCell: (data) => {
+          if (data.section !== 'body') return;
+          const raw = String(data.cell.raw ?? '').trim();
+          const dataUrl = raw && imageUrlToDataUrl[raw] ? imageUrlToDataUrl[raw] : '';
+          if (!dataUrl) return;
+          try {
+            const pad = 3;
+            const w = Math.max(10, data.cell.width - pad * 2);
+            const h = Math.max(10, data.cell.height - pad * 2);
+            const size = Math.min(w, h);
+            const x = data.cell.x + pad + (w - size) / 2;
+            const yy = data.cell.y + pad + (h - size) / 2;
+            doc.addImage(dataUrl, 'PNG', x, yy, size, size);
+          } catch {
+            // ignore
+          }
+        },
+      });
+      // jspdf-autotable attaches this.
+      const last: any = (doc as any).lastAutoTable;
+      return Number(last?.finalY) || startY;
+    };
+
+    const startY = y + 8;
+    // Split wide tables into chunks to keep PDF readable.
+    const MAX_COLS_PER_TABLE = 7;
+    const safeCols = Array.isArray(columns) ? columns : [];
+    if (safeCols.length > MAX_COLS_PER_TABLE) {
+      let curY = startY;
+      for (let i = 0; i < safeCols.length; i += MAX_COLS_PER_TABLE) {
+        const chunk = safeCols.slice(i, i + MAX_COLS_PER_TABLE);
+        curY = renderTable(chunk, curY);
+        curY += 18; // space between tables (or next chunk)
+      }
+    } else {
+      renderTable(safeCols, startY);
+    }
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);
   }

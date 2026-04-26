@@ -1,13 +1,13 @@
-<div class="table-container reports-table bg-white plr-8 ptb-8">
-  <table class="s-table table border-table layout-fixed">
+<div class="table-container reports-table bg-white plr-8 ptb-8" [class.reports-table--roomy]="roomy">
+  <table class="s-table table border-table" [class.layout-fixed]="!roomy">
     <thead>
       <tr>
-        <th *ngFor="let col of columns">{{ col.labelKey | translate }}</th>
+        <th *ngFor="let col of columns" [attr.data-col]="col.key">{{ col.labelKey | translate }}</th>
       </tr>
     </thead>
     <tbody>
       <tr *ngFor="let row of rows">
-        <td *ngFor="let col of columns">
+        <td *ngFor="let col of columns" [attr.data-col]="col.key">
           <ng-container [ngSwitch]="col.key">
             <!-- Booking deposit proof: show image preview instead of raw URL -->
             <ng-container *ngSwitchCase="'depositProof'">

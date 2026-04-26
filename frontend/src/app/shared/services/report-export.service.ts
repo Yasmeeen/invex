@@ -87,15 +87,79 @@ export class ReportExportService {
       y += 16;
     });
 
+    // Inline images in tables (e.g., booking deposit proof URLs).
+    const imageUrlToDataUrl: Record<string, string> = {};
+    const imageUrls = new Set<string>();
+    (rows || []).forEach((r: any) => {
+      if (!r) return;
+      Object.values(r).forEach((v) => {
+        const s = String(v ?? '').trim();
+        if (this.isImageUrl(s)) imageUrls.add(s);
+      });
+    });
+    // Best-effort fetch: if CORS blocks, we keep the URL as text.
+    for (const url of Array.from(imageUrls)) {
+      try {
+        const blob = await this.http.get(url, { responseType: 'blob' }).toPromise();
+        if (blob && blob.size > 0) {
+          imageUrlToDataUrl[url] = await this.blobToDataUrl(blob);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     autoTable(doc, {
       startY: y + 8,
       head: [columns],
       body: (rows || []).map((row) => columns.map((col) => String(row[col] ?? ''))),
       styles: { fontSize: 9 },
       headStyles: { fillColor: [91, 33, 182] },
+      // Make space for thumbnails when present.
+      bodyStyles: { minCellHeight: 36 },
+      didParseCell: (data) => {
+        if (data.section !== 'body') return;
+        const raw = String(data.cell.raw ?? '').trim();
+        if (raw && imageUrlToDataUrl[raw] && this.isImageUrl(raw)) {
+          // We'll draw the image manually in didDrawCell.
+          data.cell.text = [''];
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.section !== 'body') return;
+        const raw = String(data.cell.raw ?? '').trim();
+        const dataUrl = raw && imageUrlToDataUrl[raw] ? imageUrlToDataUrl[raw] : '';
+        if (!dataUrl) return;
+        try {
+          const pad = 3;
+          const w = Math.max(10, data.cell.width - pad * 2);
+          const h = Math.max(10, data.cell.height - pad * 2);
+          const size = Math.min(w, h);
+          const x = data.cell.x + pad + (w - size) / 2;
+          const yy = data.cell.y + pad + (h - size) / 2;
+          doc.addImage(dataUrl, 'PNG', x, yy, size, size);
+        } catch {
+          // ignore
+        }
+      },
     });
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+  }
+
+  private isImageUrl(s: string): boolean {
+    const v = String(s || '').trim().toLowerCase();
+    if (!v) return false;
+    if (v.startsWith('data:image/')) return true;
+    if (!v.startsWith('http://') && !v.startsWith('https://')) return false;
+    // Cloudinary URLs may not end with extension; accept it too.
+    return (
+      v.includes('cloudinary') ||
+      v.endsWith('.png') ||
+      v.endsWith('.jpg') ||
+      v.endsWith('.jpeg') ||
+      v.endsWith('.webp')
+    );
   }
 
   private blobToDataUrl(blob: Blob): Promise<string> {

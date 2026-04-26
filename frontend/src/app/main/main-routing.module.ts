@@ -17,6 +17,16 @@ const routes: Routes = [
       {
         path: 'vixa',
         loadChildren: () => import('./vixa/vixa.module').then((m) => m.VixaModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            'Cashier',
+            'Moderator',
+          ],
+        },
       },
       {
         path: 'users',

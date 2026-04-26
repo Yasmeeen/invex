@@ -5,6 +5,12 @@
   z-index: 9999;
   font-family: inherit;
 
+  &--drag-enabled {
+    // When we set left/top inline, ignore right/bottom defaults.
+    right: auto;
+    bottom: auto;
+  }
+
   &--page {
     position: relative;
     right: auto;

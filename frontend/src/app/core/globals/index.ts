@@ -11,7 +11,6 @@ export class Globals {
 
   currentUser: CurrentUser
   sessionHeaders: any  = null;
-  currentSchool:any = currentSchool; // timezone is Cairo (UTC+02:00) by default
   siteHasMessage: boolean = false;
   siteMessage: string = '';
   siteMessageType: string = '';
@@ -80,33 +79,4 @@ export class Globals {
   }
 }
 
-export const currentSchool = {
-  id: 0,
-  'school_description': '',
-  'avatar_url': '',
-  'address': '',
-  'config': {
-    'progress_reports_is_enable': false,
-    'report_is_enable': false,
-    'disable_export':false
-  },
-  'default_configs': [],
-  'ga_tracking_id': '',
-  'fedena_enabled': '',
-  'banners': {},
-  'id_number': '',
-  'website': '',
-  'phone': '',
-  'email': '',
-  'secondary_phone': '',
-  'fax': '',
-  'post_office_box': '',
-  'students_max_no': '',
-  'license_no': '',
-  'time_zone': 'Africa/Cairo',
-  'timezone_offset': '',
-  'fedena': {
-    'host': '',
-    'id': 0
-  }
-};
+

@@ -248,7 +248,7 @@
   "tr_hr_sync_started": "HR Sync Started",
   "tr_logs": "Logs",
   "tr_unique_start_and_end": "Start time and End time should be unique*",
-  "tr_permission_error_message": "Please contact your school administrator to request permission",
+  "tr_permission_error_message": "Please contact your Store administrator to request permission",
   "tr_sync_succeeded_with_warnings": "Sync Succeeded with warnings",
   "tr_go_back": "Go Back",
   "tr_not_authorized": "Sorry ,  but You aren’t authorized to this page",

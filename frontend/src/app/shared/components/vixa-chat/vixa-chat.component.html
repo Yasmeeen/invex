@@ -1,8 +1,15 @@
-<div class="vixa" [class.vixa--page]="mode === 'page'">
+<div
+  class="vixa"
+  [class.vixa--page]="mode === 'page'"
+  [class.vixa--drag-enabled]="mode === 'floating'"
+  [style.left.px]="mode === 'floating' && fabPos ? fabPos.left : null"
+  [style.top.px]="mode === 'floating' && fabPos ? fabPos.top : null"
+>
   <button
     *ngIf="mode === 'floating'"
     type="button"
     class="vixa__fab"
+    (pointerdown)="onFabPointerDown($event)"
     (click)="toggle()"
     [attr.aria-label]="'tr_vixa' | translate"
     [attr.title]="'tr_vixa' | translate"

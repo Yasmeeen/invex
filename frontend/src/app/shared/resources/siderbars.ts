@@ -114,7 +114,8 @@ export const BranchManagerSidebar = CoAdminSidebar.filter(
   (item) =>
     item.routerLink !== '/branches' &&
     item.routerLink !== '/settings' &&
-    item.routerLink !== '/users'
+    item.routerLink !== '/users' &&
+    item.routerLink !== '/audits'
 );
 
 export const Cashier = [
@@ -193,11 +194,6 @@ export const ModeratorSidebar = [
     name: 'tr_products',
     routerLink: '/products',
     icon: 'fa fa-cube icon',
-  },
-  {
-    name: 'tr_vixa',
-    routerLink: '/vixa',
-    icon: 'fa fa-comments icon',
   },
 ];
 

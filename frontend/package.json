@@ -4,6 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "start:local": "ng serve --configuration=local --port 4400",
     "build": "npm install --force && NODE_OPTIONS=--openssl-legacy-provider ng build --configuration production",
     "heroku-postbuild": "NODE_OPTIONS=--openssl-legacy-provider ng build --prod"
   },

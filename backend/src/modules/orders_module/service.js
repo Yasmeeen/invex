@@ -240,9 +240,18 @@ export const createOrder = async (req, res) => {
     );
     totalPrice = Math.round((subtotalPrice - invoiceDiscountAmount) * 100) / 100;
 
+    const isCredit = String(paymentMethod || '')
+      .trim()
+      .toLowerCase() === 'credit';
+
     let paidAmount = Number(paidAmountRaw);
     if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
     paidAmount = Math.min(Math.round(paidAmount * 100) / 100, totalPrice);
+
+    if (!isCredit) {
+      // Cash, card, Valu, etc.: full amount at checkout (client only sends paidAmount for credit).
+      paidAmount = Math.round(totalPrice * 100) / 100;
+    }
 
     const payments = [];
     if (paidAmount > 0) {
@@ -252,7 +261,7 @@ export const createOrder = async (req, res) => {
         paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
           ? new mongoose.Types.ObjectId(String(userId))
           : undefined,
-        note: 'Initial payment (cashier)',
+        note: isCredit ? 'Initial payment (cashier)' : 'Full payment at checkout',
       });
     }
 

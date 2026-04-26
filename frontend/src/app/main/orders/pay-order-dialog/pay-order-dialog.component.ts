@@ -6,6 +6,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { Order } from '@core/models/products.model';
+import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
 
 export type PayOrderDialogData = { order: Order };
 
@@ -42,10 +43,13 @@ export class PayOrderDialogComponent {
     });
   }
 
-  remaining(): number {
-    const total = Number(this.order?.totalPrice) || 0;
-    const paid = Number(this.order?.amountPaid) || 0;
-    return Math.max(0, Math.round((total - paid) * 100) / 100);
+  /** Aligned with orders list (raw `amountPaid` is 0 for most non-credit sales). */
+  displayPaid(): number {
+    return orderDisplayPaid(this.order);
+  }
+
+  displayRemaining(): number {
+    return orderDisplayRemaining(this.order);
   }
 
   submit(): void {

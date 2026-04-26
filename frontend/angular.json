@@ -99,6 +99,20 @@
               "extractLicenses": false,
               "sourceMap": true,
               "namedChunks": true
+            },
+            "local": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "vendorChunk": true,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "namedChunks": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/enviroment.local.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -114,6 +128,9 @@
             },
             "testing": {
               "browserTarget": "HR-System:build:testing"
+            },
+            "local": {
+              "browserTarget": "HR-System:build:local"
             }
           },
           "defaultConfiguration": "development"

@@ -24,24 +24,52 @@
   
       <div class="row">
         <div class="form-group col-md-3">
-          <label for="">{{'tr_from' | translate}}</label>
+          <label for="orderFromDate">{{'tr_from' | translate}}</label>
           <div class="input-with-icon">
-              <input [(ngModel)]="fromDate"  (dateChange)="getOrderStatistics()"
-                  placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId" class="s-control bg-white">
+              <input
+                id="orderFromDate"
+                name="orderFromDate"
+                [(ngModel)]="fromDate"
+                (dateChange)="getOrderStatistics()"
+                placeholder="{{'tr_pick_date' | translate}}"
+                [matDatepicker]="pickId"
+                class="s-control bg-white"
+                autocomplete="off"
+              />
               <mat-datepicker #pickId></mat-datepicker>
               <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
               </mat-datepicker-toggle>
           </div>
       </div>
       <div class="form-group col-md-3">
-          <label for="">{{'tr_to' | translate}}</label>
+          <label for="orderToDate">{{'tr_to' | translate}}</label>
           <div class="input-with-icon">
-              <input [(ngModel)]="toDate"
-                  placeholder="{{'tr_pick_date' | translate}}" [matDatepicker]="pickId2" class="s-control bg-white" (dateChange)="getOrderStatistics()">
+              <input
+                id="orderToDate"
+                name="orderToDate"
+                [(ngModel)]="toDate"
+                (dateChange)="getOrderStatistics()"
+                placeholder="{{'tr_pick_date' | translate}}"
+                [matDatepicker]="pickId2"
+                class="s-control bg-white"
+                autocomplete="off"
+              />
               <mat-datepicker #pickId2></mat-datepicker>
               <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId2">
               </mat-datepicker-toggle>
           </div>
+      </div>
+      <div class="form-group col-md-2 d-flex flex-column">
+        <label class="invisible" aria-hidden="true">&nbsp;</label>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body date-filters-clear-btn"
+          (click)="clearDateFilters()"
+          *ngIf="hasDateFilterToClear"
+        >
+          <i class="fa fa-times" aria-hidden="true"></i>
+          {{ 'tr_clear' | translate }}
+        </button>
       </div>
       <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
         <div
@@ -79,8 +107,11 @@
               <span class="text-primary">   {{orderStatistics?.totalInvoices}} </span>
            
               {{ 'tr_total_number_of_invoices' | translate }} </a>
-              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
-              <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday">{{'tr_today' | translate}}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate == null && toDate == null">{{ 'tr_all_dates' | translate }}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && toDate">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && !toDate">{{ fromDate | date: 'dd/M/YYYY' }}</div>
+              <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && !fromDate && toDate">{{ toDate | date: 'dd/M/YYYY' }}</div>
           </div>
         </div>
       </div>
@@ -95,8 +126,11 @@
               <span class="text-primary">   {{orderStatistics?.totalSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }} </span>
                {{ 'tr_total_amount' | translate}}
              </a>
-             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday"> {{fromDate | date: 'dd/M/YYYY'}} {{'tr_to' | translate}} {{toDate | date: 'dd/M/YYYY'}}</div>
-             <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday"> {{'tr_today' | translate}}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday">{{'tr_today' | translate}}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate == null && toDate == null">{{ 'tr_all_dates' | translate }}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && toDate">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && !toDate">{{ fromDate | date: 'dd/M/YYYY' }}</div>
+             <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && !fromDate && toDate">{{ toDate | date: 'dd/M/YYYY' }}</div>
           </div>
         </div>
       </div>

@@ -19,6 +19,11 @@ import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { BranchesServce } from '@shared/services/branches.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
+import {
+  isPayLaterMethod,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+} from '@core/utils/order-display.util';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -65,8 +70,9 @@ export class OrdersListComponent implements OnInit {
   curentUser:any;
   orderStatistics: orderStatistics
   today:Date = new Date();
-  fromDate: Date =new Date();
-  toDate: Date = new Date();
+  /** `null` = no date filter in stats (all time). */
+  fromDate: Date | null = new Date();
+  toDate: Date | null = new Date();
   selectedBranchId: string ;
   branches:Branch[] =[]
   /** null = no filter (all payment methods) */
@@ -88,19 +94,18 @@ export class OrdersListComponent implements OnInit {
   ) { }
 
   orderPaid(order: Order): number {
-    return Math.max(0, Number(order.amountPaid) || 0);
+    return orderDisplayPaid(order);
   }
 
   orderRemaining(order: Order): number {
-    const total = Number(order.totalPrice) || 0;
-    const paid = this.orderPaid(order);
-    return Math.max(0, Math.round((total - paid) * 100) / 100);
+    return orderDisplayRemaining(order);
   }
 
   canPayOrder(order: Order): boolean {
     if (!order?._id) return false;
     if (order.status === 'restored') return false;
-    return this.orderRemaining(order) > 0;
+    if (!isPayLaterMethod(order.paymentMethod)) return false;
+    return orderDisplayRemaining(order) > 0;
   }
 
   openPayDialog(order: Order): void {
@@ -187,6 +192,16 @@ export class OrdersListComponent implements OnInit {
     this.getOrders();
   }
 
+  clearDateFilters(): void {
+    this.fromDate = null;
+    this.toDate = null;
+    this.getOrderStatistics();
+  }
+
+  get hasDateFilterToClear(): boolean {
+    return this.fromDate != null || this.toDate != null;
+  }
+
   /** Subtotal after line discounts, before invoice-level discount (legacy orders: falls back to total). */
   orderSubtotalForList(order: Order): number {
     const s = order.subtotalPrice;
@@ -229,18 +244,31 @@ export class OrdersListComponent implements OnInit {
 
   getOrderStatistics(){
     const today = new Date();
-    this.isToday = 
-      [this.fromDate, this.toDate].every(d =>
-        new Date(d).toDateString() === today.toDateString()
-      );
+    if (this.fromDate == null && this.toDate == null) {
+      this.isToday = false;
+    } else {
+      this.isToday =
+        this.fromDate != null &&
+        this.toDate != null &&
+        [this.fromDate, this.toDate].every(
+          (d) => new Date(d).toDateString() === today.toDateString()
+        );
+    }
 
-
-    let params ={
-      from:  this.fromDate.toLocaleDateString('en-CA'),
-      to:   this.toDate.toLocaleDateString('en-CA'),
+    const params: {
+      from?: string;
+      to?: string;
+      branch?: string;
+    } = {
       branch: canPickBranchRole(this.curentUser?.role)
         ? this.selectedBranchId
         : this.globals.currentUser.branch._id,
+    };
+    if (this.fromDate) {
+      params.from = this.fromDate.toLocaleDateString('en-CA');
+    }
+    if (this.toDate) {
+      params.to = this.toDate.toLocaleDateString('en-CA');
     }
     if (this.curentUser.role === 'Cashier') {
       this.params.branch = this.curentUser.branch?._id

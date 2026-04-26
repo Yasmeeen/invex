@@ -486,6 +486,7 @@
   "tr_net_price_invalid": "السعر الصافي يجب أن يكون 0 أو أكثر",
   "tr_total_number_of_invoices": "إجمالي عدد الفواتير",
   "tr_today": "اليوم",
+  "tr_all_dates": "كل التواريخ",
   "tr_total_amount": "إجمالي المبيعات",
   "tr_net_profit": "صافي الأرباح",
   "sales_summary": "ملخص المبيعات",

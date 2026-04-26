@@ -14,11 +14,11 @@
     </div>
     <div>
       {{ 'tr_paid' | translate }}:
-      <b>{{ (order?.amountPaid || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
+      <b>{{ displayPaid() | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
     </div>
     <div>
       {{ 'tr_remaining' | translate }}:
-      <b>{{ remaining() | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
+      <b>{{ displayRemaining() | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>
     </div>
   </div>
 

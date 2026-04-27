@@ -350,6 +350,18 @@ export class CashierComponent implements AfterViewInit {
     return Math.round(p * 10000) / 10000;
   }
 
+  /** Product card price after discount% (visual only; cards don't toggle discount). */
+  cardDiscountedPrice(product: any): number {
+    const p = Number(product?.price) || 0;
+    const d = Number(product?.discount) || 0;
+    if (d <= 0) return p;
+    return Math.round((p - (p * d) / 100) * 100) / 100;
+  }
+
+  cardHasDiscount(product: any): boolean {
+    return (Number(product?.discount) || 0) > 0;
+  }
+
   /** Sum of lines after product discounts, before invoice extra discount. */
   orderSubtotal(): number {
     return this.orderItems.reduce(

@@ -213,6 +213,26 @@
         color: #2c3e50;
       }
 
+      .product-price--with-discount {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .product-price__old {
+        font-size: 0.78rem;
+        color: #7f8c8d;
+        text-decoration: line-through;
+      }
+
+      .product-price__new {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1e8449;
+      }
+
       .cashier-booking-hint {
         font-size: 0.65rem;
         line-height: 1.25;
@@ -354,7 +374,7 @@
     background-color: #4caf50;
     font-weight: 600;
   }
-  .badge.low-stock {
+  .stock-badge.low-stock {
     background-color: #e74c3c;
   }
 

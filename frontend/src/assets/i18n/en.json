@@ -371,8 +371,6 @@
   "tr_save": "Save",
   "tr_password": "Password",
   "tr_password_required": "Password is required.",
-  "tr_password_strong_hint": "Strong password: at least 8 characters, with uppercase, lowercase, number, and special character.",
-  "tr_password_invalid_strong": "Password must include uppercase, lowercase, number, special character, and be at least 8 characters.",
   "tr_new_user": "New User",
   "tr_edit_user": "Edit user",
   "tr_login_password_hint": "Forgot your password? A Super Admin or Co Admin can set a new one from Users.",

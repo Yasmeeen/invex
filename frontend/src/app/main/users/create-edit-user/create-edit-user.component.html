@@ -157,9 +157,6 @@
                     <p class="size-small steel mt-0 mb-2" *ngIf="isEdit">
                       {{ 'tr_password_optional_edit' | translate }}
                     </p>
-                    <p class="size-small steel mt-0 mb-2" *ngIf="!isEdit">
-                      {{ 'tr_password_strong_hint' | translate }}
-                    </p>
                     <div class="flex flex-middle">
                       <input
                         class="s-control"
@@ -170,7 +167,6 @@
                         #password="ngModel"
                         ngModel
                         [required]="!isEdit"
-                        [pattern]="strongPasswordPattern"
                       />
                       <i
                         class="fa fa-eye eye-icon text-primary"
@@ -194,16 +190,6 @@
                       "
                     >
                       {{ 'tr_password_required' | translate }}
-                    </span>
-
-                    <span
-                      class="text-error size-small mt-2 validator"
-                      *ngIf="
-                        password.errors?.pattern &&
-                        (password.dirty || basicInfoForm.submitted)
-                      "
-                    >
-                      {{ 'tr_password_invalid_strong' | translate }}
                     </span>
                   </div>
                 </div>

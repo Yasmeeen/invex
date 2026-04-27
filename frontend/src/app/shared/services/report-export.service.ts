@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
+import html2canvas from 'html2canvas';
 
 @Injectable({
   providedIn: 'root',
@@ -27,6 +28,17 @@ export class ReportExportService {
     columns: string[],
     rows: any[]
   ): Promise<void> {
+    const isArabic =
+      /[\u0600-\u06FF]/.test(String(title || '')) ||
+      summaryRows.some((r) => /[\u0600-\u06FF]/.test(String(r?.label || '')) || /[\u0600-\u06FF]/.test(String(r?.value || ''))) ||
+      (columns || []).some((c) => /[\u0600-\u06FF]/.test(String(c || '')));
+
+    // Arabic: render via HTML so the browser handles shaping/RTL and Tajawal font.
+    if (isArabic && typeof document !== 'undefined') {
+      await this.exportToPdfViaHtml({ title, summaryRows, columns, rows });
+      return;
+    }
+
     const doc = new jsPDF('p', 'pt');
     const margin = 40;
     const pageW = doc.internal.pageSize.getWidth();
@@ -165,6 +177,168 @@ export class ReportExportService {
     }
 
     doc.save(`${title.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+  }
+
+  private async exportToPdfViaHtml(args: {
+    title: string;
+    summaryRows: { label: string; value: any }[];
+    columns: string[];
+    rows: any[];
+  }): Promise<void> {
+    const { title, summaryRows, columns, rows } = args;
+    const doc = new jsPDF('p', 'pt', 'a4');
+
+    let logoDataUrl = '';
+    try {
+      const blob = await this.http.get('assets/images/logo3.png', { responseType: 'blob' }).toPromise();
+      if (blob && blob.size > 0) logoDataUrl = await this.blobToDataUrl(blob);
+    } catch {
+      // ignore
+    }
+
+    let qrDataUrl = '';
+    try {
+      const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
+      qrDataUrl = await qrToDataUrl(qrUrl, {
+        width: 220,
+        margin: 1,
+        color: { dark: '#1e1b4b', light: '#ffffff' },
+      });
+    } catch {
+      // ignore
+    }
+
+    // Split wide tables like the autoTable path.
+    const MAX_COLS_PER_TABLE = 7;
+    const chunks: string[][] = [];
+    const cols = Array.isArray(columns) ? columns : [];
+    for (let i = 0; i < cols.length; i += MAX_COLS_PER_TABLE) {
+      chunks.push(cols.slice(i, i + MAX_COLS_PER_TABLE));
+    }
+
+    const esc = (s: any) =>
+      String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const isImg = (v: any) => this.isImageUrl(String(v ?? '').trim());
+
+    const container = document.createElement('div');
+    // Keep it in the viewport (but invisible) so html2canvas can measure & render correctly.
+    container.style.position = 'fixed';
+    container.style.left = '0';
+    container.style.top = '0';
+    container.style.opacity = '0';
+    container.style.pointerEvents = 'none';
+    container.style.zIndex = '-1';
+    container.style.width = '794px'; // ~A4 width at 96dpi
+    container.style.background = '#fff';
+    container.dir = 'rtl';
+    container.innerHTML = `
+      <div style="font-family:Tajawal, Inter, Arial, sans-serif; padding:24px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            ${logoDataUrl ? `<img src="${logoDataUrl}" style="width:42px;height:42px;object-fit:contain;" />` : ''}
+            <div>
+              <div style="font-weight:800; color:#5b21b6; font-size:20px; line-height:1;">INVEX</div>
+              <div style="color:#64748b; font-size:11px;">Innovation</div>
+            </div>
+          </div>
+          <div style="text-align:left;">
+            ${qrDataUrl ? `<img src="${qrDataUrl}" style="width:72px;height:72px;" />` : ''}
+            <div style="color:#64748b; font-size:9px; margin-top:4px;">innovation-tec.com</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px; font-size:16px; font-weight:800;">${esc(title)}</div>
+
+        <div style="margin-top:10px; font-size:12px; color:#111827;">
+          ${summaryRows
+            .map((r) => `<div style="margin:3px 0;"><span style="font-weight:700;">${esc(r.label)}</span>: ${esc(r.value)}</div>`)
+            .join('')}
+        </div>
+
+        ${chunks
+          .map((chunk, idx) => {
+            const head = `<tr>${chunk
+              .map(
+                (c) =>
+                  `<th style="background:#5b21b6;color:#fff;padding:8px 10px;font-size:11px;text-align:right;white-space:nowrap;border:1px solid #e5e7eb;">${esc(
+                    c
+                  )}</th>`
+              )
+              .join('')}</tr>`;
+            const body = (rows || [])
+              .map((row: any) => {
+                const tds = chunk
+                  .map((c) => {
+                    const v = row?.[c];
+                    if (isImg(v)) {
+                      return `<td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;"><img src="${esc(
+                        v
+                      )}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;" /></td>`;
+                    }
+                    return `<td style="padding:8px 10px;border:1px solid #e5e7eb;font-size:11px;vertical-align:top;">${esc(
+                      v
+                    )}</td>`;
+                  })
+                  .join('');
+                return `<tr>${tds}</tr>`;
+              })
+              .join('');
+
+            return `
+              <div style="margin-top:${idx === 0 ? 14 : 26}px;">
+                <table style="width:100%; border-collapse:collapse; table-layout:auto;">
+                  <thead>${head}</thead>
+                  <tbody>${body}</tbody>
+                </table>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    `;
+
+    document.body.appendChild(container);
+    try {
+      // Wait a tick for layout, then ensure images are loaded (best-effort).
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+      const imgs = Array.from(container.querySelectorAll('img')) as HTMLImageElement[];
+      await Promise.all(
+        imgs.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) return resolve();
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            })
+        )
+      );
+
+      // Promisify doc.html; some jsPDF builds don't return a real Promise.
+      await new Promise<void>((resolve) => {
+        doc.html(container, {
+          html2canvas: {
+            scale: 1.6,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            windowWidth: 794,
+          },
+          autoPaging: 'text',
+          callback: (d) => {
+            d.save(`${String(title || '').replace(/\s+/g, '_').toLowerCase()}.pdf`);
+            resolve();
+          },
+        });
+      });
+    } finally {
+      container.remove();
+    }
   }
 
   private isImageUrl(s: string): boolean {

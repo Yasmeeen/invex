@@ -34,6 +34,12 @@
       font-size: 14px;
     }
 
+    th:nth-child(2),
+    td:nth-child(2){
+      width: 140px;
+      min-width: 140px;
+      white-space: nowrap;
+    }
   }
   /* Header */
   .cashier-header {

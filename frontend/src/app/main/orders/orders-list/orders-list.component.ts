@@ -29,6 +29,7 @@ import {
   PAYMENT_METHOD_OPTIONS,
   PaymentMethodOption,
 } from '@shared/constants/payment-method-options';
+import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
 
 @Component({
   selector: 'app-orders-list',
@@ -73,7 +74,7 @@ export class OrdersListComponent implements OnInit {
   /** `null` = no date filter in stats (all time). */
   fromDate: Date | null = new Date();
   toDate: Date | null = new Date();
-  selectedBranchId: string ;
+  selectedBranchId: string | null;
   branches:Branch[] =[]
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
@@ -195,11 +196,12 @@ export class OrdersListComponent implements OnInit {
   clearDateFilters(): void {
     this.fromDate = null;
     this.toDate = null;
+    this.selectedBranchId = null;
     this.getOrderStatistics();
   }
 
   get hasDateFilterToClear(): boolean {
-    return this.fromDate != null || this.toDate != null;
+    return this.fromDate != null || this.toDate != null || this.selectedBranchId != null;
   }
 
   /** Subtotal after line discounts, before invoice-level discount (legacy orders: falls back to total). */
@@ -226,6 +228,10 @@ export class OrdersListComponent implements OnInit {
     return opt
       ? this.translateService.instant(opt.labelKey)
       : method;
+  }
+
+  createdAtCairo(order: Order): string {
+    return formatCairoDMY(order?.createdAt as any);
   }
 
   createOrEditOrder(isEdit: boolean, order?: Order){
@@ -259,16 +265,19 @@ export class OrdersListComponent implements OnInit {
       from?: string;
       to?: string;
       branch?: string;
-    } = {
-      branch: canPickBranchRole(this.curentUser?.role)
-        ? this.selectedBranchId
-        : this.globals.currentUser.branch._id,
-    };
+    } = {};
+    if (canPickBranchRole(this.curentUser?.role)) {
+      if (this.selectedBranchId) {
+        params.branch = this.selectedBranchId;
+      }
+    } else {
+      params.branch = this.globals.currentUser.branch._id;
+    }
     if (this.fromDate) {
-      params.from = this.fromDate.toLocaleDateString('en-CA');
+      params.from = formatCairoYMD(this.fromDate);
     }
     if (this.toDate) {
-      params.to = this.toDate.toLocaleDateString('en-CA');
+      params.to = formatCairoYMD(this.toDate);
     }
     if (this.curentUser.role === 'Cashier') {
       this.params.branch = this.curentUser.branch?._id

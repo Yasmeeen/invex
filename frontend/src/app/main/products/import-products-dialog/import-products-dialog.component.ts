@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import * as ExcelJS from 'exceljs';
 import { TranslateService } from '@ngx-translate/core';
+import { Globals } from '@core/globals';
+import { isBranchManager } from '@core/utils/role-utils';
 import {
   ImportExcelRow,
   ProductsImportError,
@@ -38,8 +40,17 @@ export class ImportProductsDialogComponent {
     private productsService: ProductsSerivce,
     private dialogRef: MatDialogRef<ImportProductsDialogComponent>,
     private translate: TranslateService,
+    private globals: Globals,
     @Inject(MAT_DIALOG_DATA) public data: DialogData
   ) {}
+
+  private get isBranchManagerUser(): boolean {
+    return isBranchManager(this.globals.currentUser?.role);
+  }
+
+  private get myBranchName(): string {
+    return String(this.globals.currentUser?.branch?.name || '').trim();
+  }
 
   close(): void {
     this.dialogRef.close(this.result);
@@ -52,7 +63,11 @@ export class ImportProductsDialogComponent {
     const categories = (this.data?.metadata?.categories || []).slice().sort((a, b) => {
       return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
     });
-    const branches = (this.data?.metadata?.branches || []).slice().sort((a, b) => {
+    let branches = (this.data?.metadata?.branches || []).slice();
+    if (this.isBranchManagerUser && this.myBranchName) {
+      branches = branches.filter((b) => String(b?.name || '').trim() === this.myBranchName);
+    }
+    branches = branches.sort((a, b) => {
       return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
     });
 
@@ -99,8 +114,12 @@ export class ImportProductsDialogComponent {
       {
         Field: isAr ? 'الشيتات' : 'Sheets',
         Description: isAr
-          ? 'شيت لكل فرع. اسم الشيت لازم يطابق اسم الفرع بالظبط. كل صف = منتج. ممكن كمان تحطي inWarehouse=true عشان يدخل المخزن.'
-          : 'One sheet per branch. Sheet name must match Branch name exactly. Each row = one product. You can also set inWarehouse=true to import to warehouse.',
+          ? this.isBranchManagerUser
+            ? 'شيت فرعك فقط. اسم الشيت لازم يطابق اسم فرعك بالظبط. كل صف = منتج.'
+            : 'شيت لكل فرع. اسم الشيت لازم يطابق اسم الفرع بالظبط. كل صف = منتج. ممكن كمان تحطي inWarehouse=true عشان يدخل المخزن.'
+          : this.isBranchManagerUser
+            ? 'Only your branch sheet. Sheet name must match your Branch name exactly. Each row = one product.'
+            : 'One sheet per branch. Sheet name must match Branch name exactly. Each row = one product. You can also set inWarehouse=true to import to warehouse.',
       },
       {
         Field: isAr ? 'مطلوب' : 'Required',
@@ -328,7 +347,43 @@ export class ImportProductsDialogComponent {
         });
       }
 
-      this.parsedRows = rows;
+      // Branch Manager restriction: only own branch sheet, and must not import to warehouse.
+      if (this.isBranchManagerUser) {
+        const myBranch = this.myBranchName;
+        const localErrors: ProductsImportError[] = [];
+        const allowed: ImportExcelRow[] = [];
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          const sheet = String(r?.sheetBranchName || '').trim();
+          const inWh = String(r?.inWarehouse ?? '').trim().toLowerCase();
+          const isWarehouseTruthy = inWh === 'true' || inWh === '1' || inWh === 'yes' || inWh === 'y';
+          if (isWarehouseTruthy) {
+            localErrors.push({
+              rowNumber: i + 2,
+              sheetName: sheet,
+              field: 'inWarehouse',
+              message: 'Branch Manager cannot import products to warehouse.',
+            });
+            continue;
+          }
+          if (myBranch && sheet && sheet !== myBranch) {
+            localErrors.push({
+              rowNumber: i + 2,
+              sheetName: sheet,
+              field: 'sheetBranchName',
+              message: `You can only import products into your branch (${myBranch}).`,
+            });
+            continue;
+          }
+          allowed.push(r);
+        }
+        if (localErrors.length) {
+          this.parseErrors = localErrors;
+        }
+        this.parsedRows = allowed;
+      } else {
+        this.parsedRows = rows;
+      }
       if (!rows.length) {
         this.parseErrors = [
           {
@@ -348,6 +403,22 @@ export class ImportProductsDialogComponent {
   importNow(): void {
     this.result = null;
     if (!this.parsedRows.length) return;
+
+    if (this.isBranchManagerUser) {
+      const myBranch = this.myBranchName;
+      const forbidden = this.parsedRows.find((r) => String(r?.sheetBranchName || '').trim() !== myBranch);
+      if (myBranch && forbidden) {
+        this.parseErrors = [
+          {
+            rowNumber: 0,
+            sheetName: String(forbidden.sheetBranchName || ''),
+            field: 'sheetBranchName',
+            message: `You can only import products into your branch (${myBranch}).`,
+          },
+        ];
+        return;
+      }
+    }
 
     this.importing = true;
     this.productsService

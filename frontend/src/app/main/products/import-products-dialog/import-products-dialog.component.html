@@ -4,7 +4,7 @@
   <div class="row mb-4">
     <div class="col-md-12">
       <button class="s-btn btn-secondary" (click)="downloadTemplate()">
-        {{ 'tr_excel_sheet' | translate }} Template
+        {{ 'tr_download_template' | translate }}
       </button>
     </div>
   </div>
@@ -24,13 +24,13 @@
     <div class="col-md-6">
       <label class="checkbox-row">
         <input type="checkbox" [(ngModel)]="allowPartial" />
-        <span>Allow partial import (skip invalid rows)</span>
+        <span>{{ 'tr_products_import_allow_partial' | translate }}</span>
       </label>
     </div>
     <div class="col-md-6">
       <label class="checkbox-row">
         <input type="checkbox" [(ngModel)]="autoComputeNetPrice" />
-        <span>Auto compute netPrice when empty</span>
+        <span>{{ 'tr_products_import_auto_compute_net_price' | translate }}</span>
       </label>
     </div>
   </div>
@@ -45,24 +45,26 @@
   <div class="row mb-4">
     <div class="col-md-12">
       <button class="s-btn btn-primary" [disabled]="parsing || importing || !parsedRows?.length" (click)="importNow()">
-        Import ({{ parsedRows?.length || 0 }} rows)
+        {{ 'tr_action.import' | translate }} ({{ parsedRows?.length || 0 }} {{ 'tr_products_import_rows' | translate }})
       </button>
-      <button class="s-btn btn-secondary ml-2" (click)="close()">Close</button>
+      <button class="s-btn btn-secondary ml-2" (click)="close()">{{ 'tr_close' | translate }}</button>
     </div>
   </div>
 
   <div class="result-card" *ngIf="result">
-    <div class="mb-2"><strong>Created:</strong> {{ result.createdCount }}</div>
-    <div class="mb-2"><strong>Failed:</strong> {{ result.failedCount }}</div>
+    <div class="mb-2"><strong>{{ 'tr_products_import_created' | translate }}:</strong> {{ result.createdCount }}</div>
+    <div class="mb-2"><strong>{{ 'tr_products_import_failed' | translate }}:</strong> {{ result.failedCount }}</div>
 
     <div *ngIf="result.errors?.length">
       <div class="import-errors__header mb-3">
         <div class="import-errors__title">
           <span class="import-errors__badge">!</span>
-          <strong>Import has errors</strong>
-          <span class="muted">({{ result.errors.length }} total)</span>
+          <strong>{{ 'tr_products_import_has_errors' | translate }}</strong>
+          <span class="muted">({{ result.errors.length }} {{ 'tr_products_import_total' | translate }})</span>
         </div>
-        <button class="s-btn btn-secondary" (click)="downloadErrorReport()">Download error report</button>
+        <button class="s-btn btn-secondary" (click)="downloadErrorReport()">
+          {{ 'tr_products_import_download_error_report' | translate }}
+        </button>
       </div>
 
       <div class="errors-table">
@@ -73,8 +75,10 @@
           <div class="error-cell msg">{{ e.message }}</div>
         </div>
         <div class="import-errors__notice mt-3" *ngIf="result.errors.length > 50">
-          <strong>Notice:</strong> Showing first <strong>50</strong> errors only.
-          Please use <strong>Download error report</strong> to see the full list ({{ result.errors.length }}).
+          <strong>{{ 'tr_products_import_notice' | translate }}:</strong>
+          {{ 'tr_products_import_showing_first_50_errors' | translate }}
+          {{ 'tr_products_import_use_download_error_report' | translate }}
+          ({{ result.errors.length }}).
         </div>
       </div>
     </div>

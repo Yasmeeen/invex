@@ -6,6 +6,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
@@ -115,7 +116,7 @@ export class CashierComponent implements AfterViewInit {
   private initClientForm() {
     this.clientForm = this.fb.group({
       paymentMethod: ['cash'],
-      phone: ['', [Validators.required]],
+      phone: ['', [Validators.required, this.phoneFormatValidator]],
       name: [''],
       address: ['']
     });
@@ -184,6 +185,18 @@ export class CashierComponent implements AfterViewInit {
           this.lastNotifiedClientId = null;
         }
       });
+  }
+
+  /**
+   * Phone format: digits only (optional leading '+'), length 7..15.
+   * We ignore spaces, hyphens, and parentheses for user convenience.
+   */
+  private phoneFormatValidator(control: AbstractControl): ValidationErrors | null {
+    const raw = String(control.value ?? '').trim();
+    if (!raw) return null;
+    const normalized = raw.replace(/[\s\-()]/g, '');
+    const ok = /^\+?\d{7,15}$/.test(normalized);
+    return ok ? null : { phoneFormat: true };
   }
 
   toggleClientInfo() {

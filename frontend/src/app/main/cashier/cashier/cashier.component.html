@@ -66,9 +66,15 @@
                     </div>
                     <span
                       class="text-error size-small validator"
-                      *ngIf="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
+                      *ngIf="clientForm.get('phone')?.errors?.required && clientForm.get('phone')?.touched"
                     >
                       {{ 'tr_client_phone_required' | translate }}
+                    </span>
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="clientForm.get('phone')?.errors?.phoneFormat && clientForm.get('phone')?.touched"
+                    >
+                      {{ 'tr_client_phone_invalid' | translate }}
                     </span>
                   </div>
                 </div>

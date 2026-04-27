@@ -33,6 +33,10 @@ export class CreateEditUserComponent implements OnInit {
     'Moderator',
   ];
 
+  /** Strong password: >=8, upper, lower, digit, special. */
+  readonly strongPasswordPattern =
+    '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\\\d)(?=.*[^A-Za-z0-9]).{8,}$';
+
   /** Super Admin / Co Admin — no single branch; API stores branch = null. */
   isGlobalAdminRole(role: string | null | undefined): boolean {
     const r = String(role || '').trim();

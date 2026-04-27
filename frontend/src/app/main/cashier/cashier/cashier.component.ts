@@ -292,6 +292,10 @@ export class CashierComponent implements AfterViewInit {
     const index = this.orderItems.findIndex(i => i.productId === product._id);
     if (index > -1) {
       const item = this.orderItems[index];
+      // Auto-apply product discount by default (when defined on the product).
+      if (item?.isApplyDiscount == null) {
+        item.isApplyDiscount = Number(item?.discount) > 0;
+      }
       const maxStock = Math.max(0, Math.floor(Number(product.stock ?? item.stock ?? 0)));
       if (item.quantity >= maxStock) {
         this.focusBarcodeInput();
@@ -301,7 +305,13 @@ export class CashierComponent implements AfterViewInit {
       this.maybePushBookingWarning(item, item.quantity);
     } else {
       this.maybePushBookingWarning(product, 1);
-      this.orderItems.push({ ...product, quantity: 1, productId: product._id });
+      this.orderItems.push({
+        ...product,
+        quantity: 1,
+        productId: product._id,
+        // Auto-apply discount when product has discount%.
+        isApplyDiscount: Number(product?.discount) > 0,
+      });
     }
 
     this.focusBarcodeInput();

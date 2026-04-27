@@ -493,7 +493,7 @@
   "tr_expenses": "المصروفات",
   "tr_sell_price": "سعر البيع",
   "tr_net_price": "السعر الصافي",
-  "tr_net_price_optional": "(اختياري — يُحسب تلقائيًا من السعر − الخصم إذا تُرك فارغًا)",
+  "tr_net_price_optional": "(اختياري — يُحسب تلقائيًا من السعر − نسبة الخصم)",
   "tr_net_price_invalid": "السعر الصافي يجب أن يكون 0 أو أكثر",
   "tr_total_number_of_invoices": "إجمالي عدد الفواتير",
   "tr_today": "اليوم",

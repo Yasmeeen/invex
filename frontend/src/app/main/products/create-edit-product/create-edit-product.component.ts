@@ -431,6 +431,14 @@ createProduct() {
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
   };
+  // Let backend compute netPrice when left empty.
+  if (payload.netPrice === '' || payload.netPrice == null) {
+    delete payload.netPrice;
+  }
+  // Ensure numeric discount payload (discount is a percentage 0..100).
+  if (payload.discount === '' || payload.discount == null) {
+    payload.discount = 0;
+  }
   if (inWarehouse) {
     delete payload.branch;
   } else if (this.isBranchManagerNewProduct) {
@@ -518,6 +526,14 @@ updateProduct() {
     imageUrl: this.productImageUrl,
     attributes: this.buildAttributesPayload(),
   };
+  // Let backend compute netPrice when left empty.
+  if (payload.netPrice === '' || payload.netPrice == null) {
+    delete payload.netPrice;
+  }
+  // Ensure numeric discount payload (discount is a percentage 0..100).
+  if (payload.discount === '' || payload.discount == null) {
+    payload.discount = 0;
+  }
   if (this.storeInWarehouse) {
     delete payload.branch;
   }

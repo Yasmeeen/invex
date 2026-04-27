@@ -54,12 +54,12 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
-/** If netPrice omitted/empty, use price - discount (clamped to >= 0). */
+/** If netPrice omitted/empty, use price - (price * discount% / 100) (clamped to >= 0). */
 const resolveNetPrice = (priceNum, discountNum, netPriceRaw) => {
   const d = Number(discountNum);
-  const disc = Number.isFinite(d) && d >= 0 ? d : 0;
+  const discPct = Number.isFinite(d) && d >= 0 ? d : 0;
   if (netPriceRaw === undefined || netPriceRaw === null || String(netPriceRaw).trim() === '') {
-    return Math.max(0, priceNum - disc);
+    return Math.max(0, priceNum - (priceNum * discPct) / 100);
   }
   const n = Number(netPriceRaw);
   if (Number.isNaN(n)) return NaN;
@@ -250,6 +250,10 @@ export const importProductsFromExcelRows = async (req, res) => {
         errors.push({ rowNumber, sheetName, field: 'discount', message: 'discount must be a number >= 0' });
         continue;
       }
+      if (discountNum > 100) {
+        errors.push({ rowNumber, sheetName, field: 'discount', message: 'discount must be <= 100 (%)' });
+        continue;
+      }
 
       const cat = categoryByName.get(normalizeNameKey(categoryName));
       if (!cat?._id) {
@@ -292,7 +296,7 @@ export const importProductsFromExcelRows = async (req, res) => {
       let finalNet = netNum;
       if (Number.isNaN(finalNet)) {
         if (autoComputeNetPrice) {
-          finalNet = Math.max(0, priceNum - discountNum);
+          finalNet = Math.max(0, priceNum - (priceNum * discountNum) / 100);
         } else {
           errors.push({ rowNumber, sheetName, field: 'netPrice', code, message: 'netPrice is required' });
           continue;
@@ -785,6 +789,9 @@ export const createProduct = async (req, res) => {
     if (Number.isNaN(discountNum) || discountNum < 0) {
       return res.status(400).json({ error: 'Invalid discount' });
     }
+    if (discountNum > 100) {
+      return res.status(400).json({ error: 'Invalid discount (must be <= 100%)' });
+    }
     const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
     if (Number.isNaN(netNum) || netNum < 0) {
       return res.status(400).json({ error: 'Invalid net price' });
@@ -929,6 +936,9 @@ export const updateProduct = async (req, res) => {
       discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
     if (Number.isNaN(discountNum) || discountNum < 0) {
       return res.status(400).json({ error: 'Invalid discount' });
+    }
+    if (discountNum > 100) {
+      return res.status(400).json({ error: 'Invalid discount (must be <= 100%)' });
     }
     const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
     if (Number.isNaN(netNum) || netNum < 0) {

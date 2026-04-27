@@ -498,7 +498,7 @@
   "tr_expenses": "Expenses",
   "tr_sell_price": "Selling Price",
   "tr_net_price": "Net Price",
-  "tr_net_price_optional": "(optional — if empty, calculated as price − discount)",
+  "tr_net_price_optional": "(optional — if empty, calculated as price − discount%)",
   "tr_net_price_invalid": "Net price must be 0 or greater",
   "tr_new_branch": "New Branch",
   "tr_total_number_of_invoices": "Total Number of Invoices",

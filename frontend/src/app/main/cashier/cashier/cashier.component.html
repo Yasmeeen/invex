@@ -244,6 +244,7 @@
               class="s-control width-100"
               [(ngModel)]="invoiceDiscountMode"
               (ngModelChange)="onInvoiceDiscountModeChange()"
+              [disabled]="!canApplyInvoiceDiscount()"
             >
               <option value="percent">{{ "tr_invoice_discount_mode_percent" | translate }}</option>
               <option value="amount">{{ "tr_invoice_discount_mode_amount" | translate }}</option>
@@ -268,6 +269,7 @@
               step="0.01"
               [(ngModel)]="invoiceExtraValue"
               (ngModelChange)="onInvoiceExtraValueChange()"
+              [disabled]="!canApplyInvoiceDiscount()"
             />
           </div>
           <div *ngIf="invoiceDiscountMode === 'percent' && appliedInvoiceDiscount() > 0" class="size-small text-muted mt-1">

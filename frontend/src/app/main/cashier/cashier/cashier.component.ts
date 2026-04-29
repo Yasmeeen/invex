@@ -409,6 +409,10 @@ export class CashierComponent implements AfterViewInit {
     }
   }
 
+  canApplyInvoiceDiscount(): boolean {
+    return (this.orderItems?.length || 0) > 0 && this.orderSubtotal() > 0;
+  }
+
   finalOrderTotal(): number {
     const sub = Math.round(this.orderSubtotal() * 100) / 100;
     return Math.round((sub - this.appliedInvoiceDiscount()) * 100) / 100;
@@ -424,6 +428,9 @@ export class CashierComponent implements AfterViewInit {
   }
 
   onInvoiceDiscountModeChange(): void {
+    if (!this.canApplyInvoiceDiscount()) {
+      this.invoiceDiscountMode = 'percent';
+    }
     this.invoiceExtraValue = 0;
   }
 
@@ -434,6 +441,10 @@ export class CashierComponent implements AfterViewInit {
   }
 
   onInvoiceExtraValueChange(): void {
+    if (!this.canApplyInvoiceDiscount()) {
+      this.invoiceExtraValue = 0;
+      return;
+    }
     const sub = Math.round(this.orderSubtotal() * 100) / 100;
     let v = Number(this.invoiceExtraValue);
     if (!Number.isFinite(v)) return;

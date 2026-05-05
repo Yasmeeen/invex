@@ -430,7 +430,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       productName: b.product?.name ?? '',
       productCode: b.product?.code ?? '',
       quantity: b.quantity ?? 1,
-      location: b.productInWarehouse ? t('tr_bookings_report_warehouse') : b.branch?.name || '—',
+      location:
+        b.product?.inWarehouse || b.productInWarehouse
+          ? t('tr_bookings_report_warehouse')
+          : b.branch?.name || '—',
       customerName: b.customerName ?? '',
       customerPhone: b.customerPhone ?? '',
       pickup:

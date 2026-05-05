@@ -546,7 +546,12 @@ updateProduct() {
       this.closeModal(true);
     },
     (error) => {
-      this.appNotificationService.push(error.error.error, 'error');
+      const code = error?.error?.code;
+      const msg =
+        code === 'ACTIVE_BOOKING_BLOCKS_WAREHOUSE'
+          ? this.translateService.instant('tr_product_warehouse_blocked_active_booking')
+          : error?.error?.error || this.translateService.instant('tr_unexpected_error_message');
+      this.appNotificationService.push(msg, 'error');
     }
   );
 }

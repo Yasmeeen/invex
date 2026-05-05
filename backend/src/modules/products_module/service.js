@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
+import ProductBooking from '../../DB/models/productBooking.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
@@ -982,6 +983,25 @@ export const updateProduct = async (req, res) => {
         return res.status(409).json({ error: 'Product code already exists in warehouse' });
       }
 
+      const before = await Product.findById(req.params.id).lean();
+      if (!before) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      if (!before.inWarehouse) {
+        const activeBooking = await ProductBooking.findOne({
+          product: req.params.id,
+          status: 'active',
+        })
+          .select('_id')
+          .lean();
+        if (activeBooking) {
+          return res.status(400).json({
+            error: 'Cannot move product to warehouse while it has active bookings',
+            code: 'ACTIVE_BOOKING_BLOCKS_WAREHOUSE',
+          });
+        }
+      }
+
       const updateDoc = {
         name,
         code,
@@ -998,7 +1018,6 @@ export const updateProduct = async (req, res) => {
         updateDoc.imageUrl = imageUrlNorm;
       }
 
-      const before = await Product.findById(req.params.id).lean();
       const product = await Product.findByIdAndUpdate(req.params.id, updateDoc, { new: true });
 
       if (!product) {

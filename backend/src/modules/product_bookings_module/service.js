@@ -588,7 +588,6 @@ function buildBookingsReportMatch(query) {
     customer_phone: customerPhone,
     status,
     confirmed,
-    warehouse_only: warehouseOnly,
     search,
   } = query;
 
@@ -619,9 +618,7 @@ function buildBookingsReportMatch(query) {
   if (confirmed === 'false') {
     match.confirmed = false;
   }
-  if (warehouseOnly === 'true' || warehouseOnly === true) {
-    match.productInWarehouse = true;
-  }
+  /* warehouse_only is applied in getBookingsReport via Product.inWarehouse (current stock location). */
 
   const extraAnd = [];
   if (customerPhone && String(customerPhone).trim()) {
@@ -644,10 +641,30 @@ function buildBookingsReportMatch(query) {
   return match;
 }
 
+/**
+ * Limit bookings to products that currently have warehouse stock (Product.inWarehouse === true).
+ * Booking.productInWarehouse is historical and does not update when a product is moved.
+ */
+async function applyWarehouseOnlyProductFilter(match, query) {
+  const wo = query.warehouse_only === 'true' || query.warehouse_only === true;
+  if (!wo) return;
+  const whIds = await Product.find({ inWarehouse: true }).distinct('_id');
+  const allowed = new Set(whIds.map((id) => String(id)));
+  if (match.product) {
+    const pid = String(match.product);
+    if (!allowed.has(pid)) {
+      match.product = { $in: [] };
+    }
+  } else {
+    match.product = whIds.length ? { $in: whIds } : { $in: [] };
+  }
+}
+
 /** Analytics + paginated rows for reports UI (branch from ng-select → branch_id). */
 export const getBookingsReport = async (req, res) => {
   try {
     const match = buildBookingsReportMatch(req.query);
+    await applyWarehouseOnlyProductFilter(match, req.query);
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
     const skip = (page - 1) * limit;
@@ -697,11 +714,12 @@ export const getBookingsReport = async (req, res) => {
     const byBranch = await ProductBooking.aggregate([
       { $match: match },
       { $lookup: { from: 'branches', localField: 'branch', foreignField: '_id', as: 'b' } },
+      { $lookup: { from: 'products', localField: 'product', foreignField: '_id', as: 'p' } },
       {
         $addFields: {
           branchLabel: {
             $cond: [
-              '$productInWarehouse',
+              { $eq: [{ $ifNull: [{ $arrayElemAt: ['$p.inWarehouse', 0] }, false] }, true] },
               'Warehouse',
               { $ifNull: [{ $arrayElemAt: ['$b.name', 0] }, '—'] },
             ],
@@ -763,7 +781,6 @@ export const getBookingsReport = async (req, res) => {
     };
     if (match.branch) upcomingMatch.branch = match.branch;
     if (match.product) upcomingMatch.product = match.product;
-    if (match.productInWarehouse === true) upcomingMatch.productInWarehouse = true;
     if (match.customerPhone) upcomingMatch.customerPhone = match.customerPhone;
     if (match.confirmed === true || match.confirmed === false) {
       upcomingMatch.confirmed = match.confirmed;

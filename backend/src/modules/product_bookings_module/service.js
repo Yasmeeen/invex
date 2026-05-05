@@ -388,6 +388,19 @@ export const confirmProductBooking = async (req, res) => {
       return res.status(403).json({ error: 'You are not allowed to confirm this booking' });
     }
 
+    const productForStock = await Product.findById(booking.product).select('stock').lean();
+    if (!productForStock) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const totalBookedQty = await sumActiveBookedQuantity(booking.product);
+    const stock = Math.max(0, Number(productForStock.stock) || 0);
+    if (totalBookedQty > stock) {
+      return res.status(400).json({
+        error: 'Not enough stock to confirm bookings for this product',
+        code: 'INSUFFICIENT_STOCK_FOR_BOOKING',
+      });
+    }
+
     booking.confirmed = true;
     booking.confirmedAt = new Date();
     booking.confirmedBy = userId;

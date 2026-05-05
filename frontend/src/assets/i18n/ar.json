@@ -448,6 +448,8 @@
   "tr_booking_confirmed_status": "تم التأكيد",
   "tr_booking_confirmed_toast": "تم تأكيد الحجز",
   "tr_booking_confirm_failed": "تعذر تأكيد الحجز",
+  "tr_booking_confirm_out_of_stock": "الكمية المحجوزة تتجاوز المخزون الحالي. أعد التخزين أو ألغِ بعض الحجوزات قبل التأكيد.",
+  "tr_booking_oversubscribed_confirm_blocked": "إجمالي الحجوزات النشطة أكبر من المخزون الحالي. تم إيقاف زر التأكيد حتى يغطي المخزون كل الحجوزات أو يتم إلغاء جزء منها.",
   "tr_booking_badge": "محجوز",
   "tr_booking_customer_name": "اسم العميل",
   "tr_booking_customer_phone": "هاتف العميل",

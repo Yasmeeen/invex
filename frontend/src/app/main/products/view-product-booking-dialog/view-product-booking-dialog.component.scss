@@ -23,6 +23,17 @@
     line-height: 1.35;
   }
 
+  .booking-stock-warning {
+    margin: -8px 0 16px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #e57373;
+    background: #ffebee;
+    color: #b71c1c;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
   .booking-empty {
     border: 1px dashed #ccc;
     border-radius: 6px;

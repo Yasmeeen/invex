@@ -109,11 +109,24 @@ export class ViewProductBookingDialogComponent implements OnInit {
     return !!creatorId && String(creatorId) === String(u._id);
   }
 
+  /** Active bookings exceed current product stock (e.g. after sales); confirmations must be blocked. */
+  get bookingExceedsStock(): boolean {
+    if (!this.summary) {
+      return false;
+    }
+    const booked = Number(this.summary.totalBookedQty) || 0;
+    const stock = Number(this.summary.stock) || 0;
+    return booked > stock;
+  }
+
   /**
    * Super Admin / Co Admin: any active unconfirmed booking.
    * Branch Manager: same branch only, not central warehouse stock.
    */
   canConfirm(booking: ProductActiveBooking): boolean {
+    if (this.bookingExceedsStock) {
+      return false;
+    }
     if (booking.confirmed || booking.status === 'cancelled') {
       return false;
     }
@@ -234,8 +247,11 @@ export class ViewProductBookingDialogComponent implements OnInit {
       },
       error: (err) => {
         this.confirmingId = null;
+        const code = err?.error?.code;
         const msg =
-          err?.error?.error || this.translate.instant('tr_booking_confirm_failed');
+          code === 'INSUFFICIENT_STOCK_FOR_BOOKING'
+            ? this.translate.instant('tr_booking_confirm_out_of_stock')
+            : err?.error?.error || this.translate.instant('tr_booking_confirm_failed');
         this.notify.push(msg, 'error');
       },
     });

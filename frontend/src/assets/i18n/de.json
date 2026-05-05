@@ -435,6 +435,8 @@
   "tr_booking_confirmed_status": "Bestätigt",
   "tr_booking_confirmed_toast": "Reservierung bestätigt",
   "tr_booking_confirm_failed": "Bestätigung fehlgeschlagen",
+  "tr_booking_confirm_out_of_stock": "Nicht genug Lagerbestand für die reservierte Menge. Nachbestellen oder Reservierungen stornieren, bevor Sie bestätigen.",
+  "tr_booking_oversubscribed_confirm_blocked": "Reservierte Menge übersteigt den aktuellen Bestand. Bestätigen ist deaktiviert, bis der Bestand alle aktiven Reservierungen deckt oder Reservierungen storniert werden.",
   "tr_booking_badge": "Reserviert",
   "tr_booking_customer_name": "Kundenname",
   "tr_booking_customer_phone": "Kundentelefon",

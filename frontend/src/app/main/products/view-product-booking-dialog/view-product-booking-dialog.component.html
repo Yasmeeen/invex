@@ -33,6 +33,14 @@
             </div>
           </div>
 
+          <div
+            *ngIf="bookingExceedsStock"
+            class="booking-stock-warning size-small"
+            role="alert"
+          >
+            {{ 'tr_booking_oversubscribed_confirm_blocked' | translate }}
+          </div>
+
           <div *ngIf="bookings.length === 0" class="booking-empty size-small text-muted pt-2">
             {{ 'tr_booking_your_list_empty' | translate }}
           </div>

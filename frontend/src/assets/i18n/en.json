@@ -454,6 +454,8 @@
   "tr_booking_confirmed_status": "Confirmed",
   "tr_booking_confirmed_toast": "Booking confirmed",
   "tr_booking_confirm_failed": "Could not confirm booking",
+  "tr_booking_confirm_out_of_stock": "This product is out of stock for the reserved quantity. Restock or cancel bookings before confirming.",
+  "tr_booking_oversubscribed_confirm_blocked": "Booked quantity exceeds current stock. Confirm is disabled until stock covers all active bookings or some bookings are cancelled.",
   "tr_booking_badge": "Booked",
   "tr_booking_customer_name": "Customer name",
   "tr_booking_customer_phone": "Customer phone",

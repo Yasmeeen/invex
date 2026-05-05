@@ -14,6 +14,10 @@ import html2canvas from 'html2canvas';
 export class ReportExportService {
   constructor(private http: HttpClient) {}
 
+  private containsArabicText(value: any): boolean {
+    return /[\u0600-\u06FF]/.test(String(value ?? ''));
+  }
+
   exportToExcel(filename: string, rows: any[]): void {
     const worksheet = XLSX.utils.json_to_sheet(rows || []);
     const workbook = XLSX.utils.book_new();
@@ -28,10 +32,21 @@ export class ReportExportService {
     columns: string[],
     rows: any[]
   ): Promise<void> {
+    // Detect Arabic anywhere in the content; if present, prefer HTML render so the browser
+    // handles RTL and Arabic shaping correctly.
     const isArabic =
-      /[\u0600-\u06FF]/.test(String(title || '')) ||
-      summaryRows.some((r) => /[\u0600-\u06FF]/.test(String(r?.label || '')) || /[\u0600-\u06FF]/.test(String(r?.value || ''))) ||
-      (columns || []).some((c) => /[\u0600-\u06FF]/.test(String(c || '')));
+      this.containsArabicText(title) ||
+      (summaryRows || []).some(
+        (r) => this.containsArabicText(r?.label) || this.containsArabicText(r?.value)
+      ) ||
+      (columns || []).some((c) => this.containsArabicText(c)) ||
+      // Also scan a sample of row values (important when columns are English but data is Arabic).
+      (rows || [])
+        .slice(0, 50)
+        .some((row: any) =>
+          row &&
+          Object.values(row).some((v) => this.containsArabicText(v))
+        );
 
     // Arabic: render via HTML so the browser handles shaping/RTL and Tajawal font.
     if (isArabic && typeof document !== 'undefined') {
@@ -229,14 +244,36 @@ export class ReportExportService {
     container.style.position = 'fixed';
     container.style.left = '0';
     container.style.top = '0';
-    container.style.opacity = '0';
+    // Move off-screen without huge negative coordinates (more reliable for html2canvas than visibility:hidden).
+    container.style.transform = 'translateX(-120vw)';
+    container.style.opacity = '1';
     container.style.pointerEvents = 'none';
-    container.style.zIndex = '-1';
+    container.style.zIndex = '2147483646';
     container.style.width = '794px'; // ~A4 width at 96dpi
     container.style.background = '#fff';
     container.dir = 'rtl';
     container.innerHTML = `
-      <div style="font-family:Tajawal, Inter, Arial, sans-serif; padding:24px;">
+      <style>
+        /* Isolate PDF layout from app global styles (avoid overlap). */
+        #invex-pdf-root, #invex-pdf-root * {
+          box-sizing: border-box;
+          font-family: Tajawal, Inter, Arial, sans-serif !important;
+          direction: rtl !important;
+          text-align: right !important;
+          line-height: 1.65 !important;
+          letter-spacing: 0 !important;
+          word-break: break-word;
+          white-space: normal;
+        }
+        #invex-pdf-root table { width: 100%; border-collapse: collapse; }
+        #invex-pdf-root th, #invex-pdf-root td { vertical-align: top; }
+        /* Keep QR block LTR. */
+        #invex-pdf-root .invex-pdf-ltr, #invex-pdf-root .invex-pdf-ltr * {
+          direction: ltr !important;
+          text-align: left !important;
+        }
+      </style>
+      <div id="invex-pdf-root" style="padding:24px; background:#fff;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
           <div style="display:flex; align-items:center; gap:10px;">
             ${logoDataUrl ? `<img src="${logoDataUrl}" style="width:42px;height:42px;object-fit:contain;" />` : ''}
@@ -245,7 +282,7 @@ export class ReportExportService {
               <div style="color:#64748b; font-size:11px;">Innovation</div>
             </div>
           </div>
-          <div style="text-align:left;">
+          <div class="invex-pdf-ltr">
             ${qrDataUrl ? `<img src="${qrDataUrl}" style="width:72px;height:72px;" />` : ''}
             <div style="color:#64748b; font-size:9px; margin-top:4px;">innovation-tec.com</div>
           </div>
@@ -307,6 +344,16 @@ export class ReportExportService {
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
       await new Promise<void>((r) => requestAnimationFrame(() => r()));
 
+      // Ensure web fonts (e.g., Tajawal) are loaded before capturing to avoid text overlap.
+      try {
+        const anyDoc: any = document as any;
+        if (anyDoc?.fonts?.ready) {
+          await anyDoc.fonts.ready;
+        }
+      } catch {
+        // ignore
+      }
+
       const imgs = Array.from(container.querySelectorAll('img')) as HTMLImageElement[];
       await Promise.all(
         imgs.map(
@@ -319,23 +366,94 @@ export class ReportExportService {
         )
       );
 
-      // Promisify doc.html; some jsPDF builds don't return a real Promise.
-      await new Promise<void>((resolve) => {
-        doc.html(container, {
-          html2canvas: {
-            scale: 1.6,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            windowWidth: 794,
-          },
-          autoPaging: 'text',
-          callback: (d) => {
-            d.save(`${String(title || '').replace(/\s+/g, '_').toLowerCase()}.pdf`);
-            resolve();
-          },
-        });
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        windowWidth: 794,
       });
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const isBlankCanvas =
+        !canvas ||
+        !Number.isFinite(canvas.width) ||
+        !Number.isFinite(canvas.height) ||
+        canvas.width <= 0 ||
+        canvas.height <= 0;
+
+      if (isBlankCanvas) {
+        // Fallback: jsPDF html pipeline if canvas capture fails.
+        await new Promise<void>((resolve) => {
+          doc.html(container, {
+            html2canvas: {
+              scale: 1.6,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: '#ffffff',
+              windowWidth: 794,
+            },
+            autoPaging: 'text',
+            callback: (d) => {
+              d.save(`${String(title || '').replace(/\s+/g, '_').toLowerCase()}.pdf`);
+              resolve();
+            },
+          });
+        });
+        return;
+      }
+
+      const pxPerPt = canvas.width / pageW;
+      const pageCanvasPxH = Math.floor(pageH * pxPerPt);
+      if (!Number.isFinite(pxPerPt) || pxPerPt <= 0 || !Number.isFinite(pageCanvasPxH) || pageCanvasPxH <= 0) {
+        await new Promise<void>((resolve) => {
+          doc.html(container, {
+            html2canvas: {
+              scale: 1.6,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: '#ffffff',
+              windowWidth: 794,
+            },
+            autoPaging: 'text',
+            callback: (d) => {
+              d.save(`${String(title || '').replace(/\s+/g, '_').toLowerCase()}.pdf`);
+              resolve();
+            },
+          });
+        });
+        return;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(canvas.height / pageCanvasPxH));
+
+      // Slice canvas into page-sized images to avoid overlap artifacts.
+      for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+        const srcY = pageIndex * pageCanvasPxH;
+        const sliceH = Math.min(pageCanvasPxH, canvas.height - srcY);
+        if (sliceH <= 0) break;
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceH;
+        const ctx = pageCanvas.getContext('2d');
+        if (!ctx) break;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+
+        const imgData = pageCanvas.toDataURL('image/png');
+        const imgW = pageW;
+        const imgH = (sliceH * imgW) / canvas.width;
+        doc.addImage(imgData, 'PNG', 0, 0, imgW, imgH);
+
+        if (pageIndex < totalPages - 1) {
+          doc.addPage();
+        }
+      }
+
+      doc.save(`${String(title || '').replace(/\s+/g, '_').toLowerCase()}.pdf`);
     } finally {
       container.remove();
     }

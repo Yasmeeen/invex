@@ -435,6 +435,8 @@
   "tr_booking_confirmed_status": "Confirmée",
   "tr_booking_confirmed_toast": "Réservation confirmée",
   "tr_booking_confirm_failed": "Impossible de confirmer la réservation",
+  "tr_booking_confirm_out_of_stock": "Stock insuffisant pour la quantité réservée. Réapprovisionnez ou annulez des réservations avant de confirmer.",
+  "tr_booking_oversubscribed_confirm_blocked": "La quantité réservée dépasse le stock actuel. La confirmation est désactivée tant que le stock ne couvre pas toutes les réservations actives ou qu’elles ne sont pas annulées.",
   "tr_booking_badge": "Réservé",
   "tr_booking_customer_name": "Nom du client",
   "tr_booking_customer_phone": "Téléphone du client",

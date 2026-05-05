@@ -46,6 +46,7 @@
                       name="paymentStatus"
                       class="s-control s-select"
                       [(ngModel)]="selectedPaymentTerm"
+                      (ngModelChange)="onPaymentTermChange()"
                       #paymentStatus="ngModel"
                       [items]="selectedVendor?.paymentTerms!"
                       bindLabel="label"
@@ -61,10 +62,11 @@
                     <label>{{ 'tr_request_date' | translate }}</label>
                  
                     <div class="input-with-icon">
-                      <input  
+                      <input
                       name="requestDate"
                       ngModel
-                      #requestDate="ngModel" 
+                      #requestDate="ngModel"
+                      (ngModelChange)="onRequestDatePicked($event)"
                       placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId" class="s-control bg-white" required>
                       <mat-datepicker #pickId></mat-datepicker>
                       <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
@@ -102,6 +104,7 @@
                       name="totalAmount"
                       ngModel
                       #totalAmount="ngModel"
+                      (blur)="onTotalAmountBlur()"
                       required
                     />
                     <span class="text-error size-small validator" *ngIf="totalAmount.invalid && purchasingForm.submitted">
@@ -153,11 +156,63 @@
 
                <!-- Installments Section (Visible if paymentTerms = 'installment') -->
             <div *ngIf="selectedPaymentTerm === 'Installments'" class="mt-4">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <h5 class="m-0">{{ 'tr_installments' | translate }}</h5>
                 <button type="button" class="s-btn btn-secondary" (click)="addInstallment()">
                   + {{ 'tr_add_installment' | translate }}
                 </button>
+              </div>
+
+              <p class="size-small text-muted mb-3">{{ 'tr_installment_schedule_hint' | translate }}</p>
+
+              <div class="pr-installment-generator plr-3 ptb-3 rounded mb-3">
+                <div class="row align-items-end">
+                  <div class="col-md-3 col-12 mb-2 mb-md-0">
+                    <label class="d-block">{{ 'tr_installment_schedule_period' | translate }}</label>
+                    <select
+                      class="s-control"
+                      [ngModelOptions]="{ standalone: true }"
+                      [(ngModel)]="installmentSchedulePeriod"
+                      (change)="onInstallmentScheduleControlsChange()"
+                    >
+                      <option *ngFor="let opt of installmentPeriodOptions" [value]="opt.value">
+                        {{ opt.labelKey | translate }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="col-md-2 col-6 mb-2 mb-md-0">
+                    <label class="d-block">{{ 'tr_installment_schedule_count' | translate }}</label>
+                    <input
+                      type="number"
+                      class="s-control"
+                      min="1"
+                      step="1"
+                      [ngModelOptions]="{ standalone: true }"
+                      [(ngModel)]="installmentScheduleCount"
+                      (ngModelChange)="onInstallmentScheduleControlsChange()"
+                    />
+                  </div>
+                  <div class="col-md-4 col-12 mb-2 mb-md-0">
+                    <label class="d-block">{{ 'tr_installment_schedule_start' | translate }}</label>
+                    <div class="input-with-icon">
+                      <input
+                        [ngModelOptions]="{ standalone: true }"
+                        [(ngModel)]="installmentScheduleStart"
+                        (ngModelChange)="onInstallmentScheduleControlsChange()"
+                        [matDatepicker]="schedStartPick"
+                        class="s-control bg-white"
+                        placeholder="{{ 'tr_pick_date' | translate }}"
+                      />
+                      <mat-datepicker #schedStartPick></mat-datepicker>
+                      <mat-datepicker-toggle class="input-icon date-picker" [for]="schedStartPick"></mat-datepicker-toggle>
+                    </div>
+                  </div>
+                  <div class="col-md-3 col-12">
+                    <button type="button" class="s-btn btn-primary width-100" (click)="generateInstallmentSchedule()">
+                      {{ 'tr_installment_generate_schedule' | translate }}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div *ngFor="let inst of installments; let i = index" class="ptb-2 plr-3 rounded mb-3 bg-secondary">
@@ -166,13 +221,12 @@
                     <label>{{ 'tr_due_date' | translate }}</label>
                 
                     <div class="input-with-icon">
-                      <input  
-                      name="dueDate{{i}}"
+                      <input
+                      [name]="'dueDate' + i"
                       [(ngModel)]="inst.dueDate"
-                      #installmentDueDate="ngModel" 
-                      placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId1" class="s-control bg-white" required>
-                      <mat-datepicker #pickId1></mat-datepicker>
-                      <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId1">
+                      placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="duePick" class="s-control bg-white" required>
+                      <mat-datepicker #duePick></mat-datepicker>
+                      <mat-datepicker-toggle class="input-icon date-picker" [for]="duePick">
                       </mat-datepicker-toggle>
                   </div>
                   </div>

@@ -47,7 +47,7 @@ export class CreateEditProductComponent implements OnInit {
   categoryDropdownItems: Category[] = [];
   /** Bound to category ng-select (category must be chosen before product code). */
   selectedCategory: Category | null = null;
-  categoryAttributeDefs: Array<{ key: string; label: string }> = [];
+  categoryAttributeDefs: Array<{ key: string; label: string; options: Array<{ value: string; label: string }> }> = [];
   attributeValues: Record<string, string> = {};
   private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
@@ -139,7 +139,11 @@ export class CreateEditProductComponent implements OnInit {
       ? ((this.selectedCategory as any).attributeDefs as any[])
       : [];
     this.categoryAttributeDefs = defs
-      .map((d) => ({ key: this.normalizeAttrKey(d?.key), label: String(d?.label || '').trim() }))
+      .map((d) => {
+        const key = this.normalizeAttrKey(d?.key);
+        const label = String(d?.label || '').trim();
+        return { key, label, options: [] };
+      })
       .filter((d) => d.key && d.label);
 
     // Keep only values that still exist in defs

@@ -132,8 +132,9 @@ tooltip-content .tooltip {
 }
 
 
-.ng-select.ng-select-multiple .ng-select-container .ng-value-container {
-    align-items: center;
+/* ng-select: dropdown panel stacks above modals / Material overlay */
+.ng-dropdown-panel {
+  z-index: 10050 !important;
 }
 
 .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {

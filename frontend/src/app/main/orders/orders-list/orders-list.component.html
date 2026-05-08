@@ -270,6 +270,9 @@
                  </div>
                 <div *ngFor="let product of order.products">
                   <span>{{product.quantity}} {{'tr_items'| translate}} {{'tr_from' | translate}} {{product.code}}</span>
+                  <div class="order-line-invoice-attrs" *ngIf="product.invoiceAttributes?.length">
+                    <span *ngFor="let ia of product.invoiceAttributes">{{ ia.label }}: {{ ia.value }}</span>
+                  </div>
                 </div>
               </td>
               <td>

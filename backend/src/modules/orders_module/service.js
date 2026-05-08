@@ -1,11 +1,50 @@
 import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
+import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Client from "../../DB/models/client.model.js";
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
 import { auditLog } from '../audit_module/audit.service.js';
+
+const normalizeAttrKey = (raw) =>
+  String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
+function attrMapGet(attrs, key) {
+  if (!attrs || !key) return '';
+  if (typeof attrs.get === 'function') {
+    const v = attrs.get(key);
+    return v != null ? String(v).trim() : '';
+  }
+  const plain = attrs instanceof Map ? Object.fromEntries(attrs) : attrs;
+  return String(plain[key] ?? '').trim();
+}
+
+/** Build receipt lines from product snapshot + category attributeDefs.showOnInvoice */
+function buildInvoiceAttributesSnapshot(productDoc, categoryDoc) {
+  const out = [];
+  if (!productDoc || !categoryDoc?.attributeDefs?.length) return out;
+  for (const def of categoryDoc.attributeDefs) {
+    const key =
+      typeof def === 'string' ? normalizeAttrKey(def) : normalizeAttrKey(def?.key);
+    if (!key) continue;
+    const showOnInvoice = typeof def === 'string' ? false : !!def.showOnInvoice;
+    if (!showOnInvoice) continue;
+    const label =
+      typeof def === 'string'
+        ? key
+        : String(def.label || '').trim() || key;
+    const val = attrMapGet(productDoc.attributes, key);
+    if (!val) continue;
+    // Display the exact stored attribute value in the invoice.
+    out.push({ label, value: val });
+  }
+  return out;
+}
 
 export const getOrders = async (req, res) => {
   try {
@@ -132,6 +171,7 @@ export const createOrder = async (req, res) => {
       userId,
       invoiceDiscountAmount: invoiceDiscountRaw,
       paidAmount: paidAmountRaw,
+      paymentSplits: paymentSplitsRaw,
     } = req.body;
 
     // validation
@@ -193,6 +233,16 @@ export const createOrder = async (req, res) => {
     let totalPrice = 0;
     let numberOfProducts = 0;
     const orderProducts = [];
+    const categoryById = new Map();
+
+    const getCategoryCached = async (categoryId) => {
+      if (!categoryId) return null;
+      const id = String(categoryId);
+      if (categoryById.has(id)) return categoryById.get(id);
+      const doc = await Category.findById(categoryId).session(session).lean();
+      categoryById.set(id, doc);
+      return doc;
+    };
 
     for (const item of products) {
       const selected = item.selectedProduct;
@@ -218,6 +268,9 @@ export const createOrder = async (req, res) => {
       productDoc.stock -= quantity;
       await productDoc.save({ session });
 
+      const categoryDoc = await getCategoryCached(productDoc.category);
+      const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
+
       orderProducts.push({
         productId: selected._id,
         name: selected.name,
@@ -226,6 +279,7 @@ export const createOrder = async (req, res) => {
         price,
         cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
+        ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
       });
     }
 
@@ -239,34 +293,89 @@ export const createOrder = async (req, res) => {
       subtotalPrice
     );
     totalPrice = Math.round((subtotalPrice - invoiceDiscountAmount) * 100) / 100;
+    const totalRounded = Math.round(totalPrice * 100) / 100;
 
-    const isCredit = String(paymentMethod || '')
-      .trim()
-      .toLowerCase() === 'credit';
-
-    let paidAmount = Number(paidAmountRaw);
-    if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
-    paidAmount = Math.min(Math.round(paidAmount * 100) / 100, totalPrice);
-
-    if (!isCredit) {
-      // Cash, card, Valu, etc.: full amount at checkout (client only sends paidAmount for credit).
-      paidAmount = Math.round(totalPrice * 100) / 100;
-    }
-
+    let paidAmount = 0;
     const payments = [];
-    if (paidAmount > 0) {
-      payments.push({
-        amount: paidAmount,
-        paidAt: new Date(),
-        paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
-          ? new mongoose.Types.ObjectId(String(userId))
-          : undefined,
-        note: isCredit ? 'Initial payment (cashier)' : 'Full payment at checkout',
-      });
+    let resolvedPaymentMethod = String(paymentMethod || 'cash').trim() || 'cash';
+
+    const useSplits = Array.isArray(paymentSplitsRaw) && paymentSplitsRaw.length > 0;
+
+    if (useSplits) {
+      const splits = paymentSplitsRaw
+        .map((s) => ({
+          method: String(s?.method ?? '').trim().toLowerCase(),
+          amount: Math.round((Number(s?.amount) || 0) * 100) / 100,
+        }))
+        .filter((s) => s.method && Number.isFinite(s.amount) && s.amount >= 0);
+
+      paidAmount = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
+
+      if (paidAmount > totalRounded + 0.001) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Payment amounts exceed order total' });
+      }
+
+      const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+        ? new mongoose.Types.ObjectId(String(userId))
+        : undefined;
+
+      for (const s of splits) {
+        if (s.amount > 0) {
+          payments.push({
+            amount: s.amount,
+            paidAt: new Date(),
+            paidByUserId: uid,
+            method: s.method,
+            note: `Checkout · ${s.method}`,
+          });
+        }
+      }
+
+      const withMoney = splits.filter((s) => s.amount > 0);
+      if (paidAmount >= totalRounded - 0.001) {
+        resolvedPaymentMethod =
+          withMoney.length === 0
+            ? 'cash'
+            : withMoney.length === 1
+              ? withMoney[0].method
+              : 'mixed';
+      } else {
+        resolvedPaymentMethod = 'credit';
+      }
+    } else {
+      const isCredit = String(paymentMethod || '')
+        .trim()
+        .toLowerCase() === 'credit';
+
+      paidAmount = Number(paidAmountRaw);
+      if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
+      paidAmount = Math.min(Math.round(paidAmount * 100) / 100, totalPrice);
+
+      if (!isCredit) {
+        paidAmount = Math.round(totalPrice * 100) / 100;
+      }
+
+      const methodSlug =
+        String(paymentMethod || 'cash').trim().toLowerCase() || 'cash';
+
+      if (paidAmount > 0) {
+        payments.push({
+          amount: paidAmount,
+          paidAt: new Date(),
+          paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
+            ? new mongoose.Types.ObjectId(String(userId))
+            : undefined,
+          method: isCredit ? undefined : methodSlug,
+          note: isCredit ? 'Initial payment (cashier)' : 'Full payment at checkout',
+        });
+      }
+      resolvedPaymentMethod = String(paymentMethod || 'cash').trim() || 'cash';
     }
 
     const paymentStatus =
-      paidAmount >= totalPrice
+      paidAmount >= totalRounded - 0.001
         ? 'paid'
         : paidAmount > 0
         ? 'partial'
@@ -290,7 +399,7 @@ export const createOrder = async (req, res) => {
           clientPhoneNumber,
           clientAddress,
           sellerName,
-          paymentMethod,
+          paymentMethod: resolvedPaymentMethod,
           branch,
           products: orderProducts,
           numberOfProducts,
@@ -369,7 +478,7 @@ export const createOrder = async (req, res) => {
 export const addOrderPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { amount, paidAt, userId, note } = req.body || {};
+    const { amount, paidAt, userId, note, method: methodRaw } = req.body || {};
     const payAmount = Number(amount);
     if (!Number.isFinite(payAmount) || payAmount <= 0) {
       return res.status(400).json({ error: 'Valid amount is required' });
@@ -388,12 +497,14 @@ export const addOrderPayment = async (req, res) => {
     if (Number.isNaN(dt.getTime())) return res.status(400).json({ error: 'Invalid paidAt date' });
 
     order.payments = order.payments || [];
+    const methodSlug = String(methodRaw || '').trim().toLowerCase();
     order.payments.push({
       amount: applied,
       paidAt: dt,
       paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
         ? new mongoose.Types.ObjectId(String(userId))
         : undefined,
+      ...(methodSlug ? { method: methodSlug } : {}),
       note: String(note || '').trim(),
     });
 

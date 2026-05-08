@@ -256,6 +256,52 @@
         pointer-events: none;
       }
     }
+
+    .cashier-payment-splits {
+      border-top: 1px solid #e0e0e0;
+      padding-top: 0.75rem;
+      margin-top: 0.5rem;
+      font-weight: normal;
+    }
+
+    .cashier-payment-split-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .cashier-payment-split-row__method {
+      flex: 1 1 160px;
+      min-width: 140px;
+    }
+
+    .cashier-payment-split-row__method--labeled {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .cashier-payment-split-row__label {
+      font-weight: 600;
+      font-size: 0.88rem;
+      line-height: 1.2;
+    }
+
+    .cashier-payment-split-select {
+      width: 100%;
+    }
+
+    .cashier-payment-split-row__amount {
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    .cashier-payment-split-row__remove {
+      flex-shrink: 0;
+      min-width: 2rem;
+    }
   }
   
   /* Order Panel */
@@ -518,6 +564,18 @@
       .item-name {
         word-wrap: break-word;
         overflow-wrap: break-word;
+      }
+
+      .invoice-item-attrs {
+        margin-top: 4px;
+        font-size: 9px;
+        font-weight: normal;
+        line-height: 1.35;
+        color: #333;
+      }
+
+      .invoice-item-attr {
+        display: block;
       }
     }
 

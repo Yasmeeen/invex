@@ -19,4 +19,5 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
   { id: 'fawry', labelKey: 'tr_pay_fawry' },
   { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash' },
   { id: 'instapay', labelKey: 'tr_pay_instapay' },
+  { id: 'mixed', labelKey: 'tr_pay_mixed' },
 ];

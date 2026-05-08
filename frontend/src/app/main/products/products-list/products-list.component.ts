@@ -34,7 +34,8 @@ export class ProductsListComponent implements OnInit {
   isFilterOpen: boolean = true;
   paginationPerPage:number = 20;
   categorys: Category[] = [];
-  selectedcategory: string;
+  /** Multi-select category filter (API: comma-separated `categoryId`). */
+  selectedCategories: string[] = [];
   selectedAttributeKey = '';
   selectedAttributeValue = '';
   attributeKeyOptions: string[] = [];
@@ -44,12 +45,28 @@ export class ProductsListComponent implements OnInit {
   searchTerm: string;
   isNotAuthorized: boolean = false;
   iscategoryNotAuthorized: boolean = false;
-  selectedBranch: string ;
+  /** Multi-select branch filter (API: comma-separated `branchId`). */
+  selectedBranches: string[] = [];
   branches: Branch [] = [];
   /** all | warehouse | branches */
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   /** all | with_bookings | without_bookings — maps to API `booked` */
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
+
+  readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
+    { id: 'all', labelKey: 'tr_location_all' },
+    { id: 'warehouse', labelKey: 'tr_warehouse' },
+    { id: 'branches', labelKey: 'tr_location_branches_only' },
+  ];
+
+  readonly bookingFilterOptions: Array<{
+    id: 'all' | 'with_bookings' | 'without_bookings';
+    labelKey: string;
+  }> = [
+    { id: 'all', labelKey: 'tr_products_booking_filter_all' },
+    { id: 'with_bookings', labelKey: 'tr_products_booking_filter_with' },
+    { id: 'without_bookings', labelKey: 'tr_products_booking_filter_without' },
+  ];
   totalNumberOfProducts: number;
   viewMode: 'table' | 'cards' = 'cards';
 
@@ -208,8 +225,8 @@ export class ProductsListComponent implements OnInit {
     delete this.params['categoryId'];
     delete this.params['attrKey'];
     delete this.params['attrValue'];
-    if (this.selectedcategory) {
-      this.params['categoryId'] = this.selectedcategory;
+    if (this.selectedCategories?.length) {
+      this.params['categoryId'] = this.selectedCategories.filter(Boolean).join(',');
     }
     if (this.selectedAttributeKey && this.selectedAttributeValue) {
       this.params['attrKey'] = this.selectedAttributeKey;
@@ -226,12 +243,12 @@ export class ProductsListComponent implements OnInit {
       this.params['warehouseOnly'] = true;
     } else if (this.locationFilter === 'branches') {
       this.params['excludeWarehouse'] = true;
-      if (this.selectedBranch) {
-        this.params['branchId'] = this.selectedBranch;
+      if (this.selectedBranches?.length) {
+        this.params['branchId'] = this.selectedBranches.filter(Boolean).join(',');
       }
     } else {
-      if (this.selectedBranch) {
-        this.params['branchId'] = this.selectedBranch;
+      if (this.selectedBranches?.length) {
+        this.params['branchId'] = this.selectedBranches.filter(Boolean).join(',');
       }
     }
 
@@ -285,7 +302,13 @@ export class ProductsListComponent implements OnInit {
   }
 
   private refreshAttributeKeyOptions(): void {
-    const c = this.categorys?.find((x) => String(x._id) === String(this.selectedcategory));
+    if (this.selectedCategories.length !== 1) {
+      this.attributeKeyOptions = [];
+      this.selectedAttributeKey = '';
+      this.selectedAttributeValue = '';
+      return;
+    }
+    const c = this.categorys?.find((x) => String(x._id) === String(this.selectedCategories[0]));
     const defs = Array.isArray((c as any)?.attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeKeyOptions = defs
       .map((d: any) => String(d?.key ?? d ?? '').trim())

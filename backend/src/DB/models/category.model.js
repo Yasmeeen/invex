@@ -11,6 +11,8 @@ const categorySchema = new mongoose.Schema({
         key: { type: String, required: true, trim: true },
         /** Optional display label; if omitted, we fallback to key. */
         label: { type: String, required: false, trim: true },
+        /** When true, attribute value is printed on customer invoice/receipt. */
+        showOnInvoice: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -68,7 +70,7 @@ categorySchema.pre('validate', function normalizeAttributeDefs(next) {
       if (!key) continue;
       if (seen.has(key)) continue;
       seen.add(key);
-      cleaned.push({ key, label });
+      cleaned.push({ key, label, showOnInvoice: !!row?.showOnInvoice });
     }
     this.attributeDefs = cleaned;
     return next();

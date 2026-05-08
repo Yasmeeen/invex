@@ -85,22 +85,34 @@
                     </button>
                   </div>
 
-                  <div class="row" *ngFor="let a of attributeDefs; let i = index; trackBy: trackByIndex">
+                  <div class="row align-items-end" *ngFor="let row of attributeRows; let i = index; trackBy: trackByIndex">
                     <div class="col-md-5">
                       <div class="form-group mb-2">
                         <label class="size-small">{{ 'tr_attribute_key' | translate }}</label>
                         <input
                           type="text"
                           class="s-control"
-                          [(ngModel)]="attributeDefs[i]"
+                          [(ngModel)]="attributeRows[i].key"
                           [ngModelOptions]="{ standalone: true }"
                           placeholder="e.g. color"
-
                         />
                       </div>
                     </div>
-                    <div class="col-md-2 flex flex-middle">
-                      <button type="button" class="s-btn btn-danger mt-3" (click)="removeAttributeRow(i)">
+                    <div class="col-md-4">
+                      <div class="form-group mb-2">
+                        <label class="checkbox-inline m-0 size-small flex flex-middle">
+                          <input
+                            type="checkbox"
+                            class="mr-2"
+                            [(ngModel)]="attributeRows[i].showOnInvoice"
+                            [ngModelOptions]="{ standalone: true }"
+                          />
+                          {{ 'tr_show_attribute_on_invoice' | translate }}
+                        </label>
+                      </div>
+                    </div>
+                    <div class="col-md-3 flex flex-middle mb-2">
+                      <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">
                         {{ 'tr_remove' | translate }}
                       </button>
                     </div>

@@ -40,6 +40,8 @@ const orderSchema = new mongoose.Schema(
         amount: { type: Number, required: true, min: 0 },
         paidAt: { type: Date, required: true },
         paidByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
+        /** cash, visa, aman, … (split checkout / follow-up payments). */
+        method: { type: String, required: false, trim: true },
         note: { type: String, default: '', trim: true },
       },
     ],
@@ -58,6 +60,16 @@ const orderSchema = new mongoose.Schema(
         /** Snapshot item cost at time of sale (for profit reports). */
         cost: { type: Number, required: false, default: 0, min: 0 },
         isApplyDiscount: { type: Boolean, default: false },
+        /** Snapshot: category attributes flagged showOnInvoice (label + value). */
+        invoiceAttributes: {
+          type: [
+            {
+              label: { type: String, trim: true },
+              value: { type: String, trim: true },
+            },
+          ],
+          default: undefined,
+        },
       },
     ],
 

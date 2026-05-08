@@ -231,6 +231,81 @@ export class AddOrderComponent implements OnInit {
   }
 
   /**
+   * Rows for the printable receipt: after save uses API snapshot (incl. invoiceAttributes);
+   * before submit uses cart lines + category flags for preview.
+   */
+  receiptTableRows(): Array<{
+    totalPrice: number;
+    quantity: number;
+    discountPct: number;
+    unitPrice: number;
+    name: string;
+    invoiceAttributes: Array<{ label: string; value: string }>;
+  }> {
+    const saved = this.createdOrder?.products as any[] | undefined;
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved.map((p: any) => ({
+        totalPrice: Math.round(Number(p.price || 0) * Number(p.quantity || 0) * 100) / 100,
+        quantity: Number(p.quantity || 0),
+        discountPct: 0,
+        unitPrice: Number(p.price || 0),
+        name: String(p.name || ''),
+        invoiceAttributes: Array.isArray(p.invoiceAttributes) ? p.invoiceAttributes : [],
+      }));
+    }
+    return this.orderProducts.map((item) => {
+      const sp = item.selectedProduct || {};
+      const qty = Number(item.quantity) || 0;
+      const unit = Number(sp.price) || 0;
+      const totalFromRow =
+        Number(item.totalPrice) ||
+        (sp.isApplyDiscount && sp.discount > 0
+          ? (unit - (unit * Number(sp.discount)) / 100) * qty
+          : unit * qty);
+      return {
+        totalPrice: Math.round(totalFromRow * 100) / 100,
+        quantity: qty,
+        discountPct: sp.isApplyDiscount ? Number(sp.discount) || 0 : 0,
+        unitPrice: unit,
+        name: String(sp.name || ''),
+        invoiceAttributes: this.invoiceAttrsFromProductDraft(sp),
+      };
+    });
+  }
+
+  private normalizeAttrKey(raw: any): string {
+    return String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_');
+  }
+
+  private invoiceAttrsFromProductDraft(prod: any): Array<{ label: string; value: string }> {
+    const attrs = prod?.attributes;
+    const defs = prod?.category?.attributeDefs;
+    if (!attrs || typeof attrs !== 'object' || !Array.isArray(defs) || !defs.length) {
+      return [];
+    }
+    const out: Array<{ label: string; value: string }> = [];
+    for (const def of defs) {
+      const key =
+        typeof def === 'string' ? this.normalizeAttrKey(def) : this.normalizeAttrKey(def?.key);
+      if (!key) continue;
+      const showOnInvoice = typeof def === 'object' && def ? !!def.showOnInvoice : false;
+      if (!showOnInvoice) continue;
+      const label =
+        typeof def === 'object' && def
+          ? String(def.label || '').trim() || key
+          : key;
+      const val = String(attrs[key] ?? '').trim();
+      if (!val) continue;
+      // Display the exact stored attribute value in the receipt preview.
+      out.push({ label, value: val });
+    }
+    return out;
+  }
+
+  /**
    * Receipt print formatting: compact numbers (no commas, no decimals) to avoid wrapping on 58mm paper.
    */
   formatReceiptAmount(value: any): string {

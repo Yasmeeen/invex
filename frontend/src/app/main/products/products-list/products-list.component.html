@@ -70,30 +70,47 @@
           <label>{{ 'tr_category' | translate }}</label>
           <div class="input-with-icon bg-white">
             <ng-select
-              class="s-control s-select"
+              class="s-control s-select products-filter-ng-select"
               placeholder="{{ 'tr_select' | translate }}"
               bindLabel="name"
               bindValue="_id"
-              [(ngModel)]="selectedcategory"
-              name="categoryId"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              appendTo="body"
+              [(ngModel)]="selectedCategories"
+              name="categoryIds"
               [items]="categorys"
               [clearable]="true"
-              (change)="onCategoryFilterChange()"
+              (ngModelChange)="onCategoryFilterChange()"
             >
+              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                <div class="ng-value" *ngFor="let item of items">
+                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                  <span class="ng-value-label">{{ item.name }}</span>
+                </div>
+              </ng-template>
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
           </div>
         </div>
       </div>
-      <div class="col-md-4 mb-4" *ngIf="selectedcategory && attributeKeyOptions?.length">
+      <div class="col-md-4 mb-4" *ngIf="selectedCategories?.length === 1 && attributeKeyOptions?.length">
         <div class="form-group mb-0">
           <label>{{ 'tr_category_attributes' | translate }}</label>
           <div class="row">
             <div class="col-md-5">
-              <select class="s-control width-100" [(ngModel)]="selectedAttributeKey" name="attrKey">
-                <option value="">{{ 'tr_select' | translate }}</option>
-                <option *ngFor="let k of attributeKeyOptions" [value]="k">{{ k }}</option>
-              </select>
+              <ng-select
+                class="s-control s-select width-100"
+                placeholder="{{ 'tr_select' | translate }}"
+                [items]="attributeKeyOptions"
+                [(ngModel)]="selectedAttributeKey"
+                name="attrKey"
+                [clearable]="true"
+                appendTo="body"
+                (change)="applyAttributeSearch()"
+              >
+              </ng-select>
             </div>
             <div class="col-md-7">
               <input
@@ -111,31 +128,41 @@
       <div class="col-md-4">
         <div class="form-group">
           <label>{{ 'tr_location_filter' | translate }}</label>
-          <select
-            class="s-control width-100"
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="locationFilterOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
             [(ngModel)]="locationFilter"
             name="locationFilter"
-            (change)="getproducts()"
+            (ngModelChange)="getproducts()"
           >
-            <option value="all">{{ 'tr_location_all' | translate }}</option>
-            <option value="warehouse">{{ 'tr_warehouse' | translate }}</option>
-            <option value="branches">{{ 'tr_location_branches_only' | translate }}</option>
-          </select>
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
         </div>
       </div>
       <div class="col-md-4">
         <div class="form-group mb-0">
           <label>{{ 'tr_products_booking_filter' | translate }}</label>
-          <select
-            class="s-control width-100"
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="bookingFilterOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
             [(ngModel)]="bookingFilter"
             name="bookingFilter"
-            (change)="getproducts()"
+            (ngModelChange)="getproducts()"
           >
-            <option value="all">{{ 'tr_products_booking_filter_all' | translate }}</option>
-            <option value="with_bookings">{{ 'tr_products_booking_filter_with' | translate }}</option>
-            <option value="without_bookings">{{ 'tr_products_booking_filter_without' | translate }}</option>
-          </select>
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
         </div>
       </div>
       <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
@@ -143,16 +170,26 @@
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon bg-white">
             <ng-select
-              class="s-control s-select"
+              class="s-control s-select products-filter-ng-select"
               placeholder="{{ 'tr_select' | translate }}"
               bindLabel="name"
               bindValue="_id"
-              [(ngModel)]="selectedBranch"
-              name="branchId"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              appendTo="body"
+              [(ngModel)]="selectedBranches"
+              name="branchIds"
               [items]="branches"
               [clearable]="true"
-              (change)="getproducts()"
+              (ngModelChange)="getproducts()"
             >
+              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                <div class="ng-value" *ngFor="let item of items">
+                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                  <span class="ng-value-label">{{ item.name }}</span>
+                </div>
+              </ng-template>
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
           </div>

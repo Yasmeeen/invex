@@ -50,12 +50,25 @@
             </div>
           </div>
           <div class="col-md-6">
-            <div class="form-group">
+            <div class="form-group booking-pickup-type-field">
               <label>{{ 'tr_booking_pickup_type' | translate }}</label>
-              <select class="s-control width-100" formControlName="pickupType">
-                <option value="branch_pickup">{{ 'tr_booking_branch_pickup' | translate }}</option>
-                <option value="online_shipping">{{ 'tr_booking_online_shipping' | translate }}</option>
-              </select>
+              <ng-select
+                class="s-control s-select width-100 booking-pickup-ng-select"
+                formControlName="pickupType"
+                [items]="pickupTypeOptions"
+                bindLabel="labelKey"
+                bindValue="id"
+                [clearable]="false"
+                [searchable]="false"
+                appendTo="body"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+              </ng-select>
             </div>
           </div>
           <div class="col-md-6" *ngIf="form.get('pickupType')?.value === 'online_shipping'">

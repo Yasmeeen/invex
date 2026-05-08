@@ -47,8 +47,11 @@ export class CashierComponent implements AfterViewInit {
   invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
   /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
   invoiceExtraValue = 0;
-  /** For credit sales: amount paid now (EGP). */
-  paidNowAmount = 0;
+  /**
+   * Split payment: multi-select methods, then amount per selected method.
+   */
+  selectedPayMethods: string[] = ['cash'];
+  payAmounts: Record<string, number> = { cash: 0 };
 
   searchTerm = '';
   barcode = '';
@@ -80,6 +83,11 @@ export class CashierComponent implements AfterViewInit {
     { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash', logo: 'assets/images/payment/vodafone-cash.svg' },
     { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
   ];
+
+  /** Methods allowed per split line (not «Pay later» — under-payment is handled automatically). */
+  get paymentMethodsForSplit(): CashierPaymentMethod[] {
+    return this.paymentMethods.filter((m) => m.id !== 'credit');
+  }
 
   constructor(
     private productsSerivce: ProductsSerivce, 
@@ -115,7 +123,6 @@ export class CashierComponent implements AfterViewInit {
 
   private initClientForm() {
     this.clientForm = this.fb.group({
-      paymentMethod: ['cash'],
       phone: ['', [Validators.required, this.phoneFormatValidator]],
       name: [''],
       address: ['']
@@ -210,7 +217,6 @@ export class CashierComponent implements AfterViewInit {
   private resetClientFormFields(): void {
     this.lastNotifiedClientId = null;
     this.clientForm.reset({
-      paymentMethod: 'cash',
       phone: '',
       name: '',
       address: ''
@@ -224,6 +230,11 @@ export class CashierComponent implements AfterViewInit {
   private clearClientInformationAfterCheckout(): void {
     this.isClientInfoOpen = false;
     this.resetClientFormFields();
+  }
+
+  private resetPaymentLinesAfterCheckout(): void {
+    this.selectedPayMethods = ['cash'];
+    this.payAmounts = { cash: 0 };
   }
 
   ngAfterViewInit() {
@@ -289,6 +300,73 @@ export class CashierComponent implements AfterViewInit {
   freeSellableQty(product: Product | any): number {
     const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
     return Math.max(0, stock - this.bookedQty(product));
+  }
+
+  ensureDefaultPayAmounts(): void {
+    if (this.selectedPayMethods.length !== 1) {
+      return;
+    }
+    const id = this.selectedPayMethods[0];
+    const t = Math.round(this.finalOrderTotal() * 100) / 100;
+    const cur = Number(this.payAmounts[id]);
+    if (!Number.isFinite(cur) || cur <= 0) {
+      this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, t) };
+    }
+  }
+
+  onSelectedPayMethodsChange(ids: string[] | null): void {
+    const raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
+    if (!raw.length) {
+      this.selectedPayMethods = ['cash'];
+      this.reconcilePayAmountsKeys(['cash']);
+      return;
+    }
+    this.reconcilePayAmountsKeys(raw);
+  }
+
+  private reconcilePayAmountsKeys(ids: string[]): void {
+    const next: Record<string, number> = {};
+    for (const id of ids) {
+      next[id] = Number(this.payAmounts[id]) || 0;
+    }
+    this.payAmounts = next;
+  }
+
+  trackPayMethodId(_index: number, id: string): string {
+    return id;
+  }
+
+  getPayMethodDef(id: string): CashierPaymentMethod | undefined {
+    return this.paymentMethodsForSplit.find((m) => m.id === id);
+  }
+
+  paymentSplitsTotal(): number {
+    const sum = this.selectedPayMethods.reduce(
+      (acc, id) => acc + (Number.isFinite(Number(this.payAmounts[id])) ? Number(this.payAmounts[id]) : 0),
+      0
+    );
+    return Math.round(sum * 100) / 100;
+  }
+
+  paymentRemaining(): number {
+    return Math.round((this.finalOrderTotal() - this.paymentSplitsTotal()) * 100) / 100;
+  }
+
+  paymentOverAllocated(): boolean {
+    return this.paymentSplitsTotal() > this.finalOrderTotal() + 0.001;
+  }
+
+  /** Receipt: translation key for payment method id (store receipt language). */
+  payMethodLabelKey(method: string | undefined | null): string {
+    const m = String(method || '').trim().toLowerCase();
+    const opt = this.paymentMethods.find((x) => x.id === m);
+    if (opt) {
+      return opt.labelKey;
+    }
+    if (m === 'mixed') {
+      return 'tr_pay_mixed';
+    }
+    return 'tr_pay_cash';
   }
 
   private maybePushBookingWarning(product: Product | any, newLineQuantity: number): void {
@@ -492,6 +570,15 @@ export class CashierComponent implements AfterViewInit {
       return;
     }
 
+    this.ensureDefaultPayAmounts();
+
+    if (this.paymentOverAllocated()) {
+      this.translate
+        .get('tr_cashier_payment_over')
+        .subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
     if (this.isClientInfoOpen) {
       this.clientForm.markAllAsTouched();
       if (!this.clientForm.valid) {
@@ -517,23 +604,23 @@ export class CashierComponent implements AfterViewInit {
       clientAddress = (raw.address || '').trim() || '-';
     }
 
-    const paymentMethod =
-      this.clientForm.get('paymentMethod')?.value || 'cash';
+    const paymentSplits = this.selectedPayMethods
+      .filter((id) => String(id || '').trim())
+      .map((id) => ({
+        method: String(id).trim().toLowerCase(),
+        amount: Math.round((Number(this.payAmounts[id]) || 0) * 100) / 100,
+      }));
 
     const orderData = {
       products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
       clientName,
       clientPhoneNumber,
       clientAddress,
-      paymentMethod,
+      paymentSplits,
       branch: selectedBranchId,
       status: 'completed',
       userId: this.curentUser._id,
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
-      paidAmount:
-        paymentMethod === 'credit'
-          ? Math.round(Number(this.paidNowAmount || 0) * 100) / 100
-          : undefined,
     };
 
     const receiptSubtotal = Math.round(this.orderSubtotal() * 100) / 100;
@@ -567,7 +654,7 @@ export class CashierComponent implements AfterViewInit {
       this.cdr.detectChanges();
       window.print();
       this.orderItems = [];
-      this.paidNowAmount = 0;
+      this.resetPaymentLinesAfterCheckout();
       this.invoiceDiscountMode = 'percent';
       this.invoiceExtraValue = 0;
       this.clearClientInformationAfterCheckout();
@@ -607,6 +694,14 @@ export class CashierComponent implements AfterViewInit {
     const sub = this.receiptLinesSubtotal();
     const disc = this.receiptInvoiceExtraDiscount();
     return Math.round((sub - disc) * 100) / 100;
+  }
+
+  receiptPaidPayments(): Array<{ method?: string; amount: number }> {
+    const list = this.createdOrder?.payments;
+    if (!Array.isArray(list)) {
+      return [];
+    }
+    return list.filter((p: any) => Number(p?.amount) > 0);
   }
 
   /**

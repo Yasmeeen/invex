@@ -60,10 +60,19 @@ export interface Category {
   /** Prefix for product codes (e.g. ELEC → ELEC-001) */
   code?: string;
   /** Dynamic attributes definition (new format: string keys; legacy: objects with key/label). */
-  attributeDefs?: string[] | Array<{ key: string; label?: string }>;
+  attributeDefs?:
+    | string[]
+    | Array<{
+        key: string;
+        label?: string;
+        showOnInvoice?: boolean;
+        options?: Array<{ value: string; label: string }>;
+      }>;
   productsCount: number;
-  totalItems: number
-}export interface Branch {
+  totalItems: number;
+}
+
+export interface Branch {
   _id: string;
   name: string;
   storeAddress: string;
@@ -71,6 +80,18 @@ export interface Category {
   employeesSalary: number;
   branchInvoices: number;
   expenses: number;
+}
+
+/** Snapshot line item on a saved order (API shape; not a full Product). */
+export interface OrderProductLine {
+  productId?: string;
+  name: string;
+  code: string;
+  quantity: number;
+  price?: number;
+  cost?: number;
+  isApplyDiscount?: boolean;
+  invoiceAttributes?: Array<{ label: string; value: string }>;
 }
 
 export interface Order {
@@ -93,9 +114,10 @@ export interface Order {
     amount: number;
     paidAt: string;
     paidByUserId?: string;
+    method?: string;
     note?: string;
   }>;
-  products?: Product [];
+  products?: OrderProductLine[];
   orderNumber?: number;
   paymentMethod?: string;
   status?: string;

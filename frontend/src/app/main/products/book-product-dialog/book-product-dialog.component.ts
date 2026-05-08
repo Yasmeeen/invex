@@ -27,6 +27,10 @@ export class BookProductDialogComponent implements OnInit {
   depositPreviewUrl: string | null = null;
   product: Product;
   readonly maxQuantity: number;
+  readonly pickupTypeOptions: Array<{ id: string; labelKey: string }> = [
+    { id: 'branch_pickup', labelKey: 'tr_booking_branch_pickup' },
+    { id: 'online_shipping', labelKey: 'tr_booking_online_shipping' },
+  ];
 
   constructor(
     private fb: FormBuilder,

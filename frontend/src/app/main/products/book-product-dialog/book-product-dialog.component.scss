@@ -4,6 +4,13 @@
   gap: 0.75rem;
 }
 
+.booking-pickup-type-field {
+  ::ng-deep .booking-pickup-ng-select.ng-select {
+    position: relative;
+    z-index: 1;
+  }
+}
+
 .s-control--invalid {
   border-color: #c62828 !important;
 }

@@ -6,6 +6,11 @@ import { Category } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 import { CategoriesServce } from '@shared/services/categories.service';
 
+export interface CategoryAttributeRow {
+  key: string;
+  showOnInvoice: boolean;
+}
+
 @Component({
   selector: 'app-create-edit-category',
   templateUrl: './create-edit-category.component.html',
@@ -16,7 +21,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   categoryId: string;
   isEdit: boolean;
   @ViewChild('categoryForm') categoryForm: NgForm;
-  attributeDefs: string[] = [];
+  attributeRows: CategoryAttributeRow[] = [];
   loadingCategory = false;
 
   constructor(
@@ -58,8 +63,8 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       // initial fast patch while API loads
       this.applyCategoryToForm(this.data.category as Category);
     }
-    if (!this.isEdit && !this.attributeDefs.length) {
-      this.attributeDefs = [''];
+    if (!this.isEdit && !this.attributeRows.length) {
+      this.attributeRows = [{ key: '', showOnInvoice: false }];
     }
   }
 
@@ -76,20 +81,28 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       code: (c as any).code || '',
     });
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
-    this.attributeDefs = defs.map((x: any) => String(x?.key ?? x ?? ''));
-    if (!this.attributeDefs.length) {
-      this.attributeDefs = [''];
+    this.attributeRows = defs.map((x: any) => {
+      if (typeof x === 'string') {
+        return { key: String(x), showOnInvoice: false };
+      }
+      return {
+        key: String(x?.key ?? ''),
+        showOnInvoice: !!x?.showOnInvoice,
+      };
+    });
+    if (!this.attributeRows.length) {
+      this.attributeRows = [{ key: '', showOnInvoice: false }];
     }
   }
 
   addAttributeRow(): void {
-    this.attributeDefs.push('');
+    this.attributeRows.push({ key: '', showOnInvoice: false });
   }
 
   removeAttributeRow(i: number): void {
-    this.attributeDefs.splice(i, 1);
-    if (!this.attributeDefs.length) {
-      this.attributeDefs = [''];
+    this.attributeRows.splice(i, 1);
+    if (!this.attributeRows.length) {
+      this.attributeRows = [{ key: '', showOnInvoice: false }];
     }
   }
 
@@ -100,15 +113,15 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       .replace(/\s+/g, '_');
   }
 
-  private buildAttributeDefsPayload(): string[] {
-    const out: string[] = [];
+  private buildAttributeDefsPayload(): Array<{ key: string; showOnInvoice: boolean }> {
+    const out: Array<{ key: string; showOnInvoice: boolean }> = [];
     const seen = new Set<string>();
-    for (const raw of this.attributeDefs || []) {
-      const key = this.normalizeKey(raw);
+    for (const row of this.attributeRows || []) {
+      const key = this.normalizeKey(row?.key);
       if (!key) continue;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push(key);
+      out.push({ key, showOnInvoice: !!row?.showOnInvoice });
     }
     return out;
   }

@@ -260,12 +260,19 @@
             <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
             <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
           </tr>
-          <tr *ngFor="let item of orderProducts">
+          <tr *ngFor="let item of receiptTableRows()">
             <td>{{ formatReceiptAmount(item.totalPrice) }}</td>
             <td>{{ item.quantity }}</td>
-            <td>{{ item.selectedProduct.isApplyDiscount ? item.selectedProduct.discount : 0 }} %</td>
-            <td>{{ formatReceiptAmount(item.selectedProduct.price) }}</td>
-            <td>{{ item.selectedProduct.name }}</td>
+            <td>{{ item.discountPct }} %</td>
+            <td>{{ formatReceiptAmount(item.unitPrice) }}</td>
+            <td>
+              {{ item.name }}
+              <div class="receipt-item-attrs" *ngIf="item.invoiceAttributes?.length">
+                <span class="receipt-item-attr" *ngFor="let ia of item.invoiceAttributes">
+                  {{ ia.label }}: {{ ia.value }}
+                </span>
+              </div>
+            </td>
           </tr>
         </table>
 

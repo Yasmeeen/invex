@@ -105,6 +105,17 @@ const parseBranchIdFilter = (branchId) => {
   return branchIdStr;
 };
 
+/** Comma-separated ObjectIds from query (e.g. multi-select filters). */
+const parseOidCsvList = (raw) => {
+  if (raw == null) return [];
+  const str = String(raw).trim();
+  if (!str || str === 'undefined' || str === 'null') return [];
+  return str
+    .split(',')
+    .map((x) => String(x).trim())
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+};
+
 export const getProductsImportMetadata = async (_req, res) => {
   try {
     const [branches, categories] = await Promise.all([
@@ -704,13 +715,18 @@ export const getProducts = async (req, res) => {
       query.inWarehouse = { $ne: true };
     }
 
-    const safeBranchId = parseBranchIdFilter(branchId);
-    if (safeBranchId) {
-      query.branch = safeBranchId;
+    const categoryIds = parseOidCsvList(categoryId);
+    if (categoryIds.length === 1) {
+      query.category = categoryIds[0];
+    } else if (categoryIds.length > 1) {
+      query.category = { $in: categoryIds };
     }
 
-    if (categoryId && mongoose.Types.ObjectId.isValid(String(categoryId))) {
-      query.category = String(categoryId);
+    const branchIds = parseOidCsvList(branchId);
+    if (branchIds.length === 1) {
+      query.branch = branchIds[0];
+    } else if (branchIds.length > 1) {
+      query.branch = { $in: branchIds };
     }
 
     if (attrKey && attrValue) {
@@ -729,7 +745,7 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name code')
+        .populate('category', 'name code attributeDefs')
         .populate('branch', 'name')
         .skip(skip)
         .limit(Number(limit)),

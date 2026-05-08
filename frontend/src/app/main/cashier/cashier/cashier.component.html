@@ -51,7 +51,8 @@
               <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
               <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
             </div>
-            <div class="card-body" *ngIf="isClientInfoOpen" [formGroup]="clientForm">
+            <div class="card-body" *ngIf="isClientInfoOpen">
+              <div [formGroup]="clientForm">
     
               <div class="row">
                 
@@ -112,36 +113,77 @@
                   </span>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="form-group card-body--payment mb-md-3">
-                  <label>{{ 'tr_payment_method' | translate }}</label>
-                  <div class="input-with-icon bg-white">
-                    <ng-select
-                      formControlName="paymentMethod"
-                      class="s-control s-select cashier-payment-select width-100"
-                      [items]="paymentMethods"
-                      bindLabel="labelKey"
-                      bindValue="id"
-                      [clearable]="false"
-                      [searchable]="false"
-                    >
-                      <ng-template ng-label-tmp let-item="item">
-                        <span class="payment-option">
-                          <img [src]="item.logo" class="payment-logo" alt="" />
-                          {{ item.labelKey | translate }}
-                        </span>
-                      </ng-template>
-                      <ng-template ng-option-tmp let-item="item">
-                        <span class="payment-option">
-                          <img [src]="item.logo" class="payment-logo" alt="" />
-                          {{ item.labelKey | translate }}
-                        </span>
-                      </ng-template>
-                    </ng-select>
-                    <i class="fa fa-caret-down input-icon"></i>
-                  </div>
-                </div>
               </div>
+              </div>
+
+              <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
+                <label class="size-small weight-bold d-block mb-2">{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
+                <ng-select
+                  class="s-control s-select cashier-payment-select width-100 mb-2"
+                  [items]="paymentMethodsForSplit"
+                  bindLabel="labelKey"
+                  bindValue="id"
+                  [multiple]="true"
+                  [closeOnSelect]="false"
+                  [clearable]="true"
+                  [searchable]="true"
+                  appendTo="body"
+                  placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
+                  [(ngModel)]="selectedPayMethods"
+                  [ngModelOptions]="{ standalone: true }"
+                  name="payMethodsMulti"
+                  (ngModelChange)="onSelectedPayMethodsChange($event)"
+                >
+                  <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                    <div class="ng-value" *ngFor="let item of items">
+                      <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                      <span class="ng-value-label">{{ item.label | translate }}</span>
+                    </div>
+                  </ng-template>
+                  <ng-template ng-option-tmp let-item="item">
+                    <span class="payment-option">
+                      <img [src]="item.logo" class="payment-logo" alt="" />
+                      {{ item.labelKey | translate }}
+                    </span>
+                  </ng-template>
+                </ng-select>
+
+                <div class="cashier-payment-amount-heading size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
+                  {{ 'tr_cashier_payment_amounts_hint' | translate }}
+                </div>
+                <div
+                  class="cashier-payment-split-row"
+                  *ngFor="let mid of selectedPayMethods; trackBy: trackPayMethodId"
+                >
+                  <div class="cashier-payment-split-row__method cashier-payment-split-row__method--labeled">
+                    <img
+                      *ngIf="getPayMethodDef(mid) as pm"
+                      [src]="pm.logo"
+                      class="payment-logo"
+                      alt=""
+                    />
+                    <span class="cashier-payment-split-row__label">{{ payMethodLabelKey(mid) | translate }}</span>
+                  </div>
+                  <input
+                    type="number"
+                    class="s-control cashier-payment-split-row__amount"
+                    min="0"
+                    step="0.01"
+                    [(ngModel)]="payAmounts[mid]"
+                    [ngModelOptions]="{ standalone: true }"
+                    [name]="'payAmt_' + mid"
+                  />
+                </div>
+                <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
+                  {{ 'tr_cashier_payment_allocated' | translate }}:
+                  <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                  /
+                  {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+                </div>
+                <div class="size-small text-muted mt-1" *ngIf="paymentRemaining() > 0.005">
+                  {{ 'tr_cashier_payment_remaining_credit' | translate }}:
+                  <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                </div>
               </div>
           
             </div>
@@ -288,25 +330,6 @@
             {{ "tr_final_after_extra_discount" | translate }}:
             {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
-
-          <div
-            class="form-group mb-0 mt-2"
-            *ngIf="clientForm.get('paymentMethod')?.value === 'credit'"
-          >
-            <label class="size-small">{{ "tr_paid_now_amount" | translate }}</label>
-            <input
-              type="number"
-              class="s-control width-100"
-              min="0"
-              [max]="finalOrderTotal()"
-              step="0.01"
-              [(ngModel)]="paidNowAmount"
-            />
-            <div class="size-small text-muted mt-1">
-              {{ "tr_remaining_amount" | translate }}:
-              {{ (finalOrderTotal() - (paidNowAmount || 0)) | currency:'EGP ':'symbol':'1.2-2' }}
-            </div>
-          </div>
         </div>
         <button class="pay-btn" (click)="checkout()">
           {{ "tr_cashier.PAY" | translate }}
@@ -394,7 +417,14 @@
       </tr>
 
       <tr *ngFor="let item of createdOrder?.products">
-        <td class="item-name">{{ item.name }}</td>
+        <td class="item-name">
+          {{ item.name }}
+          <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
+            <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
+              {{ ia.label }}: {{ ia.value }}
+            </span>
+          </div>
+        </td>
         <td>{{ item.quantity }}</td>
         <td class="money">
           {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
@@ -424,6 +454,21 @@
         <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <table
+      class="invoice-table invoice-payments-table"
+      *ngIf="createdOrder?.payments?.length && receiptPaidPayments().length"
+    >
+      <tr class="header bold">
+        <td colspan="2">{{ 'tr_invoice_payments' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+      <tr *ngFor="let p of receiptPaidPayments()">
+        <td>{{ payMethodLabelKey(p.method) | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
     </table>

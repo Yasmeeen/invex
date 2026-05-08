@@ -177,6 +177,7 @@
             }}
           </div>
           <div class="product-name">{{ product.name }}</div>
+          <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
           <div class="product-price" *ngIf="!cardHasDiscount(product)">
             {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
@@ -217,7 +218,10 @@
                   [src]="item.imageUrl"
                   alt=""
                 />
-                <span>{{ item.name }}</span>
+                <span class="order-line-product__text">
+                  <span class="order-line-product__name">{{ item.name }}</span>
+                  <span class="order-line-product__code" *ngIf="item.code">{{ item.code }}</span>
+                </span>
               </span>
             </td>
             <td>

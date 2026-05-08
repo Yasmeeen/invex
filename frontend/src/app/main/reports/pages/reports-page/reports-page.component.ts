@@ -416,6 +416,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       { key: 'location', labelKey: 'tr_bookings_report_col_location' },
       { key: 'customerName', labelKey: 'tr_booking_customer_name' },
       { key: 'customerPhone', labelKey: 'tr_booking_customer_phone' },
+      { key: 'transferReferencePhone', labelKey: 'tr_booking_transfer_reference_phone' },
       { key: 'pickup', labelKey: 'tr_booking_pickup_type' },
       { key: 'depositAmount', labelKey: 'tr_booking_deposit' },
       { key: 'depositProof', labelKey: 'tr_booking_deposit_proof' },
@@ -436,15 +437,23 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           : b.branch?.name || '—',
       customerName: b.customerName ?? '',
       customerPhone: b.customerPhone ?? '',
+      transferReferencePhone: b.transferReferencePhone ?? '—',
       pickup:
         b.pickupType === 'online_shipping'
           ? t('tr_booking_online_shipping')
           : t('tr_booking_branch_pickup'),
       depositAmount: b.depositAmount ?? 0,
-      depositProof:
-        b.depositTransferImageUrl && String(b.depositTransferImageUrl).trim()
-          ? String(b.depositTransferImageUrl).trim()
-          : '—',
+      depositProof: (() => {
+        const urls = Array.isArray(b.depositTransferImageUrls) ? b.depositTransferImageUrls : [];
+        const first = b.depositTransferImageUrl && String(b.depositTransferImageUrl).trim();
+        const list =
+          urls.length > 0
+            ? urls.map((u: string) => String(u || '').trim()).filter(Boolean)
+            : first
+              ? [first]
+              : [];
+        return list.length ? list.join('\n') : '—';
+      })(),
       createdBy:
         (typeof b.createdBy === 'object' && b.createdBy?.name ? b.createdBy.name : b.createdBy) || '',
       status: b.status ?? '',

@@ -20,6 +20,8 @@ export interface Product {
   bookingStatus?: 'none' | 'active';
   /** Sum of active booking quantities (from API) */
   bookedQuantity?: number;
+  /** Active bookings that are confirmed (cashier reserved-qty warning) */
+  confirmedBookedQuantity?: number;
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
@@ -36,9 +38,15 @@ export interface ProductActiveBooking {
   depositAmount: number;
   /** Screenshot / receipt of deposit transfer (URL). */
   depositTransferImageUrl?: string;
-  bookingDate: string;
-  status?: string;
+  /** Multiple transfer proof images (new bookings). */
+  depositTransferImageUrls?: string[];
+  /** Phone number the deposit was transferred from (bank reference). */
+  transferReferencePhone?: string;
+  /** Legacy / report field; new bookings use server time. */
+  bookingDate?: string;
+  /** When the booking was recorded (show in UI). */
   createdAt?: string;
+  status?: string;
   createdBy?: { _id?: string; name?: string };
   /** Informational: manager approved the booking */
   confirmed?: boolean;

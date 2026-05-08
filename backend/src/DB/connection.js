@@ -27,24 +27,48 @@ async function fixNotificationIndexes() {
   await Notification.syncIndexes();
 }
 
-/** One-way sync: denormalize Product.bookedQuantity / bookingStatus from active ProductBooking rows. */
+/** One-way sync: denormalize Product booked totals / bookingStatus from active ProductBooking rows. */
 async function syncBookedQuantitiesFromBookings() {
   const agg = await ProductBooking.aggregate([
     { $match: { status: 'active' } },
-    { $group: { _id: '$product', total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+    {
+      $group: {
+        _id: '$product',
+        total: { $sum: { $ifNull: ['$quantity', 1] } },
+        confirmedTotal: {
+          $sum: {
+            $cond: [{ $eq: ['$confirmed', true] }, { $ifNull: ['$quantity', 1] }, 0],
+          },
+        },
+      },
+    },
   ]);
   const idsWithBookings = agg.map((a) => a._id);
   await Promise.all(
     agg.map((row) =>
       Product.updateOne(
         { _id: row._id },
-        { $set: { bookedQuantity: row.total, bookingStatus: 'active', activeBooking: null } }
+        {
+          $set: {
+            bookedQuantity: row.total,
+            confirmedBookedQuantity: row.confirmedTotal || 0,
+            bookingStatus: 'active',
+            activeBooking: null,
+          },
+        }
       )
     )
   );
   await Product.updateMany(
     { _id: { $nin: idsWithBookings } },
-    { $set: { bookedQuantity: 0, bookingStatus: 'none', activeBooking: null } }
+    {
+      $set: {
+        bookedQuantity: 0,
+        confirmedBookedQuantity: 0,
+        bookingStatus: 'none',
+        activeBooking: null,
+      },
+    }
   );
 }
 
@@ -67,7 +91,7 @@ const connectToMongoDB = async () => {
     }
     try {
       await syncBookedQuantitiesFromBookings();
-      console.log('✅ Product bookedQuantity synced from ProductBooking');
+      console.log('✅ Product booked / confirmed booked quantities synced from ProductBooking');
     } catch (e) {
       console.warn('⚠️ Booked quantity sync:', e.message);
     }

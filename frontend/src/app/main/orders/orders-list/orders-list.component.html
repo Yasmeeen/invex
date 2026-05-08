@@ -47,7 +47,7 @@
         *ngIf="hasDateFilterToClear"
       >
         <i class="fa fa-times" aria-hidden="true"></i>
-        Clear date
+        {{ 'tr_clear' | translate }} {{ 'tr_date' | translate }}
       </button>
     </div>
     <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">

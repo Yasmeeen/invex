@@ -93,19 +93,40 @@
                 </ng-container>
                 <dt>{{ 'tr_booking_deposit' | translate }}</dt>
                 <dd>{{ b.depositAmount }}</dd>
-                <ng-container *ngIf="depositProofUrl(b) as proofUrl">
-                  <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
-                  <dd class="booking-deposit-proof-dd">
-                    <a [href]="proofUrl" target="_blank" rel="noopener noreferrer">{{
-                      'tr_booking_deposit_proof_open' | translate
-                    }}</a>
-                    <img class="booking-deposit-proof-img" [src]="proofUrl" alt="" loading="lazy" />
-                  </dd>
+                <ng-container *ngIf="b.transferReferencePhone">
+                  <dt>{{ 'tr_booking_transfer_reference_phone' | translate }}</dt>
+                  <dd>{{ b.transferReferencePhone }}</dd>
                 </ng-container>
-                <dt>{{ 'tr_booking_date' | translate }}</dt>
-                <dd>{{ b.bookingDate | date : 'mediumDate' }}</dd>
+                <dt>{{ 'tr_booking_recorded_at' | translate }}</dt>
+                <dd>
+                  {{
+                    (b.createdAt ? b.createdAt : b.bookingDate) | date : 'medium'
+                  }}
+                </dd>
                 <dt *ngIf="b.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
                 <dd *ngIf="b.createdBy?.name">{{ b.createdBy?.name }}</dd>
+                <ng-container *ngIf="depositProofUrls(b).length">
+                  <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
+                  <dd class="booking-deposit-proof-dd">
+                    <div class="booking-detail-deposit-thumbs" role="list">
+                      <div
+                        *ngFor="let proofUrl of depositProofUrls(b)"
+                        class="booking-detail-deposit-thumb"
+                        role="listitem"
+                      >
+                        <button
+                          type="button"
+                          class="booking-detail-deposit-thumb__open"
+                          (click)="openDepositPreview(proofUrl)"
+                          [attr.aria-label]="'tr_booking_deposit_preview' | translate"
+                          [attr.title]="'tr_booking_deposit_preview' | translate"
+                        >
+                          <img [src]="proofUrl" alt="" loading="lazy" />
+                        </button>
+                      </div>
+                    </div>
+                  </dd>
+                </ng-container>
               </dl>
             </li>
           </ul>
@@ -118,6 +139,26 @@
         <button type="button" class="s-btn btn-primary" *ngIf="showAddBooking" (click)="openNewBooking()">
           {{ 'tr_product_book' | translate }}
         </button>
+      </div>
+    </div>
+    <div
+      *ngIf="depositPreviewUrl"
+      class="booking-deposit-lightbox"
+      (click)="closeDepositPreview()"
+      role="dialog"
+      [attr.aria-modal]="true"
+      [attr.aria-label]="'tr_booking_deposit_preview' | translate"
+    >
+      <div class="booking-deposit-lightbox__panel" (click)="$event.stopPropagation()">
+        <button
+          type="button"
+          class="booking-deposit-lightbox__close"
+          (click)="closeDepositPreview()"
+          [attr.aria-label]="'tr_close' | translate"
+        >
+          <i class="fa fa-times" aria-hidden="true"></i>
+        </button>
+        <img [src]="depositPreviewUrl" alt="" />
       </div>
     </div>
   </div>

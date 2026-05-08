@@ -197,22 +197,24 @@
                     [src]="product.imageUrl"
                     alt=""
                   />
-                  <span class="products-list__name-text">{{ product.name }}</span>
-                  <span
-                    *ngIf="bookedQty(product) > 0"
-                    class="booking-badge"
-                    [attr.title]="
-                      'tr_booking_stock_badge'
-                        | translate
-                          : { booked: bookedQty(product), stock: product.stock }
-                    "
-                  >
-                    <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
-                    <span class="booking-badge__text">{{
-                      'tr_booking_stock_badge'
-                        | translate
-                          : { booked: bookedQty(product), stock: product.stock }
-                    }}</span>
+                  <span class="products-list__name-column">
+                    <span
+                      *ngIf="bookedQty(product) > 0"
+                      class="booking-badge"
+                      [attr.title]="
+                        'tr_booking_stock_badge'
+                          | translate
+                            : { booked: bookedQty(product), stock: product.stock }
+                      "
+                    >
+                      <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
+                      <span class="booking-badge__text">{{
+                        'tr_booking_stock_badge'
+                          | translate
+                            : { booked: bookedQty(product), stock: product.stock }
+                      }}</span>
+                    </span>
+                    <span class="products-list__name-text">{{ product.name }}</span>
                   </span>
                 </span>
               </td>

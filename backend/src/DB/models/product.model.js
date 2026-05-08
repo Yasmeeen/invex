@@ -66,6 +66,12 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Sum of quantities on active ProductBooking rows where confirmed is true (denormalized). Cashier warning uses this. */
+    confirmedBookedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

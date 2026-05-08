@@ -233,10 +233,19 @@ body {
 }
 
 .products-list__name-cell {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
   max-width: 100%;
+}
+
+.products-list__name-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .products-list .products-list__thumb {
@@ -252,6 +261,7 @@ body {
 
 .products-list__name-text {
   min-width: 0;
+  line-height: 1.35;
 }
 
 .booking-badge {

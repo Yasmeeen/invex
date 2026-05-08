@@ -19,6 +19,23 @@ const normalizeDepositProofUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
+const MAX_DEPOSIT_PROOF_IMAGES = 10;
+
+function collectDepositProofUrls(depositTransferImageUrl, depositTransferImageUrls) {
+  const out = [];
+  const push = (u) => {
+    const n = normalizeDepositProofUrl(u);
+    if (n && !out.includes(n)) {
+      out.push(n);
+    }
+  };
+  if (Array.isArray(depositTransferImageUrls)) {
+    depositTransferImageUrls.forEach(push);
+  }
+  push(depositTransferImageUrl);
+  return out.slice(0, MAX_DEPOSIT_PROOF_IMAGES);
+}
+
 function bookingListMatchForViewer({ productId, product, viewerUserId, viewer }) {
   const pidOid = new mongoose.Types.ObjectId(String(productId));
   const viewerOid = new mongoose.Types.ObjectId(String(viewerUserId));
@@ -117,14 +134,24 @@ async function sumActiveBookedQuantity(productOid) {
   return agg?.total || 0;
 }
 
+async function sumActiveConfirmedBookedQuantity(productOid) {
+  const [agg] = await ProductBooking.aggregate([
+    { $match: { product: productOid, status: 'active', confirmed: true } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+  ]);
+  return agg?.total || 0;
+}
+
 async function recalcProductBookingTotals(productId) {
   const pid = new mongoose.Types.ObjectId(String(productId));
   const total = await sumActiveBookedQuantity(pid);
+  const confirmedTotal = await sumActiveConfirmedBookedQuantity(pid);
   await Product.updateOne(
     { _id: pid },
     {
       $set: {
         bookedQuantity: total,
+        confirmedBookedQuantity: confirmedTotal,
         bookingStatus: total > 0 ? 'active' : 'none',
         activeBooking: null,
       },
@@ -188,7 +215,8 @@ export const createProductBooking = async (req, res) => {
       shippingAddress,
       depositAmount,
       depositTransferImageUrl,
-      bookingDate,
+      depositTransferImageUrls,
+      transferReferencePhone,
       userId,
     } = req.body;
 
@@ -212,16 +240,37 @@ export const createProductBooking = async (req, res) => {
     if (Number.isNaN(dep) || dep < 0) {
       return res.status(400).json({ error: 'Valid deposit amount is required' });
     }
-    const depositProofUrl = normalizeDepositProofUrl(depositTransferImageUrl);
+    const depositProofUrls = collectDepositProofUrls(depositTransferImageUrl, depositTransferImageUrls);
+    if (depositProofUrls.length > MAX_DEPOSIT_PROOF_IMAGES) {
+      return res.status(400).json({ error: `At most ${MAX_DEPOSIT_PROOF_IMAGES} deposit images allowed` });
+    }
+    // Legacy: reject invalid single URL if client sent only invalid URL and no valid URLs in array
+    const hadSingleRaw = depositTransferImageUrl != null && String(depositTransferImageUrl).trim() !== '';
     if (
-      depositTransferImageUrl != null &&
-      String(depositTransferImageUrl).trim() !== '' &&
-      !depositProofUrl
+      hadSingleRaw &&
+      depositProofUrls.length === 0 &&
+      (!Array.isArray(depositTransferImageUrls) || depositTransferImageUrls.length === 0)
     ) {
       return res.status(400).json({ error: 'Invalid deposit transfer image URL' });
     }
-    if (!bookingDate) {
-      return res.status(400).json({ error: 'Booking date is required' });
+    if (Array.isArray(depositTransferImageUrls) && depositTransferImageUrls.length > 0 && depositProofUrls.length === 0) {
+      return res.status(400).json({ error: 'Invalid deposit transfer image URL(s)' });
+    }
+
+    const transferRefRaw = String(transferReferencePhone || '').trim();
+    const needsTransferRef = dep > 0 || depositProofUrls.length > 0;
+    if (needsTransferRef && !transferRefRaw) {
+      return res
+        .status(400)
+        .json({ error: 'Transfer reference phone is required when deposit or transfer proof is provided' });
+    }
+    let transferRefStored = '';
+    if (transferRefRaw) {
+      const transferRefDigits = digitsOnly(transferRefRaw);
+      if (transferRefDigits.length < 10) {
+        return res.status(400).json({ error: 'Invalid transfer reference phone' });
+      }
+      transferRefStored = canonicalPhoneForStorage(transferRefRaw);
     }
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       return res.status(400).json({ error: 'userId is required' });
@@ -270,8 +319,10 @@ export const createProductBooking = async (req, res) => {
       pickupType,
       shippingAddress: String(shippingAddress || '').trim(),
       depositAmount: dep,
-      depositTransferImageUrl: depositProofUrl || '',
-      bookingDate: new Date(bookingDate),
+      depositTransferImageUrls: depositProofUrls,
+      depositTransferImageUrl: depositProofUrls[0] || '',
+      transferReferencePhone: transferRefStored,
+      bookingDate: new Date(),
       status: 'active',
       createdBy: userId,
     });
@@ -405,6 +456,7 @@ export const confirmProductBooking = async (req, res) => {
     booking.confirmedAt = new Date();
     booking.confirmedBy = userId;
     await booking.save();
+    await recalcProductBookingTotals(booking.product);
 
     const populated = await ProductBooking.findById(booking._id)
       .populate('confirmedBy', 'name')
@@ -489,7 +541,15 @@ export const cancelProductBooking = async (req, res) => {
       return res.status(404).json({ error: 'Active booking not found' });
     }
 
-    const admin = await isStoreAdmin(userId);
+    const actor = await User.findById(userId).select('role').lean();
+    if (!actor) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (actor.role === 'Moderator') {
+      return res.status(403).json({ error: 'Moderators cannot cancel bookings' });
+    }
+
+    const admin = ADMIN_ROLES.includes(actor.role);
     if (!admin && String(booking.createdBy) !== String(userId)) {
       return res.status(403).json({ error: 'You can only cancel bookings you created' });
     }
@@ -864,7 +924,7 @@ export const listProductBookings = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(lim)
-        .populate('product', 'name code price branch inWarehouse stock bookedQuantity')
+        .populate('product', 'name code price branch inWarehouse stock bookedQuantity confirmedBookedQuantity')
         .populate('createdBy', 'name')
         .populate('client', 'name phoneNumber')
         .lean(),

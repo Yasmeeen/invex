@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, HostListener, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
@@ -20,6 +20,11 @@ export class BookProductDialogComponent implements OnInit {
   isUploadingDepositProof = false;
   readonly maxImageBytes = 5 * 1024 * 1024;
   readonly depositProofFolder = 'booking-deposits';
+  readonly maxDepositProofImages = 10;
+  /** Uploaded proof URLs (multiple). */
+  depositProofUrls: string[] = [];
+  /** Full-screen preview URL (lightbox). */
+  depositPreviewUrl: string | null = null;
   product: Product;
   readonly maxQuantity: number;
 
@@ -35,10 +40,6 @@ export class BookProductDialogComponent implements OnInit {
   ) {
     this.product = data.product;
     this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
     this.form = this.fb.group({
       quantity: [
         1,
@@ -49,8 +50,7 @@ export class BookProductDialogComponent implements OnInit {
       pickupType: ['branch_pickup', Validators.required],
       shippingAddress: [''],
       depositAmount: [0, [Validators.required, Validators.min(0)]],
-      depositTransferImageUrl: [''],
-      bookingDate: [`${y}-${m}-${d}`, Validators.required],
+      transferReferencePhone: [''],
     });
   }
 
@@ -67,8 +67,26 @@ export class BookProductDialogComponent implements OnInit {
     });
   }
 
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event?: KeyboardEvent): void {
+    if (this.depositPreviewUrl) {
+      event?.preventDefault?.();
+      this.closeDepositPreview();
+    }
+  }
+
   close(): void {
+    this.closeDepositPreview();
     this.dialogRef.close(false);
+  }
+
+  openDepositPreview(url: string): void {
+    const u = String(url || '').trim();
+    this.depositPreviewUrl = u || null;
+  }
+
+  closeDepositPreview(): void {
+    this.depositPreviewUrl = null;
   }
 
   isCloudinaryConfigured(): boolean {
@@ -79,6 +97,11 @@ export class BookProductDialogComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) {
+      return;
+    }
+    if (this.depositProofUrls.length >= this.maxDepositProofImages) {
+      this.notify.push(this.translate.instant('tr_booking_deposit_proof_max_images'), 'error');
+      input.value = '';
       return;
     }
     if (!file.type.startsWith('image/')) {
@@ -100,8 +123,8 @@ export class BookProductDialogComponent implements OnInit {
     this.cloudinaryUpload.uploadProductImage(file, this.depositProofFolder).subscribe({
       next: (url) => {
         this.isUploadingDepositProof = false;
-        this.form.patchValue({ depositTransferImageUrl: url || '' });
         if (url) {
+          this.depositProofUrls = [...this.depositProofUrls, url];
           this.notify.push(this.translate.instant('tr_booking_deposit_proof_upload_ok'), 'success');
         }
         input.value = '';
@@ -114,12 +137,17 @@ export class BookProductDialogComponent implements OnInit {
     });
   }
 
-  clearDepositProof(): void {
-    this.form.patchValue({ depositTransferImageUrl: '' });
+  removeDepositProofAt(index: number): void {
+    const removed = this.depositProofUrls[index];
+    if (removed && this.depositPreviewUrl === removed) {
+      this.depositPreviewUrl = null;
+    }
+    this.depositProofUrls = this.depositProofUrls.filter((_, i) => i !== index);
   }
 
-  get depositProofUrl(): string {
-    return String(this.form.get('depositTransferImageUrl')?.value || '').trim();
+  clearDepositProofs(): void {
+    this.depositProofUrls = [];
+    this.depositPreviewUrl = null;
   }
 
   submit(): void {
@@ -158,7 +186,15 @@ export class BookProductDialogComponent implements OnInit {
       return;
     }
     const v = this.form.getRawValue();
+    const dep = Number(v.depositAmount);
+    const refPhone = String(v.transferReferencePhone || '').trim();
+    const needsRef = dep > 0 || this.depositProofUrls.length > 0;
+    if (needsRef && !refPhone) {
+      this.notify.push(this.translate.instant('tr_booking_transfer_reference_required'), 'error');
+      return;
+    }
     this.saving = true;
+    const urls = [...this.depositProofUrls];
     this.bookings
       .createBooking({
         productId: this.product._id,
@@ -168,8 +204,9 @@ export class BookProductDialogComponent implements OnInit {
         pickupType: v.pickupType,
         shippingAddress: v.pickupType === 'online_shipping' ? String(v.shippingAddress || '').trim() : '',
         depositAmount: Number(v.depositAmount),
-        depositTransferImageUrl: String(v.depositTransferImageUrl || '').trim() || undefined,
-        bookingDate: v.bookingDate,
+        depositTransferImageUrls: urls.length ? urls : undefined,
+        depositTransferImageUrl: urls.length === 1 ? urls[0] : undefined,
+        transferReferencePhone: refPhone,
         userId: uid,
       })
       .subscribe({

@@ -121,7 +121,13 @@ export class ReportExportService {
       if (!r) return;
       Object.values(r).forEach((v) => {
         const s = String(v ?? '').trim();
-        if (this.isImageUrl(s)) imageUrls.add(s);
+        if (!s) return;
+        s.split(/[\n,]+/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .forEach((part) => {
+            if (this.isImageUrl(part)) imageUrls.add(part);
+          });
       });
     });
     // Best-effort fetch: if CORS blocks, we keep the URL as text.
@@ -148,7 +154,8 @@ export class ReportExportService {
         didParseCell: (data) => {
           if (data.section !== 'body') return;
           const raw = String(data.cell.raw ?? '').trim();
-          if (raw && imageUrlToDataUrl[raw] && this.isImageUrl(raw)) {
+          const imgUrl = this.firstImageUrlInCell(raw);
+          if (imgUrl && imageUrlToDataUrl[imgUrl]) {
             // We'll draw the image manually in didDrawCell.
             data.cell.text = [''];
           }
@@ -156,7 +163,8 @@ export class ReportExportService {
         didDrawCell: (data) => {
           if (data.section !== 'body') return;
           const raw = String(data.cell.raw ?? '').trim();
-          const dataUrl = raw && imageUrlToDataUrl[raw] ? imageUrlToDataUrl[raw] : '';
+          const imgUrl = this.firstImageUrlInCell(raw);
+          const dataUrl = imgUrl && imageUrlToDataUrl[imgUrl] ? imageUrlToDataUrl[imgUrl] : '';
           if (!dataUrl) return;
           try {
             const pad = 3;
@@ -237,8 +245,6 @@ export class ReportExportService {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    const isImg = (v: any) => this.isImageUrl(String(v ?? '').trim());
-
     const container = document.createElement('div');
     // Keep it in the viewport (but invisible) so html2canvas can measure & render correctly.
     container.style.position = 'fixed';
@@ -311,9 +317,10 @@ export class ReportExportService {
                 const tds = chunk
                   .map((c) => {
                     const v = row?.[c];
-                    if (isImg(v)) {
+                    const imgUrl = this.firstImageUrlInCell(v);
+                    if (imgUrl) {
                       return `<td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:center;"><img src="${esc(
-                        v
+                        imgUrl
                       )}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;" /></td>`;
                     }
                     return `<td style="padding:8px 10px;border:1px solid #e5e7eb;font-size:11px;vertical-align:top;">${esc(
@@ -472,6 +479,21 @@ export class ReportExportService {
       v.endsWith('.jpeg') ||
       v.endsWith('.webp')
     );
+  }
+
+  /** First image URL inside a cell value (single URL or newline/comma-separated URLs). */
+  private firstImageUrlInCell(v: any): string {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (this.isImageUrl(s)) return s;
+    const parts = s
+      .split(/[\n,]+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    for (const p of parts) {
+      if (this.isImageUrl(p)) return p;
+    }
+    return '';
   }
 
   private blobToDataUrl(blob: Blob): Promise<string> {

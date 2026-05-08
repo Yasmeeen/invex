@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, HostListener, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -6,7 +6,7 @@ import { Product, ProductActiveBooking } from '@core/models/products.model';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { ProductBookingsService, ProductBookingsSummary } from '@shared/services/product-bookings.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
-import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
+import { canPickBranchRole, isBranchManager, isModerator } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 
 @Component({
@@ -27,6 +27,8 @@ export class ViewProductBookingDialogComponent implements OnInit {
   cancellingId: string | null = null;
   confirmingId: string | null = null;
   private refreshParent = false;
+  /** Lightbox URL for deposit proof preview. */
+  depositPreviewUrl: string | null = null;
 
   constructor(
     private dialogRef: MatDialogRef<ViewProductBookingDialogComponent, boolean>,
@@ -58,12 +60,31 @@ export class ViewProductBookingDialogComponent implements OnInit {
     this.bookingsApi.getForProduct(this.product._id, uid).subscribe({
       next: (res) => {
         this.bookings = (res.bookings || []).map((b: ProductActiveBooking) => {
-          const row = b as ProductActiveBooking & { deposit_transfer_image_url?: string };
-          const urlRaw =
+          const row = b as ProductActiveBooking & {
+            deposit_transfer_image_url?: string;
+            deposit_transfer_image_urls?: string[];
+            transfer_reference_phone?: string;
+          };
+          const single =
             row.depositTransferImageUrl ??
             (typeof row.deposit_transfer_image_url === 'string' ? row.deposit_transfer_image_url : '');
-          const url = String(urlRaw || '').trim();
-          return { ...b, depositTransferImageUrl: url || undefined };
+          const urlsFromApi = row.depositTransferImageUrls ?? row.deposit_transfer_image_urls;
+          const urls = Array.isArray(urlsFromApi)
+            ? urlsFromApi.map((x) => String(x || '').trim()).filter(Boolean)
+            : [];
+          const merged = urls.length
+            ? urls
+            : String(single || '').trim()
+              ? [String(single).trim()]
+              : [];
+          const transferRef =
+            row.transferReferencePhone ?? row.transfer_reference_phone ?? '';
+          return {
+            ...b,
+            depositTransferImageUrls: merged.length ? merged : undefined,
+            depositTransferImageUrl: merged[0] || undefined,
+            transferReferencePhone: String(transferRef || '').trim() || undefined,
+          };
         });
         this.summary = res.summary;
         this.loading = false;
@@ -80,7 +101,25 @@ export class ViewProductBookingDialogComponent implements OnInit {
     return this.canAddBooking && (this.summary?.availableToBook ?? 0) > 0;
   }
 
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event?: KeyboardEvent): void {
+    if (this.depositPreviewUrl) {
+      event?.preventDefault?.();
+      this.closeDepositPreview();
+    }
+  }
+
+  openDepositPreview(url: string): void {
+    const u = String(url || '').trim();
+    this.depositPreviewUrl = u || null;
+  }
+
+  closeDepositPreview(): void {
+    this.depositPreviewUrl = null;
+  }
+
   close(): void {
+    this.closeDepositPreview();
     this.dialogRef.close(this.refreshParent);
   }
 
@@ -90,15 +129,28 @@ export class ViewProductBookingDialogComponent implements OnInit {
       : this.translate.instant('tr_booking_branch_pickup');
   }
 
-  /** Deposit transfer proof URL (normalized for template). */
-  depositProofUrl(b: ProductActiveBooking): string {
+  /** Deposit transfer proof URLs (one or many). */
+  depositProofUrls(b: ProductActiveBooking): string[] {
+    const fromArr = b.depositTransferImageUrls;
+    if (Array.isArray(fromArr) && fromArr.length) {
+      return fromArr.map((u) => String(u || '').trim()).filter(Boolean);
+    }
     const u = String(b.depositTransferImageUrl || '').trim();
-    return u;
+    return u ? [u] : [];
+  }
+
+  /** @deprecated Use depositProofUrls; kept for any legacy template refs. */
+  depositProofUrl(b: ProductActiveBooking): string {
+    const urls = this.depositProofUrls(b);
+    return urls[0] || '';
   }
 
   canCancel(booking: ProductActiveBooking): boolean {
     const u = this.auth.getUserFromLocalStorage();
     if (!u?._id) {
+      return false;
+    }
+    if (isModerator(u.role)) {
       return false;
     }
     if (canPickBranchRole(u.role)) {
@@ -151,6 +203,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
   }
 
   openNewBooking(): void {
+    this.closeDepositPreview();
     const max = this.summary?.availableToBook ?? 0;
     if (max < 1) {
       return;

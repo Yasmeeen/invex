@@ -15,17 +15,176 @@
   gap: 0.5rem;
 }
 
-.booking-deposit-proof-preview {
+.booking-deposit-file-input {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.booking-deposit-clear-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+
+  .fa {
+    font-size: 1rem;
+  }
+}
+
+.booking-deposit-thumbs {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-width: 280px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  align-items: flex-start;
+}
+
+.booking-deposit-thumb {
+  position: relative;
+  width: 5.5rem;
+  height: 5.5rem;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e0e6e2;
+  background: #f8faf9;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.booking-deposit-thumb__open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  cursor: zoom-in;
+  background: transparent;
+  line-height: 0;
 
   img {
-    max-width: 100%;
-    max-height: 160px;
-    object-fit: contain;
-    border-radius: 8px;
-    border: 1px solid #e8ede9;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &:focus {
+    outline: 2px solid #5b21b6;
+    outline-offset: 2px;
+  }
+
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+.booking-deposit-thumb__remove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  z-index: 2;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.95);
+  color: #b91c1c;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+
+  .fa {
+    font-size: 1.15rem;
+  }
+
+  &:hover {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+
+  &:focus {
+    outline: 2px solid #5b21b6;
+    outline-offset: 1px;
+  }
+}
+
+.booking-deposit-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(2px);
+  animation: booking-lightbox-fade 0.18s ease-out;
+}
+
+@keyframes booking-lightbox-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.booking-deposit-lightbox__panel {
+  position: relative;
+  max-width: min(94vw, 900px);
+  max-height: min(88vh, 900px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.booking-deposit-lightbox__panel img {
+  max-width: 100%;
+  max-height: min(88vh, 900px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  background: #fff;
+}
+
+.booking-deposit-lightbox__close {
+  position: absolute;
+  top: -0.5rem;
+  inset-inline-end: -0.5rem;
+  z-index: 2;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #fff;
+  color: #334155;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+
+  .fa {
+    font-size: 1.1rem;
+  }
+
+  &:hover {
+    background: #f1f5f9;
   }
 }

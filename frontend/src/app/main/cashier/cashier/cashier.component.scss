@@ -205,7 +205,17 @@
       .product-name {
         font-size: 0.9rem;
         font-weight: 600;
+        margin-bottom: 0.2rem;
+      }
+
+      .product-code {
+        font-size: 0.72rem;
+        color: #7f8c8d;
+        font-weight: 600;
+        letter-spacing: 0.02em;
         margin-bottom: 0.3rem;
+        word-break: break-all;
+        line-height: 1.2;
       }
   
       .product-price {
@@ -278,6 +288,27 @@
         gap: 0.5rem;
         justify-content: center;
         flex-wrap: wrap;
+      }
+
+      .order-line-product__text {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .order-line-product__name {
+        font-weight: 600;
+      }
+
+      .order-line-product__code {
+        font-size: 0.72rem;
+        color: #5d6d7e;
+        font-weight: 600;
+        word-break: break-all;
+        line-height: 1.2;
       }
 
       .order-line-thumb {

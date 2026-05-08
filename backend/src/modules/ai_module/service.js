@@ -1,15 +1,40 @@
 import mongoose from 'mongoose';
 import User from '../../DB/models/user.model.js';
+import Branch from '../../DB/models/branch.model.js';
 import { canUseBookings, canUseProfit, canUseReports } from './policy.js';
 import { createProvider } from './provider.js';
 import { toolBookings, toolProfit, toolSales } from './tools.js';
 import { searchMarketPrices } from './web_search.js';
 
+function normalizeArabicText(s) {
+  return String(s || '')
+    .replace(/[؟?!.،,:;()"']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/ة/g, 'ه')
+    .replace(/[أإآٱ]/g, 'ا');
+}
+
+function formatLocalISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function todayRangeISO() {
+  // IMPORTANT: do not use toISOString().slice(0, 10); it converts to UTC and can shift the day.
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  const iso = formatLocalISODate(now);
+  return { from: iso, to: iso };
+}
+
+function yesterdayRangeISO() {
+  const now = new Date();
+  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const iso = formatLocalISODate(y);
+  return { from: iso, to: iso };
 }
 
 /** Monday–Sunday range for the current calendar week (local time). */
@@ -17,8 +42,16 @@ function thisWeekRangeISO() {
   const now = new Date();
   const dayFromMonday = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
   const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayFromMonday);
-  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6, 23, 59, 59, 999);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6);
+  return { from: formatLocalISODate(from), to: formatLocalISODate(to) };
+}
+
+function thisMonthRangeISO() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  // day 0 of next month = last day of current month
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { from: formatLocalISODate(from), to: formatLocalISODate(to) };
 }
 
 function pickIsoDate(s) {
@@ -26,17 +59,30 @@ function pickIsoDate(s) {
   return m || [];
 }
 
+function escapeRegex(s) {
+  return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pickDMYDatesToISO(s) {
+  const out = [];
+  const re = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/g;
+  const raw = String(s || '');
+  let m;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = re.exec(raw))) {
+    const dd = String(m[1]).padStart(2, '0');
+    const mm = String(m[2]).padStart(2, '0');
+    const yyyy = String(m[3]);
+    out.push(`${yyyy}-${mm}-${dd}`);
+  }
+  return out;
+}
+
 /** English / Arabic cues for “this week” (UI quick actions, natural chat). */
 function messageImpliesCurrentWeek(message) {
   const raw = String(message || '');
   if (/\bweek\b/i.test(raw) || /\bweekly\b/i.test(raw)) return true;
-  const n = raw
-    .replace(/[؟?!.،,:;()"']/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
-    .replace(/ة/g, 'ه')
-    .replace(/[أإآٱ]/g, 'ا');
+  const n = normalizeArabicText(raw);
   return (
     n.includes('اسبوع') ||
     n.includes('الاسبوع') ||
@@ -46,12 +92,124 @@ function messageImpliesCurrentWeek(message) {
   );
 }
 
+function messageImpliesToday(message) {
+  const raw = String(message || '');
+  if (/\btoday\b/i.test(raw)) return true;
+  const n = normalizeArabicText(raw);
+  return (
+    n.includes('اليوم') ||
+    n.includes('النهارده') ||
+    n.includes('نهارده') ||
+    n.includes('النهاردة') ||
+    n.includes('نهاردة')
+  );
+}
+
+function messageImpliesYesterday(message) {
+  const raw = String(message || '');
+  if (/\byesterday\b/i.test(raw)) return true;
+  const n = normalizeArabicText(raw);
+  return n.includes('امبارح') || n.includes('امس');
+}
+
+function messageImpliesCurrentMonth(message) {
+  const raw = String(message || '');
+  if (/\bmonth\b/i.test(raw) || /\bmonthly\b/i.test(raw)) return true;
+  const n = normalizeArabicText(raw);
+  return (
+    n.includes('شهر') ||
+    n.includes('الشهر') ||
+    n.includes('هذا الشهر') ||
+    n.includes('الشهر دا') ||
+    n.includes('الشهر ده')
+  );
+}
+
+function extractBranchNameFromMessage(message) {
+  const raw = String(message || '');
+  // Prefer quoted branch names (can contain spaces).
+  // Examples:
+  // - "... on branch 'Alex 2'"
+  // - "مبيعات النهارده فرع 'سوهاج 1'"
+  let m = raw.match(/(?:\bbranch\b|فرع)\s*(?:[:\-]|\s)?\s*['"«]\s*([^'"»\n]+?)\s*['"»]/i);
+  let name = m && m[1] ? String(m[1]).trim() : '';
+
+  // Unquoted: capture the rest of the line after "branch/فرع" then trim trailing report/time words.
+  if (!name) {
+    m = raw.match(/(?:\bbranch\b|فرع)\s*(?:[:\-]|\s)?\s*([^\n]+)/i);
+    name = m && m[1] ? String(m[1]).trim() : '';
+  }
+
+  if (!name) return null;
+
+  // Remove common trailing words accidentally captured (sales/profit/bookings + time cues).
+  // Keep it conservative: only strip from the end.
+  const cleanup = (s) => {
+    let out = String(s || '').trim();
+    // Normalize punctuation to spaces so suffix stripping works.
+    out = out.replace(/[؟?!.،,:;()"]/g, ' ').replace(/\s+/g, ' ').trim();
+    const suffixes = [
+      'sales',
+      'profit',
+      'bookings',
+      'مبيعات',
+      'ارباح',
+      'أرباح',
+      'ربح',
+      'حجوزات',
+      'حجز',
+      'اليوم',
+      'النهارده',
+      'نهارده',
+      'امبارح',
+      'امس',
+      'اسبوع',
+      'الاسبوع',
+      'شهر',
+      'الشهر',
+    ];
+    // Strip multiple suffix tokens if present.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const before = out;
+      for (const suf of suffixes) {
+        const re = new RegExp(`\\s*\\b${escapeRegex(suf)}\\b\\s*$`, 'i');
+        out = out.replace(re, '').trim();
+      }
+      if (out === before) break;
+    }
+    return out.trim();
+  };
+
+  name = cleanup(name);
+  return name || null;
+}
+
+async function resolveBranchIdFromMessage(message) {
+  const name = extractBranchNameFromMessage(message);
+  if (!name) return null;
+
+  const esc = escapeRegex(name);
+  let b = await Branch.findOne({ name: { $regex: new RegExp(`^${esc}$`, 'i') } })
+    .select('_id name')
+    .lean();
+  if (!b) {
+    b = await Branch.findOne({ name: { $regex: new RegExp(esc, 'i') } }).select('_id name').lean();
+  }
+  if (!b) return { branchId: null, branchName: name };
+  return { branchId: String(b._id), branchName: String(b.name || '') };
+}
+
 function inferRange({ message, from, to }) {
   if (from && to) return { from, to };
-  const dates = pickIsoDate(message);
+  // Prefer explicit dates (YYYY-MM-DD) or (DD/MM/YYYY).
+  const dates = [...pickIsoDate(message), ...pickDMYDatesToISO(message)];
   if (dates.length >= 2) return { from: dates[0], to: dates[1] };
   if (dates.length === 1) return { from: dates[0], to: dates[0] };
+  if (messageImpliesCurrentMonth(message)) return thisMonthRangeISO();
   if (messageImpliesCurrentWeek(message)) return thisWeekRangeISO();
+  if (messageImpliesYesterday(message)) return yesterdayRangeISO();
+  if (messageImpliesToday(message)) return todayRangeISO();
   // default: today
   return todayRangeISO();
 }
@@ -123,13 +281,28 @@ export const chat = async (req, res) => {
     // Branch scoping: global roles can ask for a specific branch; others are forced to their branch.
     let effectiveBranchId = null;
     const isGlobal = role === 'Super Admin' || role === 'Co Admin';
+    let branchMeta = { source: 'none', branchId: null, branchName: null };
     if (isGlobal) {
-      effectiveBranchId =
-        branchId && mongoose.Types.ObjectId.isValid(String(branchId))
-          ? String(branchId)
-          : null;
+      if (branchId && mongoose.Types.ObjectId.isValid(String(branchId))) {
+        effectiveBranchId = String(branchId);
+        branchMeta = { source: 'body.branchId', branchId: effectiveBranchId, branchName: null };
+      } else {
+        const resolved = await resolveBranchIdFromMessage(msg);
+        if (resolved?.branchId) {
+          effectiveBranchId = resolved.branchId;
+          branchMeta = {
+            source: 'message.branchName',
+            branchId: resolved.branchId,
+            branchName: resolved.branchName,
+          };
+        } else if (resolved?.branchName) {
+          // Branch name was present but not found in DB; keep meta for debugging.
+          branchMeta = { source: 'message.branchName_not_found', branchId: null, branchName: resolved.branchName };
+        }
+      }
     } else {
       effectiveBranchId = user.branch ? String(user.branch) : null;
+      branchMeta = { source: 'user.branch', branchId: effectiveBranchId, branchName: null };
     }
 
     const i = intent(msg);
@@ -151,10 +324,15 @@ export const chat = async (req, res) => {
       });
       if (out.statusCode >= 400) return res.status(out.statusCode).json(out.jsonBody);
       const s = out.jsonBody?.summary || {};
+      const branchLine = branchMeta?.branchName
+        ? ar
+          ? `الفرع: ${branchMeta.branchName}\n`
+          : `Branch: ${branchMeta.branchName}\n`
+        : '';
       const answer = ar
-        ? `الفترة: ${rf} إلى ${rt}\nالإيرادات: ${s.totalRevenue || 0}\nالتكلفة: ${s.totalCost || 0}\nربح التشغيل: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nصافي الربح: ${s.netProfit || 0}`
-        : `Range: ${rf} to ${rt}\nRevenue: ${s.totalRevenue || 0}\nCost: ${s.totalCost || 0}\nTrading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nNet profit: ${s.netProfit || 0}`;
-      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt } } });
+        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nالإيرادات: ${s.totalRevenue || 0}\nالتكلفة: ${s.totalCost || 0}\nربح التشغيل: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nصافي الربح: ${s.netProfit || 0}`
+        : `${branchLine}Range: ${rf} to ${rt}\nRevenue: ${s.totalRevenue || 0}\nCost: ${s.totalCost || 0}\nTrading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nNet profit: ${s.netProfit || 0}`;
+      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt }, branch: branchMeta } });
     }
 
     if (i === 'sales') {
@@ -171,10 +349,15 @@ export const chat = async (req, res) => {
       });
       if (out.statusCode >= 400) return res.status(out.statusCode).json(out.jsonBody);
       const s = out.jsonBody?.summary || {};
+      const branchLine = branchMeta?.branchName
+        ? ar
+          ? `الفرع: ${branchMeta.branchName}\n`
+          : `Branch: ${branchMeta.branchName}\n`
+        : '';
       const answer = ar
-        ? `الفترة: ${rf} إلى ${rt}\nإجمالي المبيعات: ${s.totalSales || 0}\nعدد الفواتير: ${s.totalOrders || 0}\nمتوسط قيمة الفاتورة: ${s.averageOrderValue || 0}`
-        : `Range: ${rf} to ${rt}\nTotal sales: ${s.totalSales || 0}\nTotal orders: ${s.totalOrders || 0}\nAvg order: ${s.averageOrderValue || 0}`;
-      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt } } });
+        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nإجمالي المبيعات: ${s.totalSales || 0}\nعدد الفواتير: ${s.totalOrders || 0}\nمتوسط قيمة الفاتورة: ${s.averageOrderValue || 0}`
+        : `${branchLine}Range: ${rf} to ${rt}\nTotal sales: ${s.totalSales || 0}\nTotal orders: ${s.totalOrders || 0}\nAvg order: ${s.averageOrderValue || 0}`;
+      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt }, branch: branchMeta } });
     }
 
     if (i === 'bookings') {
@@ -193,6 +376,11 @@ export const chat = async (req, res) => {
       });
       if (out.statusCode >= 400) return res.status(out.statusCode).json(out.jsonBody);
       const summary = out.jsonBody?.summary || {};
+      const branchLine = branchMeta?.branchName
+        ? ar
+          ? `الفرع: ${branchMeta.branchName}\n`
+          : `Branch: ${branchMeta.branchName}\n`
+        : '';
       const top = (out.jsonBody?.topProducts || []).slice(0, 5);
       const topLine =
         top.length > 0
@@ -201,9 +389,9 @@ export const chat = async (req, res) => {
             ? 'لا يوجد.'
             : 'None.';
       const answer = ar
-        ? `الفترة: ${rf} إلى ${rt}\nالحجوزات (نشطة): ${summary.activeCount || 0}\nالحجوزات (ملغاة): ${summary.cancelledCount || 0}\nأكثر المنتجات حجزًا: ${topLine}`
-        : `Range: ${rf} to ${rt}\nBookings (active): ${summary.activeCount || 0}\nBookings (cancelled): ${summary.cancelledCount || 0}\nTop booked products: ${topLine}`;
-      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt } } });
+        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nالحجوزات (نشطة): ${summary.activeCount || 0}\nالحجوزات (ملغاة): ${summary.cancelledCount || 0}\nأكثر المنتجات حجزًا: ${topLine}`
+        : `${branchLine}Range: ${rf} to ${rt}\nBookings (active): ${summary.activeCount || 0}\nBookings (cancelled): ${summary.cancelledCount || 0}\nTop booked products: ${topLine}`;
+      return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt }, branch: branchMeta } });
     }
 
     if (i === 'pricing') {

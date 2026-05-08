@@ -276,9 +276,13 @@ export class CashierComponent implements AfterViewInit {
     );
   }
 
-  /** Active reservation count on this SKU (from API). */
+  /** Confirmed active reservation count on this SKU (unconfirmed bookings do not warn cashier). */
   bookedQty(product: Product | any): number {
-    return Math.max(0, Math.floor(Number(product?.bookedQuantity ?? 0)));
+    const c = product?.confirmedBookedQuantity;
+    if (c != null && Number.isFinite(Number(c))) {
+      return Math.max(0, Math.floor(Number(c)));
+    }
+    return 0;
   }
 
   /** Units sellable without touching reserved quantity. */

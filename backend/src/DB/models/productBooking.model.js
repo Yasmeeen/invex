@@ -33,7 +33,18 @@ const productBookingSchema = new mongoose.Schema(
     depositAmount: { type: Number, required: true, min: 0 },
     /** Proof of deposit transfer (e.g. Cloudinary or local /uploads URL). */
     depositTransferImageUrl: { type: String, default: '', trim: true },
-    bookingDate: { type: Date, required: true },
+    /** Multiple transfer screenshots / receipts (preferred). */
+    depositTransferImageUrls: { type: [String], default: [] },
+    /** Phone number the deposit transfer was sent from (bank reference). */
+    transferReferencePhone: { type: String, default: '', trim: true },
+    /** Kept for reporting filters; set server-side to booking creation time. */
+    bookingDate: {
+      type: Date,
+      required: true,
+      default() {
+        return new Date();
+      },
+    },
     status: {
       type: String,
       enum: ['active', 'cancelled'],
@@ -55,6 +66,17 @@ const productBookingSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+/** Never fail on missing client `bookingDate`; reporting uses this as “booked at”. */
+productBookingSchema.pre('validate', function bookingDateDefault(next) {
+  const v = this.bookingDate;
+  if (v == null || v === '') {
+    this.bookingDate = new Date();
+  } else if (v instanceof Date && Number.isNaN(v.getTime())) {
+    this.bookingDate = new Date();
+  }
+  next();
+});
 
 productBookingSchema.index({ product: 1, status: 1 });
 

@@ -13,7 +13,9 @@ export interface CreateProductBookingPayload {
   shippingAddress?: string;
   depositAmount: number;
   depositTransferImageUrl?: string;
-  bookingDate: string;
+  depositTransferImageUrls?: string[];
+  /** Required when deposit > 0 or when transfer proof images are uploaded. */
+  transferReferencePhone?: string;
   userId: string;
 }
 

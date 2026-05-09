@@ -9,6 +9,7 @@ import { CategoriesServce } from '@shared/services/categories.service';
 export interface CategoryAttributeRow {
   key: string;
   showOnInvoice: boolean;
+  showInBarcode: boolean;
 }
 
 @Component({
@@ -64,7 +65,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       this.applyCategoryToForm(this.data.category as Category);
     }
     if (!this.isEdit && !this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
     }
   }
 
@@ -83,26 +84,27 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
       if (typeof x === 'string') {
-        return { key: String(x), showOnInvoice: false };
+        return { key: String(x), showOnInvoice: false, showInBarcode: false };
       }
       return {
         key: String(x?.key ?? ''),
         showOnInvoice: !!x?.showOnInvoice,
+        showInBarcode: !!x?.showInBarcode,
       };
     });
     if (!this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
     }
   }
 
   addAttributeRow(): void {
-    this.attributeRows.push({ key: '', showOnInvoice: false });
+    this.attributeRows.push({ key: '', showOnInvoice: false, showInBarcode: false });
   }
 
   removeAttributeRow(i: number): void {
     this.attributeRows.splice(i, 1);
     if (!this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
     }
   }
 
@@ -113,15 +115,27 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       .replace(/\s+/g, '_');
   }
 
-  private buildAttributeDefsPayload(): Array<{ key: string; showOnInvoice: boolean }> {
-    const out: Array<{ key: string; showOnInvoice: boolean }> = [];
+  private buildAttributeDefsPayload(): Array<{
+    key: string;
+    showOnInvoice: boolean;
+    showInBarcode: boolean;
+  }> {
+    const out: Array<{
+      key: string;
+      showOnInvoice: boolean;
+      showInBarcode: boolean;
+    }> = [];
     const seen = new Set<string>();
     for (const row of this.attributeRows || []) {
       const key = this.normalizeKey(row?.key);
       if (!key) continue;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ key, showOnInvoice: !!row?.showOnInvoice });
+      out.push({
+        key,
+        showOnInvoice: !!row?.showOnInvoice,
+        showInBarcode: !!row?.showInBarcode,
+      });
     }
     return out;
   }

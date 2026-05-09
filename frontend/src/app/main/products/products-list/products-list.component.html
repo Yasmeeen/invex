@@ -47,6 +47,15 @@
       >
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
+      <button
+        *ngIf="shouldShowPendingTransfersToolbar"
+        type="button"
+        class="s-btn btn-secondary size-body pending-transfers-btn"
+        (click)="openPendingTransfers()"
+      >
+        {{ 'tr_branch_transfers_pending' | translate }}
+        <span class="pending-transfers-badge" *ngIf="pendingTransferCount > 0">{{ pendingTransferCount }}</span>
+      </button>
     </div>
   </h2>
 
@@ -251,6 +260,20 @@
                             : { booked: bookedQty(product), stock: product.stock }
                       }}</span>
                     </span>
+                    <span
+                      *ngIf="transferReservedQty(product) > 0"
+                      class="transfer-badge"
+                      [attr.title]="
+                        'tr_product_transfer_reserved_hint'
+                          | translate : { n: transferReservedQty(product) }
+                      "
+                    >
+                      <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
+                      {{
+                        'tr_product_transfer_reserved_short'
+                          | translate : { n: transferReservedQty(product) }
+                      }}
+                    </span>
                     <span class="products-list__name-text">{{ product.name }}</span>
                   </span>
                 </span>
@@ -304,6 +327,15 @@
                         {{ "tr_print_code" | translate }}
                       </div>
                     </ng-container>
+                    <ng-container *ngIf="canTransferProduct(product)">
+                      <div
+                        class="single-option"
+                        *ngIf="availableUnitsForBranchTransfer(product) > 0"
+                        (click)="openTransferProduct(product)"
+                      >
+                        {{ "tr_product_transfer_branch" | translate }}
+                      </div>
+                    </ng-container>
                   </div>
                 </span>
               </td>
@@ -326,7 +358,23 @@
             </div>
 
             <div class="product-card__title">
-              <div class="product-card__name">{{ product.name }}</div>
+              <div class="product-card__name">
+                <span
+                  *ngIf="transferReservedQty(product) > 0"
+                  class="transfer-badge"
+                  [attr.title]="
+                    'tr_product_transfer_reserved_hint'
+                      | translate : { n: transferReservedQty(product) }
+                  "
+                >
+                  <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
+                  {{
+                    'tr_product_transfer_reserved_short'
+                      | translate : { n: transferReservedQty(product) }
+                  }}
+                </span>
+                {{ product.name }}
+              </div>
               <div class="product-card__meta">
                 <span class="muted">{{ product.code }}</span>
                 <span class="dot">•</span>
@@ -363,6 +411,15 @@
                   </div>
                   <div class="single-option" (click)="deleteProduct(product)">
                     <div class="text-error">{{ "tr_action.delete" | translate }}</div>
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="canTransferProduct(product)">
+                  <div
+                    class="single-option"
+                    *ngIf="availableUnitsForBranchTransfer(product) > 0"
+                    (click)="openTransferProduct(product)"
+                  >
+                    {{ "tr_product_transfer_branch" | translate }}
                   </div>
                 </ng-container>
               </div>

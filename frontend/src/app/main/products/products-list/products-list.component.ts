@@ -9,7 +9,10 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { TranslateService } from '@ngx-translate/core';
 import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
-import { ProductsSerivce } from '@shared/services/products.service';
+import {
+  productBarcodeAttributeValues,
+  ProductsSerivce,
+} from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { Globals } from '@core/globals';
@@ -23,6 +26,8 @@ import { BookProductDialogComponent } from '../book-product-dialog/book-product-
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
 import { ImportProductsDialogComponent } from '../import-products-dialog/import-products-dialog.component';
 import { ProductsImportMetadata } from '@shared/services/products.service';
+import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
+import { PendingBranchTransfersDialogComponent } from '../pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 
 @Component({
   selector: 'app-products-list',
@@ -52,6 +57,9 @@ export class ProductsListComponent implements OnInit {
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   /** all | with_bookings | without_bookings — maps to API `booked` */
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
+
+  /** Toolbar badge: incoming pending branch transfers */
+  pendingTransferCount = 0;
 
   readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
     { id: 'all', labelKey: 'tr_location_all' },
@@ -107,6 +115,48 @@ export class ProductsListComponent implements OnInit {
     return !isModerator(this.globals.currentUser?.role);
   }
 
+  get shouldShowPendingTransfersToolbar(): boolean {
+    const role = this.globals.currentUser?.role as string | undefined;
+    return canPickBranchRole(role) || isBranchManager(role);
+  }
+
+  /** Super Admin / Co Admin / Admin / Branch Manager (own branch only); not warehouse products. */
+  canTransferProduct(product: Product): boolean {
+    if (!product || product.inWarehouse) {
+      return false;
+    }
+    if (isModerator(this.globals.currentUser?.role)) {
+      return false;
+    }
+    const role = this.globals.currentUser?.role as string | undefined;
+    if (canPickBranchRole(role)) {
+      return true;
+    }
+    if (!isBranchManager(role)) {
+      return false;
+    }
+    const myId = this.globals.currentUser?.branch?._id;
+    const pid =
+      product?.branch &&
+      (typeof product.branch === 'object' ? (product.branch as Branch)._id : product.branch);
+    if (!myId || !pid) {
+      return false;
+    }
+    return String(pid) === String(myId);
+  }
+
+  transferReservedQty(product: Product): number {
+    return Math.max(0, Math.floor(Number(product.transferReservedQuantity) || 0));
+  }
+
+  /** Units available to move to another branch (respects bookings + pending transfer reservations). */
+  availableUnitsForBranchTransfer(product: Product): number {
+    const stock = Math.max(0, Number(product.stock) || 0);
+    const booked = this.bookedQty(product);
+    const reserved = this.transferReservedQty(product);
+    return Math.max(0, stock - booked - reserved);
+  }
+
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
   canBranchManagerModifyProduct(product: Product): boolean {
     if (isModerator(this.globals.currentUser?.role)) {
@@ -153,7 +203,11 @@ export class ProductsListComponent implements OnInit {
   }
 
   showProductActionsMenu(product: Product): boolean {
-    return this.canBranchManagerModifyProduct(product) || this.canBookProduct(product);
+    return (
+      this.canBranchManagerModifyProduct(product) ||
+      this.canBookProduct(product) ||
+      this.canTransferProduct(product)
+    );
   }
 
   bookedQty(product: Product): number {
@@ -162,7 +216,8 @@ export class ProductsListComponent implements OnInit {
 
   availableToBook(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
-    return Math.max(0, stock - this.bookedQty(product));
+    const reserved = this.transferReservedQty(product);
+    return Math.max(0, stock - this.bookedQty(product) - reserved);
   }
 
   ngOnInit(): void {
@@ -171,6 +226,79 @@ export class ProductsListComponent implements OnInit {
     this.getproducts();
     this.getcategorys();
     this.getBranches();
+    this.refreshPendingTransferCount();
+  }
+
+  refreshPendingTransferCount(): void {
+    const uid = this.globals.currentUser?._id;
+    if (!uid || !this.shouldShowPendingTransfersToolbar) {
+      this.pendingTransferCount = 0;
+      return;
+    }
+    this.productsService.getPendingBranchTransferCount(String(uid)).subscribe({
+      next: (r) => (this.pendingTransferCount = Number(r?.count) || 0),
+      error: () => {},
+    });
+  }
+
+  openPendingTransfers(): void {
+    if (!this.shouldShowPendingTransfersToolbar) {
+      return;
+    }
+    this.dialog.open(PendingBranchTransfersDialogComponent, {
+      width: '920px',
+      maxWidth: '95vw',
+      data: {
+        onChanged: () => {
+          this.refreshPendingTransferCount();
+          this.getproducts();
+        },
+      },
+      disableClose: false,
+    });
+  }
+
+  openTransferProduct(product: Product): void {
+    if (!this.canTransferProduct(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    const maxQ = this.availableUnitsForBranchTransfer(product);
+    if (maxQ <= 0) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_branch_transfer_no_capacity'),
+        'error'
+      );
+      return;
+    }
+    const pid =
+      product.branch &&
+      (typeof product.branch === 'object' ? (product.branch as Branch)._id : product.branch);
+    const branches = (this.branches || []).filter((b) => String(b._id) !== String(pid));
+    if (!branches.length) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_branch_transfer_no_other_branch'),
+        'error'
+      );
+      return;
+    }
+    this.dialog
+      .open(TransferProductBranchDialogComponent, {
+        width: '520px',
+        maxWidth: '95vw',
+        data: { product, branches, maxQuantity: maxQ },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((ok) => {
+        if (ok) {
+          this.refreshPendingTransferCount();
+          this.getproducts();
+        }
+      });
   }
 
   openImportDialog(): void {
@@ -418,9 +546,15 @@ export class ProductsListComponent implements OnInit {
       );
       return;
     }
-    this.productsService.getBarcodeImage(product.code, product.name).subscribe((html: any) => {
-      this.printHtml(html);
-    });
+    const bv = productBarcodeAttributeValues(
+      product.category,
+      product.attributes
+    );
+    this.productsService
+      .getBarcodeImage(product.code, product.name, bv)
+      .subscribe((html: any) => {
+        this.printHtml(html);
+      });
   }
   openBookProduct(product: Product): void {
     if (!this.canBookProduct(product)) {
@@ -430,7 +564,7 @@ export class ProductsListComponent implements OnInit {
       );
       return;
     }
-    if (product.stock === 0) {
+    if (this.availableToBook(product) <= 0) {
       this.appNotificationService.push(this.translateService.instant('tr_booking_no_stock'), 'error');
       return;
     }

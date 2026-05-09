@@ -30,10 +30,12 @@ const normalizeAttributeDefs = (raw) => {
       typeof r === 'string' ? '' : String(r?.label || '').trim();
     const showOnInvoice =
       typeof r === 'string' ? false : !!r?.showOnInvoice;
+    const showInBarcode =
+      typeof r === 'string' ? false : !!r?.showInBarcode;
     if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, label: label || key, showOnInvoice });
+    out.push({ key, label: label || key, showOnInvoice, showInBarcode });
   }
   return out;
 };

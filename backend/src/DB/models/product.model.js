@@ -27,6 +27,12 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    /** Quantity reserved for pending branch-to-branch transfers (not sold until approved or released). */
+    transferReservedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     discount: {
       type: Number,
       default: 0,

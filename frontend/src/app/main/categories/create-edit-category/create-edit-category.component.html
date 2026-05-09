@@ -77,44 +77,66 @@
                   </div>
                 </div>
 
-                <div class="mt-3">
-                  <div class="flex flex-space-between flex-middle mb-2">
-                    <label class="m-0">{{ 'tr_category_attributes' | translate }}</label>
+                <div class="category-attrs-block">
+                  <div class="category-attrs-toolbar">
+                    <label class="category-attrs-toolbar__title m-0">{{ 'tr_category_attributes' | translate }}</label>
                     <button type="button" class="s-btn btn-secondary prevent-flex-shrink" (click)="addAttributeRow()">
                       {{ 'tr_add_field' | translate }}
                     </button>
                   </div>
 
-                  <div class="row align-items-end" *ngFor="let row of attributeRows; let i = index; trackBy: trackByIndex">
-                    <div class="col-md-5">
-                      <div class="form-group mb-2">
-                        <label class="size-small">{{ 'tr_attribute_key' | translate }}</label>
-                        <input
-                          type="text"
-                          class="s-control"
-                          [(ngModel)]="attributeRows[i].key"
-                          [ngModelOptions]="{ standalone: true }"
-                          placeholder="e.g. color"
-                        />
-                      </div>
+                  <div class="category-attrs-grid">
+                    <div class="category-attrs-head">
+                      <span>{{ 'tr_category_attr_col_name' | translate }}</span>
+                      <span>{{ 'tr_category_attr_col_show' | translate }}</span>
+                      <span></span>
                     </div>
-                    <div class="col-md-4">
-                      <div class="form-group mb-2">
-                        <label class="checkbox-inline m-0 size-small flex flex-middle">
+
+                    <div
+                      class="category-attr-row"
+                      *ngFor="let row of attributeRows; let i = index; trackBy: trackByIndex"
+                    >
+                      <div class="category-attr-row__key">
+                        <label class="category-attr-row__label-inline">{{ 'tr_attribute_key' | translate }}</label>
+                        <div class="form-group">
+                          <input
+                            type="text"
+                            class="s-control"
+                            [(ngModel)]="attributeRows[i].key"
+                            [ngModelOptions]="{ standalone: true }"
+                            [attr.placeholder]="'tr_category_attr_placeholder' | translate"
+                          />
+                        </div>
+                      </div>
+                      <div class="category-attr-row__checks">
+                        <label
+                          class="chk-pill"
+                          [attr.title]="'tr_show_attribute_on_invoice' | translate"
+                        >
                           <input
                             type="checkbox"
-                            class="mr-2"
                             [(ngModel)]="attributeRows[i].showOnInvoice"
                             [ngModelOptions]="{ standalone: true }"
                           />
-                          {{ 'tr_show_attribute_on_invoice' | translate }}
+                          <span>{{ 'tr_attr_invoice_short' | translate }}</span>
+                        </label>
+                        <label
+                          class="chk-pill"
+                          [attr.title]="'tr_show_attribute_value_on_barcode' | translate"
+                        >
+                          <input
+                            type="checkbox"
+                            [(ngModel)]="attributeRows[i].showInBarcode"
+                            [ngModelOptions]="{ standalone: true }"
+                          />
+                          <span>{{ 'tr_attr_barcode_short' | translate }}</span>
                         </label>
                       </div>
-                    </div>
-                    <div class="col-md-3 flex flex-middle mb-2">
-                      <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">
-                        {{ 'tr_remove' | translate }}
-                      </button>
+                      <div class="category-attr-row__remove">
+                        <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">
+                          {{ 'tr_remove' | translate }}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -7,6 +7,8 @@ export interface Product {
   category: Category;
   code: string;
   stock: number;
+  /** Units reserved for pending branch-to-branch transfers */
+  transferReservedQuantity?: number;
   price: number;
   netPrice: number;
   discount: number;
@@ -66,6 +68,8 @@ export interface Category {
         key: string;
         label?: string;
         showOnInvoice?: boolean;
+        /** When true, only the value (not the label) is printed on the barcode sticker. */
+        showInBarcode?: boolean;
         options?: Array<{ value: string; label: string }>;
       }>;
   productsCount: number;

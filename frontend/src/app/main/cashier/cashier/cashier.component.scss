@@ -70,6 +70,17 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+
+    /* Later flex sibling (.order-panel) was painting above the payment dropdown and eating clicks. */
+    .products-panel {
+      position: relative;
+      z-index: 2;
+    }
+
+    .order-panel {
+      position: relative;
+      z-index: 1;
+    }
   }
 
   /* Client info & generic card blocks (Bootstrap-like names, local styles) */
@@ -124,9 +135,24 @@
     flex-shrink: 0;
   }
 
-  ::ng-deep .cashier-payment-select .ng-dropdown-panel .ng-option {
+  /* Scope to payment block so class on ng-select is optional */
+  .cashier-payment-splits ::ng-deep ng-select .ng-dropdown-panel .ng-option {
     padding-top: 6px;
     padding-bottom: 6px;
+  }
+
+  /* Project .s-select sets .ng-select-container { position: static }, which breaks dropdown placement. */
+  .cashier-payment-splits ::ng-deep ng-select.ng-select .ng-select-container {
+    position: relative !important;
+  }
+
+  /* Decorative caret sits after ng-select in DOM; never block clicks on the control or options. */
+  .cashier-payment-splits .input-with-icon > .input-icon {
+    pointer-events: none;
+  }
+
+  .cashier-payment-splits ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 20 !important;
   }
   
   /* Products Panel */

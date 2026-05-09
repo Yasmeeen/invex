@@ -263,7 +263,9 @@ export const createOrder = async (req, res) => {
 
       const productDoc = await Product.findById(selected._id).session(session);
       if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
-      if (productDoc.stock < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
+      const transferReserved = Number(productDoc.transferReservedQuantity) || 0;
+      const maxSellable = Number(productDoc.stock) - transferReserved;
+      if (maxSellable < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
 
       productDoc.stock -= quantity;
       await productDoc.save({ session });

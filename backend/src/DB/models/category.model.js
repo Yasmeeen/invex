@@ -13,6 +13,8 @@ const categorySchema = new mongoose.Schema({
         label: { type: String, required: false, trim: true },
         /** When true, attribute value is printed on customer invoice/receipt. */
         showOnInvoice: { type: Boolean, default: false },
+        /** When true, only the attribute value (not the label) is shown on the barcode sticker. */
+        showInBarcode: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -70,7 +72,12 @@ categorySchema.pre('validate', function normalizeAttributeDefs(next) {
       if (!key) continue;
       if (seen.has(key)) continue;
       seen.add(key);
-      cleaned.push({ key, label, showOnInvoice: !!row?.showOnInvoice });
+      cleaned.push({
+        key,
+        label,
+        showOnInvoice: !!row?.showOnInvoice,
+        showInBarcode: !!row?.showInBarcode,
+      });
     }
     this.attributeDefs = cleaned;
     return next();

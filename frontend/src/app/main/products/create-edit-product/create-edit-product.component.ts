@@ -13,7 +13,10 @@ import {
 } from '@angular/core';
 import { NgForm } from '@angular/forms';
 import { Branch, Category, Product } from '@core/models/products.model';
-import { ProductsSerivce } from '@shared/services/products.service';
+import {
+  productBarcodeAttributeValues,
+  ProductsSerivce,
+} from '@shared/services/products.service';
 import { Subscription } from 'rxjs';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -453,8 +456,12 @@ createProduct() {
     (res: any) => {
       this.appNotificationService.push('✅ المنتج تم إضافته', 'success');
 
+      const bv = productBarcodeAttributeValues(
+        this.selectedCategory,
+        payload.attributes
+      );
       this.productsSerivce
-        .getBarcodeImage(res.createdProduct.code, payload.name)
+        .getBarcodeImage(res.createdProduct.code, payload.name, bv)
         .subscribe((html: any) => {
           this.printHtml(html);
           this.closeModal();

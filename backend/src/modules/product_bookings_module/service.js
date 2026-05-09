@@ -282,9 +282,11 @@ export const createProductBooking = async (req, res) => {
     }
     const pid = product._id;
     const alreadyBooked = await sumActiveBookedQuantity(pid);
-    if (alreadyBooked + quantity > product.stock) {
+    const transferReserved = Number(product.transferReservedQuantity) || 0;
+    const capacity = Math.max(0, Number(product.stock) - transferReserved);
+    if (alreadyBooked + quantity > capacity) {
       return res.status(400).json({
-        error: `Only ${Math.max(0, product.stock - alreadyBooked)} unit(s) available to book`,
+        error: `Only ${Math.max(0, capacity - alreadyBooked)} unit(s) available to book`,
       });
     }
 
@@ -439,13 +441,17 @@ export const confirmProductBooking = async (req, res) => {
       return res.status(403).json({ error: 'You are not allowed to confirm this booking' });
     }
 
-    const productForStock = await Product.findById(booking.product).select('stock').lean();
+    const productForStock = await Product.findById(booking.product)
+      .select('stock transferReservedQuantity')
+      .lean();
     if (!productForStock) {
       return res.status(404).json({ error: 'Product not found' });
     }
     const totalBookedQty = await sumActiveBookedQuantity(booking.product);
     const stock = Math.max(0, Number(productForStock.stock) || 0);
-    if (totalBookedQty > stock) {
+    const transferReserved = Number(productForStock.transferReservedQuantity) || 0;
+    const capacity = Math.max(0, stock - transferReserved);
+    if (totalBookedQty > capacity) {
       return res.status(400).json({
         error: 'Not enough stock to confirm bookings for this product',
         code: 'INSUFFICIENT_STOCK_FOR_BOOKING',
@@ -595,7 +601,7 @@ export const getBookingByProductId = async (req, res) => {
     }
 
     const product = await Product.findById(productId)
-      .select('stock name code branch inWarehouse')
+      .select('stock name code branch inWarehouse transferReservedQuantity')
       .lean();
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -619,13 +625,16 @@ export const getBookingByProductId = async (req, res) => {
       sumActiveBookedQuantity(new mongoose.Types.ObjectId(String(productId))),
     ]);
 
-    const availableToBook = Math.max(0, (product.stock || 0) - totalBookedQty);
+    const transferReserved = Number(product.transferReservedQuantity) || 0;
+    const capacity = Math.max(0, (product.stock || 0) - transferReserved);
+    const availableToBook = Math.max(0, capacity - totalBookedQty);
 
     return res.json({
       bookings,
       summary: {
         totalBookedQty,
         stock: product.stock,
+        transferReservedQuantity: transferReserved,
         availableToBook,
       },
     });

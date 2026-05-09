@@ -10,6 +10,8 @@ import { CreateEditProductComponent } from './create-edit-product/create-edit-pr
 import { BookProductDialogComponent } from './book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from './view-product-booking-dialog/view-product-booking-dialog.component';
 import { ImportProductsDialogComponent } from './import-products-dialog/import-products-dialog.component';
+import { TransferProductBranchDialogComponent } from './transfer-product-branch-dialog/transfer-product-branch-dialog.component';
+import { PendingBranchTransfersDialogComponent } from './pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 
 
 @NgModule({
@@ -19,6 +21,8 @@ import { ImportProductsDialogComponent } from './import-products-dialog/import-p
     BookProductDialogComponent,
     ViewProductBookingDialogComponent,
     ImportProductsDialogComponent,
+    TransferProductBranchDialogComponent,
+    PendingBranchTransfersDialogComponent,
   ],
   imports: [
     CommonModule,

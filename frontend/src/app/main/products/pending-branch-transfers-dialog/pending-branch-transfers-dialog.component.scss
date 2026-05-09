@@ -1,0 +1,35 @@
+.pending-transfers-modal .modal-content {
+  max-width: 920px;
+}
+
+.pending-transfers-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pending-transfers-table {
+  font-size: 0.9rem;
+}
+
+.pending-transfers-actions {
+  white-space: nowrap;
+  text-align: right;
+
+  .s-btn + .s-btn {
+    margin-inline-start: 0.35rem;
+  }
+}
+
+.reject-panel .justify-end {
+  justify-content: flex-end;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.d-flex {
+  display: flex;
+}

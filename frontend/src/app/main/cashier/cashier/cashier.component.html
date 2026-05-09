@@ -118,35 +118,46 @@
 
               <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
                 <label class="size-small weight-bold d-block mb-2">{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
-                <ng-select
-                  class="s-control s-select cashier-payment-select width-100 mb-2"
-                  [items]="paymentMethodsForSplit"
-                  bindLabel="labelKey"
-                  bindValue="id"
-                  [multiple]="true"
-                  [closeOnSelect]="false"
-                  [clearable]="true"
-                  [searchable]="true"
-                  appendTo="body"
-                  placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-                  [(ngModel)]="selectedPayMethods"
-                  [ngModelOptions]="{ standalone: true }"
-                  name="payMethodsMulti"
-                  (ngModelChange)="onSelectedPayMethodsChange($event)"
-                >
-                  <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                    <div class="ng-value" *ngFor="let item of items">
-                      <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
-                      <span class="ng-value-label">{{ item.label | translate }}</span>
-                    </div>
-                  </ng-template>
-                  <ng-template ng-option-tmp let-item="item">
-                    <span class="payment-option">
-                      <img [src]="item.logo" class="payment-logo" alt="" />
-                      {{ item.labelKey | translate }}
-                    </span>
-                  </ng-template>
-                </ng-select>
+                <div class="input-with-icon bg-white width-100 mb-2">
+                  <ng-select
+                    class="s-control s-select width-100"
+                    [items]="paymentMethodsForSplit"
+                    bindLabel="labelKey"
+                    bindValue="id"
+                    [multiple]="true"
+                    [closeOnSelect]="false"
+                    [clearable]="true"
+                    [searchable]="true"
+                    appendTo="body"
+                    dropdownPosition="bottom"
+                    placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
+                    [(ngModel)]="selectedPayMethods"
+                    [ngModelOptions]="{ standalone: true }"
+                    name="payMethodsMulti"
+                    (ngModelChange)="onSelectedPayMethodsChange($event)"
+                  >
+                    <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                      <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                        <span class="ng-value-label">{{ $any(item).labelKey | translate }}</span>
+                        <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+                      </div>
+                      <div
+                        class="ng-value"
+                         *ngIf="items.length > 2"
+                        [attr.title]="payMethodsOverflowTitle(items)"
+                      >
+                        <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+                      </div>
+                    </ng-template>
+                    <ng-template ng-option-tmp let-item="item">
+                      <span class="payment-option">
+                        <img [src]="$any(item).logo" class="payment-logo" alt="" />
+                        {{ $any(item).labelKey | translate }}
+                      </span>
+                    </ng-template>
+                  </ng-select>
+                  <i class="fa fa-caret-down input-icon"></i>
+                </div>
 
                 <div class="cashier-payment-amount-heading size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
                   {{ 'tr_cashier_payment_amounts_hint' | translate }}

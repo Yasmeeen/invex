@@ -1,12 +1,125 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
+import ProductBranchTransfer from '../../DB/models/productBranchTransfer.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import User from '../../DB/models/user.model.js';
+import Notification from '../../DB/models/notification.model.js';
+import { emitToUsers } from '../../realtime/socket.js';
 import { auditLog } from '../audit_module/audit.service.js';
 
+const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
+
+function pickActorUserId(req) {
+  const body = req?.body || {};
+  const query = req?.query || {};
+  return body.userId || body.user_id || query.userId || query.user_id || null;
+}
+
+async function sumActiveBookedQuantityProducts(productOid) {
+  const oid =
+    productOid instanceof mongoose.Types.ObjectId
+      ? productOid
+      : new mongoose.Types.ObjectId(String(productOid));
+  const [agg] = await ProductBooking.aggregate([
+    { $match: { product: oid, status: 'active' } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+  ]);
+  return agg?.total || 0;
+}
+
+async function loadUserForBranchTransfer(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
+  return User.findById(userId).select('name role branch').lean();
+}
+
+function assertMayInitiateBranchTransfer(user, product) {
+  if (!user) {
+    const err = new Error('UNAUTHORIZED');
+    err.code = 'UNAUTHORIZED';
+    throw err;
+  }
+  if (product.inWarehouse) {
+    const err = new Error('WAREHOUSE');
+    err.code = 'WAREHOUSE';
+    throw err;
+  }
+  if (!product.branch) {
+    const err = new Error('NO_BRANCH');
+    err.code = 'NO_BRANCH';
+    throw err;
+  }
+  if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
+    return;
+  }
+  if (user.role === 'Branch Manager' && user.branch && String(user.branch) === String(product.branch)) {
+    return;
+  }
+  const err = new Error('FORBIDDEN');
+  err.code = 'FORBIDDEN';
+  throw err;
+}
+
+function assertMayResolveBranchTransfer(user, transfer) {
+  if (!user) {
+    const err = new Error('UNAUTHORIZED');
+    err.code = 'UNAUTHORIZED';
+    throw err;
+  }
+  if (transfer.status !== 'pending') {
+    const err = new Error('NOT_PENDING');
+    err.code = 'NOT_PENDING';
+    throw err;
+  }
+  if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
+    return;
+  }
+  if (user.role === 'Branch Manager' && user.branch && String(user.branch) === String(transfer.toBranch)) {
+    return;
+  }
+  const err = new Error('FORBIDDEN');
+  err.code = 'FORBIDDEN';
+  throw err;
+}
+
+async function collectIncomingTransferNotifyUserIds(toBranchId) {
+  const admins = await User.find({ role: { $in: TRANSFER_ADMIN_ROLES } }).select('_id').lean();
+  const managers = await User.find({
+    role: 'Branch Manager',
+    branch: toBranchId,
+  })
+    .select('_id')
+    .lean();
+  const seen = new Set();
+  const out = [];
+  for (const u of [...admins, ...managers]) {
+    const s = String(u._id);
+    if (!seen.has(s)) {
+      seen.add(s);
+      out.push(u._id);
+    }
+  }
+  return out;
+}
+
+function copyProductAttributesForBranchClone(sourceDoc) {
+  const raw = sourceDoc?.attributes;
+  if (!raw) return {};
+  if (raw instanceof Map) return Object.fromEntries(raw);
+  if (typeof raw === 'object' && !Array.isArray(raw)) return { ...raw };
+  return {};
+}
+
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const escapeHtml = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
 /** Ensures product code uses the category prefix; category must have a non-empty code. */
 async function validateProductCodeForCategory(categoryId, productCode) {
@@ -571,6 +684,21 @@ export const generateBarcodeImage = async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
+    const bvRaw = req.query.bv;
+    const barcodeParts = [];
+    if (bvRaw != null) {
+      const rawParts = Array.isArray(bvRaw) ? bvRaw : [bvRaw];
+      for (const p of rawParts) {
+        const t = String(p ?? '').trim();
+        if (t) barcodeParts.push(t);
+      }
+    }
+    /** One horizontal line: values separated by Arabic comma (also if legacy multi-param bv). */
+    const barcodeAttrLine = barcodeParts.join('\u060c ');
+    const barcodeAttrHtml = barcodeAttrLine
+      ? `<div class="barcode-attr-line">${escapeHtml(barcodeAttrLine)}</div>`
+      : '';
+
     bwipjs.toBuffer(
       {
         bcid: 'code128',
@@ -645,6 +773,16 @@ export const generateBarcodeImage = async (req, res) => {
         font-weight: bold;
       }
 
+      .barcode-attr-line {
+        font-size: 7px;
+        line-height: 1.2;
+        margin-bottom: 0.5mm;
+        max-width: 95%;
+        text-align: center;
+        white-space: normal;
+        word-break: break-word;
+      }
+
 </style>
 
             </head>
@@ -652,6 +790,7 @@ export const generateBarcodeImage = async (req, res) => {
             <body>
             <div class="sticker-name">
                <div class="product-name">${name || ''}</div>
+               ${barcodeAttrHtml}
                <img src="data:image/png;base64,${png.toString('base64')}" />
                <div class="code-name">${code || ''}</div>
             </div>
@@ -1125,6 +1264,16 @@ export const updateProduct = async (req, res) => {
 // Delete product
 export const deleteProduct = async (req, res) => {
   try {
+    const existing = await Product.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    if (Number(existing.transferReservedQuantity || 0) > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete product while a branch transfer is pending',
+      });
+    }
+
     const product = await Product.findByIdAndDelete(req.params.id);
 
     if (!product) {
@@ -1144,6 +1293,483 @@ export const deleteProduct = async (req, res) => {
   } catch (error) {
     console.error('❌ Error deleting product:', error.message);
     res.status(500).json({ error: 'Failed to delete product' });
+  }
+};
+
+/** Branch → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
+export const requestBranchTransfer = async (req, res) => {
+  try {
+    const userId = pickActorUserId(req);
+    const { productId, toBranchId, quantity } = req.body;
+    const qty = Math.floor(Number(quantity));
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
+      return res.status(400).json({ error: 'Invalid productId' });
+    }
+    if (!toBranchId || !mongoose.Types.ObjectId.isValid(String(toBranchId))) {
+      return res.status(400).json({ error: 'Invalid toBranchId' });
+    }
+    if (!qty || qty < 1) {
+      return res.status(400).json({ error: 'quantity must be >= 1' });
+    }
+
+    const user = await loadUserForBranchTransfer(userId);
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    try {
+      assertMayInitiateBranchTransfer(user, product);
+    } catch (e) {
+      if (e.code === 'WAREHOUSE') {
+        return res.status(400).json({ error: 'Warehouse products cannot use pending branch transfer' });
+      }
+      if (e.code === 'NO_BRANCH') {
+        return res.status(400).json({ error: 'Product has no branch' });
+      }
+      return res.status(403).json({ error: 'You cannot request this transfer' });
+    }
+
+    const fromBranchId = product.branch;
+    if (String(fromBranchId) === String(toBranchId)) {
+      return res.status(400).json({ error: 'Source and destination branch must differ' });
+    }
+
+    const booked = await sumActiveBookedQuantityProducts(product._id);
+    const reserved = Number(product.transferReservedQuantity) || 0;
+    const stock = Math.max(0, Number(product.stock) || 0);
+    const available = Math.max(0, stock - booked - reserved);
+    if (qty > available) {
+      return res.status(400).json({
+        error: `Only ${available} unit(s) available to transfer (stock minus bookings and pending transfers)`,
+      });
+    }
+
+    product.transferReservedQuantity = reserved + qty;
+    await product.save();
+
+    const transfer = await ProductBranchTransfer.create({
+      product: product._id,
+      fromBranch: fromBranchId,
+      toBranch: toBranchId,
+      quantity: qty,
+      status: 'pending',
+      initiatedBy: userId,
+    });
+
+    const populated = await ProductBranchTransfer.findById(transfer._id)
+      .populate('product', 'name code')
+      .populate('fromBranch', 'name')
+      .populate('toBranch', 'name')
+      .populate('initiatedBy', 'name')
+      .lean();
+
+    try {
+      const recipientIds = await collectIncomingTransferNotifyUserIds(toBranchId);
+      const fromName = populated?.fromBranch?.name || 'Branch';
+      const toName = populated?.toBranch?.name || 'Branch';
+      const pname = populated?.product?.name || 'Product';
+      const notification = await Notification.create({
+        type: 'branch_transfer_pending',
+        title: 'Product transfer pending receipt',
+        body: `${pname} ×${qty}: ${fromName} → ${toName} (awaiting approval)`,
+        data: {
+          transferId: transfer._id,
+          productId: product._id,
+          productName: pname,
+          quantity: qty,
+          fromBranchId,
+          toBranchId,
+          initiatedById: userId,
+        },
+        recipients: recipientIds,
+        readBy: [],
+      });
+      emitToUsers(recipientIds, 'notification:new', { notification });
+    } catch (notifyErr) {
+      console.warn('⚠️ branch transfer notification:', notifyErr?.message || notifyErr);
+    }
+
+    await auditLog(req, {
+      action: 'branch_transfer_request',
+      module: 'products',
+      entityType: 'ProductBranchTransfer',
+      entityId: transfer._id,
+      message: `Branch transfer requested (${qty})`,
+      metadata: { productId: product._id, fromBranchId, toBranchId, quantity: qty },
+    });
+
+    return res.status(201).json({
+      message: 'Transfer requested; waiting for destination branch approval',
+      transfer: populated,
+    });
+  } catch (e) {
+    console.error('requestBranchTransfer:', e);
+    return res.status(500).json({ error: 'Failed to request branch transfer' });
+  }
+};
+
+/** Body: userId */
+export const approveBranchTransfer = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const userId = pickActorUserId(req);
+    const { id } = req.params;
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Invalid transfer id' });
+    }
+
+    const user = await loadUserForBranchTransfer(userId);
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const transfer = await ProductBranchTransfer.findById(id).session(session);
+    if (!transfer || transfer.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Pending transfer not found' });
+    }
+
+    try {
+      assertMayResolveBranchTransfer(user, transfer);
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ error: 'You cannot approve this transfer' });
+    }
+
+    const sourceProduct = await Product.findById(transfer.product).session(session);
+    if (!sourceProduct) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (String(sourceProduct.branch) !== String(transfer.fromBranch)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Product branch no longer matches transfer source' });
+    }
+
+    const qty = Number(transfer.quantity);
+    const reserved = Number(sourceProduct.transferReservedQuantity) || 0;
+    if (reserved < qty) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Transfer reservation mismatch; cancel and recreate transfer' });
+    }
+
+    const booked = await sumActiveBookedQuantityProducts(sourceProduct._id);
+    const stock = Math.max(0, Number(sourceProduct.stock) || 0);
+    if (stock - booked < qty) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'Not enough free stock to complete transfer (bookings may have increased)',
+      });
+    }
+
+    sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
+    sourceProduct.stock = stock - qty;
+    await sourceProduct.save({ session });
+
+    const toBranchId = transfer.toBranch;
+    let destinationProduct = await Product.findOne({
+      code: sourceProduct.code,
+      branch: toBranchId,
+      inWarehouse: { $ne: true },
+    }).session(session);
+
+    const attrs = copyProductAttributesForBranchClone(sourceProduct);
+    const imageUrlNorm = normalizeImageUrl(sourceProduct.imageUrl);
+
+    if (destinationProduct) {
+      destinationProduct.stock = Number(destinationProduct.stock) + qty;
+      await destinationProduct.save({ session });
+    } else {
+      const created = await Product.create(
+        [
+          {
+            name: sourceProduct.name,
+            code: sourceProduct.code,
+            price: sourceProduct.price,
+            netPrice: sourceProduct.netPrice,
+            stock: qty,
+            discount: sourceProduct.discount || 0,
+            category: sourceProduct.category,
+            branch: toBranchId,
+            inWarehouse: false,
+            imageUrl: imageUrlNorm,
+            attributes: attrs,
+          },
+        ],
+        { session }
+      );
+      destinationProduct = Array.isArray(created) ? created[0] : created;
+    }
+
+    transfer.status = 'approved';
+    transfer.resolvedBy = userId;
+    transfer.resolvedAt = new Date();
+    await transfer.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    try {
+      await StockMovement.create({
+        movementType: 'transfer',
+        productId: sourceProduct._id,
+        productName: sourceProduct.name,
+        branchId: toBranchId,
+        fromBranchId: transfer.fromBranch,
+        toBranchId,
+        quantity: qty,
+        unitPrice: Number(sourceProduct.price || 0),
+        totalValue: Number(sourceProduct.price || 0) * qty,
+        referenceType: 'branch_transfer',
+        referenceId: transfer._id,
+        notes: 'Branch transfer approved',
+      });
+    } catch (movementError) {
+      console.error('⚠️ Failed to log branch transfer movement:', movementError.message);
+    }
+
+    try {
+      const initiatorId = transfer.initiatedBy;
+      const confirmerName = user.name || 'Manager';
+      const notification = await Notification.create({
+        type: 'branch_transfer_approved',
+        title: 'Branch transfer approved',
+        body: `${sourceProduct.name} ×${qty} received — ${confirmerName}`,
+        data: {
+          transferId: transfer._id,
+          productId: sourceProduct._id,
+          quantity: qty,
+          approvedById: userId,
+        },
+        recipients: [initiatorId],
+        readBy: [],
+      });
+      emitToUsers([initiatorId], 'notification:new', { notification });
+    } catch (notifyErr) {
+      console.warn('⚠️ branch transfer approve notification:', notifyErr?.message || notifyErr);
+    }
+
+    await auditLog(req, {
+      action: 'branch_transfer_approve',
+      module: 'products',
+      entityType: 'ProductBranchTransfer',
+      entityId: transfer._id,
+      message: `Branch transfer approved (${qty})`,
+      metadata: { productId: sourceProduct._id, fromBranchId: transfer.fromBranch, toBranchId },
+    });
+
+    return res.json({ message: 'Transfer approved and stock moved', transferId: transfer._id });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('approveBranchTransfer:', e);
+    return res.status(500).json({ error: 'Failed to approve transfer' });
+  }
+};
+
+/** Body: userId, rejectReason? */
+export const rejectBranchTransfer = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const userId = pickActorUserId(req);
+    const { id } = req.params;
+    const rejectReason = String(req.body?.rejectReason || '').trim().slice(0, 500);
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Invalid transfer id' });
+    }
+
+    const user = await loadUserForBranchTransfer(userId);
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const transfer = await ProductBranchTransfer.findById(id).session(session);
+    if (!transfer || transfer.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Pending transfer not found' });
+    }
+
+    try {
+      assertMayResolveBranchTransfer(user, transfer);
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ error: 'You cannot reject this transfer' });
+    }
+
+    const sourceProduct = await Product.findById(transfer.product).session(session);
+    if (!sourceProduct) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const qty = Number(transfer.quantity);
+    const reserved = Number(sourceProduct.transferReservedQuantity) || 0;
+    sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
+    await sourceProduct.save({ session });
+
+    transfer.status = 'rejected';
+    transfer.resolvedBy = userId;
+    transfer.resolvedAt = new Date();
+    transfer.rejectReason = rejectReason;
+    await transfer.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    try {
+      const initiatorId = transfer.initiatedBy;
+      const notification = await Notification.create({
+        type: 'branch_transfer_rejected',
+        title: 'Branch transfer rejected',
+        body: rejectReason
+          ? `${sourceProduct.name} ×${qty}: ${rejectReason}`
+          : `${sourceProduct.name} ×${qty} transfer was rejected`,
+        data: {
+          transferId: transfer._id,
+          productId: sourceProduct._id,
+          quantity: qty,
+          rejectedById: userId,
+          rejectReason,
+        },
+        recipients: [initiatorId],
+        readBy: [],
+      });
+      emitToUsers([initiatorId], 'notification:new', { notification });
+    } catch (notifyErr) {
+      console.warn('⚠️ branch transfer reject notification:', notifyErr?.message || notifyErr);
+    }
+
+    await auditLog(req, {
+      action: 'branch_transfer_reject',
+      module: 'products',
+      entityType: 'ProductBranchTransfer',
+      entityId: transfer._id,
+      message: `Branch transfer rejected (${qty})`,
+      metadata: { productId: sourceProduct._id, rejectReason },
+    });
+
+    return res.json({ message: 'Transfer rejected; reservation released', transferId: transfer._id });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('rejectBranchTransfer:', e);
+    return res.status(500).json({ error: 'Failed to reject transfer' });
+  }
+};
+
+/** Query: userId (required), status=pending|approved|rejected|all */
+export const listBranchTransfers = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.query.user_id;
+    const user = await loadUserForBranchTransfer(userId);
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const rawStatus = String(req.query.status || 'pending').trim().toLowerCase();
+    const q = {};
+    if (rawStatus === 'all') {
+      // no status filter
+    } else if (['pending', 'approved', 'rejected'].includes(rawStatus)) {
+      q.status = rawStatus;
+    } else {
+      q.status = 'pending';
+    }
+
+    if (!TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
+      if (user.role === 'Branch Manager' && user.branch) {
+        const bid = user.branch;
+        q.$or = [{ toBranch: bid }, { fromBranch: bid }];
+      } else {
+        return res.json({ transfers: [] });
+      }
+    }
+
+    const transfers = await ProductBranchTransfer.find(q)
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate('product', 'name code stock branch inWarehouse transferReservedQuantity')
+      .populate('fromBranch', 'name')
+      .populate('toBranch', 'name')
+      .populate('initiatedBy', 'name')
+      .populate('resolvedBy', 'name')
+      .lean();
+
+    return res.json({ transfers });
+  } catch (e) {
+    console.error('listBranchTransfers:', e);
+    return res.status(500).json({ error: 'Failed to list transfers' });
+  }
+};
+
+/** Incoming pending transfers for toolbar badge */
+export const getPendingBranchTransferCount = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.query.user_id;
+    const user = await loadUserForBranchTransfer(userId);
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    let count = 0;
+    if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
+      count = await ProductBranchTransfer.countDocuments({ status: 'pending' });
+    } else if (user.role === 'Branch Manager' && user.branch) {
+      count = await ProductBranchTransfer.countDocuments({
+        status: 'pending',
+        toBranch: user.branch,
+      });
+    }
+
+    return res.json({ count });
+  } catch (e) {
+    console.error('getPendingBranchTransferCount:', e);
+    return res.status(500).json({ error: 'Failed to count transfers' });
   }
 };
 
@@ -1202,11 +1828,15 @@ export const transferProductStock = async (req, res) => {
       return res.status(400).json({ error: 'Source branch does not match selected product branch.' });
     }
 
-    if (Number(sourceProduct.stock) < transferQty) {
+    const reserved = Number(sourceProduct.transferReservedQuantity) || 0;
+    const sellable = Number(sourceProduct.stock) - reserved;
+    if (sellable < transferQty) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
-        error: fromWh ? 'Not enough stock in warehouse.' : 'Not enough stock in source branch.',
+        error: fromWh
+          ? 'Not enough stock in warehouse.'
+          : 'Not enough stock in source branch (some quantity may be reserved for pending transfers).',
       });
     }
 

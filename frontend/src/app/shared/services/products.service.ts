@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import { Product } from '@core/models/products.model';
+import { Category, Product } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -28,6 +28,20 @@ export type ProductsImportResult = {
   createdCount: number;
   failedCount: number;
   errors: ProductsImportError[];
+};
+
+export type BranchTransferItem = {
+  _id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  quantity: number;
+  rejectReason?: string;
+  createdAt?: string;
+  resolvedAt?: string;
+  product?: { name?: string; code?: string };
+  fromBranch?: { _id?: string; name?: string };
+  toBranch?: { _id?: string; name?: string };
+  initiatedBy?: { name?: string };
+  resolvedBy?: { name?: string };
 };
 
 export type ImportExcelRow = {
@@ -63,14 +77,20 @@ getProducts(params: any) {
     });
   }
 
-  getBarcodeImage(code: string,productName: string){
-    // return this.http.get(`${PRODUCTS_URL}/barcode/${code}`, {
-    //   responseType: 'text' as 'json'
-    // });
-    return this.http.get(
-      `${PRODUCTS_URL}/barcode/${code}?name=${encodeURIComponent(productName)}`,
-      { responseType: 'text' as 'json' }
-    )
+  getBarcodeImage(code: string, productName: string, barcodeValues?: string[]) {
+    let params = new HttpParams().set('name', productName);
+    const parts = (barcodeValues || [])
+      .map((v) => String(v ?? '').trim())
+      .filter(Boolean);
+    /** Arabic comma + space — compact horizontal line on the sticker */
+    const line = parts.join('\u060c ');
+    if (line) {
+      params = params.set('bv', line);
+    }
+    return this.http.get(`${PRODUCTS_URL}/barcode/${encodeURIComponent(code)}`, {
+      params,
+      responseType: 'text' as 'json',
+    });
   }
 
 getPurchasingRequests(params: any) {
@@ -126,6 +146,48 @@ transferProductStock(payload: {
   return this.http.post(`${PRODUCTS_URL}/transfer-stock`, payload);
 }
 
+requestBranchTransfer(payload: {
+  userId: string;
+  productId: string;
+  toBranchId: string;
+  quantity: number;
+}) {
+  return this.http.post<{ message: string; transfer: BranchTransferItem }>(
+    `${PRODUCTS_URL}/branch-transfer/request`,
+    payload
+  );
+}
+
+listBranchTransfers(params: { userId: string; status?: string }) {
+  let hp = new HttpParams().set('userId', params.userId);
+  if (params.status) {
+    hp = hp.set('status', params.status);
+  }
+  return this.http.get<{ transfers: BranchTransferItem[] }>(`${PRODUCTS_URL}/branch-transfers`, {
+    params: hp,
+  });
+}
+
+getPendingBranchTransferCount(userId: string) {
+  return this.http.get<{ count: number }>(`${PRODUCTS_URL}/branch-transfers/pending-count`, {
+    params: { userId },
+  });
+}
+
+approveBranchTransfer(transferId: string, userId: string) {
+  return this.http.post<{ message: string }>(
+    `${PRODUCTS_URL}/branch-transfer/${transferId}/approve`,
+    { userId }
+  );
+}
+
+rejectBranchTransfer(transferId: string, userId: string, rejectReason?: string) {
+  return this.http.post<{ message: string }>(
+    `${PRODUCTS_URL}/branch-transfer/${transferId}/reject`,
+    { userId, rejectReason: rejectReason || '' }
+  );
+}
+
 getProductsStats(branchId?: any) {
   let params: any = {};
   if (branchId) params.branchId = branchId;
@@ -133,4 +195,29 @@ getProductsStats(branchId?: any) {
 }
 
 
+}
+
+/** Values only (no attribute names), in category attributeDefs order, for barcode sticker text. */
+export function productBarcodeAttributeValues(
+  category: Category | undefined | null,
+  attributes: Record<string, string> | undefined | null
+): string[] {
+  const defs = category?.attributeDefs;
+  if (!Array.isArray(defs) || !defs.length || !attributes) {
+    return [];
+  }
+  const out: string[] = [];
+  for (const def of defs) {
+    const key = typeof def === 'string' ? def : def?.key;
+    const showInBarcode =
+      typeof def === 'string' ? false : !!def?.showInBarcode;
+    if (!showInBarcode || !key) {
+      continue;
+    }
+    const v = attributes[key];
+    if (v != null && String(v).trim() !== '') {
+      out.push(String(v).trim());
+    }
+  }
+  return out;
 }

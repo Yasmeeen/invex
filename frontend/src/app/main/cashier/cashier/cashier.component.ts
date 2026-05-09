@@ -84,10 +84,13 @@ export class CashierComponent implements AfterViewInit {
     { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
   ];
 
-  /** Methods allowed per split line (not «Pay later» — under-payment is handled automatically). */
-  get paymentMethodsForSplit(): CashierPaymentMethod[] {
-    return this.paymentMethods.filter((m) => m.id !== 'credit');
-  }
+  /**
+   * Same as paymentMethods minus «credit». Must stay a stable array reference — a getter that
+   * returns `.filter()` breaks ng-select: items change every CD cycle so clicks never stick.
+   */
+  readonly paymentMethodsForSplit: CashierPaymentMethod[] = this.paymentMethods.filter(
+    (m) => m.id !== 'credit'
+  );
 
   constructor(
     private productsSerivce: ProductsSerivce, 
@@ -334,6 +337,21 @@ export class CashierComponent implements AfterViewInit {
 
   trackPayMethodId(_index: number, id: string): string {
     return id;
+  }
+
+  /** Native tooltip for “+N” overflow chips (no skolera-tooltip in this app). */
+  payMethodsOverflowTitle(items: readonly unknown[] | null | undefined): string {
+    if (!items?.length || items.length <= 2) {
+      return '';
+    }
+    return items
+      .slice(2)
+      .map((row) => {
+        const item = row as CashierPaymentMethod;
+        return item?.labelKey ? this.translate.instant(item.labelKey) : '';
+      })
+      .filter(Boolean)
+      .join(', ');
   }
 
   getPayMethodDef(id: string): CashierPaymentMethod | undefined {

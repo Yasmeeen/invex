@@ -85,6 +85,17 @@ export class CreateEditProductComponent implements OnInit {
     return !!this.data?.cashDeskPurchase;
   }
 
+  /** Popup title: desk purchase vs exchange trade-in vs default. */
+  get modalHeadingKey(): string {
+    if (this.cashDeskPurchase && this.data?.exchangeFlow) {
+      return 'tr_exchange_trade_in_form_title';
+    }
+    if (this.cashDeskPurchase) {
+      return 'tr_desk_purchase_new_product';
+    }
+    return 'tr_new_product';
+  }
+
   /** New product only: Branch Manager adds to assigned branch (no warehouse/branch UI). */
   get isBranchManagerNewProduct(): boolean {
     return !this.isEdit && isBranchManager(this.globals.currentUser?.role);

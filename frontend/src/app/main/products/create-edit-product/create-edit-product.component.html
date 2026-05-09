@@ -4,9 +4,7 @@
     <div class="modal-content" #modalContent>
       <div class="modal-header border-bottom">
         <h3 class="steel weight-medium size-default m-0">
-          {{
-            cashDeskPurchase ? ('tr_desk_purchase_new_product' | translate) : ('tr_new_product' | translate)
-          }}
+          {{ modalHeadingKey | translate }}
         </h3>
       </div>
 

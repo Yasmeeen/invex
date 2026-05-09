@@ -343,6 +343,17 @@
       margin-bottom: 1rem;
       font-size: 1.1rem;
     }
+
+    .cashier-desk-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+
+      .cashier-desk-actions__btn {
+        flex: 1 1 140px;
+        min-width: 0;
+      }
+    }
   
     table {
       width: 100%;

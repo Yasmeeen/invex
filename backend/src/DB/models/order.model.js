@@ -30,6 +30,17 @@ const orderSchema = new mongoose.Schema(
     /** Amount due after all discounts (unchanged meaning for reports). */
     totalPrice: { type: Number, min: 0 },
 
+    /**
+     * Cashier exchange / trade-in: purchase credit applied toward this sale (EGP).
+     * Payment validation uses (totalPrice − appliedCredit); totalPrice stays gross sale.
+     */
+    exchangeTradeInCreditAmount: { type: Number, default: 0, min: 0 },
+    exchangeProductPurchaseRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false,
+      ref: 'ProductPurchaseRequest',
+    },
+
     /** Credit (بيع بالآجل): track partial payments until fully settled. */
     amountPaid: { type: Number, min: 0, default: 0 },
     paymentStatus: {

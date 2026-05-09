@@ -66,6 +66,11 @@ export class CashierComponent implements AfterViewInit {
   createdDeskPurchase: any = null;
   printMode: 'sale' | 'deskPurchase' = 'sale';
 
+  /** Exchange: trade-in product intake recorded via desk purchase; cleared after checkout / cancel. */
+  exchangeTradeInPurchase: any = null;
+  /** After sale receipt print, optionally print trade-in purchase receipt. */
+  private pendingExchangePurchaseReceipt: any = null;
+
   // Client information section
   isClientInfoOpen = false;
   clientForm: FormGroup;
@@ -120,7 +125,18 @@ export class CashierComponent implements AfterViewInit {
     this.initClientForm();
   }
 
-  openDeskPurchaseProductDialog(): void {
+  startExchangeFlow(): void {
+    this.openDeskPurchaseProductDialog({ mode: 'exchange' });
+  }
+
+  cancelExchangeFlow(): void {
+    this.exchangeTradeInPurchase = null;
+    this.refreshExchangePaymentDefaults();
+    this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+  }
+
+  /** Desk intake purchase popup (`exchange`: trade-in step; defer purchase receipt until after sale checkout). */
+  openDeskPurchaseProductDialog(opts?: { mode?: 'desk' | 'exchange' }): void {
     const selectedBranchId = canPickBranchRole(this.curentUser?.role)
       ? this.adminSelectedBranchId
       : this.globals.currentUser?.branch?._id;
@@ -130,12 +146,15 @@ export class CashierComponent implements AfterViewInit {
       return;
     }
 
+    const isExchange = opts?.mode === 'exchange';
+
     const ref = this.dialog.open(CreateEditProductComponent, {
       width: '850px',
       data: {
         isEdit: false,
         cashDeskPurchase: true,
         forcedBranchId: String(selectedBranchId),
+        exchangeFlow: isExchange,
       },
       disableClose: true,
     });
@@ -145,13 +164,71 @@ export class CashierComponent implements AfterViewInit {
         return;
       }
       const body = res.deskPurchaseResult;
-      this.createdDeskPurchase = body?.purchase || body;
+      const purchase = body?.purchase || body;
+
+      if (isExchange) {
+        this.exchangeTradeInPurchase = purchase;
+        this.refreshExchangePaymentDefaults();
+        const msgKey = body?.createdProduct ? 'tr_exchange_trade_in_ok_auto' : 'tr_exchange_trade_in_ok_pending';
+        this.translate.get(msgKey).subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+        this.loadProducts();
+        return;
+      }
+
+      this.createdDeskPurchase = purchase;
       this.printMode = 'deskPurchase';
       this.printDeskPurchaseReceipt();
       const msgKey = body?.createdProduct ? 'tr_product_purchase_created_ok' : 'tr_product_purchase_pending_ok';
       this.translate.get(msgKey).subscribe((msg) => this.appNotificationService.push(msg, 'success'));
       this.loadProducts();
     });
+  }
+
+  /** Purchase cost credited toward exchange settlement (= agreed trade-in value toward sale). */
+  exchangeTradeInCredit(): number {
+    const p = this.exchangeTradeInPurchase;
+    if (!p?.productPayload) return 0;
+    const q = Math.max(1, Math.floor(Number(p.quantity) || 1));
+    const net = Number(p.productPayload.netPrice);
+    if (!Number.isFinite(net) || net < 0) return 0;
+    return Math.round(net * q * 100) / 100;
+  }
+
+  /** Cash to collect after trade-in credit (minimum zero). */
+  exchangeAmountDue(): number {
+    const sale = Math.round(this.finalOrderTotal() * 100) / 100;
+    const cr = this.exchangeTradeInCredit();
+    return Math.round(Math.max(0, sale - cr) * 100) / 100;
+  }
+
+  /** If trade-in credit exceeds sale total, store may owe this to customer (informational). */
+  exchangeStoreOwesCustomer(): number {
+    const sale = Math.round(this.finalOrderTotal() * 100) / 100;
+    const cr = this.exchangeTradeInCredit();
+    return Math.round(Math.max(0, cr - sale) * 100) / 100;
+  }
+
+  /** Payment totals compare against this amount at cashier when exchange active. */
+  effectiveCheckoutTotal(): number {
+    if (this.exchangeTradeInPurchase) {
+      return this.exchangeAmountDue();
+    }
+    return Math.round(this.finalOrderTotal() * 100) / 100;
+  }
+
+  private refreshExchangePaymentDefaults(): void {
+    if (!this.exchangeTradeInPurchase) return;
+    this.ensureDefaultPayAmounts();
+  }
+
+  receiptExchangeCredit(): number {
+    const v = Number(this.createdOrder?.exchangeTradeInCreditAmount);
+    return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  receiptExchangeCollected(): number {
+    const v = Number(this.createdOrder?.amountPaid);
+    return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
   }
 
   printDeskPurchaseReceipt(): void {
@@ -359,7 +436,7 @@ export class CashierComponent implements AfterViewInit {
       return;
     }
     const id = this.selectedPayMethods[0];
-    const t = Math.round(this.finalOrderTotal() * 100) / 100;
+    const t = Math.round(this.effectiveCheckoutTotal() * 100) / 100;
     const cur = Number(this.payAmounts[id]);
     if (!Number.isFinite(cur) || cur <= 0) {
       this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, t) };
@@ -416,11 +493,11 @@ export class CashierComponent implements AfterViewInit {
   }
 
   paymentRemaining(): number {
-    return Math.round((this.finalOrderTotal() - this.paymentSplitsTotal()) * 100) / 100;
+    return Math.round((this.effectiveCheckoutTotal() - this.paymentSplitsTotal()) * 100) / 100;
   }
 
   paymentOverAllocated(): boolean {
-    return this.paymentSplitsTotal() > this.finalOrderTotal() + 0.001;
+    return this.paymentSplitsTotal() > this.effectiveCheckoutTotal() + 0.001;
   }
 
   /** Receipt: translation key for payment method id (store receipt language). */
@@ -465,6 +542,7 @@ export class CashierComponent implements AfterViewInit {
       }
       item.quantity++;
       this.maybePushBookingWarning(item, item.quantity);
+      this.refreshExchangePaymentDefaults();
     } else {
       this.maybePushBookingWarning(product, 1);
       this.orderItems.push({
@@ -477,6 +555,7 @@ export class CashierComponent implements AfterViewInit {
     }
 
     this.focusBarcodeInput();
+    this.refreshExchangePaymentDefaults();
   }
 
   scanProduct(code: string) {
@@ -495,13 +574,19 @@ export class CashierComponent implements AfterViewInit {
     }
     item.quantity++;
     this.maybePushBookingWarning(item, item.quantity);
+    this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
   }
   decreaseQty(i: number) { 
     if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; 
+    this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
   }
-  removeItem(i: number) { this.orderItems.splice(i, 1); this.focusBarcodeInput(); }
+  removeItem(i: number) {
+    this.orderItems.splice(i, 1);
+    this.refreshExchangePaymentDefaults();
+    this.focusBarcodeInput();
+  }
 
   /** Unit price after product-level discount (matches backend). */
   lineUnitPrice(item: any): number {
@@ -582,6 +667,7 @@ export class CashierComponent implements AfterViewInit {
       this.invoiceDiscountMode = 'percent';
     }
     this.invoiceExtraValue = 0;
+    this.refreshExchangePaymentDefaults();
   }
 
   /** Max value for the number input (percent 0–100; amount capped at subtotal; final unbounded). */
@@ -610,6 +696,7 @@ export class CashierComponent implements AfterViewInit {
       if (v < 0) v = 0;
     }
     this.invoiceExtraValue = Math.round(v * 100) / 100;
+    this.refreshExchangePaymentDefaults();
   }
 
   getTotal() { 
@@ -679,7 +766,10 @@ export class CashierComponent implements AfterViewInit {
         amount: Math.round((Number(this.payAmounts[id]) || 0) * 100) / 100,
       }));
 
-    const orderData = {
+    const exchangeCredit = this.exchangeTradeInPurchase ? this.exchangeTradeInCredit() : 0;
+    const exchangePurchaseId = this.exchangeTradeInPurchase?._id;
+
+    const orderData: Record<string, unknown> = {
       products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
       clientName,
       clientPhoneNumber,
@@ -691,12 +781,22 @@ export class CashierComponent implements AfterViewInit {
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
     };
 
+    if (exchangeCredit > 0) {
+      orderData.exchangeTradeInCreditAmount = exchangeCredit;
+      if (exchangePurchaseId) {
+        orderData.exchangeProductPurchaseRequestId = exchangePurchaseId;
+      }
+    }
+
     const receiptSubtotal = Math.round(this.orderSubtotal() * 100) / 100;
     const receiptInvoiceDisc = Math.round(this.appliedInvoiceDiscount() * 100) / 100;
     const receiptFinal =
       Math.round((receiptSubtotal - receiptInvoiceDisc) * 100) / 100;
 
     this.ordersSerivce.createOrder(orderData).subscribe((res: any) => {
+      const pendingPurchaseReceipt = this.exchangeTradeInPurchase;
+      this.exchangeTradeInPurchase = null;
+
       const base = res?.newOrder ?? {};
       // Receipt must show invoice-level discount even if API omits fields or CD lags.
       this.createdOrder = {
@@ -705,6 +805,10 @@ export class CashierComponent implements AfterViewInit {
         invoiceDiscountAmount: receiptInvoiceDisc,
         totalPrice: receiptFinal,
       };
+
+      this.pendingExchangePurchaseReceipt =
+        exchangeCredit > 0 && pendingPurchaseReceipt ? pendingPurchaseReceipt : null;
+
       this.printInvoice();
 
       this.loadProducts();
@@ -717,15 +821,35 @@ export class CashierComponent implements AfterViewInit {
     });
   }
 
-  printInvoice() {
+  printInvoice(): void {
     setTimeout(() => {
       this.cdr.detectChanges();
       window.print();
+
       this.orderItems = [];
       this.resetPaymentLinesAfterCheckout();
       this.invoiceDiscountMode = 'percent';
       this.invoiceExtraValue = 0;
       this.clearClientInformationAfterCheckout();
+
+      const snap = this.pendingExchangePurchaseReceipt;
+      this.pendingExchangePurchaseReceipt = null;
+
+      if (snap) {
+        setTimeout(() => {
+          this.createdDeskPurchase = snap;
+          this.printMode = 'deskPurchase';
+          this.cdr.detectChanges();
+          setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+              this.printMode = 'sale';
+              this.createdDeskPurchase = null;
+              this.cdr.detectChanges();
+            }, 400);
+          }, 320);
+        }, 650);
+      }
     }, 300);
   }
 

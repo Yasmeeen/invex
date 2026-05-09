@@ -172,6 +172,8 @@ export const createOrder = async (req, res) => {
       invoiceDiscountAmount: invoiceDiscountRaw,
       paidAmount: paidAmountRaw,
       paymentSplits: paymentSplitsRaw,
+      exchangeTradeInCreditAmount: exchangeCreditRaw,
+      exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
     } = req.body;
 
     // validation
@@ -302,6 +304,22 @@ export const createOrder = async (req, res) => {
     }
     const totalRounded = Math.round(totalPrice * 100) / 100;
 
+    let exchangeTradeInCreditAmount = 0;
+    const creditReq = Number(exchangeCreditRaw);
+    if (Number.isFinite(creditReq) && creditReq > 0) {
+      exchangeTradeInCreditAmount = Math.round(creditReq * 100) / 100;
+    }
+    const exchangeCreditApplied = Math.min(exchangeTradeInCreditAmount, totalRounded);
+    const amountDueForPayment = Math.round((totalRounded - exchangeCreditApplied) * 100) / 100;
+
+    let exchangeProductPurchaseRequestId;
+    if (
+      exchangePurchaseIdRaw &&
+      mongoose.Types.ObjectId.isValid(String(exchangePurchaseIdRaw))
+    ) {
+      exchangeProductPurchaseRequestId = new mongoose.Types.ObjectId(String(exchangePurchaseIdRaw));
+    }
+
     let paidAmount = 0;
     const payments = [];
     let resolvedPaymentMethod = String(paymentMethod || 'cash').trim() || 'cash';
@@ -318,10 +336,10 @@ export const createOrder = async (req, res) => {
 
       paidAmount = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
 
-      if (paidAmount > totalRounded + 0.001) {
+      if (paidAmount > amountDueForPayment + 0.001) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ error: 'Payment amounts exceed order total' });
+        return res.status(400).json({ error: 'Payment amounts exceed amount due' });
       }
 
       const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
@@ -341,7 +359,7 @@ export const createOrder = async (req, res) => {
       }
 
       const withMoney = splits.filter((s) => s.amount > 0);
-      if (paidAmount >= totalRounded - 0.001) {
+      if (paidAmount >= amountDueForPayment - 0.001) {
         resolvedPaymentMethod =
           withMoney.length === 0
             ? 'cash'
@@ -358,10 +376,10 @@ export const createOrder = async (req, res) => {
 
       paidAmount = Number(paidAmountRaw);
       if (!Number.isFinite(paidAmount) || paidAmount < 0) paidAmount = 0;
-      paidAmount = Math.min(Math.round(paidAmount * 100) / 100, totalPrice);
+      paidAmount = Math.min(Math.round(paidAmount * 100) / 100, amountDueForPayment);
 
       if (!isCredit) {
-        paidAmount = Math.round(totalPrice * 100) / 100;
+        paidAmount = Math.round(amountDueForPayment * 100) / 100;
       }
 
       const methodSlug =
@@ -382,7 +400,7 @@ export const createOrder = async (req, res) => {
     }
 
     const paymentStatus =
-      paidAmount >= totalRounded - 0.001
+      paidAmount >= amountDueForPayment - 0.001
         ? 'paid'
         : paidAmount > 0
         ? 'partial'
@@ -413,6 +431,14 @@ export const createOrder = async (req, res) => {
           subtotalPrice,
           invoiceDiscountAmount,
           totalPrice,
+          ...(exchangeCreditApplied > 0
+            ? {
+                exchangeTradeInCreditAmount: exchangeCreditApplied,
+                ...(exchangeProductPurchaseRequestId
+                  ? { exchangeProductPurchaseRequestId }
+                  : {}),
+              }
+            : {}),
           amountPaid: paidAmount,
           paymentStatus,
           payments,

@@ -26,6 +26,8 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
+import { MatDialog } from '@angular/material/dialog';
+import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
 
@@ -59,6 +61,10 @@ export class CashierComponent implements AfterViewInit {
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string
+
+  /** Desk product purchase (inventory intake); receipt print uses shared component. */
+  createdDeskPurchase: any = null;
+  printMode: 'sale' | 'deskPurchase' = 'sale';
 
   // Client information section
   isClientInfoOpen = false;
@@ -95,6 +101,7 @@ export class CashierComponent implements AfterViewInit {
   constructor(
     private productsSerivce: ProductsSerivce, 
     private ordersSerivce: OrdersSerivce,
+    private dialog: MatDialog,
     private authenticationService: AuthenticationService,
     private branchesServce: BranchesServce,
     private globals: Globals,
@@ -111,6 +118,48 @@ export class CashierComponent implements AfterViewInit {
       this.loadProducts();
     }
     this.initClientForm();
+  }
+
+  openDeskPurchaseProductDialog(): void {
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser?.branch?._id;
+
+    if (!selectedBranchId) {
+      this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
+    const ref = this.dialog.open(CreateEditProductComponent, {
+      width: '850px',
+      data: {
+        isEdit: false,
+        cashDeskPurchase: true,
+        forcedBranchId: String(selectedBranchId),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((res: any) => {
+      if (!res?.submitted || !res?.deskPurchaseResult) {
+        return;
+      }
+      const body = res.deskPurchaseResult;
+      this.createdDeskPurchase = body?.purchase || body;
+      this.printMode = 'deskPurchase';
+      this.printDeskPurchaseReceipt();
+      const msgKey = body?.createdProduct ? 'tr_product_purchase_created_ok' : 'tr_product_purchase_pending_ok';
+      this.translate.get(msgKey).subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+      this.loadProducts();
+    });
+  }
+
+  printDeskPurchaseReceipt(): void {
+    setTimeout(() => {
+      this.cdr.detectChanges();
+      window.print();
+      this.printMode = 'sale';
+    }, 250);
   }
   getBranches() {
     let params = {

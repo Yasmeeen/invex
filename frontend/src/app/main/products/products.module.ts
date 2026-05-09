@@ -6,7 +6,7 @@ import { ProductsRoutingModule } from './products-routing.module';
 import { ProductsListComponent } from './products-list/products-list.component';
 import { SharedModule } from '@shared/shared.module';
 import { ProductsSerivce } from '@shared/services/products.service';
-import { CreateEditProductComponent } from './create-edit-product/create-edit-product.component';
+import { CreateEditProductModule } from './create-edit-product/create-edit-product.module';
 import { BookProductDialogComponent } from './book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from './view-product-booking-dialog/view-product-booking-dialog.component';
 import { ImportProductsDialogComponent } from './import-products-dialog/import-products-dialog.component';
@@ -17,7 +17,6 @@ import { PendingBranchTransfersDialogComponent } from './pending-branch-transfer
 @NgModule({
   declarations: [
     ProductsListComponent,
-    CreateEditProductComponent,
     BookProductDialogComponent,
     ViewProductBookingDialogComponent,
     ImportProductsDialogComponent,
@@ -28,6 +27,7 @@ import { PendingBranchTransfersDialogComponent } from './pending-branch-transfer
     CommonModule,
     ProductsRoutingModule,
     SharedModule,
+    CreateEditProductModule,
     TranslateModule.forChild(),
   ],
   providers: [

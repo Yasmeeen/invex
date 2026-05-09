@@ -58,6 +58,7 @@ export const REPORTS_URL = BASE_URL + '/reports';
 
 export const PRODUCT_BOOKINGS_URL = BASE_URL + '/product-bookings';
 export const NOTIFICATIONS_URL = BASE_URL + '/notifications';
+export const PRODUCT_PURCHASE_REQUESTS_URL = BASE_URL + '/product-purchase-requests';
 
 export const AUDITS_URL = BASE_URL + '/audits';
 

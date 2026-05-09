@@ -246,9 +246,16 @@
       </div>
     </div>
 
+
     <!-- Order Panel -->
     <div class="order-panel">
       <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
+
+      <button type="button" class="s-btn btn-secondary mb-3 width-100" (click)="openDeskPurchaseProductDialog()">
+        {{ 'tr_product_purchase_button' | translate }}
+      </button>
+
+      <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
 
  
       <table class="products-table-casheier ">
@@ -258,7 +265,7 @@
             <th>{{ "tr_cashier.QTY" | translate }}</th>
             <th>{{ "tr_cashier.PRICE" | translate }}</th>
             <th>{{ "tr_cashier.TOTAL" | translate }}</th>
-            <th>{{ "tr_cashier.REMOVE" | translate }}</th>
+            <th>x</th>
           </tr>
         </thead>
         <tbody>
@@ -366,6 +373,7 @@
   class="invoice-container"
   id="print-container"
   [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
+  *ngIf="printMode === 'sale'"
 >
   <ng-container *ngIf="storeSettings.settings$ | async as st">
     <!-- Store logo (from Settings) -->
@@ -523,3 +531,9 @@
     </div>
   </ng-container>
 </div>
+
+<app-purchase-receipt-print
+  *ngIf="printMode === 'deskPurchase'"
+  [purchase]="createdDeskPurchase"
+  [printDate]="todayDate"
+></app-purchase-receipt-print>

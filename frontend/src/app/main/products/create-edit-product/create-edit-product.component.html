@@ -4,7 +4,9 @@
     <div class="modal-content" #modalContent>
       <div class="modal-header border-bottom">
         <h3 class="steel weight-medium size-default m-0">
-          {{ 'tr_new_product' | translate }}
+          {{
+            cashDeskPurchase ? ('tr_desk_purchase_new_product' | translate) : ('tr_new_product' | translate)
+          }}
         </h3>
       </div>
 
@@ -163,26 +165,6 @@
                     </div>
                   </div>
 
-                  <!-- Dynamic category attributes -->
-                  <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
-                    <div class="border-top pt-3 mt-2">
-                      <h4 class="m-0 mb-2">{{ 'tr_category_attributes' | translate }}</h4>
-                      <div class="row" *ngFor="let d of categoryAttributeDefs">
-                        <div class="col-md-6">
-                          <div class="form-group">
-                            <label>{{ d.label }}</label>
-                            <input
-                              type="text"
-                              class="s-control"
-                              [(ngModel)]="attributeValues[d.key]"
-                              [ngModelOptions]="{ standalone: true }"
-                              autocomplete="off"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                   <!-- Price -->
                   <div class="col-md-6">
         
@@ -240,7 +222,7 @@
                       class="form-group"
                       [class.has-error]="stock.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ 'tr_stock' | translate }}</label>
+                      <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
                       <input
                         type="number"
                         class="s-control"
@@ -328,7 +310,14 @@
                     </p>
                   </div>
 
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct">
+                  <div class="col-md-12" *ngIf="cashDeskPurchase && deskPurchaseBranchLabel && !isBranchManagerNewProduct">
+                    <p class="text-muted size-small m-0">
+                      {{ 'tr_branch' | translate }}:
+                      <strong>{{ deskPurchaseBranchLabel }}</strong>
+                    </p>
+                  </div>
+
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
                     <div class="form-group">
                       <label>{{ 'tr_product_storage' | translate }}</label>
                       <div class="storage-choice">
@@ -355,7 +344,7 @@
                   </div>
 
                   <!-- Branch -->
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse">
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse && !cashDeskPurchase">
                     <div
                       class="form-group"
                       [class.has-error]="branch.invalid && basicInfoForm.submitted"
@@ -385,6 +374,26 @@
                     </div>
                   </div>
 
+                  <!-- Dynamic category attributes (last; two fields per row) -->
+                  <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
+                    <div class="border-top pt-3 mt-3">
+                      <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
+                      <div class="row">
+                        <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
+                          <div class="form-group">
+                            <label>{{ d.label }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="attributeValues[d.key]"
+                              [ngModelOptions]="{ standalone: true }"
+                              autocomplete="off"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                 </div>
               </form>
@@ -401,9 +410,9 @@
           (click)="submitForm()"
           class="s-btn btn-primary"
           type="submit"
-          [disabled]="isUploadingImage"
+          [disabled]="isUploadingImage || isSubmitting"
         >
-          {{ 'tr_save' | translate }}
+          {{ cashDeskPurchase ? ('tr_product_purchase_submit' | translate) : ('tr_save' | translate) }}
         </button>
       </div>
     </div>

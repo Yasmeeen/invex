@@ -1,0 +1,53 @@
+<h2 class="m-0 mb-3">{{ dialogData?.title || ('tr_product_purchase_title' | translate) }}</h2>
+
+<div class="size-small text-muted mb-3" *ngIf="dialogData?.body">{{ dialogData.body }}</div>
+
+<div class="card mb-3" *ngIf="dialogData?.data as d">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_name' | translate }}</div>
+        <div class="weight-bold">{{ d?.product?.name || d?.productName || '-' }}</div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
+        <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>
+        <div class="weight-bold">{{ d?.branchName || '-' }}</div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_quantity' | translate }}</div>
+        <div class="weight-bold">{{ d?.quantity || 1 }}</div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_purchase_price' | translate }}</div>
+        <div class="weight-bold">{{ d?.product?.netPrice || '-' }}</div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="size-small text-muted">{{ 'tr_sale_price' | translate }}</div>
+        <div class="weight-bold">{{ d?.product?.price || '-' }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="form-group mb-3">
+  <label class="size-small">{{ 'tr_notes' | translate }}</label>
+  <input class="s-control width-100" [(ngModel)]="note" [disabled]="saving" />
+</div>
+
+<div class="flex flex-space-between">
+  <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+    {{ 'tr_close' | translate }}
+  </button>
+  <div class="flex">
+    <button type="button" class="s-btn btn-secondary mr-2" (click)="reject()" [disabled]="saving">
+      {{ 'tr_action.reject' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="approve()" [disabled]="saving">
+      {{ 'tr_action.approve' | translate }}
+    </button>
+  </div>
+</div>

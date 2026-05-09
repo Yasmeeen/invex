@@ -25,6 +25,7 @@ import { environment } from 'src/environments/environment';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
+import { ProductPurchaseRequestsService } from '@shared/services/product-purchase-requests.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -58,6 +59,8 @@ export class CreateEditProductComponent implements OnInit {
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
+  /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
+  deskPurchaseBranchLabel = '';
   readonly maxImageBytes = 5 * 1024 * 1024;
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
   @ViewChild('modalContainer') modalContainer: ElementRef;
@@ -74,8 +77,13 @@ export class CreateEditProductComponent implements OnInit {
     private branchesServce:BranchesServce ,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private cloudinaryUpload: CloudinaryUploadService,
-    public globals: Globals
+    public globals: Globals,
+    private productPurchaseRequests: ProductPurchaseRequestsService
   ) {}
+
+  get cashDeskPurchase(): boolean {
+    return !!this.data?.cashDeskPurchase;
+  }
 
   /** New product only: Branch Manager adds to assigned branch (no warehouse/branch UI). */
   get isBranchManagerNewProduct(): boolean {
@@ -121,6 +129,9 @@ export class CreateEditProductComponent implements OnInit {
   ngOnInit() {
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
+    if (this.cashDeskPurchase) {
+      this.storeInWarehouse = false;
+    }
     this.getCategories();
     this.getBranches();
     if(this.isEdit){
@@ -128,6 +139,15 @@ export class CreateEditProductComponent implements OnInit {
      
     }
 
+  }
+
+  private applyDeskPurchaseBranchLabel(): void {
+    this.deskPurchaseBranchLabel = '';
+    if (!this.cashDeskPurchase || !this.data?.forcedBranchId || !this.branches?.length) {
+      return;
+    }
+    const b = this.branches.find((x: Branch) => String(x._id) === String(this.data.forcedBranchId));
+    this.deskPurchaseBranchLabel = b?.name ? String(b.name) : '';
   }
 
   private normalizeAttrKey(raw: any): string {
@@ -200,6 +220,7 @@ export class CreateEditProductComponent implements OnInit {
     }
     this.subscriptions.push(this.branchesServce.getBranchs(params).subscribe((response: any) => {
       this.branches = response.branches
+      this.applyDeskPurchaseBranchLabel();
     },(error:any)=> {
 
       this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
@@ -386,6 +407,93 @@ generateBarcode() {
       this.appNotificationService.push(msg, 'error');
     },
   });
+}
+
+private submitDeskPurchaseRequest(): void {
+  if (this.isUploadingImage) {
+    return;
+  }
+  if (!this.basicInfoForm.valid) return;
+  if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_select_category_first_code'),
+      'error'
+    );
+    return;
+  }
+  const codeTrim = String(this.codeValue || '').trim();
+  const prefix = String(this.selectedCategory.code || '').trim();
+  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_product_code_prefix_mismatch'),
+      'error'
+    );
+    return;
+  }
+
+  const fv = this.basicInfoForm.value;
+  const netNum = Number(fv.netPrice);
+  if (fv.netPrice === '' || fv.netPrice == null || Number.isNaN(netNum) || netNum < 0) {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_desk_purchase_net_required'),
+      'error'
+    );
+    return;
+  }
+
+  const uid = String(this.globals.currentUser?._id || '');
+  if (!uid) {
+    this.appNotificationService.push(this.translateService.instant('tr_unexpected_error_message'), 'error');
+    return;
+  }
+
+  let branchId = '';
+  if (this.data?.forcedBranchId) {
+    branchId = String(this.data.forcedBranchId);
+  } else if (this.isBranchManagerNewProduct) {
+    branchId = String(this.globals.currentUser?.branch?._id || '');
+  } else if (fv.branch?._id) {
+    branchId = String(fv.branch._id);
+  }
+
+  if (!branchId) {
+    this.appNotificationService.push(this.translateService.instant('tr_branch_required'), 'error');
+    return;
+  }
+
+  const qty = Math.max(1, Math.floor(Number(fv.stock) || 1));
+  const discountNum =
+    fv.discount === undefined || fv.discount === null || fv.discount === '' ? 0 : Number(fv.discount);
+
+  this.isSubmitting = true;
+  this.productPurchaseRequests
+    .create({
+      userId: uid,
+      branchId,
+      quantity: qty,
+      product: {
+        name: String(fv.name || '').trim(),
+        code: codeTrim,
+        categoryId: String(this.selectedCategory._id),
+        price: Math.round(Number(fv.price) * 100) / 100,
+        netPrice: Math.round(netNum * 100) / 100,
+        discount: Number.isFinite(discountNum) ? Math.round(discountNum * 100) / 100 : 0,
+        attributes: this.buildAttributesPayload(),
+        imageUrl: this.productImageUrl || '',
+        notes: '',
+      },
+    })
+    .subscribe({
+      next: (res: any) => {
+        this.isSubmitting = false;
+        this.dialogRef.close({ submitted: true, deskPurchaseResult: res });
+      },
+      error: (error: any) => {
+        this.isSubmitting = false;
+        const msg = error?.error?.details || error?.error?.error || error?.error?.message || 'Failed';
+        this.appNotificationService.push(msg, 'error');
+      },
+    });
 }
 
 createProduct() {
@@ -602,6 +710,9 @@ updateProduct() {
     if(this.isEdit){
       this.updateProduct();
     }
+    else if (this.cashDeskPurchase) {
+      this.submitDeskPurchaseRequest();
+    }
     else{
       this.createProduct();
     }
@@ -671,7 +782,7 @@ updateProduct() {
   destroyComponent() {
     this.destroyEmitter.emit();
   }
-  closeModal(isSubmit?: boolean) {
-    this.dialogRef.close(isSubmit);
+  closeModal(result?: any) {
+    this.dialogRef.close(result);
   }
 }

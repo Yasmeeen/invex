@@ -13,6 +13,7 @@ import { isModerator } from '@core/utils/role-utils';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { ViewProductBookingDialogComponent } from '../products/view-product-booking-dialog/view-product-booking-dialog.component';
 import { Product } from '@core/models/products.model';
+import { ProductPurchaseApprovalDialogComponent } from '@shared/components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
 
 @Component({
   selector: 'app-header',
@@ -148,28 +149,41 @@ export class HeaderComponent implements OnInit {
     if (n?.type === 'booking_created') {
       return 'fa-bookmark';
     }
+    if (n?.type === 'product_purchase_pending') {
+      return 'fa-shopping-cart';
+    }
     return 'fa-bell';
   }
 
   private navigateFromNotification(n: NotificationItem): void {
-    if (n.type !== 'booking_created' && n.type !== 'booking_confirmed') {
+    if (n.type === 'product_purchase_pending') {
+      const purchaseId = n?.data?.purchaseId;
+      if (!purchaseId) return;
+      this.dialog.open(ProductPurchaseApprovalDialogComponent, {
+        width: '720px',
+        data: { purchaseId, title: n.title, body: n.body, data: n.data },
+        disableClose: true,
+      });
       return;
     }
-    const productId = n?.data?.productId;
-    if (!productId) {
-      return;
+
+    if (n.type === 'booking_created' || n.type === 'booking_confirmed') {
+      const productId = n?.data?.productId;
+      if (!productId) {
+        return;
+      }
+      this.productsService.getProduct(productId).subscribe({
+        next: (p: any) => {
+          const product = p as Product;
+          this.dialog.open(ViewProductBookingDialogComponent, {
+            width: '680px',
+            data: { product, canAddBooking: true },
+            disableClose: true,
+          });
+        },
+        error: () => {},
+      });
     }
-    this.productsService.getProduct(productId).subscribe({
-      next: (p: any) => {
-        const product = p as Product;
-        this.dialog.open(ViewProductBookingDialogComponent, {
-          width: '680px',
-          data: { product, canAddBooking: true },
-          disableClose: true,
-        });
-      },
-      error: () => {},
-    });
   }
 
   markAllNotificationsRead(): void {

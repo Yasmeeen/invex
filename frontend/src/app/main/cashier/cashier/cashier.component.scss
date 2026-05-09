@@ -1,10 +1,11 @@
 /* cashier.component.scss */
 @import 'variables';
 @import 'color_scheme';
-@import 'print';
+/* Do NOT @import global _print.scss here: it hides .s-btn etc. at all times when scoped into this component. Print rules are below under @media print. */
 
 
-#print-container {
+#print-container,
+#print-purchase-receipt {
   display: none;
 }
 
@@ -481,179 +482,11 @@
     background-color: #e74c3c;
   }
 
-  // (refactor) old duplicate invoice styles removed; keep single receipt block below.
   $receiptWidth: 80mm;
   $receiptHeight: 200mm;
 
-  .invoice-container {
-    width: $receiptWidth;
-    font-family: Arial, sans-serif;
-    font-size: 10px;
-    color: #000;
-    padding: 2mm 2mm 10mm;
-    box-sizing: border-box;
-  
-    .center {
-      text-align: center;
-    }
-  
-    .bold {
-      font-weight: bold;
-    }
-  
-    .mtb-4 {
-      margin: 10px 0;
-    }
+  @import 'invoice-container-print';
 
-    .store-name {
-      font-size: 12px;
-      font-weight: 700;
-      margin: 6px 0;
-    }
-
-    .invoice-logo {
-      display: block;
-      margin: 0 auto 2mm;
-      max-height: 58px;
-      max-width: 100%;
-      object-fit: contain;
-    }
-
-    .invoice-client-block {
-      margin: 6px 0 8px;
-      padding: 4px 2px 6px;
-      border-top: 1px dashed #000;
-      border-bottom: 1px dashed #000;
-    }
-
-    .invoice-client-block__title {
-      font-weight: 700;
-      font-size: 10px;
-      text-align: center;
-      margin-bottom: 4px;
-      letter-spacing: 0.02em;
-    }
-
-    .invoice-client-block__table td {
-      font-size: 8px;
-      padding: 2px 4px;
-    }
-
-    .invoice-client-block__label {
-      font-weight: 700;
-      white-space: nowrap;
-      width: 40%;
-    }
-  
-    .invoice-table {
-      display: table;
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 5px;
-  
-      td {
-        padding: 3px 5px;
-        vertical-align: top;
-      }
-  
-      .header {
-        border-bottom: 1px solid #000;
-      }
-    }
-  
-    .products-table {
-      table-layout: fixed;
-      width: 100%;
-      font-size: 10px;
-
-      col.products-table__col-name {
-        width: 40%;
-      }
-      col.products-table__col-qty {
-        width: 16%;
-      }
-      col.products-table__col-price {
-        width: 22%;
-      }
-      col.products-table__col-total {
-        width: 23%;
-      }
-
-      td {
-        &:nth-child(3),
-        &:nth-child(4) {
-          text-align: right;
-          white-space: nowrap;
-        }
-      }
-
-      .item-name {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-      }
-
-      .invoice-item-attrs {
-        margin-top: 4px;
-        font-size: 9px;
-        font-weight: normal;
-        line-height: 1.35;
-        color: #333;
-      }
-
-      .invoice-item-attr {
-        display: block;
-      }
-    }
-
-    .totals-table td {
-      text-align: right;
-      white-space: nowrap;
-    }
-  
-    .separator {
-      margin: 5px 0;
-      &.dashed {
-        border-bottom: 1px dashed #000;
-      }
-      &.double-border {
-        border-bottom: 2px solid #000;
-      }
-    }
-  
-    .final-total {
-      font-size: 11px;
-      margin: 5px 0;
-      text-align: center;
-      font-weight: 700;
-    }
-  
-    .footer {
-      margin-top: 10px;
-      font-size: 9px;
-    }
-
-    .invoice-qr {
-      margin-top: 10px;
-      padding: 4px 3mm 0;
-      box-sizing: border-box;
-
-      &__img {
-        width: 96px;
-        height: 96px;
-        display: inline-block;
-        vertical-align: top;
-        image-rendering: pixelated;
-      }
-
-      &__caption {
-        font-size: 8px;
-        color: #333;
-        margin-top: 3px;
-        letter-spacing: 0.02em;
-      }
-    }
-  }
-  
   /* Print Styles */
   @media print {
     @page {
@@ -690,11 +523,14 @@
     }
   
     #print-container,
-    #print-container * {
+    #print-container *,
+    #print-purchase-receipt,
+    #print-purchase-receipt * {
       visibility: visible;
     }
-  
-    #print-container {
+
+    #print-container,
+    #print-purchase-receipt {
       display: block !important;
       position: absolute;
       left: 0;
@@ -706,7 +542,8 @@
   }
 
   /* Receipt language direction */
-  #print-container[dir="rtl"] {
+  #print-container[dir="rtl"],
+  #print-purchase-receipt[dir="rtl"] {
     direction: rtl;
     text-align: right;
 
@@ -714,4 +551,3 @@
       text-align: right;
     }
   }
-  

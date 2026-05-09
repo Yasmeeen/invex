@@ -19,6 +19,8 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { NotAuthorizedComponent } from './components/not-authorized/not-authorized.component';
 import { ReceiptTranslatePipe } from './pipes/receipt-translate.pipe';
 import { VixaChatComponent } from './components/vixa-chat/vixa-chat.component';
+import { ProductPurchaseApprovalDialogComponent } from './components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
+import { PurchaseReceiptPrintComponent } from './components/purchase-receipt-print/purchase-receipt-print.component';
 
 
 
@@ -33,6 +35,8 @@ import { VixaChatComponent } from './components/vixa-chat/vixa-chat.component';
     NotAuthorizedComponent,
     ReceiptTranslatePipe,
     VixaChatComponent,
+    ProductPurchaseApprovalDialogComponent,
+    PurchaseReceiptPrintComponent,
   ],
   imports: [
     CommonModule,
@@ -61,6 +65,8 @@ import { VixaChatComponent } from './components/vixa-chat/vixa-chat.component';
     NotAuthorizedComponent,
     ReceiptTranslatePipe,
     VixaChatComponent,
+    ProductPurchaseApprovalDialogComponent,
+    PurchaseReceiptPrintComponent,
   ],
   providers: [VersionCheckService,UpdateService]
 })

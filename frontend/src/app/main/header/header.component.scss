@@ -188,6 +188,11 @@ $forest: #6c5ce7;
     flex-shrink: 0;
   }
 
+  .notification-content__title {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
 }
 
 .app-topbar__notify-dot {

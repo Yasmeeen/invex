@@ -60,8 +60,13 @@
                 <i class="fa" [ngClass]="notificationIconClass(n)"></i>
               </div>
               <div class="notification-content">
-                <div class="weight-medium steel">
-                  {{ n.title || ('tr_notifications' | translate) }}
+                <div class="weight-medium steel notification-content__title">
+                  <ng-container [ngSwitch]="n.type">
+                    <span *ngSwitchCase="'product_purchase_pending'">{{
+                      'tr_notification_product_purchase_pending_title' | translate
+                    }}</span>
+                    <span *ngSwitchDefault>{{ n.title || ('tr_notifications' | translate) }}</span>
+                  </ng-container>
                 </div>
                 <div class="size-small text-muted mt-1">{{ n.body }}</div>
                 <div class="size-small text-muted mt-1">{{ n.createdAt | date : 'short' }}</div>

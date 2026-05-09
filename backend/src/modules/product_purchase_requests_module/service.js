@@ -54,6 +54,55 @@ async function collectApproverUserIds(branchId) {
   return users.map((u) => u._id);
 }
 
+/** Populated refs are `{ _id, ... }`; permission checks must compare raw ObjectIds. */
+function dereferenceDocId(ref) {
+  if (ref == null) return ref;
+  if (typeof ref === 'object' && ref._id != null) return ref._id;
+  return ref;
+}
+
+export const getProductPurchaseRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.query;
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid purchase id' });
+    }
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const actor = await User.findById(userId).select('_id name role branch').lean();
+    if (!actor) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const purchase = await ProductPurchaseRequest.findById(id)
+      .populate('branch', 'name')
+      .populate('createdBy', 'name role')
+      .populate('resolvedBy', 'name role')
+      .lean();
+
+    if (!purchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    const isAllowed =
+      actor.role === 'Super Admin' ||
+      actor.role === 'Co Admin' ||
+      (actor.role === 'Branch Manager' &&
+        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch)));
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    return res.json({ purchase });
+  } catch (e) {
+    console.error('getProductPurchaseRequest:', e);
+    return res.status(500).json({ error: 'Failed to fetch purchase' });
+  }
+};
+
 export const listProductPurchaseRequests = async (req, res) => {
   try {
     const { status, branchId, page = 1, limit = 20 } = req.query;
@@ -345,7 +394,8 @@ export const approveProductPurchaseRequest = async (req, res) => {
     const isAllowed =
       actor.role === 'Super Admin' ||
       actor.role === 'Co Admin' ||
-      (actor.role === 'Branch Manager' && String(actor.branch) === String(purchase.branch));
+      (actor.role === 'Branch Manager' &&
+        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch)));
     if (!isAllowed) {
       await session.abortTransaction();
       session.endSession();
@@ -487,7 +537,8 @@ export const rejectProductPurchaseRequest = async (req, res) => {
     const isAllowed =
       actor.role === 'Super Admin' ||
       actor.role === 'Co Admin' ||
-      (actor.role === 'Branch Manager' && String(actor.branch) === String(purchase.branch));
+      (actor.role === 'Branch Manager' &&
+        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch)));
     if (!isAllowed) {
       await session.abortTransaction();
       session.endSession();

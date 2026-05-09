@@ -251,7 +251,7 @@
     <div class="order-panel">
       <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
 
-      <div class="cashier-desk-actions mb-3">
+      <div class="cashier-desk-actions mb-3 ">
         <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="openDeskPurchaseProductDialog()">
           {{ 'tr_product_purchase_button' | translate }}
         </button>
@@ -260,7 +260,7 @@
         </button>
       </div>
 
-      <div class="card mb-3 p-3" *ngIf="exchangeTradeInPurchase">
+      <div class="card mb-3 plr-3 ptb-3" *ngIf="exchangeTradeInPurchase">
         <div class="flex flex-space-between flex-wrap gap-sm mb-2">
           <span class="weight-bold">{{ 'tr_exchange_active_title' | translate }}</span>
           <button type="button" class="s-btn btn-secondary size-small" (click)="cancelExchangeFlow()">

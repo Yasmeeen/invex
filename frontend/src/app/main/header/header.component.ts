@@ -14,6 +14,7 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { ViewProductBookingDialogComponent } from '../products/view-product-booking-dialog/view-product-booking-dialog.component';
 import { Product } from '@core/models/products.model';
 import { ProductPurchaseApprovalDialogComponent } from '@shared/components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
+import { normalizeMongoId } from '@core/utils/mongo-id.util';
 
 @Component({
   selector: 'app-header',
@@ -157,11 +158,11 @@ export class HeaderComponent implements OnInit {
 
   private navigateFromNotification(n: NotificationItem): void {
     if (n.type === 'product_purchase_pending') {
-      const purchaseId = n?.data?.purchaseId;
+      const purchaseId = normalizeMongoId(n?.data?.purchaseId);
       if (!purchaseId) return;
       this.dialog.open(ProductPurchaseApprovalDialogComponent, {
         width: '720px',
-        data: { purchaseId, title: n.title, body: n.body, data: n.data },
+        data: { purchaseId, body: n.body, data: n.data },
         disableClose: true,
       });
       return;

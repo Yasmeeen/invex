@@ -1,3 +1,46 @@
+/* Dialog shell: global `.mat-dialog-container` is transparent — host supplies the white panel. */
+:host {
+  display: block;
+  background: #fff;
+  color: #2c3e50;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.product-purchase-approval-dialog__heading {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.product-purchase-approval-dialog__banner {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+
+  &--ok {
+    background: rgba(46, 204, 113, 0.12);
+    border: 1px solid rgba(39, 174, 96, 0.35);
+    color: #1e8449;
+  }
+
+  &--muted {
+    background: rgba(149, 165, 166, 0.14);
+    border: 1px solid rgba(127, 140, 141, 0.35);
+    color: #566573;
+  }
+
+  &--warn {
+    background: rgba(241, 196, 15, 0.14);
+    border: 1px solid rgba(243, 156, 18, 0.45);
+    color: #7d6608;
+  }
+}
+
 .card {
+  background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
 }

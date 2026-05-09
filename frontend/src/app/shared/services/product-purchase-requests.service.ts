@@ -36,6 +36,12 @@ export class ProductPurchaseRequestsService {
     return this.http.patch(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}/reject`, payload);
   }
 
+  getById(purchaseId: string, userId: string): Observable<any> {
+    return this.http.get(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}`, {
+      params: { userId },
+    });
+  }
+
   list(params: {
     status?: 'pending' | 'approved' | 'rejected';
     branchId?: string;

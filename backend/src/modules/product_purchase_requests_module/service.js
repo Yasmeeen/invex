@@ -8,6 +8,11 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
 import { auditLog } from '../audit_module/audit.service.js';
+import {
+  allocateSequentialProductCodes,
+  assertCodesNotUsedInStorage,
+  validateProductCodeForCategory,
+} from '../products_module/service.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -210,9 +215,41 @@ export const createProductPurchaseRequest = async (req, res) => {
       return res.status(400).json({ error: 'attributes must be an object' });
     }
 
+    const catMultiRow = await Category.findById(String(categoryId)).select('multiCodePerPiece').session(session).lean();
+    const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+
+    let unitCodesNorm = [];
+    if (categoryIsMulti && q > 1) {
+      const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
+      unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+      if (unitCodesNorm.length !== q) {
+        try {
+          unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
+        } catch (e) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: e?.message || 'Cannot allocate codes' });
+        }
+      }
+      const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
+      if (seen.size !== unitCodesNorm.length) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Duplicate codes in unitCodes' });
+      }
+      for (const c of unitCodesNorm) {
+        const chk = await validateProductCodeForCategory(String(categoryId), c);
+        if (!chk.ok) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: chk.error });
+        }
+      }
+    }
+
     const payload = {
       name,
-      code,
+      code: categoryIsMulti && q > 1 ? unitCodesNorm[0] : code,
       category: new mongoose.Types.ObjectId(String(categoryId)),
       price: Math.round(priceNum * 100) / 100,
       netPrice: Math.round(netNum * 100) / 100,
@@ -221,6 +258,9 @@ export const createProductPurchaseRequest = async (req, res) => {
       imageUrl: imageUrlNorm,
       notes,
     };
+    if (categoryIsMulti && q > 1) {
+      payload.unitCodes = unitCodesNorm;
+    }
 
     const autoApprove = isAutoApproverRole(actor.role);
 
@@ -244,6 +284,87 @@ export const createProductPurchaseRequest = async (req, res) => {
     let createdProduct = null;
 
     if (autoApprove) {
+      if (categoryIsMulti && q > 1) {
+        const free = await assertCodesNotUsedInStorage(unitCodesNorm, branchId, false);
+        if (!free.ok) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(409).json({ error: free.error });
+        }
+        const createdList = [];
+        for (const unitCode of unitCodesNorm) {
+          const [prodRow] = await Product.create(
+            [
+              {
+                name,
+                code: unitCode,
+                price: payload.price,
+                netPrice: payload.netPrice,
+                stock: 1,
+                discount: payload.discount,
+                category: payload.category,
+                branch: branchId,
+                inWarehouse: false,
+                imageUrl: payload.imageUrl,
+                attributes: payload.attributes,
+              },
+            ],
+            { session }
+          );
+          createdList.push(prodRow);
+        }
+        createdProduct = createdList[0];
+        created.createdProductId = createdList[0]._id;
+        created.createdProductIds = createdList.map((p) => p._id);
+        await created.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        for (const prodRow of createdList) {
+          try {
+            await StockMovement.create({
+              movementType: 'purchase',
+              productId: prodRow._id,
+              productName: prodRow.name,
+              branchId: branchId,
+              fromBranchId: null,
+              toBranchId: branchId,
+              quantity: 1,
+              unitPrice: payload.netPrice,
+              totalValue: Math.round(payload.netPrice * 100) / 100,
+              referenceType: 'productPurchaseRequest',
+              referenceId: created._id,
+              notes: `Product purchase (desk, auto-approved, multi-code)`,
+            });
+          } catch (e) {
+            console.warn('⚠️ product purchase stock movement:', e?.message || e);
+          }
+        }
+
+        await auditLog(req, {
+          action: 'create',
+          module: 'product_purchase_requests',
+          entityType: 'ProductPurchaseRequest',
+          entityId: created?._id,
+          message: 'Product purchase request created (auto-approved, multi-code)',
+          metadata: {
+            branchId,
+            productCodes: unitCodesNorm,
+            quantity: q,
+            createdProductId: createdList[0]._id,
+            createdProductIds: createdList.map((p) => String(p._id)),
+          },
+        });
+
+        return res.status(201).json({
+          message: '✅ Purchase created and approved',
+          purchase: created.toObject ? created.toObject() : created,
+          createdProduct,
+          createdProducts: createdList,
+        });
+      }
+
       const existing = await Product.findOne({ code, branch: branchId }).session(session);
       if (existing) {
         await session.abortTransaction();
@@ -317,17 +438,26 @@ export const createProductPurchaseRequest = async (req, res) => {
 
     try {
       const recipientIds = await collectApproverUserIds(branchId);
+      const codeSummary =
+        categoryIsMulti && q > 1 && unitCodesNorm.length ? unitCodesNorm.join(', ') : code;
       const notification = await Notification.create({
         type: 'product_purchase_pending',
         title: 'Product purchase pending approval',
-        body: `${name} (${code}) — ${q} unit(s) · Branch: ${branch?.name || 'Branch'}`,
+        body: `${name} (${codeSummary}) — ${q} unit(s) · Branch: ${branch?.name || 'Branch'}`,
         data: {
           purchaseId: created._id,
           branchId,
           branchName: branch?.name || null,
           createdById: actor._id,
           createdByName: actor?.name || null,
-          product: { name, code, categoryId: String(categoryId), price: payload.price, netPrice: payload.netPrice },
+          product: {
+            name,
+            code: codeSummary,
+            categoryId: String(categoryId),
+            price: payload.price,
+            netPrice: payload.netPrice,
+            ...(categoryIsMulti && q > 1 && unitCodesNorm.length ? { unitCodes: unitCodesNorm } : {}),
+          },
           quantity: q,
         },
         recipients: recipientIds,
@@ -406,13 +536,6 @@ export const approveProductPurchaseRequest = async (req, res) => {
     const pp = purchase.productPayload || {};
     const code = String(pp.code || '').trim();
 
-    const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
-    if (existing) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(409).json({ error: 'Product code already exists in this branch' });
-    }
-
     const attrsNorm = await normalizeAttributesForCategory(String(pp.category), pp.attributes);
     if (attrsNorm === null) {
       await session.abortTransaction();
@@ -420,62 +543,161 @@ export const approveProductPurchaseRequest = async (req, res) => {
       return res.status(400).json({ error: 'Invalid attributes' });
     }
 
-    const [prod] = await Product.create(
-      [
-        {
-          name: pp.name,
-          code,
-          price: Number(pp.price) || 0,
-          netPrice: Number(pp.netPrice) || 0,
-          stock: q,
-          discount: Number(pp.discount) || 0,
-          category: pp.category,
-          branch: purchase.branch,
-          inWarehouse: false,
-          imageUrl: normalizeImageUrl(pp.imageUrl),
-          attributes: attrsNorm,
-        },
-      ],
-      { session }
-    );
+    const categoryIdStr = String(pp.category);
+    const catMultiRow = await Category.findById(categoryIdStr).select('multiCodePerPiece').session(session).lean();
+    const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+
+    let prod;
+    let createdList = [];
+
+    if (categoryIsMulti && q > 1) {
+      const raw = Array.isArray(pp.unitCodes) ? pp.unitCodes : [];
+      const codes = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+      if (codes.length !== q) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Purchase is missing unit codes for multi-code category' });
+      }
+      const seen = new Set(codes.map((c) => c.toUpperCase()));
+      if (seen.size !== codes.length) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Duplicate codes on purchase request' });
+      }
+      for (const c of codes) {
+        const chk = await validateProductCodeForCategory(categoryIdStr, c);
+        if (!chk.ok) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: chk.error });
+        }
+      }
+      const free = await assertCodesNotUsedInStorage(codes, purchase.branch, false);
+      if (!free.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({ error: free.error });
+      }
+      for (const unitCode of codes) {
+        const [pRow] = await Product.create(
+          [
+            {
+              name: pp.name,
+              code: unitCode,
+              price: Number(pp.price) || 0,
+              netPrice: Number(pp.netPrice) || 0,
+              stock: 1,
+              discount: Number(pp.discount) || 0,
+              category: pp.category,
+              branch: purchase.branch,
+              inWarehouse: false,
+              imageUrl: normalizeImageUrl(pp.imageUrl),
+              attributes: attrsNorm,
+            },
+          ],
+          { session }
+        );
+        createdList.push(pRow);
+      }
+      prod = createdList[0];
+    } else {
+      const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
+      if (existing) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({ error: 'Product code already exists in this branch' });
+      }
+
+      const [pRow] = await Product.create(
+        [
+          {
+            name: pp.name,
+            code,
+            price: Number(pp.price) || 0,
+            netPrice: Number(pp.netPrice) || 0,
+            stock: q,
+            discount: Number(pp.discount) || 0,
+            category: pp.category,
+            branch: purchase.branch,
+            inWarehouse: false,
+            imageUrl: normalizeImageUrl(pp.imageUrl),
+            attributes: attrsNorm,
+          },
+        ],
+        { session }
+      );
+      prod = pRow;
+      createdList = [pRow];
+    }
 
     purchase.status = 'approved';
     purchase.resolvedBy = actor._id;
     purchase.resolvedAt = new Date();
     purchase.resolutionNote = String(resolutionNote || '').trim().slice(0, 500);
     purchase.createdProductId = prod._id;
+    if (createdList.length > 1) {
+      purchase.createdProductIds = createdList.map((p) => p._id);
+    }
     await purchase.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
     try {
-      await StockMovement.create({
-        movementType: 'purchase',
-        productId: prod._id,
-        productName: prod.name,
-        branchId: purchase.branch,
-        fromBranchId: null,
-        toBranchId: purchase.branch,
-        quantity: q,
-        unitPrice: Number(pp.netPrice) || 0,
-        totalValue: Math.round((Number(pp.netPrice) || 0) * q * 100) / 100,
-        referenceType: 'productPurchaseRequest',
-        referenceId: purchase._id,
-        notes: `Product purchase approved`,
-      });
+      if (createdList.length > 1) {
+        for (const pRow of createdList) {
+          await StockMovement.create({
+            movementType: 'purchase',
+            productId: pRow._id,
+            productName: pRow.name,
+            branchId: purchase.branch,
+            fromBranchId: null,
+            toBranchId: purchase.branch,
+            quantity: 1,
+            unitPrice: Number(pp.netPrice) || 0,
+            totalValue: Math.round((Number(pp.netPrice) || 0) * 100) / 100,
+            referenceType: 'productPurchaseRequest',
+            referenceId: purchase._id,
+            notes: `Product purchase approved (multi-code)`,
+          });
+        }
+      } else {
+        await StockMovement.create({
+          movementType: 'purchase',
+          productId: prod._id,
+          productName: prod.name,
+          branchId: purchase.branch,
+          fromBranchId: null,
+          toBranchId: purchase.branch,
+          quantity: q,
+          unitPrice: Number(pp.netPrice) || 0,
+          totalValue: Math.round((Number(pp.netPrice) || 0) * q * 100) / 100,
+          referenceType: 'productPurchaseRequest',
+          referenceId: purchase._id,
+          notes: `Product purchase approved`,
+        });
+      }
     } catch (e) {
       console.warn('⚠️ product purchase approve stock movement:', e?.message || e);
     }
 
     try {
       const creatorId = purchase.createdBy;
+      const codeSummary =
+        createdList.length > 1
+          ? createdList.map((p) => p.code).join(', ')
+          : String(pp.code || '');
       if (creatorId && String(creatorId) !== String(actor._id)) {
         const notification = await Notification.create({
           type: 'product_purchase_approved',
           title: 'Product purchase approved',
-          body: `${pp.name} (${pp.code}) — approved by ${(actor?.name || 'Manager').trim()}`,
-          data: { purchaseId: purchase._id, productId: prod._id, approvedById: actor._id },
+          body: `${pp.name} (${codeSummary}) — approved by ${(actor?.name || 'Manager').trim()}`,
+          data: {
+            purchaseId: purchase._id,
+            productId: prod._id,
+            approvedById: actor._id,
+            ...(createdList.length > 1 ? { productIds: createdList.map((p) => String(p._id)) } : {}),
+          },
           recipients: [creatorId],
           readBy: [],
         });
@@ -491,10 +713,20 @@ export const approveProductPurchaseRequest = async (req, res) => {
       entityType: 'ProductPurchaseRequest',
       entityId: purchase?._id,
       message: 'Product purchase request approved',
-      metadata: { productId: prod._id, quantity: q, branchId: purchase.branch },
+      metadata: {
+        productId: prod._id,
+        quantity: q,
+        branchId: purchase.branch,
+        ...(createdList.length > 1 ? { productIds: createdList.map((p) => String(p._id)) } : {}),
+      },
     });
 
-    return res.json({ message: '✅ Approved', purchase, createdProduct: prod });
+    return res.json({
+      message: '✅ Approved',
+      purchase,
+      createdProduct: prod,
+      ...(createdList.length > 1 ? { createdProducts: createdList } : {}),
+    });
   } catch (e) {
     await session.abortTransaction();
     session.endSession();

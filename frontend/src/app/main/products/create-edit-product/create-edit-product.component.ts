@@ -17,7 +17,7 @@ import {
   productBarcodeAttributeValues,
   ProductsSerivce,
 } from '@shared/services/products.service';
-import { Subscription } from 'rxjs';
+import { forkJoin, Observable, Subscription } from 'rxjs';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
@@ -25,7 +25,10 @@ import { environment } from 'src/environments/environment';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
-import { ProductPurchaseRequestsService } from '@shared/services/product-purchase-requests.service';
+import {
+  DeskPurchaseProductPayload,
+  ProductPurchaseRequestsService,
+} from '@shared/services/product-purchase-requests.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -56,6 +59,8 @@ export class CreateEditProductComponent implements OnInit {
   private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false;
+  /** When category.multiCodePerPiece and quantity > 1: one editable code per unit (new product only). */
+  multiUnitCodes: string[] = [];
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
@@ -103,6 +108,246 @@ export class CreateEditProductComponent implements OnInit {
 
   hasCategoryCode(c?: Category | null): boolean {
     return !!(c && String(c.code || '').trim());
+  }
+
+  get isMultiCodeCategory(): boolean {
+    return !!(this.selectedCategory?.multiCodePerPiece);
+  }
+
+  getStockQty(): number {
+    const v = this.basicInfoForm?.value?.stock;
+    return Math.max(1, Math.floor(Number(v) || 1));
+  }
+
+  /** One SKU per physical unit: category flag + quantity > 1 + new product. */
+  get isMultiUnitMode(): boolean {
+    return !this.isEdit && this.isMultiCodeCategory && this.getStockQty() > 1;
+  }
+
+  trackByUnitIndex(i: number): number {
+    return i;
+  }
+
+  private syncPrimaryCodeFromMultiUnits(): void {
+    const first = String(this.multiUnitCodes[0] ?? '').trim();
+    this.codeValue = first;
+    this.basicInfoForm?.form?.patchValue({ code: first });
+  }
+
+  /** When quantity changes: shrink array, or append auto-generated codes for new slots only. */
+  onStockQuantityChanged(): void {
+    if (this.isEdit || !this.isMultiCodeCategory) {
+      this.multiUnitCodes = [];
+      return;
+    }
+    const q = this.getStockQty();
+    if (q <= 1) {
+      this.multiUnitCodes = [];
+      return;
+    }
+
+    if (this.multiUnitCodes.length > q) {
+      this.multiUnitCodes = this.multiUnitCodes.slice(0, q);
+      this.syncPrimaryCodeFromMultiUnits();
+      return;
+    }
+
+    if (this.multiUnitCodes.length < q) {
+      const keep = [...this.multiUnitCodes];
+      const need = q - keep.length;
+      this.multiUnitCodes = [...keep, ...Array.from({ length: need }, () => '')];
+
+      const cat = this.selectedCategory;
+      if (!cat?._id || !this.hasCategoryCode(cat)) {
+        return;
+      }
+      this.productsSerivce.generateBarcode(String(cat._id), need).subscribe({
+        next: (res: { code?: string; codes?: string[] }) => {
+          const add = res.codes?.length ? res.codes : res.code ? [res.code] : [];
+          this.multiUnitCodes = [...keep, ...add].slice(0, q);
+          this.syncPrimaryCodeFromMultiUnits();
+          this.isCodeGenerated = true;
+        },
+        error: (err: any) => {
+          const msg =
+            err?.error?.error ||
+            this.translateService.instant('tr_barcode_generate_failed');
+          this.appNotificationService.push(msg, 'error');
+        },
+      });
+      return;
+    }
+
+    this.syncPrimaryCodeFromMultiUnits();
+  }
+
+  /** Replace every unit code with a fresh block from the server (current quantity). */
+  refreshMultiUnitCodes(showToast = false): void {
+    const cat = this.selectedCategory;
+    const q = this.getStockQty();
+    if (!cat?._id || !this.hasCategoryCode(cat) || q <= 1 || this.isEdit) {
+      this.multiUnitCodes = [];
+      return;
+    }
+    this.productsSerivce.generateBarcode(String(cat._id), q).subscribe({
+      next: (res: { code?: string; codes?: string[] }) => {
+        const codes = res.codes?.length ? res.codes : res.code ? [res.code] : [];
+        this.multiUnitCodes = codes.slice(0, q);
+        while (this.multiUnitCodes.length < q) {
+          this.multiUnitCodes.push('');
+        }
+        this.syncPrimaryCodeFromMultiUnits();
+        this.isCodeGenerated = true;
+        if (showToast) {
+          this.appNotificationService.push(
+            this.translateService.instant('tr_product_code_generated'),
+            'success'
+          );
+        }
+      },
+      error: (err: any) => {
+        const msg =
+          err?.error?.error ||
+          this.translateService.instant('tr_barcode_generate_failed');
+        this.appNotificationService.push(msg, 'error');
+      },
+    });
+  }
+
+  onMultiUnitCodeBlur(index: number): void {
+    const cat = this.selectedCategory;
+    if (!cat || !this.hasCategoryCode(cat)) {
+      return;
+    }
+    const prefix = String(cat.code || '').trim();
+    let v = String(this.multiUnitCodes[index] ?? '').trim();
+    if (!v) {
+      if (index === 0) {
+        this.syncPrimaryCodeFromMultiUnits();
+      }
+      return;
+    }
+    const pu = prefix.toUpperCase();
+    if (!v.toUpperCase().startsWith(pu)) {
+      const join = prefix.endsWith('-') ? '' : '-';
+      v = `${prefix}${join}${v}`.replace(/-+/g, '-');
+    }
+    this.multiUnitCodes[index] = v;
+    if (index === 0) {
+      this.codeValue = v;
+      this.basicInfoForm?.form?.patchValue({ code: v });
+    }
+  }
+
+  /** Validates per-unit codes before desk/create submit. */
+  private getValidatedMultiUnitCodes(): string[] | null {
+    if (!this.isMultiUnitMode || !this.selectedCategory) {
+      return null;
+    }
+    const q = this.getStockQty();
+    if (this.multiUnitCodes.length !== q) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_unit_codes_mismatch'),
+        'error'
+      );
+      return null;
+    }
+    const units = this.multiUnitCodes.map((c) => String(c ?? '').trim());
+    if (units.some((c) => !c)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_unit_codes_empty'),
+        'error'
+      );
+      return null;
+    }
+    const seen = new Set(units.map((c) => c.toUpperCase()));
+    if (seen.size !== units.length) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_unit_codes_duplicate'),
+        'error'
+      );
+      return null;
+    }
+    const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
+    for (const c of units) {
+      if (!c.toUpperCase().startsWith(prefixU)) {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_code_prefix_mismatch'),
+          'error'
+        );
+        return null;
+      }
+    }
+    return units;
+  }
+
+  private mergeBarcodePrintDocuments(htmlFragments: string[]): string {
+    const first = htmlFragments[0] || '';
+    const styleMatch = first.match(/<style[^>]*>([\s\S]*)<\/style>/i);
+    const baseStyle = styleMatch ? styleMatch[1] : '';
+    const bodies = htmlFragments.map((h) => {
+      const m = h.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      return m ? m[1].trim() : '';
+    });
+    /** Backend template uses row flex on body → multiple stickers sat side‑by‑side. Force a vertical stack with the same 38×25mm slot per code so roll printers feed label after label. */
+    const stackOverrides = `
+      html.sticker-stack-print-root {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+      }
+      body.sticker-stack-print {
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        width: 38mm !important;
+        max-width: 38mm !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+      }
+      body.sticker-stack-print .sticker-name {
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        max-width: 38mm !important;
+        min-height: 25mm !important;
+        height: 25mm !important;
+        max-height: 25mm !important;
+        box-sizing: border-box !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+    `;
+    const inner = bodies.join('');
+    return `<!DOCTYPE html><html class="sticker-stack-print-root"><head><meta charset="utf-8"/><style>${baseStyle}\n${stackOverrides}</style></head><body class="sticker-stack-print">${inner}</body></html>`;
+  }
+
+  private printBarcodeStickers(productName: string, codes: string[], bv: string[], onDone?: () => void): void {
+    const cleanCodes = (codes || []).map((c) => String(c ?? '').trim()).filter(Boolean);
+    if (!cleanCodes.length) {
+      onDone?.();
+      return;
+    }
+    const reqs: Observable<string>[] = cleanCodes.map((c) =>
+      this.productsSerivce.getBarcodeImage(c, productName, bv) as Observable<string>
+    );
+    forkJoin(reqs).subscribe({
+      next: (parts: string[]) => {
+        this.printHtml(this.mergeBarcodePrintDocuments(parts));
+        onDone?.();
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_barcode_generate_failed'),
+          'error'
+        );
+        onDone?.();
+      },
+    });
   }
 
   private refreshCategoryDropdownItems(): void {
@@ -281,6 +526,7 @@ export class CreateEditProductComponent implements OnInit {
         this.codeValue = '';
         this.isCodeGenerated = false;
       }
+      this.multiUnitCodes = [];
       return;
     }
     if (!this.hasCategoryCode(cat)) {
@@ -288,11 +534,13 @@ export class CreateEditProductComponent implements OnInit {
         this.codeValue = '';
         this.isCodeGenerated = false;
       }
+      this.multiUnitCodes = [];
       return;
     }
     if (!this.isEdit) {
       this.codeValue = '';
       this.isCodeGenerated = false;
+      this.multiUnitCodes = [];
       this.regenerateCodeFromCategory();
       return;
     }
@@ -308,11 +556,19 @@ export class CreateEditProductComponent implements OnInit {
     if (!cat?._id || !this.hasCategoryCode(cat)) {
       return;
     }
+    if (!this.isEdit && this.isMultiCodeCategory && this.getStockQty() > 1) {
+      this.refreshMultiUnitCodes(false);
+      return;
+    }
     this.productsSerivce.generateBarcode(String(cat._id)).subscribe({
-      next: (res: { code: string }) => {
-        this.codeValue = res.code;
+      next: (res: { code?: string; codes?: string[] }) => {
+        const single = res.codes?.length ? res.codes[0] : res.code;
+        if (!single) {
+          return;
+        }
+        this.codeValue = single;
         this.isCodeGenerated = true;
-        this.basicInfoForm?.form?.patchValue({ code: res.code });
+        this.basicInfoForm?.form?.patchValue({ code: single });
       },
       error: (err: any) => {
         const msg =
@@ -401,11 +657,20 @@ generateBarcode() {
     );
     return;
   }
+  const q = this.getStockQty();
+  if (!this.isEdit && this.isMultiCodeCategory && q > 1) {
+    this.refreshMultiUnitCodes(true);
+    return;
+  }
   this.productsSerivce.generateBarcode(String(cat._id)).subscribe({
-    next: (res: { code: string }) => {
-      this.codeValue = res.code;
+    next: (res: { code?: string; codes?: string[] }) => {
+      const single = res.codes?.length ? res.codes[0] : res.code;
+      if (!single) {
+        return;
+      }
+      this.codeValue = single;
       this.isCodeGenerated = true;
-      this.basicInfoForm?.form?.patchValue({ code: res.code });
+      this.basicInfoForm?.form?.patchValue({ code: single });
       this.appNotificationService.push(
         this.translateService.instant('tr_product_code_generated'),
         'success'
@@ -432,14 +697,22 @@ private submitDeskPurchaseRequest(): void {
     );
     return;
   }
-  const codeTrim = String(this.codeValue || '').trim();
-  const prefix = String(this.selectedCategory.code || '').trim();
-  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
-    this.appNotificationService.push(
-      this.translateService.instant('tr_product_code_prefix_mismatch'),
-      'error'
-    );
-    return;
+  const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
+  let deskMultiUnits: string[] | null = null;
+  if (this.isMultiUnitMode) {
+    deskMultiUnits = this.getValidatedMultiUnitCodes();
+    if (!deskMultiUnits) {
+      return;
+    }
+  } else {
+    const codeTrim = String(this.codeValue || '').trim();
+    if (!codeTrim.toUpperCase().startsWith(prefixU)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_code_prefix_mismatch'),
+        'error'
+      );
+      return;
+    }
   }
 
   const fv = this.basicInfoForm.value;
@@ -476,28 +749,58 @@ private submitDeskPurchaseRequest(): void {
   const discountNum =
     fv.discount === undefined || fv.discount === null || fv.discount === '' ? 0 : Number(fv.discount);
 
+  const deskCode = deskMultiUnits?.length
+    ? deskMultiUnits[0]
+    : String(this.codeValue || '').trim();
+
+  const deskProduct: DeskPurchaseProductPayload = {
+    name: String(fv.name || '').trim(),
+    code: deskCode,
+    categoryId: String(this.selectedCategory._id),
+    price: Math.round(Number(fv.price) * 100) / 100,
+    netPrice: Math.round(netNum * 100) / 100,
+    discount: Number.isFinite(discountNum) ? Math.round(discountNum * 100) / 100 : 0,
+    attributes: this.buildAttributesPayload(),
+    imageUrl: this.productImageUrl || '',
+    notes: '',
+  };
+  if (deskMultiUnits?.length) {
+    deskProduct.unitCodes = [...deskMultiUnits];
+  }
+
   this.isSubmitting = true;
   this.productPurchaseRequests
     .create({
       userId: uid,
       branchId,
       quantity: qty,
-      product: {
-        name: String(fv.name || '').trim(),
-        code: codeTrim,
-        categoryId: String(this.selectedCategory._id),
-        price: Math.round(Number(fv.price) * 100) / 100,
-        netPrice: Math.round(netNum * 100) / 100,
-        discount: Number.isFinite(discountNum) ? Math.round(discountNum * 100) / 100 : 0,
-        attributes: this.buildAttributesPayload(),
-        imageUrl: this.productImageUrl || '',
-        notes: '',
-      },
+      product: deskProduct,
     })
     .subscribe({
       next: (res: any) => {
         this.isSubmitting = false;
-        this.dialogRef.close({ submitted: true, deskPurchaseResult: res });
+        const createdProducts = res?.createdProducts;
+        const nameStr = String(fv.name || '').trim();
+        const bv = productBarcodeAttributeValues(this.selectedCategory!, this.buildAttributesPayload());
+        const finish = () => this.dialogRef.close({ submitted: true, deskPurchaseResult: res });
+
+        if (Array.isArray(createdProducts) && createdProducts.length > 1) {
+          const codes = createdProducts.map((p: any) => String(p?.code || '').trim()).filter(Boolean);
+          this.printBarcodeStickers(nameStr, codes, bv, finish);
+          return;
+        }
+        const single = res?.createdProduct?.code ? String(res.createdProduct.code).trim() : '';
+        if (single) {
+          this.productsSerivce.getBarcodeImage(single, nameStr, bv).subscribe({
+            next: (html: any) => {
+              this.printHtml(html);
+              finish();
+            },
+            error: () => finish(),
+          });
+          return;
+        }
+        finish();
       },
       error: (error: any) => {
         this.isSubmitting = false;
@@ -519,14 +822,22 @@ createProduct() {
     );
     return;
   }
-  const codeTrim = String(this.codeValue || '').trim();
-  const prefix = String(this.selectedCategory.code || '').trim();
-  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
-    this.appNotificationService.push(
-      this.translateService.instant('tr_product_code_prefix_mismatch'),
-      'error'
-    );
-    return;
+  const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
+  let createMultiUnits: string[] | null = null;
+  if (this.isMultiUnitMode) {
+    createMultiUnits = this.getValidatedMultiUnitCodes();
+    if (!createMultiUnits) {
+      return;
+    }
+  } else {
+    const codeTrim = String(this.codeValue || '').trim();
+    if (!codeTrim.toUpperCase().startsWith(prefixU)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_code_prefix_mismatch'),
+        'error'
+      );
+      return;
+    }
   }
 
   const inWarehouse = this.isBranchManagerNewProduct ? false : this.storeInWarehouse;
@@ -552,11 +863,14 @@ createProduct() {
 
   const payload: any = {
     ...this.basicInfoForm.value,
-    code: this.codeValue,
+    code: createMultiUnits?.length ? createMultiUnits[0] : this.codeValue,
     inWarehouse,
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
   };
+  if (createMultiUnits?.length) {
+    payload.unitCodes = [...createMultiUnits];
+  }
   // Let backend compute netPrice when left empty.
   if (payload.netPrice === '' || payload.netPrice == null) {
     delete payload.netPrice;
@@ -579,13 +893,27 @@ createProduct() {
         this.selectedCategory,
         payload.attributes
       );
-      this.productsSerivce
-        .getBarcodeImage(res.createdProduct.code, payload.name, bv)
-        .subscribe((html: any) => {
-          this.printHtml(html);
-          this.closeModal();
+      const names = String(payload.name || '').trim();
+      const codes =
+        Array.isArray(res?.createdProducts) && res.createdProducts.length > 1
+          ? res.createdProducts.map((p: any) => String(p?.code || '').trim()).filter(Boolean)
+          : res?.createdProduct?.code
+            ? [String(res.createdProduct.code).trim()]
+            : [];
 
+      if (codes.length > 1) {
+        this.printBarcodeStickers(names, codes, bv, () => this.closeModal());
+      } else if (codes.length === 1) {
+        this.productsSerivce.getBarcodeImage(codes[0], names, bv).subscribe({
+          next: (html: any) => {
+            this.printHtml(html);
+            this.closeModal();
+          },
+          error: () => this.closeModal(),
         });
+      } else {
+        this.closeModal();
+      }
     },
     (error) => {
       this.appNotificationService.push(error.error.error, 'error');

@@ -4,6 +4,11 @@ const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   /** Short prefix for product codes (e.g. ELEC → ELEC-001). Uppercase in API. */
   code: { type: String, trim: true },
+  /**
+   * When true, each physical unit gets its own product code (quantity N creates N products, stock 1 each).
+   * When false, one code covers the whole quantity (single product, stock N).
+   */
+  multiCodePerPiece: { type: Boolean, default: false },
   /** Dynamic attributes definition for products under this category. */
   attributeDefs: {
     type: [
@@ -41,6 +46,7 @@ function ensureCodeInPlain(_doc, ret) {
   if (!Array.isArray(ret.attributeDefs)) {
     ret.attributeDefs = [];
   }
+  ret.multiCodePerPiece = !!ret.multiCodePerPiece;
   return ret;
 }
 

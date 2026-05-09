@@ -61,6 +61,8 @@ export interface Category {
   name: string;
   /** Prefix for product codes (e.g. ELEC → ELEC-001) */
   code?: string;
+  /** Each unit gets its own SKU/code when quantity > 1 */
+  multiCodePerPiece?: boolean;
   /** Dynamic attributes definition (new format: string keys; legacy: objects with key/label). */
   attributeDefs?:
     | string[]

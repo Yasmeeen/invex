@@ -33,6 +33,8 @@ const productPurchaseRequestSchema = new mongoose.Schema(
     productPayload: {
       name: { type: String, required: true, trim: true },
       code: { type: String, required: true, trim: true },
+      /** When category.multiCodePerPiece and quantity > 1: one code per unit (same length as quantity). */
+      unitCodes: { type: [String], default: undefined },
       category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
       price: { type: Number, required: true, min: 0 },
       /** Stored as product.netPrice. */
@@ -45,6 +47,8 @@ const productPurchaseRequestSchema = new mongoose.Schema(
 
     quantity: { type: Number, required: true, min: 1, default: 1 },
     createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
+    /** When multi-code purchase creates several products. */
+    createdProductIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], default: undefined },
   },
   { timestamps: true }
 );

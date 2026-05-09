@@ -122,7 +122,7 @@ const escapeHtml = (s) =>
     .replace(/"/g, '&quot;');
 
 /** Ensures product code uses the category prefix; category must have a non-empty code. */
-async function validateProductCodeForCategory(categoryId, productCode) {
+export async function validateProductCodeForCategory(categoryId, productCode) {
   const cat = await Category.findById(categoryId).lean();
   if (!cat) {
     return { ok: false, error: 'Invalid category' };
@@ -144,6 +144,60 @@ async function validateProductCodeForCategory(categoryId, productCode) {
       ok: false,
       error: `Product code must start with "${prefix}"`,
     };
+  }
+  return { ok: true };
+}
+
+/**
+ * Reserve `count` sequential codes PREFIX-NNN for a category (based on existing products in that category).
+ */
+export async function allocateSequentialProductCodes(categoryId, count) {
+  const n = Math.min(500, Math.max(1, Math.floor(Number(count)) || 1));
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    throw new Error('Invalid category');
+  }
+  const rawPrefix = (cat.code || '').trim();
+  if (!rawPrefix) {
+    throw new Error('Category has no code prefix');
+  }
+  const base = rawPrefix.replace(/-+$/g, '').toUpperCase();
+  const prefixRe = escapeRegex(base);
+  const products = await Product.find({
+    category: categoryId,
+    code: new RegExp(`^${prefixRe}(-\\d+)$`, 'i'),
+  })
+    .select('code')
+    .lean();
+
+  let max = 0;
+  const re = new RegExp(`^${prefixRe}-(\\d+)$`, 'i');
+  for (const p of products) {
+    const m = String(p.code).match(re);
+    if (m) {
+      max = Math.max(max, parseInt(m[1], 10));
+    }
+  }
+  const next = max + 1;
+  const codes = [];
+  for (let i = 0; i < n; i++) {
+    codes.push(`${base}-${String(next + i).padStart(3, '0')}`);
+  }
+  return codes;
+}
+
+/** Ensure none of `codes` already exist in warehouse (branch null) or in `branchOid`. */
+export async function assertCodesNotUsedInStorage(codes, branchOid, isWarehouse) {
+  for (const c of codes) {
+    const code = String(c ?? '').trim();
+    if (!code) {
+      return { ok: false, error: 'Empty product code' };
+    }
+    const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
+    const ex = await Product.findOne(filter).select('_id').lean();
+    if (ex) {
+      return { ok: false, error: `Product code already exists: ${code}` };
+    }
   }
   return { ok: true };
 }
@@ -629,7 +683,7 @@ export const generateBarcodePDF = async (req, res) => {
   }
 };
 
-// Suggested next product code: {CATEGORY_CODE}-{NNN} for the selected category
+// Suggested next product code(s): {CATEGORY_CODE}-{NNN} for the selected category (optional `count`)
 export const generateBarcode = async (req, res) => {
   try {
     const categoryId = req.query.categoryId != null ? String(req.query.categoryId).trim() : '';
@@ -648,27 +702,14 @@ export const generateBarcode = async (req, res) => {
       });
     }
 
-    const base = rawPrefix.replace(/-+$/g, '').toUpperCase();
-    const prefixRe = escapeRegex(base);
-    const products = await Product.find({
-      category: categoryId,
-      code: new RegExp(`^${prefixRe}(-\\d+)$`, 'i'),
-    })
-      .select('code')
-      .lean();
+    const countRaw = req.query.count != null ? Number(req.query.count) : 1;
+    const count = Math.min(500, Math.max(1, Math.floor(Number.isFinite(countRaw) ? countRaw : 1)));
 
-    let max = 0;
-    const re = new RegExp(`^${prefixRe}-(\\d+)$`, 'i');
-    for (const p of products) {
-      const m = String(p.code).match(re);
-      if (m) {
-        max = Math.max(max, parseInt(m[1], 10));
-      }
+    const codes = await allocateSequentialProductCodes(categoryId, count);
+    if (count === 1) {
+      return res.json({ code: codes[0] });
     }
-
-    const next = max + 1;
-    const code = `${base}-${String(next).padStart(3, '0')}`;
-    res.json({ code });
+    return res.json({ codes });
   } catch (error) {
     console.error('❌ Error generating barcode:', error);
     res.status(500).json({ error: 'Failed to generate barcode' });
@@ -884,7 +925,7 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name code attributeDefs')
+        .populate('category', 'name code attributeDefs multiCodePerPiece')
         .populate('branch', 'name')
         .skip(skip)
         .limit(Number(limit)),
@@ -914,7 +955,7 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name code attributeDefs')
+      .populate('category', 'name code attributeDefs multiCodePerPiece')
       .populate('branch', 'name');
 
     if (!product) {
@@ -973,6 +1014,124 @@ export const createProduct = async (req, res) => {
     const attrs = await normalizeAttributesForCategory(categoryId, attributes);
     if (attrs === null) {
       return res.status(400).json({ error: 'attributes must be an object' });
+    }
+
+    const catRow = await Category.findById(categoryId).select('multiCodePerPiece').lean();
+    const categoryMultiCode = !!catRow?.multiCodePerPiece;
+    const unitCount = Math.max(1, Math.floor(stockNum));
+
+    if (categoryMultiCode && unitCount > 1) {
+      let codes = [];
+      if (Array.isArray(req.body.unitCodes) && req.body.unitCodes.length) {
+        codes = req.body.unitCodes.map((x) => String(x ?? '').trim()).filter(Boolean);
+        if (codes.length !== unitCount) {
+          return res.status(400).json({ error: 'unitCodes length must match stock quantity' });
+        }
+        const seen = new Set(codes.map((c) => c.toUpperCase()));
+        if (seen.size !== codes.length) {
+          return res.status(400).json({ error: 'Duplicate codes in unitCodes' });
+        }
+        for (const c of codes) {
+          const chk = await validateProductCodeForCategory(categoryId, c);
+          if (!chk.ok) {
+            return res.status(400).json({ error: chk.error });
+          }
+        }
+      } else {
+        try {
+          codes = await allocateSequentialProductCodes(categoryId, unitCount);
+        } catch (e) {
+          return res.status(400).json({ error: e?.message || 'Cannot allocate codes' });
+        }
+      }
+
+      if (isWarehouse) {
+        const free = await assertCodesNotUsedInStorage(codes, null, true);
+        if (!free.ok) {
+          return res.status(409).json({ error: free.error });
+        }
+        const createdProducts = [];
+        for (const c of codes) {
+          const p = await Product.create({
+            name,
+            code: c,
+            price: priceNum,
+            netPrice: netNum,
+            stock: 1,
+            discount: discountNum,
+            category: categoryId,
+            branch: null,
+            inWarehouse: true,
+            imageUrl: imageUrlNorm,
+            attributes: attrs,
+          });
+          createdProducts.push(p);
+        }
+        await auditLog(req, {
+          action: 'create',
+          module: 'products',
+          entityType: 'Product',
+          entityId: createdProducts[0]?._id,
+          message: `Products created (warehouse) ×${createdProducts.length} (multi-code)`.trim(),
+          after: {
+            count: createdProducts.length,
+            codes: createdProducts.map((x) => x.code),
+            inWarehouse: true,
+          },
+        });
+        return res.status(201).json({
+          message: '✅ Products created',
+          createdProducts,
+          createdProduct: createdProducts[0],
+        });
+      }
+
+      if (!branch?._id) {
+        return res.status(400).json({ error: 'Branch is required when not storing in warehouse' });
+      }
+      if (!mongoose.Types.ObjectId.isValid(String(branch._id))) {
+        return res.status(400).json({ error: 'Invalid branch' });
+      }
+      const branchOid = branch._id;
+      const free = await assertCodesNotUsedInStorage(codes, branchOid, false);
+      if (!free.ok) {
+        return res.status(409).json({ error: free.error });
+      }
+      const createdProducts = [];
+      for (const c of codes) {
+        const p = await Product.create({
+          name,
+          code: c,
+          price: priceNum,
+          netPrice: netNum,
+          stock: 1,
+          discount: discountNum,
+          category: categoryId,
+          branch: branchOid,
+          inWarehouse: false,
+          imageUrl: imageUrlNorm,
+          attributes: attrs,
+        });
+        createdProducts.push(p);
+      }
+      await auditLog(req, {
+        action: 'create',
+        module: 'products',
+        entityType: 'Product',
+        entityId: createdProducts[0]?._id,
+        message: `Products created ×${createdProducts.length} (multi-code)`.trim(),
+        after: {
+          count: createdProducts.length,
+          codes: createdProducts.map((x) => x.code),
+          branch: branchOid,
+          inWarehouse: false,
+        },
+      });
+      return res.status(201).json({
+        message: '✅ Products created',
+        createdProducts,
+        createdProduct: createdProducts[0],
+      });
     }
 
     const codeCheck = await validateProductCodeForCategory(categoryId, code);

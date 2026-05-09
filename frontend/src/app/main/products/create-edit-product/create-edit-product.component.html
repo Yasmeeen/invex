@@ -104,9 +104,76 @@
                     </div>
                   </div>
 
-                  <!-- Product code (enabled only after category with code is selected) -->
+                  <!-- Stock / quantity (before codes so multi-code categories know how many unit fields to show) -->
                   <div class="col-md-12">
                     <div
+                      class="form-group"
+                      [class.has-error]="stock.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="stock"
+                        #stock="ngModel"
+                        ngModel
+                        required
+                        min="1"
+                        (ngModelChange)="onStockQuantityChanged()"
+                      />
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="stock.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_stock_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Product code (multi-code category + qty > 1 ⇒ one code per unit) -->
+                  <div class="col-md-12">
+                    <ng-container *ngIf="isMultiUnitMode">
+                      <input type="hidden" name="code" [(ngModel)]="codeValue" />
+                      <div class="form-group">
+                        <label>{{ 'tr_product_unit_codes_title' | translate }}</label>
+                        <p class="text-muted size-small m-0 mb-2">
+                          {{ 'tr_category_multi_code_hint' | translate }}
+                        </p>
+                        <p class="text-muted size-small m-0 mb-3">
+                          {{ 'tr_product_unit_codes_editable_hint' | translate }}
+                        </p>
+                        <div class="multi-unit-codes__list">
+                          <div
+                            class="form-group multi-unit-codes__row"
+                            *ngFor="let _u of multiUnitCodes; let i = index; trackBy: trackByUnitIndex"
+                          >
+                            <label class="size-small steel m-0 mb-1">{{
+                              'tr_product_unit_code_piece' | translate: { n: i + 1 }
+                            }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="multiUnitCodes[i]"
+                              [ngModelOptions]="{ standalone: true }"
+                              [readonly]="!isProductCodeEnabled"
+                              [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                              (blur)="onMultiUnitCodeBlur(i)"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary mt-2"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="refreshMultiUnitCodes(true)"
+                        >
+                          {{ 'tr_product_regenerate_unit_codes' | translate }}
+                        </button>
+                      </div>
+                    </ng-container>
+
+                    <div
+                      *ngIf="!isMultiUnitMode"
                       class="form-group"
                       [class.has-error]="code.invalid && basicInfoForm.submitted"
                     >
@@ -210,34 +277,6 @@
                       </span>
                     </div>
                   </div>
-
-            
-            
-
-                  <!-- Stock -->
-                  <div class="col-md-6">
-                    <div
-                      class="form-group"
-                      [class.has-error]="stock.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
-                      <input
-                        type="number"
-                        class="s-control"
-                        name="stock"
-                        #stock="ngModel"
-                        ngModel
-                        required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="stock.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_stock_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-             
 
                   <!-- Discount -->
                   <div class="col-md-6">

@@ -77,6 +77,23 @@
                   </div>
                 </div>
 
+                <div class="form-group mb-0">
+                  <label class="chk-pill d-inline-flex align-items-start gap-2">
+                    <input
+                      type="checkbox"
+                      name="multiCodePerPiece"
+                      ngModel
+                      class="mt-1"
+                    />
+                    <span>
+                      {{ "tr_category_multi_code_per_piece" | translate }}
+                      <span class="d-block text-muted size-small weight-normal m-0 mt-1">
+                        {{ "tr_category_multi_code_hint" | translate }}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
                 <div class="category-attrs-block">
                   <div class="category-attrs-toolbar">
                     <label class="category-attrs-toolbar__title m-0">{{ 'tr_category_attributes' | translate }}</label>

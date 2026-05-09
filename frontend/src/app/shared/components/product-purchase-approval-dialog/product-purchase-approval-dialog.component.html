@@ -48,6 +48,10 @@
           <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
           <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
         </div>
+        <div class="col-12 mb-2" *ngIf="(d?.product?.unitCodes?.length ?? 0) > 1">
+          <div class="size-small text-muted">{{ 'tr_product_unit_codes_title' | translate }}</div>
+          <div class="weight-bold text-break">{{ d?.product?.unitCodes?.join(', ') }}</div>
+        </div>
         <div class="col-md-6 mb-2">
           <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>
           <div class="weight-bold">{{ d?.branchName || '-' }}</div>

@@ -80,6 +80,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     this.categoryForm.form.patchValue({
       name: (c as any).name,
       code: (c as any).code || '',
+      multiCodePerPiece: !!(c as any).multiCodePerPiece,
     });
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
@@ -154,6 +155,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       name: this.category.name,
       code: (this.category as any).code,
       attributeDefs: attrPayload,
+      multiCodePerPiece: !!(this.category as any).multiCodePerPiece,
     };
 
     if (this.isEdit && this.categoryId) {

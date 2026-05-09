@@ -118,10 +118,12 @@ export const getCategoryById = async (req, res) => {
   }
 };
 
+const parseBool = (v) => v === true || v === 'true' || String(v).toLowerCase() === 'true';
+
 // Create category
 export const createCategory = async (req, res) => {
   try {
-    const { name, code, attributeDefs } = req.body;
+    const { name, code, attributeDefs, multiCodePerPiece } = req.body;
     const codeNorm = normalizeCategoryCode(code);
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
@@ -149,6 +151,7 @@ export const createCategory = async (req, res) => {
       name: name.trim(),
       code: codeNorm,
       attributeDefs: attr,
+      multiCodePerPiece: parseBool(multiCodePerPiece),
     });
 
     res.status(201).json({
@@ -167,7 +170,7 @@ export const createCategory = async (req, res) => {
 // Update category
 export const updateCategory = async (req, res) => {
   try {
-    const { name, code, attributeDefs } = req.body;
+    const { name, code, attributeDefs, multiCodePerPiece } = req.body;
     const updates = {};
 
     if (name != null && String(name).trim() !== '') {
@@ -197,6 +200,10 @@ export const updateCategory = async (req, res) => {
         return res.status(400).json({ error: 'attributeDefs must be an array' });
       }
       updates.attributeDefs = attr;
+    }
+
+    if (multiCodePerPiece !== undefined) {
+      updates.multiCodePerPiece = parseBool(multiCodePerPiece);
     }
 
     if (Object.keys(updates).length === 0) {

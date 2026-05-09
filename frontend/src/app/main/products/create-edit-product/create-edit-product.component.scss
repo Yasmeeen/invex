@@ -23,6 +23,16 @@
   font-weight: normal;
 }
 
+.multi-unit-codes__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.multi-unit-codes__row label {
+  display: block;
+}
+
 .code-field-readonly {
   background-color: #f5f5f5;
   cursor: not-allowed;

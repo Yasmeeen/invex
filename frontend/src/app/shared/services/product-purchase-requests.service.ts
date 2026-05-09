@@ -13,6 +13,8 @@ export interface DeskPurchaseProductPayload {
   attributes?: Record<string, string>;
   imageUrl?: string;
   notes?: string;
+  /** When category uses multi-code per piece and quantity > 1 */
+  unitCodes?: string[];
 }
 
 @Injectable({ providedIn: 'root' })

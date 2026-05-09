@@ -70,10 +70,17 @@ constructor(
 getProducts(params: any) {
   return this.http.get(PRODUCTS_URL, { params: params });
 }
-  /** Next suggested code for the category (e.g. ELEC-001). Requires categoryId. */
-  generateBarcode(categoryId: string): Observable<{ code: string }> {
-    return this.http.get<{ code: string }>(`${PRODUCTS_URL}/generate-barcode`, {
-      params: { categoryId },
+  /**
+   * Next suggested code(s) for the category (e.g. ELEC-001).
+   * With count > 1 returns `{ codes }`; otherwise `{ code }`.
+   */
+  generateBarcode(categoryId: string, count?: number): Observable<{ code?: string; codes?: string[] }> {
+    let params = new HttpParams().set('categoryId', categoryId);
+    if (count != null && count > 1) {
+      params = params.set('count', String(count));
+    }
+    return this.http.get<{ code?: string; codes?: string[] }>(`${PRODUCTS_URL}/generate-barcode`, {
+      params,
     });
   }
 

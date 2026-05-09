@@ -22,8 +22,11 @@ const orderSchema = new mongoose.Schema(
     numberOfProducts: { type: Number, min: 0 },
     /** Sum of line totals (after per-item product discounts), before invoice-level extra discount. */
     subtotalPrice: { type: Number, min: 0 },
-    /** Extra discount applied on the whole invoice at cashier (same currency as total). */
-    invoiceDiscountAmount: { type: Number, min: 0, default: 0 },
+    /**
+     * Invoice-level adjustment at cashier (same currency as total).
+     * Positive = extra discount; negative = surcharge (final total above subtotal).
+     */
+    invoiceDiscountAmount: { type: Number, default: 0 },
     /** Amount due after all discounts (unchanged meaning for reports). */
     totalPrice: { type: Number, min: 0 },
 

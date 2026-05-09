@@ -501,7 +501,7 @@ export class CashierComponent implements AfterViewInit {
         return Math.min(Math.round(v * 100) / 100, sub);
       }
       case 'final': {
-        const target = Math.min(Math.max(0, Math.round(v * 100) / 100), sub);
+        const target = Math.max(0, Math.round(v * 100) / 100);
         return Math.round((sub - target) * 100) / 100;
       }
       default:
@@ -518,13 +518,14 @@ export class CashierComponent implements AfterViewInit {
     return Math.round((sub - this.appliedInvoiceDiscount()) * 100) / 100;
   }
 
-  /** Same as applied discount / subtotal * 100 (for display when user typed amount or final). */
+  /** Equivalent % of subtotal (discount or surcharge vs lines total). */
   invoiceDiscountPercentEquivalent(): number {
     const sub = Math.round(this.orderSubtotal() * 100) / 100;
     if (sub <= 0) return 0;
     const d = this.appliedInvoiceDiscount();
-    if (d <= 0) return 0;
-    return Math.round((d / sub) * 10000) / 100;
+    if (d === 0) return 0;
+    const mag = Math.abs(d);
+    return Math.round((mag / sub) * 10000) / 100;
   }
 
   onInvoiceDiscountModeChange(): void {
@@ -534,9 +535,10 @@ export class CashierComponent implements AfterViewInit {
     this.invoiceExtraValue = 0;
   }
 
-  /** Max value for the number input (percent 0–100, else subtotal). */
+  /** Max value for the number input (percent 0–100; amount capped at subtotal; final unbounded). */
   invoiceExtraInputMax(): number {
     if (this.invoiceDiscountMode === 'percent') return 100;
+    if (this.invoiceDiscountMode === 'final') return 999999999;
     return Math.max(0, Math.round(this.orderSubtotal() * 100) / 100);
   }
 
@@ -557,7 +559,6 @@ export class CashierComponent implements AfterViewInit {
       if (v > sub) v = sub;
     } else {
       if (v < 0) v = 0;
-      if (v > sub) v = sub;
     }
     this.invoiceExtraValue = Math.round(v * 100) / 100;
   }
@@ -698,10 +699,18 @@ export class CashierComponent implements AfterViewInit {
     return Math.round(sum * 100) / 100;
   }
 
+  /** Positive extra discount amount (EGP), for receipt line. */
   receiptInvoiceExtraDiscount(): number {
     const d = Number(this.createdOrder?.invoiceDiscountAmount);
     if (!Number.isFinite(d) || d <= 0) return 0;
     return Math.round(d * 100) / 100;
+  }
+
+  /** Positive surcharge amount when final total was set above subtotal. */
+  receiptInvoiceSurchargeAmount(): number {
+    const d = Number(this.createdOrder?.invoiceDiscountAmount);
+    if (!Number.isFinite(d) || d >= 0) return 0;
+    return Math.round(-d * 100) / 100;
   }
 
   receiptFinalTotal(): number {
@@ -710,7 +719,8 @@ export class CashierComponent implements AfterViewInit {
       return Math.round(t * 100) / 100;
     }
     const sub = this.receiptLinesSubtotal();
-    const disc = this.receiptInvoiceExtraDiscount();
+    const adj = Number(this.createdOrder?.invoiceDiscountAmount);
+    const disc = Number.isFinite(adj) ? adj : 0;
     return Math.round((sub - disc) * 100) / 100;
   }
 

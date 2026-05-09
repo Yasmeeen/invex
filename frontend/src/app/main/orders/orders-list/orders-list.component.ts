@@ -213,10 +213,18 @@ export class OrdersListComponent implements OnInit {
     return Number(order.totalPrice) || 0;
   }
 
+  /** Positive invoice-level discount (EGP); excludes surcharge. */
   orderInvoiceExtraDiscount(order: Order): number {
     const d = order.invoiceDiscountAmount;
-    if (d == null || !Number.isFinite(Number(d))) return 0;
-    return Math.max(0, Number(d));
+    if (d == null || !Number.isFinite(Number(d)) || Number(d) <= 0) return 0;
+    return Number(d);
+  }
+
+  /** Positive surcharge when final total was above subtotal (stored as negative discount). */
+  orderInvoiceSurcharge(order: Order): number {
+    const d = order.invoiceDiscountAmount;
+    if (d == null || !Number.isFinite(Number(d)) || Number(d) >= 0) return 0;
+    return Math.round(-Number(d) * 100) / 100;
   }
 
   /** Translate stored order.paymentMethod id for display. */

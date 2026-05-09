@@ -253,10 +253,18 @@
               <td>{{ order.branch?.name }}</td>
               <td>{{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>
-                <ng-container *ngIf="orderInvoiceExtraDiscount(order) > 0; else noExtraDisc">
-                  {{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                <ng-container *ngIf="orderInvoiceExtraDiscount(order) > 0">
+                  −{{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
                 </ng-container>
-                <ng-template #noExtraDisc>—</ng-template>
+                <ng-container *ngIf="orderInvoiceSurcharge(order) > 0">
+                  <span *ngIf="orderInvoiceExtraDiscount(order) > 0"><br /></span>
+                  +{{ orderInvoiceSurcharge(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                  ({{ "tr_invoice_extra_surcharge" | translate }})
+                </ng-container>
+                <ng-container
+                  *ngIf="orderInvoiceExtraDiscount(order) <= 0 && orderInvoiceSurcharge(order) <= 0"
+                  >—</ng-container
+                >
               </td>
               <td>{{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>

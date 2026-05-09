@@ -287,14 +287,19 @@ export const createOrder = async (req, res) => {
 
     const subtotalPrice = Math.round(totalPrice * 100) / 100;
     let invoiceDiscountAmount = Number(invoiceDiscountRaw);
-    if (!Number.isFinite(invoiceDiscountAmount) || invoiceDiscountAmount < 0) {
+    if (!Number.isFinite(invoiceDiscountAmount)) {
       invoiceDiscountAmount = 0;
     }
-    invoiceDiscountAmount = Math.min(
-      Math.round(invoiceDiscountAmount * 100) / 100,
-      subtotalPrice
-    );
+    invoiceDiscountAmount = Math.round(invoiceDiscountAmount * 100) / 100;
+    if (invoiceDiscountAmount >= 0) {
+      invoiceDiscountAmount = Math.min(invoiceDiscountAmount, subtotalPrice);
+    }
     totalPrice = Math.round((subtotalPrice - invoiceDiscountAmount) * 100) / 100;
+    if (totalPrice < 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Invalid invoice adjustment' });
+    }
     const totalRounded = Math.round(totalPrice * 100) / 100;
 
     let paidAmount = 0;

@@ -57,7 +57,7 @@
               <div class="row">
                 
                 <div
-                  class="col-md-6"
+                  class="col-md-4"
                   [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
                 >
                   <div class="form-group">
@@ -80,7 +80,7 @@
                   </div>
                 </div>
                 <div
-                  class="col-md-6"
+                  class="col-md-4"
                   [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
                 >
                   <div class="form-group">
@@ -97,7 +97,7 @@
                   </div>
                 </div>
                 <div
-                class="col-md-6"
+                class="col-md-4"
                 [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
               >
                 <div class="form-group mb-0">
@@ -333,8 +333,18 @@
             {{ "tr_invoice_discount_derived_amount" | translate }}:
             {{ appliedInvoiceDiscount() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
-          <div *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() > 0" class="size-small text-muted mt-1">
+          <div
+            *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() > 0"
+            class="size-small text-muted mt-1"
+          >
             {{ "tr_invoice_discount_derived_percent" | translate }}:
+            {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
+          </div>
+          <div
+            *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() < 0"
+            class="size-small text-muted mt-1"
+          >
+            {{ "tr_invoice_surcharge_derived_percent" | translate }}:
             {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
           </div>
           <div class="weight-bold mt-2">
@@ -458,6 +468,13 @@
         <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="receiptInvoiceSurchargeAmount() > 0">
+        <td>{{ 'tr_invoice_extra_surcharge' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptInvoiceSurchargeAmount()) }}
           {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>

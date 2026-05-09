@@ -311,6 +311,8 @@
   "tr_invoice_discount_input_final": "Total à payer après remise (EGP)",
   "tr_invoice_discount_derived_amount": "Montant de la remise",
   "tr_invoice_discount_derived_percent": "Pourcentage équivalent",
+  "tr_invoice_surcharge_derived_percent": "Pourcentage équivalent de majoration",
+  "tr_invoice_extra_surcharge": "Majoration sur la facture",
   "tr_final_after_extra_discount": "Montant à payer",
   "tr_tax_percent": "Taxe %",
   "tr_tax_amount": "Montant de la taxe :",

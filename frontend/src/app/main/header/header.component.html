@@ -86,7 +86,11 @@
       <i class="fa fa-language" aria-hidden="true"></i>
     </button>
 
-    <a routerLink="/cashier" class="s-btn btn-primary btn-sm app-topbar__cta hidden-mobile">
+    <a
+      *ngIf="showOpenCashierLink"
+      routerLink="/cashier"
+      class="s-btn btn-primary btn-sm app-topbar__cta hidden-mobile"
+    >
       {{ 'tr_open_cashier' | translate }}
     </a>
 

@@ -326,6 +326,8 @@
   "tr_invoice_discount_input_final": "Total to pay after discount (EGP)",
   "tr_invoice_discount_derived_amount": "Discount amount",
   "tr_invoice_discount_derived_percent": "Equivalent discount",
+  "tr_invoice_surcharge_derived_percent": "Equivalent surcharge vs subtotal",
+  "tr_invoice_extra_surcharge": "Invoice surcharge",
   "tr_final_after_extra_discount": "Amount due",
   "tr_tax_percent": "Tax %",
   "tr_tax_amount": "Tax Amount:",

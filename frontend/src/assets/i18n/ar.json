@@ -295,6 +295,8 @@
   "tr_invoice_discount_input_final": "الإجمالي بعد الخصم (جنيه)",
   "tr_invoice_discount_derived_amount": "مبلغ الخصم",
   "tr_invoice_discount_derived_percent": "نسبة الخصم المكافئة",
+  "tr_invoice_surcharge_derived_percent": "نسبة الزيادة مقابل المجموع",
+  "tr_invoice_extra_surcharge": "زيادة على الفاتورة",
   "tr_final_after_extra_discount": "الإجمالي النهائي",
   "tr_tax_percent": "% الضريبة:",
   "tr_tax_amount": "مبلغ الضريبة:",

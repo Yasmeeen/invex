@@ -311,6 +311,8 @@
   "tr_invoice_discount_input_final": "Endbetrag nach Rabatt (EGP)",
   "tr_invoice_discount_derived_amount": "Rabattbetrag",
   "tr_invoice_discount_derived_percent": "Entspricht",
+  "tr_invoice_surcharge_derived_percent": "Entsprechender Zuschlag zur Zwischensumme",
+  "tr_invoice_extra_surcharge": "Rechnungszuschlag",
   "tr_final_after_extra_discount": "Fälliger Betrag",
   "tr_tax_percent": "Steuer %",
   "tr_tax_amount": "Steuerbetrag:",

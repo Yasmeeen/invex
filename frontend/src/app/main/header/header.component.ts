@@ -9,6 +9,7 @@ import { NotificationsService, NotificationItem } from '@shared/services/notific
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
 import { applyUiLanguage } from '@core/i18n/ui-language';
+import { isModerator } from '@core/utils/role-utils';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { ViewProductBookingDialogComponent } from '../products/view-product-booking-dialog/view-product-booking-dialog.component';
 import { Product } from '@core/models/products.model';
@@ -50,6 +51,11 @@ export class HeaderComponent implements OnInit {
       return '';
     }
     return (u.name || u.username || u.email || 'User').toString();
+  }
+
+  /** Moderators must not see the cashier shortcut (no cashier route access). */
+  get showOpenCashierLink(): boolean {
+    return !isModerator(this.currentUser?.role);
   }
 
   get userInitials(): string {

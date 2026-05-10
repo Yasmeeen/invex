@@ -1,0 +1,124 @@
+:host {
+  display: block;
+}
+
+.drawer-close-dialog {
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.06),
+    0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+
+  &__title {
+    margin: 0;
+    padding: 0 0 10px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  &__body {
+    min-width: 280px;
+    max-width: 520px;
+    padding-top: 12px;
+  }
+
+  &__loading {
+    margin-top: 1rem;
+  }
+
+  &__summary {
+    margin-top: 0.75rem;
+  }
+
+  &__section {
+    font-size: 0.95rem;
+    margin: 1rem 0 0.35rem;
+    color: rgba(15, 23, 42, 0.75);
+    font-weight: 600;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+
+    &--highlight {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      font-size: 1rem;
+    }
+  }
+
+  &__muted {
+    color: rgba(15, 23, 42, 0.5);
+    font-size: 0.85rem;
+    margin: 0.25rem 0;
+  }
+
+  &__hint {
+    font-size: 0.8rem;
+    color: rgba(15, 23, 42, 0.45);
+    margin-inline-start: 0.25rem;
+  }
+
+  &__note {
+    font-size: 0.8rem;
+    color: rgba(15, 23, 42, 0.5);
+    margin-top: 1rem;
+    margin-bottom: 0;
+    line-height: 1.4;
+  }
+
+  &__status {
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    background: rgba(15, 23, 42, 0.06);
+
+    &--ok {
+      background: rgba(46, 125, 50, 0.12);
+      color: #2e7d32;
+    }
+
+    &--warn {
+      background: rgba(211, 47, 47, 0.1);
+      color: #c62828;
+    }
+
+    &--info {
+      background: rgba(25, 118, 210, 0.1);
+      color: #1565c0;
+    }
+  }
+
+  &__var {
+    font-weight: 700;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 0;
+    margin: 12px 0 0;
+    border-top: 1px solid rgba(15, 23, 42, 0.06);
+  }
+}

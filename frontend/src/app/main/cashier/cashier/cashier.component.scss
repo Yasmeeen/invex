@@ -72,8 +72,9 @@
       gap: 0.35rem;
     }
 
-    /** Daily expense — readable on primary bar */
-    &__expense-btn {
+    /** Daily expense / drawer close — readable on primary bar */
+    &__expense-btn,
+    &__drawer-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -106,7 +107,8 @@
       }
     }
 
-    &__expense-label {
+    &__expense-label,
+    &__drawer-label {
       max-width: 11rem;
       overflow: hidden;
       text-overflow: ellipsis;

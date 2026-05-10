@@ -37,6 +37,16 @@
         <span class="cashier-header__expense-label">{{ 'tr_daily_expense_title' | translate }}</span>
       </button>
 
+      <button
+        type="button"
+        class="cashier-header__drawer-btn"
+        (click)="openDrawerCloseDialog()"
+        [attr.title]="'tr_drawer_close_title' | translate"
+      >
+        <i class="fa fa-inbox" aria-hidden="true"></i>
+        <span class="cashier-header__drawer-label">{{ 'tr_drawer_close_toolbar' | translate }}</span>
+      </button>
+
       <button class="close-btn" *ngIf="isCashierFullScreen" (click)="closeCashier()">✖</button>
 
       <i class="fa fa-arrows-alt pointer cashier-header__zoom" *ngIf="!isCashierFullScreen" (click)="isCashierFullScreen = true" aria-hidden="true"></i>

@@ -29,6 +29,7 @@ import { canPickBranchRole } from '@core/utils/role-utils';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
+import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
 
@@ -152,6 +153,33 @@ export class CashierComponent implements AfterViewInit {
       width: '440px',
       panelClass: 'daily-expense-dialog-panel',
       backdropClass: 'daily-expense-dialog-backdrop',
+      data: {
+        userId: uid,
+        forcedBranchId: String(selectedBranchId),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe(() => {});
+  }
+
+  /** End-of-day drawer reconciliation (preview + counted cash). */
+  openDrawerCloseDialog(): void {
+    const uid = this.curentUser?._id;
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser?.branch?._id;
+
+    if (!selectedBranchId) {
+      this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
+    const ref = this.dialog.open(DrawerCloseDialogComponent, {
+      width: '580px',
+      maxWidth: '96vw',
+      panelClass: 'drawer-close-dialog-panel',
+      backdropClass: 'drawer-close-dialog-backdrop',
       data: {
         userId: uid,
         forcedBranchId: String(selectedBranchId),

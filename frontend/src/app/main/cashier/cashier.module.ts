@@ -9,6 +9,7 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { CreateEditProductModule } from '../products/create-edit-product/create-edit-product.module';
 import { DailyExpenseDialogModule } from '../expenses/daily-expense-dialog/daily-expense-dialog.module';
+import { DrawerCloseDialogModule } from '../drawer-close/drawer-close-dialog/drawer-close-dialog.module';
 
 
 @NgModule({
@@ -22,6 +23,7 @@ import { DailyExpenseDialogModule } from '../expenses/daily-expense-dialog/daily
     MatDialogModule,
     CreateEditProductModule,
     DailyExpenseDialogModule,
+    DrawerCloseDialogModule,
   ],
   providers: [
     ProductsSerivce,

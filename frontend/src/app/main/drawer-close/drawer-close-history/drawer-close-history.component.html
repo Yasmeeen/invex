@@ -1,0 +1,104 @@
+<div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_drawer_close_history_title' | translate }}</span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button type="button" class="s-btn btn-primary size-body" (click)="openCloseDialog()">
+        {{ 'tr_drawer_close_open_action' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary"></i>
+      </button>
+    </div>
+  </h2>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="row flex-wrap">
+      <div class="col-md-3" *ngIf="showBranchFilter">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_branch_filter' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [(ngModel)]="filterBranchId"
+              [items]="branches"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="true"
+              placeholder="{{ 'tr_bookings_report_status_all' | translate }}"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_from' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateFrom" />
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_to' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateTo" />
+        </div>
+      </div>
+      <div class="col-md-3 flex flex-bottom pb-2">
+        <button type="button" class="s-btn btn-secondary mr-2" (click)="applyFilters()">
+          {{ 'tr_apply' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-secondary" (click)="clearDateFilters()">
+          {{ 'tr_clear' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4 mt-4" *ngIf="!loading">
+    <div class="table-container" *ngIf="closes.length > 0">
+      <table class="s-table table layout-fixed">
+        <thead>
+          <tr>
+            <th>{{ 'tr_drawer_close_col_day' | translate }}</th>
+            <th>{{ 'tr_branch' | translate }}</th>
+            <th>{{ 'tr_drawer_close_expected_cash' | translate }}</th>
+            <th>{{ 'tr_drawer_close_actual_cash' | translate }}</th>
+            <th>{{ 'tr_drawer_close_variance' | translate }}</th>
+            <th>{{ 'tr_drawer_close_shortage_reason' | translate }}</th>
+            <th>{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
+            <th>{{ 'tr_drawer_close_closed_at' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of closes">
+            <td>{{ row.businessDate }}</td>
+            <td>{{ row.branch?.name || '—' }}</td>
+            <td>{{ row.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ row.actualCashCounted | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ row.variance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td class="drawer-close-history__notes">{{ row.shortageReason || '—' }}</td>
+            <td>{{ row.closedBy?.name || row.closedBy?.email || '—' }}</td>
+            <td>{{ row.createdAt | date : 'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state-here text-center ptb-8" *ngIf="closes.length === 0">
+      <p>{{ 'tr_no_items_found' | translate }}</p>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      >
+      </pagination>
+    </div>
+  </div>
+
+  <div *ngIf="loading">
+    <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
+  </div>
+</div>

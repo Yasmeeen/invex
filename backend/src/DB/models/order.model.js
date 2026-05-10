@@ -93,6 +93,9 @@ const orderSchema = new mongoose.Schema(
       default: "completed",
     },
 
+    /** When the invoice was voided / returned — used for drawer reconciliation (refund timing). */
+    restoredAt: { type: Date, required: false, index: true },
+
     orderNumber: { type: Number, unique: true, required: true },
   },
   { timestamps: true }

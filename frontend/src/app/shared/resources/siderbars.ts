@@ -44,6 +44,11 @@ export const AdminSidebar = [
     routerLink: '/expenses',
     icon: 'fa fa-money icon',
   },
+  {
+    name: 'tr_drawer_close_history_menu',
+    routerLink: '/drawer-close',
+    icon: 'fa fa-inbox icon',
+  },
 
   {
     name: 'tr_purchases',
@@ -134,6 +139,11 @@ export const Cashier = [
     name: 'tr_cashier.TITLE',
     routerLink: '/cashier',
     icon: 'fa fa-credit-card icon',
+  },
+  {
+    name: 'tr_drawer_close_history_menu',
+    routerLink: '/drawer-close',
+    icon: 'fa fa-inbox icon',
   },
   {
     name: 'tr_vixa',

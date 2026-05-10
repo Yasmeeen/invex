@@ -673,6 +673,7 @@ export const restoreOrder = async (req, res) => {
 
     // ✅ Update order status
     order.status = 'restored';
+    order.restoredAt = new Date();
     await order.save();
 
     await auditLog(req, {

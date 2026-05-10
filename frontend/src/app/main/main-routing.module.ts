@@ -147,6 +147,14 @@ const routes: Routes = [
           allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
         },
       },
+      {
+        path: 'drawer-close',
+        loadChildren: () => import('./drawer-close/drawer-close.module').then((m) => m.DrawerCloseModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
+        },
+      },
 
 
       

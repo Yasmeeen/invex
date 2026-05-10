@@ -77,21 +77,24 @@
                   </div>
                 </div>
 
-                <div class="form-group mb-0">
-                  <label class="chk-pill d-inline-flex align-items-start gap-2">
+                <div class="form-group mb-0 category-multi-code-checkbox">
+                  <span class="s-checkbox size-tiny flex align-items-start">
                     <input
                       type="checkbox"
                       name="multiCodePerPiece"
+                      [attr.id]="'category-multi-code-' + (categoryId || 'new')"
                       ngModel
-                      class="mt-1"
                     />
-                    <span>
+                    <label
+                      class="category-multi-code-checkbox__label"
+                      [attr.for]="'category-multi-code-' + (categoryId || 'new')"
+                    >
                       {{ "tr_category_multi_code_per_piece" | translate }}
-                      <span class="d-block text-muted size-small weight-normal m-0 mt-1">
-                        {{ "tr_category_multi_code_hint" | translate }}
-                      </span>
-                    </span>
-                  </label>
+                    </label>
+                  </span>
+                  <p class="category-multi-code-checkbox__hint text-muted size-small weight-normal m-0">
+                    {{ "tr_category_multi_code_hint" | translate }}
+                  </p>
                 </div>
 
                 <div class="category-attrs-block">
@@ -126,28 +129,30 @@
                         </div>
                       </div>
                       <div class="category-attr-row__checks">
-                        <label
-                          class="chk-pill"
+                        <span
+                          class="s-checkbox size-tiny flex"
                           [attr.title]="'tr_show_attribute_on_invoice' | translate"
                         >
                           <input
                             type="checkbox"
+                            [id]="'category-attr-' + i + '-invoice'"
                             [(ngModel)]="attributeRows[i].showOnInvoice"
                             [ngModelOptions]="{ standalone: true }"
                           />
-                          <span>{{ 'tr_attr_invoice_short' | translate }}</span>
-                        </label>
-                        <label
-                          class="chk-pill"
+                          <label [attr.for]="'category-attr-' + i + '-invoice'">{{ 'tr_attr_invoice_short' | translate }}</label>
+                        </span>
+                        <span
+                          class="s-checkbox size-tiny flex"
                           [attr.title]="'tr_show_attribute_value_on_barcode' | translate"
                         >
                           <input
                             type="checkbox"
+                            [id]="'category-attr-' + i + '-barcode'"
                             [(ngModel)]="attributeRows[i].showInBarcode"
                             [ngModelOptions]="{ standalone: true }"
                           />
-                          <span>{{ 'tr_attr_barcode_short' | translate }}</span>
-                        </label>
+                          <label [attr.for]="'category-attr-' + i + '-barcode'">{{ 'tr_attr_barcode_short' | translate }}</label>
+                        </span>
                       </div>
                       <div class="category-attr-row__remove">
                         <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">

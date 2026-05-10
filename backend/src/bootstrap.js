@@ -18,6 +18,7 @@ import notificationsRoutes from './modules/notifications_module/router.js';
 import auditRoutes from './modules/audit_module/router.js';
 import aiRoutes from './modules/ai_module/router.js';
 import productPurchaseRequestsRoutes from './modules/product_purchase_requests_module/router.js';
+import dailyExpensesRoutes from './modules/daily_expenses_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -62,6 +63,7 @@ const bootstrap = (app, express) => {
   app.use('/api/audits', auditRoutes);
   app.use('/api/ai', aiRoutes);
   app.use('/api/product-purchase-requests', productPurchaseRequestsRoutes);
+  app.use('/api/daily-expenses', dailyExpensesRoutes);
 
   return app;
 };

@@ -108,7 +108,7 @@ function canonicalPhoneForStorage(raw) {
   return String(raw || '').trim();
 }
 
-async function findOrCreateClient({ name, phone, address, branchOid }) {
+async function findOrCreateClient({ name, phone, registeredAddress, branchOid }) {
   const existing = await findClientByPhone(phone);
   if (existing) {
     return existing;
@@ -117,10 +117,14 @@ async function findOrCreateClient({ name, phone, address, branchOid }) {
   if (!phoneNumber) {
     throw new Error('INVALID_PHONE');
   }
+  const addr = String(registeredAddress || '').trim();
+  if (!addr) {
+    throw new Error('INVALID_REGISTERED_ADDRESS');
+  }
   const doc = {
     name: String(name || '').trim() || 'Customer',
     phoneNumber,
-    address: String(address || '').trim(),
+    address: addr,
     branches: branchOid && mongoose.Types.ObjectId.isValid(String(branchOid)) ? [branchOid] : [],
   };
   return Client.create(doc);
@@ -213,6 +217,7 @@ export const createProductBooking = async (req, res) => {
       customerPhone,
       pickupType,
       shippingAddress,
+      registeredAddress,
       depositAmount,
       depositTransferImageUrl,
       depositTransferImageUrls,
@@ -233,8 +238,20 @@ export const createProductBooking = async (req, res) => {
     if (!['branch_pickup', 'online_shipping'].includes(pickupType)) {
       return res.status(400).json({ error: 'Invalid pickup type' });
     }
-    if (pickupType === 'online_shipping' && !String(shippingAddress || '').trim()) {
+    const registeredAddrTrim = String(registeredAddress ?? '').trim();
+    const shippingAddrTrim = String(shippingAddress ?? '').trim();
+    if (pickupType === 'online_shipping' && !shippingAddrTrim) {
       return res.status(400).json({ error: 'Shipping address is required for online shipping' });
+    }
+    if (
+      pickupType === 'online_shipping' &&
+      registeredAddrTrim &&
+      shippingAddrTrim &&
+      registeredAddrTrim === shippingAddrTrim
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Shipping address must differ from the registered customer address' });
     }
     const dep = Number(depositAmount);
     if (Number.isNaN(dep) || dep < 0) {
@@ -297,12 +314,17 @@ export const createProductBooking = async (req, res) => {
       client = await findOrCreateClient({
         name: customerName,
         phone: customerPhone,
-        address: pickupType === 'online_shipping' ? shippingAddress : '',
+        registeredAddress: registeredAddrTrim,
         branchOid,
       });
     } catch (e) {
       if (e.message === 'INVALID_PHONE') {
         return res.status(400).json({ error: 'Invalid phone number' });
+      }
+      if (e.message === 'INVALID_REGISTERED_ADDRESS') {
+        return res.status(400).json({
+          error: 'Registered address is required for new customers',
+        });
       }
       if (e.code === 11000) {
         return res.status(409).json({ error: 'Phone number already registered' });

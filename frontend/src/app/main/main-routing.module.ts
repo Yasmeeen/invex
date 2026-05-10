@@ -139,6 +139,14 @@ const routes: Routes = [
         canActivate: [RoleGuard],
         data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'] },
       },
+      {
+        path: 'expenses',
+        loadChildren: () => import('./expenses/expenses.module').then((m) => m.ExpensesModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
+        },
+      },
 
 
       

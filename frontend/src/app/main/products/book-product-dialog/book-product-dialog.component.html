@@ -39,14 +39,49 @@
           </div>
           <div class="col-md-6">
             <div class="form-group">
-              <label>{{ 'tr_booking_customer_name' | translate }}</label>
-              <input class="s-control width-100" formControlName="customerName" />
+              <label>{{ 'tr_booking_customer_phone' | translate }}</label>
+              <input
+                class="s-control width-100"
+                [class.s-control--invalid]="
+                  form.get('customerPhone')?.invalid && form.get('customerPhone')?.touched
+                "
+                type="tel"
+                autocomplete="tel"
+                formControlName="customerPhone"
+              />
+              <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_phone_lookup_hint' | translate }}</p>
+              <div
+                class="text-error size-small mt-1"
+                *ngIf="form.get('customerPhone')?.invalid && form.get('customerPhone')?.touched"
+              >
+                <span *ngIf="form.get('customerPhone')?.errors?.['required']">{{
+                  'tr_client_phone_required' | translate
+                }}</span>
+                <span *ngIf="form.get('customerPhone')?.errors?.['phoneFormat']">{{
+                  'tr_client_phone_invalid' | translate
+                }}</span>
+              </div>
+              <div *ngIf="clientLookupLoading" class="size-small text-muted mt-1">
+                {{ 'tr_booking_phone_lookup_loading' | translate }}…
+              </div>
             </div>
           </div>
           <div class="col-md-6">
             <div class="form-group">
-              <label>{{ 'tr_booking_customer_phone' | translate }}</label>
-              <input class="s-control width-100" formControlName="customerPhone" />
+              <label>{{ 'tr_booking_customer_name' | translate }}</label>
+              <input class="s-control width-100" formControlName="customerName" />
+            </div>
+          </div>
+          <div class="col-md-12">
+            <div class="form-group">
+              <label>{{ 'tr_booking_registered_address' | translate }}</label>
+              <input
+                type="text"
+                class="s-control width-100"
+                formControlName="registeredAddress"
+                autocomplete="street-address"
+              />
+              <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_registered_address_hint' | translate }}</p>
             </div>
           </div>
           <div class="col-md-6">
@@ -71,10 +106,15 @@
               </ng-select>
             </div>
           </div>
-          <div class="col-md-6" *ngIf="form.get('pickupType')?.value === 'online_shipping'">
+          <div class="col-md-12" *ngIf="form.get('pickupType')?.value === 'online_shipping'">
             <div class="form-group">
               <label>{{ 'tr_booking_shipping_address' | translate }}</label>
-              <input class="s-control width-100" formControlName="shippingAddress" />
+              <textarea
+                class="s-control width-100 booking-shipping-address"
+                rows="2"
+                formControlName="shippingAddress"
+              ></textarea>
+              <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_shipping_address_hint' | translate }}</p>
             </div>
           </div>
           <div class="col-md-6">
@@ -157,7 +197,7 @@
         <button
           type="button"
           class="s-btn btn-primary"
-          [disabled]="saving || isUploadingDepositProof"
+          [disabled]="saving || isUploadingDepositProof || clientLookupLoading"
           (click)="submit()"
         >
           {{ 'tr_booking_save' | translate }}

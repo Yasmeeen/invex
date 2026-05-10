@@ -28,6 +28,7 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
+import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
 
@@ -133,6 +134,32 @@ export class CashierComponent implements AfterViewInit {
     this.exchangeTradeInPurchase = null;
     this.refreshExchangePaymentDefaults();
     this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+  }
+
+  /** Record cash-drawer daily expense (same dialog as `/expenses` page). */
+  openDailyExpenseDialog(): void {
+    const uid = this.curentUser?._id;
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser?.branch?._id;
+
+    if (!selectedBranchId) {
+      this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
+    const ref = this.dialog.open(DailyExpenseDialogComponent, {
+      width: '440px',
+      panelClass: 'daily-expense-dialog-panel',
+      backdropClass: 'daily-expense-dialog-backdrop',
+      data: {
+        userId: uid,
+        forcedBranchId: String(selectedBranchId),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe(() => {});
   }
 
   /** Desk intake purchase popup (`exchange`: trade-in step; defer purchase receipt until after sale checkout). */

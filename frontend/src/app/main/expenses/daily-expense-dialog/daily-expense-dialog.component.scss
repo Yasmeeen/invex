@@ -1,0 +1,45 @@
+:host {
+  display: block;
+}
+
+/**
+ * Compact “glass” surface: not a solid Material card, but enough contrast so labels
+ * stay readable on top of the product grid (without background it looked washed out).
+ */
+.daily-expense-dialog {
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.06),
+    0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+}
+
+.daily-expense-dialog__title {
+  margin: 0;
+  padding: 0 0 10px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.daily-expense-dialog__body {
+  min-width: 280px;
+  max-width: 420px;
+  padding-top: 12px;
+}
+
+.daily-expense-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}

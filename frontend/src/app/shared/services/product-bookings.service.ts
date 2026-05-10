@@ -9,6 +9,8 @@ export interface CreateProductBookingPayload {
   quantity?: number;
   customerName: string;
   customerPhone: string;
+  /** Saved on the Client profile when the phone is new; ignored when the client already exists. */
+  registeredAddress: string;
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   depositAmount: number;

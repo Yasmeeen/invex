@@ -62,5 +62,7 @@ export const PRODUCT_PURCHASE_REQUESTS_URL = BASE_URL + '/product-purchase-reque
 
 export const AUDITS_URL = BASE_URL + '/audits';
 
+export const DAILY_EXPENSES_URL = BASE_URL + '/daily-expenses';
+
 // AI assistant (Vixa)
 export const AI_CHAT_URL = BASE_URL + '/ai/chat';

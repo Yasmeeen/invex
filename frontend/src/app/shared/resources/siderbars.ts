@@ -39,6 +39,11 @@ export const AdminSidebar = [
     routerLink: '/cashier',
     icon: 'fa fa-credit-card icon',
   },
+  {
+    name: 'tr_daily_expenses_menu',
+    routerLink: '/expenses',
+    icon: 'fa fa-money icon',
+  },
 
   {
     name: 'tr_purchases',

@@ -28,7 +28,7 @@
       <label>{{ 'tr_branches' | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3" *ngIf="reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -47,7 +47,7 @@
         </ng-template>
       </ng-select>
     </div>
-    <div class="col-md-2">
+    <div class="col-md-2" *ngIf="reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
       <input
         class="s-control"
@@ -57,7 +57,7 @@
         autocomplete="tel"
       />
     </div>
-    <div class="col-md-2 mt-4" *ngIf="reportType !== 'bookings'">
+    <div class="col-md-2 mt-4" *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_group' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.groupBy">
         <option value="daily">{{ 'tr_report_group_daily' | translate }}</option>

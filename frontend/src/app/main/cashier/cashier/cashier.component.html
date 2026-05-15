@@ -6,18 +6,19 @@
       <!-- Branch Selection (Super Admin / Co Admin) -->
       <div *ngIf="curentUser.role === 'Super Admin' || curentUser.role === 'Co Admin'" class="branch-selection max-300 width-100">
         <div class="form-group mb-0">
+          <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon">
             <ng-select
               class="s-control s-select"
-              placeholder="{{ 'tr_branches' | translate }}"
+              [items]="branches"
               bindLabel="name"
               bindValue="_id"
               [clearable]="false"
+              placeholder="{{ 'tr_branches' | translate }}"
               [(ngModel)]="adminSelectedBranchId"
               #branch="ngModel"
               name="branchId"
               (change)="loadProducts()"
-              [items]="branches"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
@@ -139,50 +140,59 @@
               </div>
 
               <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
-                <label class="size-small weight-bold d-block mb-2">{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
-                <div class="input-with-icon bg-white width-100 mb-2">
-                  <ng-select
-                    class="s-control s-select width-100"
-                    [items]="paymentMethodsForSplit"
-                    bindLabel="labelKey"
-                    bindValue="id"
-                    [multiple]="true"
-                    [closeOnSelect]="false"
-                    [clearable]="true"
-                    [searchable]="true"
-                    appendTo="body"
-                    dropdownPosition="bottom"
-                    placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-                    [(ngModel)]="selectedPayMethods"
-                    [ngModelOptions]="{ standalone: true }"
-                    name="payMethodsMulti"
-                    (ngModelChange)="onSelectedPayMethodsChange($event)"
-                  >
-                    <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                      <div class="ng-value" *ngFor="let item of items | slice:0:2">
-                        <span class="ng-value-label">{{ $any(item).labelKey | translate }}</span>
-                        <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
-                      </div>
-                      <div
-                        class="ng-value"
-                         *ngIf="items.length > 2"
-                        [attr.title]="payMethodsOverflowTitle(items)"
-                      >
-                        <span class="ng-value-label">+ {{ items.length - 2 }}</span>
-                      </div>
-                    </ng-template>
-                    <ng-template ng-option-tmp let-item="item">
-                      <span class="payment-option">
-                        <img [src]="$any(item).logo" class="payment-logo" alt="" />
-                        {{ $any(item).labelKey | translate }}
-                      </span>
-                    </ng-template>
-                  </ng-select>
-                  <i class="fa fa-caret-down input-icon"></i>
+                <div class="form-group mb-0">
+                  <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
+                  <div class="input-with-icon">
+                    <ng-select
+                      class="s-control s-select"
+                      [items]="paymentMethodsForSplit"
+                      bindLabel="labelKey"
+                      bindValue="id"
+                      [multiple]="true"
+                      [closeOnSelect]="false"
+                      [clearable]="true"
+                      [searchable]="true"
+                      placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
+                      [(ngModel)]="selectedPayMethods"
+                      [ngModelOptions]="{ standalone: true }"
+                      name="payMethodsMulti"
+                      (ngModelChange)="onSelectedPayMethodsChange($event)"
+                    >
+                      <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                        <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                          <span class="ng-value-label">{{ $any(item).labelKey | translate }}</span>
+                          <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+                        </div>
+                        <div
+                          class="ng-value"
+                          *ngIf="items.length > 2"
+                          [attr.title]="payMethodsOverflowTitle(items)"
+                        >
+                          <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+                        </div>
+                      </ng-template>
+                      <ng-template ng-option-tmp let-item="item">
+                        <span class="payment-option">
+                          <img [src]="$any(item).logo" class="payment-logo" alt="" />
+                          {{ $any(item).labelKey | translate }}
+                          <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
+                            (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
+                          </span>
+                        </span>
+                      </ng-template>
+                    </ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
                 </div>
 
                 <div class="cashier-payment-amount-heading size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
                   {{ 'tr_cashier_payment_amounts_hint' | translate }}
+                </div>
+                <div
+                  class="cashier-payment-amount-heading size-small text-muted mb-2"
+                  *ngIf="selectedPayMethods?.length && cashierPaymentHasAnyFee()"
+                >
+                  {{ 'tr_cashier_payment_gross_fee_hint' | translate }}
                 </div>
                 <div
                   class="cashier-payment-split-row"
@@ -196,6 +206,9 @@
                       alt=""
                     />
                     <span class="cashier-payment-split-row__label">{{ payMethodLabelKey(mid) | translate }}</span>
+                    <span *ngIf="paymentAppFeePercent(mid) > 0" class="cashier-payment-split-row__fee-pct text-muted size-small">
+                      (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
+                    </span>
                   </div>
                   <input
                     type="number"

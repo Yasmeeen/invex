@@ -92,6 +92,7 @@ export class CashierComponent implements AfterViewInit {
     { id: 'tru', labelKey: 'tr_pay_tru', logo: 'assets/images/payment/tru.svg' },
     { id: 'sohoula', labelKey: 'tr_pay_sohoula', logo: 'assets/images/payment/sohoula.svg' },
     { id: 'maylo_seven', labelKey: 'tr_pay_maylo_seven', logo: 'assets/images/payment/maylo-seven.svg' },
+    { id: 'forsa', labelKey: 'tr_pay_forsa', logo: 'assets/images/payment/cash.svg' },
     { id: 'fawry', labelKey: 'tr_pay_fawry', logo: 'assets/images/payment/fawry.svg' },
     { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash', logo: 'assets/images/payment/vodafone-cash.svg' },
     { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
@@ -491,10 +492,13 @@ export class CashierComponent implements AfterViewInit {
       return;
     }
     const id = this.selectedPayMethods[0];
-    const t = Math.round(this.effectiveCheckoutTotal() * 100) / 100;
+    const netDue = Math.round(this.effectiveCheckoutTotal() * 100) / 100;
     const cur = Number(this.payAmounts[id]);
     if (!Number.isFinite(cur) || cur <= 0) {
-      this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, t) };
+      const pct = this.paymentAppFeePercent(id);
+      const gross =
+        pct > 0 ? Math.round(netDue * (1 + pct / 100) * 100) / 100 : netDue;
+      this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, gross) };
     }
   }
 
@@ -539,9 +543,36 @@ export class CashierComponent implements AfterViewInit {
     return this.paymentMethodsForSplit.find((m) => m.id === id);
   }
 
+  /** BNPL / wallet surcharge from store settings (0 if unset). */
+  paymentAppFeePercent(methodId: string | undefined | null): number {
+    const m = String(methodId || '')
+      .trim()
+      .toLowerCase();
+    const row = this.storeSettings.snapshot.paymentAppFeePercents?.find((x) => x.method === m);
+    const p = Number(row?.percent);
+    return Number.isFinite(p) && p > 0 ? Math.min(p, 100) : 0;
+  }
+
+  /**
+   * Converts cashier-entered gross (what customer paid in the app, incl. fee) to invoice net.
+   */
+  payAmountNetForInvoice(methodId: string, enteredGross: number): number {
+    const pct = this.paymentAppFeePercent(methodId);
+    const g = Number(enteredGross) || 0;
+    if (pct <= 0) {
+      return Math.round(g * 100) / 100;
+    }
+    const net = g / (1 + pct / 100);
+    return Math.round(net * 100) / 100;
+  }
+
+  cashierPaymentHasAnyFee(): boolean {
+    return this.selectedPayMethods.some((id) => this.paymentAppFeePercent(id) > 0);
+  }
+
   paymentSplitsTotal(): number {
     const sum = this.selectedPayMethods.reduce(
-      (acc, id) => acc + (Number.isFinite(Number(this.payAmounts[id])) ? Number(this.payAmounts[id]) : 0),
+      (acc, id) => acc + this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
       0
     );
     return Math.round(sum * 100) / 100;
@@ -818,7 +849,7 @@ export class CashierComponent implements AfterViewInit {
       .filter((id) => String(id || '').trim())
       .map((id) => ({
         method: String(id).trim().toLowerCase(),
-        amount: Math.round((Number(this.payAmounts[id]) || 0) * 100) / 100,
+        amount: this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
       }));
 
     const exchangeCredit = this.exchangeTradeInPurchase ? this.exchangeTradeInCredit() : 0;

@@ -54,6 +54,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   upcomingColumns: { key: string; labelKey: string }[] = [];
   upcomingRows: any[] = [];
 
+  /** Desk purchases: detail lines below treasury summary. */
+  deskPurchasesDetailColumns: { key: string; labelKey: string }[] = [];
+  deskPurchasesDetailRows: any[] = [];
+
   /** Sales report: breakdown by cash / card / application payment types. */
   salesPaymentColumns: { key: string; labelKey: string }[] = [];
   salesPaymentRows: any[] = [];
@@ -69,6 +73,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     customers: 'tr_report_title_customers',
     installments: 'tr_report_title_installments',
     bookings: 'tr_report_title_bookings',
+    deskPurchases: 'tr_report_title_desk_purchases',
   };
 
   constructor(
@@ -160,6 +165,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.upcomingRows = [];
           this.salesPaymentColumns = [];
           this.salesPaymentRows = [];
+          this.deskPurchasesDetailColumns = [];
+          this.deskPurchasesDetailRows = [];
         }
       );
       return;
@@ -174,6 +181,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       stock: this.reportsService.getStockReport.bind(this.reportsService),
       customers: this.reportsService.getCustomersReport.bind(this.reportsService),
       installments: this.reportsService.getInstallmentsReport.bind(this.reportsService),
+      deskPurchases: this.reportsService.getDeskPurchasesTreasuryReport.bind(this.reportsService),
     };
 
     map[this.reportType](scoped).subscribe(
@@ -189,8 +197,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.tableColumns = [];
         this.tableRows = [];
         this.chartOptions = null;
+        this.secondaryChartOptions = null;
         this.salesPaymentColumns = [];
         this.salesPaymentRows = [];
+        this.deskPurchasesDetailColumns = [];
+        this.deskPurchasesDetailRows = [];
       }
     );
   }
@@ -201,6 +212,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.secondaryChartOptions = null;
     this.salesPaymentColumns = [];
     this.salesPaymentRows = [];
+    this.deskPurchasesDetailColumns = [];
+    this.deskPurchasesDetailRows = [];
     const t = (key: string, params?: object) => this.translate.instant(key, params);
 
     if (this.reportType === 'bookings') {
@@ -366,6 +379,54 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         (res.topCustomers || []).map((x: any) => x.customerName || x.customerPhone),
         (res.topCustomers || []).map((x: any) => Number(x.totalSpending || 0))
       );
+      return;
+    }
+
+    if (this.reportType === 'deskPurchases') {
+      const s = res.summary || {};
+      this.cards = [
+        { titleKey: 'tr_report_desk_purchases_total_cost', value: s.totalAmount ?? 0 },
+        { titleKey: 'tr_report_desk_purchases_intakes', value: s.totalIntakes ?? 0 },
+      ];
+      this.tableColumns = [
+        { key: 'treasuryLabel', labelKey: 'tr_report_col_purchase_treasury' },
+        { key: 'totalAmount', labelKey: 'tr_report_col_amount' },
+        { key: 'intakeCount', labelKey: 'tr_report_desk_purchases_col_intakes' },
+      ];
+      const bt = s.byTreasury || [];
+      this.tableRows = bt.map((x: any) => ({
+        treasuryLabel: x.treasuryLabel ? `${x.treasuryLabel} (${x.treasuryKey})` : x.treasuryKey,
+        totalAmount: x.totalAmount,
+        intakeCount: x.intakeCount,
+      }));
+      const piePay = bt
+        .filter((x: any) => Number(x.totalAmount || 0) > 0)
+        .map((x: any) => ({
+          name: String(x.treasuryLabel || x.treasuryKey || ''),
+          y: Number(x.totalAmount || 0),
+        }));
+      this.secondaryChartOptions =
+        piePay.length > 0 ? this.pieChart(t('tr_report_desk_purchases_by_treasury'), piePay) : null;
+      this.chartOptions = null;
+
+      this.deskPurchasesDetailColumns = [
+        { key: 'createdAt', labelKey: 'tr_daily_expenses_recorded_at' },
+        { key: 'branchName', labelKey: 'tr_branch' },
+        { key: 'treasuryLabel', labelKey: 'tr_report_col_purchase_treasury' },
+        { key: 'productName', labelKey: 'tr_report_col_product' },
+        { key: 'quantity', labelKey: 'tr_report_col_qty' },
+        { key: 'unitCost', labelKey: 'tr_purchase_price' },
+        { key: 'lineTotal', labelKey: 'tr_report_col_amount' },
+      ];
+      this.deskPurchasesDetailRows = (res.lines || []).map((x: any) => ({
+        createdAt: x.createdAt ? new Date(x.createdAt).toLocaleString() : '',
+        branchName: x.branchName || '',
+        treasuryLabel: x.treasuryLabel || x.treasuryKey || '',
+        productName: x.productName || '',
+        quantity: x.quantity,
+        unitCost: x.unitCost,
+        lineTotal: x.lineTotal,
+      }));
       return;
     }
 

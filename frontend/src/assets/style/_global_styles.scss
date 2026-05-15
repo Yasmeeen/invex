@@ -137,6 +137,12 @@ tooltip-content .tooltip {
   z-index: 10050 !important;
 }
 
+/**
+ * appendTo="body" renders `.ng-dropdown-panel` as direct child of `body`.
+ * Cashier fullscreen overlay uses z-index 9999 — without this, clicks hit the overlay instead of options.
+ */
+
+
 .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {
     @extend %flex-centered;
     display: inline-flex;

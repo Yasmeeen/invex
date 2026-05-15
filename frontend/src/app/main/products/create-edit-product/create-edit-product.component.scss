@@ -1,8 +1,18 @@
-/* ng-select inside modal: stable items + appendTo body; icon must not steal clicks */
+/* ng-select: append inside dialog so panel stays under CDK overlay / focus (appendTo body often drops clicks). */
+#create-edit-product-modal-root {
+  position: relative;
+  overflow: visible;
+}
+
 ::ng-deep .complex-modal .input-with-icon {
   ng-select.ng-select {
     position: relative;
     z-index: 3;
+  }
+
+  /* Global `.s-select` forces `position: static` on the container, which breaks appendTo body placement (cashier uses the same override). */
+  ng-select.ng-select .ng-select-container {
+    position: relative !important;
   }
 
   .input-icon {

@@ -75,6 +75,14 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     return Math.round(this.unitNet * this.lineQuantity * 100) / 100;
   }
 
+  get purchaseTreasuryDisplay(): string {
+    const label = String(this.purchase?.purchaseTreasuryLabel || '').trim();
+    const key = String(this.purchase?.purchaseTreasuryKey || '').trim().toLowerCase();
+    if (!label && !key) return '';
+    if (label && key) return `${label} (${key})`;
+    return label || key;
+  }
+
   get attrLines(): Array<{ label: string; value: string }> {
     const raw = this.purchase?.productPayload?.attributes;
     if (!raw || typeof raw !== 'object') return [];

@@ -4,16 +4,31 @@ import { BehaviorSubject, Observable, from, of } from 'rxjs';
 import { catchError, concatMap, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { STORE_SETTINGS_URL } from '@core/base/urls';
+import { PAYMENT_APP_FEE_METHOD_IDS } from '@shared/constants/payment-app-fee-methods';
 
 export type ReceiptLanguageCode = 'ar' | 'en' | 'de' | 'fr';
 
 export const RECEIPT_LANGUAGE_CODES: ReceiptLanguageCode[] = ['ar', 'en', 'de', 'fr'];
+
+export interface PurchaseTreasuryMethod {
+  key: string;
+  label: string;
+}
+
+export interface PaymentAppFeePercent {
+  method: string;
+  percent: number;
+}
 
 export interface StoreSettings {
   storeName: string;
   storePhoneNumber: string;
   logoUrl: string;
   receiptLanguage: ReceiptLanguageCode;
+  /** Purchase desk treasury buckets (from API; includes cash + banks/wallets). */
+  purchaseTreasuryMethods: PurchaseTreasuryMethod[];
+  /** Cashier: customer gross payment → invoice net (percent on top of net). */
+  paymentAppFeePercents: PaymentAppFeePercent[];
 }
 
 const DEFAULTS: StoreSettings = {
@@ -21,6 +36,8 @@ const DEFAULTS: StoreSettings = {
   storePhoneNumber: '',
   logoUrl: '',
   receiptLanguage: 'en',
+  purchaseTreasuryMethods: [{ key: 'cash', label: 'Cash' }],
+  paymentAppFeePercents: [],
 };
 
 @Injectable({ providedIn: 'root' })
@@ -36,6 +53,32 @@ export class StoreSettingsService {
     return this._settings.value;
   }
 
+  private normalizePaymentAppFeePercents(raw: unknown): PaymentAppFeePercent[] {
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    const allowed = new Set<string>(PAYMENT_APP_FEE_METHOD_IDS as unknown as string[]);
+    const seen = new Set<string>();
+    const out: PaymentAppFeePercent[] = [];
+    for (const row of raw) {
+      const method = String((row as PaymentAppFeePercent)?.method ?? '')
+        .trim()
+        .toLowerCase();
+      if (!method || !allowed.has(method) || seen.has(method)) {
+        continue;
+      }
+      let percent = Number((row as PaymentAppFeePercent)?.percent);
+      if (!Number.isFinite(percent)) {
+        percent = 0;
+      }
+      percent = Math.max(0, Math.min(100, Math.round(percent * 100) / 100));
+      seen.add(method);
+      out.push({ method, percent });
+    }
+    out.sort((a, b) => a.method.localeCompare(b.method));
+    return out;
+  }
+
   /** Load from API (call once after login / main layout). */
   load(): void {
     const epoch = ++this.loadEpoch;
@@ -45,12 +88,22 @@ export class StoreSettingsService {
           return;
         }
         const receiptLanguage = this.normalizeReceiptLanguage(data.receiptLanguage);
+        const methods = Array.isArray(data.purchaseTreasuryMethods)
+          ? data.purchaseTreasuryMethods
+              .filter((m: PurchaseTreasuryMethod) => m?.key && m?.label)
+              .map((m: PurchaseTreasuryMethod) => ({
+                key: String(m.key).trim().toLowerCase(),
+                label: String(m.label).trim(),
+              }))
+          : DEFAULTS.purchaseTreasuryMethods;
         this._settings.next({
           ...this._settings.value,
           storeName: data.storeName ?? DEFAULTS.storeName,
           storePhoneNumber: data.storePhoneNumber ?? '',
           logoUrl: data.logoUrl ?? '',
           receiptLanguage,
+          purchaseTreasuryMethods: methods.length ? methods : DEFAULTS.purchaseTreasuryMethods,
+          paymentAppFeePercents: this.normalizePaymentAppFeePercents(data.paymentAppFeePercents),
         });
         this.ensureReceiptTranslationPacks();
       },
@@ -102,10 +155,23 @@ export class StoreSettingsService {
         const receiptLanguage = this.normalizeReceiptLanguage(
           receiptFromResponse ?? receiptFromBody ?? this._settings.value.receiptLanguage
         );
+        const mergedMethods =
+          Array.isArray(data.purchaseTreasuryMethods) && data.purchaseTreasuryMethods.length
+            ? data.purchaseTreasuryMethods.map((m: PurchaseTreasuryMethod) => ({
+                key: String(m.key).trim().toLowerCase(),
+                label: String(m.label).trim(),
+              }))
+            : this._settings.value.purchaseTreasuryMethods;
+        const mergedFees =
+          data.paymentAppFeePercents !== undefined && data.paymentAppFeePercents !== null
+            ? this.normalizePaymentAppFeePercents(data.paymentAppFeePercents)
+            : this._settings.value.paymentAppFeePercents;
         this._settings.next({
           ...this._settings.value,
           ...data,
           receiptLanguage,
+          purchaseTreasuryMethods: mergedMethods?.length ? mergedMethods : DEFAULTS.purchaseTreasuryMethods,
+          paymentAppFeePercents: mergedFees,
         });
         this.ensureReceiptTranslationPacks();
       })

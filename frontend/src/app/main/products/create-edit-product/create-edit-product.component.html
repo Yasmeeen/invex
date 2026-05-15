@@ -1,7 +1,11 @@
 <div class="complex-modal">
   <div class="modal-wrapper">
     <div class="close-modal-icon" (click)="closeModal()"></div>
-    <div class="modal-content" #modalContent>
+    <div
+      id="create-edit-product-modal-root"
+      class="modal-content"
+      #modalContent
+    >
       <div class="modal-header border-bottom">
         <h3 class="steel weight-medium size-default m-0">
           {{ modalHeadingKey | translate }}
@@ -66,7 +70,7 @@
                           bindLabel="name"
                           [compareWith]="categoryCompare"
                           [clearable]="!isEdit"
-                          appendTo="body"
+                          appendTo="#create-edit-product-modal-root"
                           [(ngModel)]="selectedCategory"
                           (ngModelChange)="onProductCategoryChange($event)"
                           #category="ngModel"
@@ -354,6 +358,27 @@
                     </p>
                   </div>
 
+                  <div class="col-md-8 mt-4" *ngIf="cashDeskPurchase">
+                    <div class="form-group">
+                      <label>{{ 'tr_purchase_treasury_method' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          [(ngModel)]="deskPurchaseTreasuryKey"
+                          name="deskPurchaseTreasuryKey"
+                          [items]="purchaseTreasuryMethodOptions"
+                          bindLabel="label"
+                          bindValue="key"
+                          [clearable]="false"
+                          appendTo="#create-edit-product-modal-root"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <p class="text-muted size-small m-0 mt-1">{{ 'tr_purchase_treasury_method_hint' | translate }}</p>
+                    </div>
+                  </div>
+
                   <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
                     <div class="form-group">
                       <label>{{ 'tr_product_storage' | translate }}</label>
@@ -393,7 +418,7 @@
                           placeholder="{{ 'tr_select' | translate }}"
                           bindLabel="name"
                           [clearable]="false"
-                          appendTo="body"
+                          appendTo="#create-edit-product-modal-root"
                           ngModel
                           #branch="ngModel"
                           name="branch"

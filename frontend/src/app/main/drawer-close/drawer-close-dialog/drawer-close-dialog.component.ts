@@ -171,6 +171,19 @@ export class DrawerCloseDialogComponent implements OnInit {
     return t !== key ? t : method;
   }
 
+  deskCashDrawerAmount(p: DrawerClosePreview | null): number {
+    if (!p) return 0;
+    const v = p.deskPurchaseCashDrawerTotal ?? p.deskPurchaseCashOutTotal ?? 0;
+    return round2(Number(v));
+  }
+
+  deskGrandTotal(p: DrawerClosePreview | null): number | null {
+    if (p == null || p.deskPurchaseGrandTotal == null) return null;
+    const n = Number(p.deskPurchaseGrandTotal);
+    if (!Number.isFinite(n)) return null;
+    return round2(n);
+  }
+
   goToConfirm(): void {
     if (this.previewLoading || !this.preview) {
       if (!this.previewLoading && !this.preview) {

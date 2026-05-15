@@ -3,6 +3,13 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { DRAWER_CLOSE_URL } from '@core/base/urls';
 
+export interface DeskPurchaseTreasuryLine {
+  key: string;
+  label: string;
+  total: number;
+  count: number;
+}
+
 export interface DrawerClosePreview {
   businessDate: string;
   branchId: string;
@@ -11,7 +18,11 @@ export interface DrawerClosePreview {
   restoredInvoiceCount: number;
   invoiceCount: number;
   dailyExpenseTotal: number;
+  /** Cash paid from physical drawer for desk purchases only (legacy alias). */
   deskPurchaseCashOutTotal: number;
+  deskPurchaseCashDrawerTotal?: number;
+  deskPurchaseGrandTotal?: number;
+  deskPurchaseByTreasuryMethod?: DeskPurchaseTreasuryLine[];
   deskPurchaseIntakeCount: number;
   cashReceivedTotal: number;
   cashRefundedTotal: number;

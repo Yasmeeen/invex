@@ -94,6 +94,8 @@ export class ProductPurchaseApprovalDialogComponent implements OnInit {
         },
         branchName,
         quantity: p.quantity ?? 1,
+        treasuryLabel: String(p.purchaseTreasuryLabel || '').trim(),
+        treasuryKey: String(p.purchaseTreasuryKey || 'cash').trim().toLowerCase(),
       };
     }
     return this.dialogData?.data || {};

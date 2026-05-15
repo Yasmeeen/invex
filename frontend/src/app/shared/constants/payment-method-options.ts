@@ -16,6 +16,7 @@ export const PAYMENT_METHOD_OPTIONS: PaymentMethodOption[] = [
   { id: 'tru', labelKey: 'tr_pay_tru' },
   { id: 'sohoula', labelKey: 'tr_pay_sohoula' },
   { id: 'maylo_seven', labelKey: 'tr_pay_maylo_seven' },
+  { id: 'forsa', labelKey: 'tr_pay_forsa' },
   { id: 'fawry', labelKey: 'tr_pay_fawry' },
   { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash' },
   { id: 'instapay', labelKey: 'tr_pay_instapay' },

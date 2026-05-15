@@ -29,6 +29,7 @@ import {
   DeskPurchaseProductPayload,
   ProductPurchaseRequestsService,
 } from '@shared/services/product-purchase-requests.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -66,6 +67,8 @@ export class CreateEditProductComponent implements OnInit {
   isUploadingImage = false;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
   deskPurchaseBranchLabel = '';
+  /** Purchase treasury key from Store Settings (`cash` = paid from physical drawer). */
+  deskPurchaseTreasuryKey = 'cash';
   readonly maxImageBytes = 5 * 1024 * 1024;
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
   @ViewChild('modalContainer') modalContainer: ElementRef;
@@ -83,8 +86,30 @@ export class CreateEditProductComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: any,
     private cloudinaryUpload: CloudinaryUploadService,
     public globals: Globals,
-    private productPurchaseRequests: ProductPurchaseRequestsService
+    private productPurchaseRequests: ProductPurchaseRequestsService,
+    private storeSettings: StoreSettingsService
   ) {}
+
+  /** Methods configured under Store Settings → purchase treasury. */
+  get purchaseTreasuryMethodOptions(): { key: string; label: string }[] {
+    const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
+    if (Array.isArray(m) && m.length) {
+      return m.map((x) => ({
+        key: String(x.key || '').trim().toLowerCase(),
+        label: String(x.label || x.key || '').trim(),
+      }));
+    }
+    return [{ key: 'cash', label: this.translateService.instant('tr_pay_cash') }];
+  }
+
+  private syncDeskPurchaseTreasuryKey(): void {
+    const opts = this.purchaseTreasuryMethodOptions;
+    const keys = new Set(opts.map((o) => o.key));
+    if (!keys.has(this.deskPurchaseTreasuryKey)) {
+      const cash = opts.find((o) => o.key === 'cash');
+      this.deskPurchaseTreasuryKey = cash ? cash.key : opts[0]?.key || 'cash';
+    }
+  }
 
   get cashDeskPurchase(): boolean {
     return !!this.data?.cashDeskPurchase;
@@ -387,6 +412,10 @@ export class CreateEditProductComponent implements OnInit {
     this.isEdit = this.data.isEdit
     if (this.cashDeskPurchase) {
       this.storeInWarehouse = false;
+      this.syncDeskPurchaseTreasuryKey();
+      this.subscriptions.push(
+        this.storeSettings.settings$.subscribe(() => this.syncDeskPurchaseTreasuryKey())
+      );
     }
     this.getCategories();
     this.getBranches();
@@ -745,6 +774,8 @@ private submitDeskPurchaseRequest(): void {
     return;
   }
 
+  this.syncDeskPurchaseTreasuryKey();
+
   const qty = Math.max(1, Math.floor(Number(fv.stock) || 1));
   const discountNum =
     fv.discount === undefined || fv.discount === null || fv.discount === '' ? 0 : Number(fv.discount);
@@ -775,6 +806,7 @@ private submitDeskPurchaseRequest(): void {
       branchId,
       quantity: qty,
       product: deskProduct,
+      purchaseTreasuryKey: this.deskPurchaseTreasuryKey || 'cash',
     })
     .subscribe({
       next: (res: any) => {

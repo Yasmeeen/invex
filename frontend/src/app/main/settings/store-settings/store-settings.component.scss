@@ -1,5 +1,5 @@
 .store-settings-page {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 1rem 1.25rem 2rem;
 }
@@ -95,4 +95,35 @@
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #e8ede9;
+}
+
+.store-settings-card__field--treasury {
+  padding-top: 0.25rem;
+}
+
+.purchase-treasury-table__head,
+.purchase-treasury-table__row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.purchase-treasury-table__head {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+
+.purchase-treasury-table__row {
+  margin-bottom: 0.45rem;
+}
+
+.purchase-treasury-table__remove {
+  min-width: 2.25rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
 }

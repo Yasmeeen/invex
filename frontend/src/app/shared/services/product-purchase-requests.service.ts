@@ -26,6 +26,8 @@ export class ProductPurchaseRequestsService {
     branchId: string;
     quantity?: number;
     product: DeskPurchaseProductPayload;
+    /** Store Settings purchase treasury key (`cash` = from physical drawer). */
+    purchaseTreasuryKey?: string;
   }): Observable<any> {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }

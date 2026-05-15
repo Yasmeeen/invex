@@ -31,5 +31,9 @@ export class ReportsService {
   getInstallmentsReport(params: any) {
     return this.http.get(`${REPORTS_URL}/installments`, { params });
   }
+
+  getDeskPurchasesTreasuryReport(params: any) {
+    return this.http.get(`${REPORTS_URL}/desk-purchases-treasury`, { params });
+  }
 }
 

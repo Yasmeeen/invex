@@ -28,6 +28,9 @@
     &.open {
       opacity: 1;
       pointer-events: all;
+      /* Inline ng-select (no appendTo): avoid clipping panels that extend past the flex layout */
+      overflow-x: hidden;
+      overflow-y: auto;
     }
   }
   .products-table-casheier{
@@ -143,13 +146,42 @@
         transform: rotate(90deg);
       }
     }
+
+    /** Same structure as drawer-close-dialog: label + .input-with-icon (label light on primary bar) */
+    .form-group > label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    /** Branch ng-select (same pattern as drawer-close): caret must not steal clicks */
+    .branch-selection {
+      position: relative;
+      z-index: 24;
+
+      .input-with-icon > .input-icon {
+        pointer-events: none;
+      }
+
+      ::ng-deep ng-select.ng-select-opened {
+        z-index: 60 !important;
+      }
+
+      ::ng-deep ng-select .ng-dropdown-panel {
+        z-index: 70 !important;
+      }
+    }
   }
   
   /* Body */
   .cashier-body {
     display: flex;
     flex: 1;
-    overflow: hidden;
+    overflow: visible;
+    min-height: 0;
 
     /* Later flex sibling (.order-panel) was painting above the payment dropdown and eating clicks. */
     .products-panel {
@@ -201,6 +233,27 @@
     border-bottom: 1px solid #e0e0e0;
   }
 
+  .cashier-payment-splits {
+    position: relative;
+    z-index: 8;
+
+    /** Match drawer-close: label weight/size (on white card ≈ dialog body text) */
+    .form-group > label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: rgba(15, 23, 42, 0.88);
+    }
+
+    .input-with-icon {
+      width: 100%;
+    }
+
+
+  }
+
   .payment-option {
     display: inline-flex;
     align-items: center;
@@ -215,12 +268,7 @@
     flex-shrink: 0;
   }
 
-  /* Scope to payment block so class on ng-select is optional */
-  .cashier-payment-splits ::ng-deep ng-select .ng-dropdown-panel .ng-option {
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-
+  /* Same global .s-select rules as drawer-close (no custom panel height/padding overrides). */
   /* Project .s-select sets .ng-select-container { position: static }, which breaks dropdown placement. */
   .cashier-payment-splits ::ng-deep ng-select.ng-select .ng-select-container {
     position: relative !important;
@@ -231,10 +279,6 @@
     pointer-events: none;
   }
 
-  .cashier-payment-splits ::ng-deep ng-select .ng-dropdown-panel {
-    z-index: 20 !important;
-  }
-  
   /* Products Panel */
   .products-panel {
     flex: 2;
@@ -393,6 +437,11 @@
       font-weight: 600;
       font-size: 0.88rem;
       line-height: 1.2;
+    }
+
+    .cashier-payment-split-row__fee-pct {
+      white-space: nowrap;
+      margin-inline-start: 0.15rem;
     }
 
     .cashier-payment-split-select {

@@ -17,6 +17,7 @@ const routes: Routes = [
   { path: 'customers', component: ReportsPageComponent, data: { reportType: 'customers' } },
   { path: 'installments', component: ReportsPageComponent, data: { reportType: 'installments' } },
   { path: 'bookings', component: ReportsPageComponent, data: { reportType: 'bookings' } },
+  { path: 'desk-purchases', component: ReportsPageComponent, data: { reportType: 'deskPurchases' } },
 ];
 
 @NgModule({

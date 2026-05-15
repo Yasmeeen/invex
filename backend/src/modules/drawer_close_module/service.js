@@ -5,6 +5,7 @@ import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model
 import DrawerClose from '../../DB/models/drawerClose.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import User from '../../DB/models/user.model.js';
+import { treasuryKeyIsCashDrawer } from '../settings_module/treasuryMethods.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -136,22 +137,49 @@ async function sumDailyExpenses(branchOid, start, end) {
   return round2(agg?.total || 0);
 }
 
-/** Desk purchase / trade-in intake — assumed paid from drawer (cost × qty). */
-async function deskPurchaseCashOut(branchOid, start, end) {
+/**
+ * Desk purchase / trade-in — cost × qty split by purchase treasury.
+ * Only `cash` bucket reduces physical drawer expected balance.
+ */
+async function deskPurchaseTreasuryBreakdown(branchOid, start, end) {
   const rows = await ProductPurchaseRequest.find({
     branch: branchOid,
     createdAt: { $gte: start, $lte: end },
   })
-    .select('quantity productPayload')
+    .select('quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel')
     .lean();
 
-  let total = 0;
+  const byKey = {};
+  let cashDrawerTotal = 0;
+  let grandTotal = 0;
+
   for (const r of rows) {
     const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
     const net = round2(Number(r.productPayload?.netPrice || 0));
-    total = round2(total + net * q);
+    const line = round2(net * q);
+    grandTotal = round2(grandTotal + line);
+    const key = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
+    const label = String(r.purchaseTreasuryLabel || '').trim() || key;
+    if (!byKey[key]) {
+      byKey[key] = { key, label, total: 0, count: 0 };
+    }
+    byKey[key].total = round2(byKey[key].total + line);
+    byKey[key].count += 1;
+    if (treasuryKeyIsCashDrawer(key)) {
+      cashDrawerTotal = round2(cashDrawerTotal + line);
+    }
   }
-  return { total, intakeCount: rows.length };
+
+  const deskPurchaseByTreasuryMethod = Object.values(byKey).sort((a, b) =>
+    String(a.key).localeCompare(String(b.key))
+  );
+
+  return {
+    deskPurchaseCashDrawerTotal: cashDrawerTotal,
+    deskPurchaseGrandTotal: grandTotal,
+    deskPurchaseByTreasuryMethod,
+    deskPurchaseIntakeCount: rows.length,
+  };
 }
 
 function sumMethods(map, filterFn) {
@@ -176,13 +204,14 @@ export async function computeDrawerPreview(branchOid, bounds) {
     refundsByMethod(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
     sumDailyExpenses(branchOid, start, end),
-    deskPurchaseCashOut(branchOid, start, end),
+    deskPurchaseTreasuryBreakdown(branchOid, start, end),
   ]);
 
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
   const cashRefunded = sumMethods(refundInfo.merged, isPhysicalCashMethod);
 
-  const expectedCashInDrawer = round2(cashReceived - cashRefunded - expenseTotal - deskInfo.total);
+  const deskCashFromDrawer = deskInfo.deskPurchaseCashDrawerTotal;
+  const expectedCashInDrawer = round2(cashReceived - cashRefunded - expenseTotal - deskCashFromDrawer);
 
   return {
     paymentsReceivedByMethod: paymentsIn,
@@ -190,8 +219,12 @@ export async function computeDrawerPreview(branchOid, bounds) {
     restoredInvoiceCount: refundInfo.count,
     invoiceCount: invoices,
     dailyExpenseTotal: expenseTotal,
-    deskPurchaseCashOutTotal: deskInfo.total,
-    deskPurchaseIntakeCount: deskInfo.intakeCount,
+    /** @deprecated use deskPurchaseCashDrawerTotal — kept as alias (cash drawer portion only). */
+    deskPurchaseCashOutTotal: deskCashFromDrawer,
+    deskPurchaseCashDrawerTotal: deskCashFromDrawer,
+    deskPurchaseGrandTotal: deskInfo.deskPurchaseGrandTotal,
+    deskPurchaseByTreasuryMethod: deskInfo.deskPurchaseByTreasuryMethod,
+    deskPurchaseIntakeCount: deskInfo.deskPurchaseIntakeCount,
     cashReceivedTotal: cashReceived,
     cashRefundedTotal: cashRefunded,
     expectedCashInDrawer,

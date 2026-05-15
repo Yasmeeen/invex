@@ -13,6 +13,10 @@ import {
   assertCodesNotUsedInStorage,
   validateProductCodeForCategory,
 } from '../products_module/service.js';
+import {
+  getEffectivePurchaseTreasuryMethodsFromDb,
+  treasuryMethodMap,
+} from '../settings_module/treasuryMethods.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -146,7 +150,7 @@ export const createProductPurchaseRequest = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { userId, branchId, quantity: qtyRaw, product } = req.body || {};
+    const { userId, branchId, quantity: qtyRaw, product, purchaseTreasuryKey: treasuryKeyRaw } = req.body || {};
 
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       await session.abortTransaction();
@@ -264,6 +268,20 @@ export const createProductPurchaseRequest = async (req, res) => {
 
     const autoApprove = isAutoApproverRole(actor.role);
 
+    const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+    const treasuryKeysAllowed = new Set(treasuryMethods.map((m) => m.key));
+    const tMap = treasuryMethodMap(treasuryMethods);
+    const treasuryKeyNorm =
+      treasuryKeyRaw !== undefined && treasuryKeyRaw !== null && String(treasuryKeyRaw).trim() !== ''
+        ? String(treasuryKeyRaw).trim().toLowerCase()
+        : 'cash';
+    if (!treasuryKeysAllowed.has(treasuryKeyNorm)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Invalid purchase treasury method' });
+    }
+    const purchaseTreasuryLabel = String(tMap.get(treasuryKeyNorm) || treasuryKeyNorm).trim();
+
     const purchase = await ProductPurchaseRequest.create(
       [
         {
@@ -272,6 +290,8 @@ export const createProductPurchaseRequest = async (req, res) => {
           createdBy: actor._id,
           productPayload: payload,
           quantity: q,
+          purchaseTreasuryKey: treasuryKeyNorm,
+          purchaseTreasuryLabel,
           ...(autoApprove
             ? { resolvedBy: actor._id, resolvedAt: new Date(), resolutionNote: 'Auto-approved' }
             : {}),

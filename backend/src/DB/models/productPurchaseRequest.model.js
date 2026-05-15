@@ -46,6 +46,12 @@ const productPurchaseRequestSchema = new mongoose.Schema(
     },
 
     quantity: { type: Number, required: true, min: 1, default: 1 },
+
+    /** Store Settings purchase treasury key (`cash` = paid from physical drawer). */
+    purchaseTreasuryKey: { type: String, trim: true, default: 'cash', index: true },
+    /** Snapshot label at creation time (for receipts/history if settings change). */
+    purchaseTreasuryLabel: { type: String, trim: true, default: '' },
+
     createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
     /** When multi-code purchase creates several products. */
     createdProductIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], default: undefined },

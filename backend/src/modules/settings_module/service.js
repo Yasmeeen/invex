@@ -1,4 +1,6 @@
 import StoreSettings from '../../DB/models/storeSettings.model.js';
+import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
+import { normalizePurchaseTreasuryMethods } from './treasuryMethods.js';
 
 const MAX_LOGO_LENGTH = 600000;
 
@@ -22,6 +24,8 @@ export const getStoreSettings = async (req, res) => {
       storePhoneNumber: doc.storePhoneNumber,
       logoUrl: doc.logoUrl || '',
       receiptLanguage: doc.receiptLanguage || 'en',
+      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
+      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
     });
   } catch (error) {
     console.error('getStoreSettings:', error);
@@ -31,7 +35,14 @@ export const getStoreSettings = async (req, res) => {
 
 export const updateStoreSettings = async (req, res) => {
   try {
-    const { storeName, storePhoneNumber, logoUrl, receiptLanguage } = req.body;
+    const {
+      storeName,
+      storePhoneNumber,
+      logoUrl,
+      receiptLanguage,
+      purchaseTreasuryMethods,
+      paymentAppFeePercents,
+    } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
 
@@ -58,11 +69,38 @@ export const updateStoreSettings = async (req, res) => {
       return res.status(400).json({ error: 'Logo image is too large (max ~450KB)' });
     }
 
+    let treasuryNormalized;
+    if (purchaseTreasuryMethods !== undefined) {
+      if (!Array.isArray(purchaseTreasuryMethods)) {
+        return res.status(400).json({ error: 'purchaseTreasuryMethods must be an array' });
+      }
+      if (purchaseTreasuryMethods.length > 40) {
+        return res.status(400).json({ error: 'Too many purchase treasury methods (max 40)' });
+      }
+      treasuryNormalized = normalizePurchaseTreasuryMethods(purchaseTreasuryMethods);
+      if (!treasuryNormalized.some((x) => x.key === 'cash')) {
+        return res.status(400).json({ error: 'purchaseTreasuryMethods must include key "cash"' });
+      }
+    }
+
+    let feesNormalized;
+    if (paymentAppFeePercents !== undefined) {
+      if (!Array.isArray(paymentAppFeePercents)) {
+        return res.status(400).json({ error: 'paymentAppFeePercents must be an array' });
+      }
+      if (paymentAppFeePercents.length > 40) {
+        return res.status(400).json({ error: 'Too many payment app fee rows (max 40)' });
+      }
+      feesNormalized = normalizePaymentAppFeePercents(paymentAppFeePercents);
+    }
+
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
     if (storePhoneNumber !== undefined) update.storePhoneNumber = storePhoneNumber.trim().slice(0, 50);
     if (logoUrl !== undefined) update.logoUrl = logoUrl;
     if (receiptLanguage !== undefined) update.receiptLanguage = receiptLangNormalized;
+    if (treasuryNormalized !== undefined) update.purchaseTreasuryMethods = treasuryNormalized;
+    if (feesNormalized !== undefined) update.paymentAppFeePercents = feesNormalized;
 
     const existing = await getLatestSettingsDoc();
     const filter = existing ? { _id: existing._id } : {};
@@ -83,6 +121,8 @@ export const updateStoreSettings = async (req, res) => {
       storePhoneNumber: doc.storePhoneNumber,
       logoUrl: doc.logoUrl || '',
       receiptLanguage: doc.receiptLanguage || 'en',
+      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
+      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
     });
   } catch (error) {
     console.error('updateStoreSettings:', error);

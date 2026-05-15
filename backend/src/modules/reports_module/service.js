@@ -4,6 +4,7 @@ import Product from '../../DB/models/product.model.js';
 import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
+import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Branch from '../../DB/models/branch.model.js';
 
 /** Monthly branch fixed costs (rent + salaries + invoices + expenses) spread over this many days for daily rate. */
@@ -609,5 +610,74 @@ export const getBookingsReport = async (req, res) => {
   } catch (error) {
     console.error('getBookingsReport:', error);
     return res.status(500).json({ error: 'Failed to generate bookings report' });
+  }
+};
+
+/** Desk purchase / trade-in cost by configured purchase treasury (cash drawer vs banks/wallets). */
+export const getDeskPurchasesTreasuryReport = async (req, res) => {
+  try {
+    const f = parseCommonFilters(req.query);
+    const match = {
+      createdAt: { $gte: f.from, $lte: f.to },
+    };
+    if (f.branchId) {
+      match.branch = f.branchId;
+    }
+
+    const rows = await ProductPurchaseRequest.find(match)
+      .select('createdAt quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel branch')
+      .populate('branch', 'name')
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+
+    const byTreasury = {};
+    let totalAmount = 0;
+    for (const r of rows) {
+      const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
+      const net = round2(Number(r.productPayload?.netPrice || 0));
+      const line = round2(net * q);
+      totalAmount = round2(totalAmount + line);
+      const key = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
+      const label = String(r.purchaseTreasuryLabel || '').trim() || key;
+      if (!byTreasury[key]) {
+        byTreasury[key] = { treasuryKey: key, treasuryLabel: label, totalAmount: 0, intakeCount: 0 };
+      }
+      byTreasury[key].totalAmount = round2(byTreasury[key].totalAmount + line);
+      byTreasury[key].intakeCount += 1;
+    }
+
+    const summaryByTreasury = Object.values(byTreasury).sort((a, b) =>
+      String(a.treasuryKey).localeCompare(String(b.treasuryKey))
+    );
+
+    const lines = rows.map((r) => {
+      const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
+      const net = round2(Number(r.productPayload?.netPrice || 0));
+      const k = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
+      return {
+        createdAt: r.createdAt,
+        branchName: r.branch?.name || '',
+        productName: r.productPayload?.name || '',
+        quantity: q,
+        unitCost: net,
+        lineTotal: round2(net * q),
+        treasuryKey: k,
+        treasuryLabel: String(r.purchaseTreasuryLabel || '').trim() || k,
+      };
+    });
+
+    return res.json({
+      filters: f,
+      summary: {
+        totalAmount,
+        totalIntakes: rows.length,
+        byTreasury: summaryByTreasury,
+      },
+      lines,
+    });
+  } catch (error) {
+    console.error('getDeskPurchasesTreasuryReport:', error);
+    return res.status(500).json({ error: 'Failed to generate desk purchases treasury report' });
   }
 };

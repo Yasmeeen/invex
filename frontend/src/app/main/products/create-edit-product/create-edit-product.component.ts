@@ -69,6 +69,8 @@ export class CreateEditProductComponent implements OnInit {
   deskPurchaseBranchLabel = '';
   /** Purchase treasury key from Store Settings (`cash` = paid from physical drawer). */
   deskPurchaseTreasuryKey = 'cash';
+  /** Stable array for ng-select `[items]` (never a getter — new refs break selection). */
+  purchaseTreasuryMethodOptions: { key: string; label: string }[] = [];
   readonly maxImageBytes = 5 * 1024 * 1024;
   @Output() destroyEmitter: EventEmitter<any> = new EventEmitter();
   @ViewChild('modalContainer') modalContainer: ElementRef;
@@ -90,19 +92,19 @@ export class CreateEditProductComponent implements OnInit {
     private storeSettings: StoreSettingsService
   ) {}
 
-  /** Methods configured under Store Settings → purchase treasury. */
-  get purchaseTreasuryMethodOptions(): { key: string; label: string }[] {
+  private syncDeskPurchaseTreasuryKey(): void {
     const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
     if (Array.isArray(m) && m.length) {
-      return m.map((x) => ({
+      this.purchaseTreasuryMethodOptions = m.map((x) => ({
         key: String(x.key || '').trim().toLowerCase(),
         label: String(x.label || x.key || '').trim(),
       }));
+    } else {
+      this.purchaseTreasuryMethodOptions = [
+        { key: 'cash', label: this.translateService.instant('tr_pay_cash') },
+      ];
     }
-    return [{ key: 'cash', label: this.translateService.instant('tr_pay_cash') }];
-  }
 
-  private syncDeskPurchaseTreasuryKey(): void {
     const opts = this.purchaseTreasuryMethodOptions;
     const keys = new Set(opts.map((o) => o.key));
     if (!keys.has(this.deskPurchaseTreasuryKey)) {

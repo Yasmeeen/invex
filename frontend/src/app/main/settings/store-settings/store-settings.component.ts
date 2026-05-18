@@ -8,7 +8,7 @@ import {
 } from '@shared/services/store-settings.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { PaymentAppFeesDialogComponent } from './payment-app-fees-dialog/payment-app-fees-dialog.component';
 
 /** Editable row: user sees `label` only; `key` kept internally (server or generated on save). */
@@ -18,9 +18,10 @@ export interface TreasuryUiRow {
 }
 
 @Component({
-  selector: 'app-store-settings',
-  templateUrl: './store-settings.component.html',
-  styleUrls: ['./store-settings.component.scss'],
+    selector: 'app-store-settings',
+    templateUrl: './store-settings.component.html',
+    styleUrls: ['./store-settings.component.scss'],
+    standalone: false
 })
 export class StoreSettingsComponent implements OnInit, OnDestroy {
   form: StoreSettings = {

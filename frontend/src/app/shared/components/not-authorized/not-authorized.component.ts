@@ -4,31 +4,33 @@ import {Location} from '@angular/common';
 
 @Component({
     selector: '[not-authorized]',
-    template: `<div class="bg-white ptb-8" *ngIf="notAuthorized">
-      <div class="text-center">
-          <div class="not-authorized-img">
-              <img src="assets/images/authorized/admin.svg"/>
-          </div>
-          <p class="text-primary weight-bold not-authorized-text">
-                  403
-          </p>
-          <p class="weight-bold">
-                {{'tr_not_authorized' | translate}}
-          </p>
-          <div class="max-200 max-center mt-4">
-          <button  class="s-btn btn-primary btn-block" (click)="callBack()"> {{'tr_go_back' | translate}} </button>
-          </div>
-          
+    template: `@if (notAuthorized) {
+  <div class="bg-white ptb-8">
+    <div class="text-center">
+      <div class="not-authorized-img">
+        <img src="assets/images/authorized/admin.svg"/>
       </div>
+      <p class="text-primary weight-bold not-authorized-text">
+        403
+      </p>
+      <p class="weight-bold">
+        {{'tr_not_authorized' | translate}}
+      </p>
+      <div class="max-200 max-center mt-4">
+        <button  class="s-btn btn-primary btn-block" (click)="callBack()"> {{'tr_go_back' | translate}} </button>
+      </div>
+    </div>
   </div>
+}
 
-  <div [hidden]="notAuthorized ">
-      <ng-content></ng-content>
-  </div>`,
-  styles: [`
+<div [hidden]="notAuthorized ">
+  <ng-content></ng-content>
+</div>`,
+    styles: [`
   .not-authorized-text{
       font-size: 48px;
-  }`]
+  }`],
+    standalone: false
 })
 export class NotAuthorizedComponent implements OnInit {
 

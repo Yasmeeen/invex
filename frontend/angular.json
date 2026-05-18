@@ -121,16 +121,16 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "browserTarget": "HR-System:build:production"
+              "buildTarget": "HR-System:build:production"
             },
             "development": {
-              "browserTarget": "HR-System:build:development"
+              "buildTarget": "HR-System:build:development"
             },
             "testing": {
-              "browserTarget": "HR-System:build:testing"
+              "buildTarget": "HR-System:build:testing"
             },
             "local": {
-              "browserTarget": "HR-System:build:local"
+              "buildTarget": "HR-System:build:local"
             }
           },
           "defaultConfiguration": "development"
@@ -138,7 +138,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "HR-System:build"
+            "buildTarget": "HR-System:build"
           }
         },
         "test": {
@@ -163,5 +163,30 @@
       }
     }
   },
-  "defaultProject": "HR-System"
+  "schematics": {
+    "@schematics/angular:component": {
+      "type": "component"
+    },
+    "@schematics/angular:directive": {
+      "type": "directive"
+    },
+    "@schematics/angular:service": {
+      "type": "service"
+    },
+    "@schematics/angular:guard": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:interceptor": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:module": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:pipe": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:resolver": {
+      "typeSeparator": "."
+    }
+  }
 }

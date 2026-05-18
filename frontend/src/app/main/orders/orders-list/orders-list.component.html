@@ -5,115 +5,137 @@
       <div class="form-group col-md-3">
         <label for="orderFromDate">{{'tr_from' | translate}}</label>
         <div class="input-with-icon">
-            <input
-              id="orderFromDate"
-              name="orderFromDate"
-              [(ngModel)]="fromDate"
-              (dateChange)="getOrderStatistics()"
-              placeholder="{{'tr_pick_date' | translate}}"
-              [matDatepicker]="pickId"
-              class="s-control bg-white"
-              autocomplete="off"
+          <input
+            id="orderFromDate"
+            name="orderFromDate"
+            [(ngModel)]="fromDate"
+            (dateChange)="getOrderStatistics()"
+            placeholder="{{'tr_pick_date' | translate}}"
+            [matDatepicker]="pickId"
+            class="s-control bg-white"
+            autocomplete="off"
             />
-            <mat-datepicker #pickId></mat-datepicker>
-            <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
-            </mat-datepicker-toggle>
+          <mat-datepicker #pickId></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
+          </mat-datepicker-toggle>
         </div>
-    </div>
-    <div class="form-group col-md-3">
+      </div>
+      <div class="form-group col-md-3">
         <label for="orderToDate">{{'tr_to' | translate}}</label>
         <div class="input-with-icon">
-            <input
-              id="orderToDate"
-              name="orderToDate"
-              [(ngModel)]="toDate"
-              (dateChange)="getOrderStatistics()"
-              placeholder="{{'tr_pick_date' | translate}}"
-              [matDatepicker]="pickId2"
-              class="s-control bg-white"
-              autocomplete="off"
+          <input
+            id="orderToDate"
+            name="orderToDate"
+            [(ngModel)]="toDate"
+            (dateChange)="getOrderStatistics()"
+            placeholder="{{'tr_pick_date' | translate}}"
+            [matDatepicker]="pickId2"
+            class="s-control bg-white"
+            autocomplete="off"
             />
-            <mat-datepicker #pickId2></mat-datepicker>
-            <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId2">
-            </mat-datepicker-toggle>
-        </div>
-    </div>
-    <div class="form-group col-md-2 d-flex flex-column">
-      <label class="invisible" aria-hidden="true">&nbsp;</label>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body date-filters-clear-btn"
-        (click)="clearDateFilters()"
-        *ngIf="hasDateFilterToClear"
-      >
-        <i class="fa fa-times" aria-hidden="true"></i>
-        {{ 'tr_clear' | translate }} {{ 'tr_date' | translate }}
-      </button>
-    </div>
-    <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
-      <div
-        class="form-group"
-      >
-        <label>{{ 'tr_branches' | translate }}</label>
-        <div class="input-with-icon bg-white">
-          <ng-select
-            class="s-control s-select"
-            placeholder="{{ 'tr_select' | translate }}"
-            bindLabel="name"
-            bindValue="_id"
- 
-            [(ngModel)]= "selectedBranchId"
-            #branch="ngModel"
-            name="branchId"
-            [items]="branches"
-            (change)="getOrderStatistics()"
-            required
-          >
-          </ng-select>
-          <i class="fa fa-caret-down input-icon"></i>
+          <mat-datepicker #pickId2></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId2">
+          </mat-datepicker-toggle>
         </div>
       </div>
-    </div>
- 
-
-    <div class="col-md-3">
-      <div class="flex flex-middle mt-4">
-        <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
-          <i class="fa fa-users"></i>
+      <div class="form-group col-md-2 d-flex flex-column">
+        <label class="invisible" aria-hidden="true">&nbsp;</label>
+        @if (hasDateFilterToClear) {
+          <button
+            type="button"
+            class="s-btn btn-secondary size-body date-filters-clear-btn"
+            (click)="clearDateFilters()"
+            >
+            <i class="fa fa-times" aria-hidden="true"></i>
+            {{ 'tr_clear' | translate }} {{ 'tr_date' | translate }}
+          </button>
+        }
+      </div>
+      @if (curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin') {
+        <div class="col-md-4">
+          <div
+            class="form-group"
+            >
+            <label>{{ 'tr_branches' | translate }}</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                placeholder="{{ 'tr_select' | translate }}"
+                bindLabel="name"
+                bindValue="_id"
+                [(ngModel)]= "selectedBranchId"
+                #branch="ngModel"
+                name="branchId"
+                [items]="branches"
+                (change)="getOrderStatistics()"
+                required
+                >
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
         </div>
-        <div class="ml-2">
-          <a class="hover-link pointer weight-bold" >
-            <span class="text-primary">   {{orderStatistics?.totalInvoices}} </span>
-         
+      }
+
+
+      <div class="col-md-3">
+        <div class="flex flex-middle mt-4">
+          <div class="bg-light-success text-success border-success border rounded-100 size-small ptb-3 plr-3">
+            <i class="fa fa-users"></i>
+          </div>
+          <div class="ml-2">
+            <a class="hover-link pointer weight-bold" >
+              <span class="text-primary">   {{orderStatistics?.totalInvoices}} </span>
+
             {{ 'tr_total_number_of_invoices' | translate }} </a>
-            <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday">{{'tr_today' | translate}}</div>
-            <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate == null && toDate == null">{{ 'tr_all_dates' | translate }}</div>
-            <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && toDate">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
-            <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && !toDate">{{ fromDate | date: 'dd/M/YYYY' }}</div>
-            <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && !fromDate && toDate">{{ toDate | date: 'dd/M/YYYY' }}</div>
+            @if (isToday) {
+              <div class="size-small mtb-1 steel weight-bold">{{'tr_today' | translate}}</div>
+            }
+            @if (!isToday && fromDate == null && toDate == null) {
+              <div class="size-small mtb-1 steel weight-bold">{{ 'tr_all_dates' | translate }}</div>
+            }
+            @if (!isToday && fromDate && toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
+            }
+            @if (!isToday && fromDate && !toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ fromDate | date: 'dd/M/YYYY' }}</div>
+            }
+            @if (!isToday && !fromDate && toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ toDate | date: 'dd/M/YYYY' }}</div>
+            }
+          </div>
         </div>
       </div>
-    </div>
-    <div class="col-md-3">
+      <div class="col-md-3">
 
-      <div class="flex flex-middle mt-4">
-        <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
-          <i class="fa fa-calendar"></i>
-        </div>
-        <div class="ml-2">
-          <a class="hover-link pointer weight-bold" >
-            <span class="text-primary">   {{orderStatistics?.totalSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }} </span>
-             {{ 'tr_total_amount' | translate}}
-           </a>
-           <div class="size-small mtb-1 steel weight-bold" *ngIf="isToday">{{'tr_today' | translate}}</div>
-           <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate == null && toDate == null">{{ 'tr_all_dates' | translate }}</div>
-           <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && toDate">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
-           <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && fromDate && !toDate">{{ fromDate | date: 'dd/M/YYYY' }}</div>
-           <div class="size-small mtb-1 steel weight-bold" *ngIf="!isToday && !fromDate && toDate">{{ toDate | date: 'dd/M/YYYY' }}</div>
+        <div class="flex flex-middle mt-4">
+          <div class="bg-secondary text-primary border rounded-100 size-small ptb-3 plr-3">
+            <i class="fa fa-calendar"></i>
+          </div>
+          <div class="ml-2">
+            <a class="hover-link pointer weight-bold" >
+              <span class="text-primary">   {{orderStatistics?.totalSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }} </span>
+              {{ 'tr_total_amount' | translate}}
+            </a>
+            @if (isToday) {
+              <div class="size-small mtb-1 steel weight-bold">{{'tr_today' | translate}}</div>
+            }
+            @if (!isToday && fromDate == null && toDate == null) {
+              <div class="size-small mtb-1 steel weight-bold">{{ 'tr_all_dates' | translate }}</div>
+            }
+            @if (!isToday && fromDate && toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ fromDate | date: 'dd/M/YYYY' }} {{'tr_to' | translate}} {{ toDate | date: 'dd/M/YYYY' }}</div>
+            }
+            @if (!isToday && fromDate && !toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ fromDate | date: 'dd/M/YYYY' }}</div>
+            }
+            @if (!isToday && !fromDate && toDate) {
+              <div class="size-small mtb-1 steel weight-bold">{{ toDate | date: 'dd/M/YYYY' }}</div>
+            }
+          </div>
         </div>
       </div>
-    </div>
-  
+
     </div>
 
   </div>
@@ -123,7 +145,7 @@
   class="content-shadow bg-white mb-5"
   not-authorized
   [notAuthorized]="isNotAuthorized"
->
+  >
 
 
   <h2 class="size-body title-with-btn plr-4 ptb-4">
@@ -133,7 +155,7 @@
       <button
         class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
-      >
+        >
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
       <!-- <button (click)="createOrEditOrder(false)">{{'tr_add_order' | translate}}</button> -->
@@ -142,195 +164,216 @@
 
 
 
-  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
-    <div class="row">
-      <div class="col-md-3">
-        <div class="form-group mb-0">
-          <label>{{ "tr_order_number" | translate }}/{{ "tr_phone_number" | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <input
-              class="s-control"
-              (keyup)="filterorders($event, 'search')"
-              placeholder="{{ 'tr_search' | translate }}"
-              [(ngModel)]="nameSearchTerm"
-            />
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ "tr_order_number" | translate }}/{{ "tr_phone_number" | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                (keyup)="filterorders($event, 'search')"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="nameSearchTerm"
+                />
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-md-3" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
-        <div class="form-group mb-0">
-          <label>{{ "tr_branch" | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <input
-              class="s-control"
-              (keyup)="filterorders($event, 'searchBranch')"
-              placeholder="{{ 'tr_search' | translate }}"
-            />
+        @if (curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin') {
+          <div class="col-md-3">
+            <div class="form-group mb-0">
+              <label>{{ "tr_branch" | translate }}</label>
+              <div class="input-with-icon bg-white width-100">
+                <input
+                  class="s-control"
+                  (keyup)="filterorders($event, 'searchBranch')"
+                  placeholder="{{ 'tr_search' | translate }}"
+                  />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div
-          class="form-group"
-        >
-          <label>{{ 'tr_status' | translate }}</label>
-          <div class="input-with-icon bg-white">
-            <ng-select
-              class="s-control s-select"
-              placeholder="{{ 'tr_select' | translate }}"
-  
-              [(ngModel)]= "selectedStatus"
-              #branch="ngModel"
-              name="branchId"
-              [items]="status"
-              (change)="getOrders()"
-              required
+        }
+        <div class="col-md-3">
+          <div
+            class="form-group"
             >
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
+            <label>{{ 'tr_status' | translate }}</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                placeholder="{{ 'tr_select' | translate }}"
+                [(ngModel)]= "selectedStatus"
+                #branch="ngModel"
+                name="branchId"
+                [items]="status"
+                (change)="getOrders()"
+                required
+                >
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="col-md-3">
-        <div class="form-group mb-0">
-          <label>{{ 'tr_payment_method' | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <ng-select
-              class="s-control s-select"
-              [items]="paymentMethodOptions"
-              bindValue="id"
-              [clearable]="true"
-              [(ngModel)]="selectedPaymentMethod"
-              name="orderPaymentMethodFilter"
-              placeholder="{{ 'tr_all_payment_methods' | translate }}"
-              (change)="onPaymentMethodFilterChange()"
-            >
-              <ng-template ng-label-tmp let-item="item">
-                <span *ngIf="item">{{ item.labelKey | translate }}</span>
-              </ng-template>
-              <ng-template ng-option-tmp let-item="item">
-                {{ item.labelKey | translate }}
-              </ng-template>
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_payment_method' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <ng-select
+                class="s-control s-select"
+                [items]="paymentMethodOptions"
+                bindValue="id"
+                [clearable]="true"
+                [(ngModel)]="selectedPaymentMethod"
+                name="orderPaymentMethodFilter"
+                placeholder="{{ 'tr_all_payment_methods' | translate }}"
+                (change)="onPaymentMethodFilterChange()"
+                >
+                <ng-template ng-label-tmp let-item="item">
+                  @if (item) {
+                    <span>{{ item.labelKey | translate }}</span>
+                  }
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 
   <div>
-    <div class="plr-4 mt-4" *ngIf="!ordersLoading">
-      <div
-        class="table-container orders-list"
-        id="table-container"
-        *ngIf="ordersList.length > 0"
-      >
-        <table class="s-table table orders-table layout-fixed orders-list">
-          <thead>
-            <tr>
-              <th>{{ "tr_number" | translate }}</th>
-              <th>{{ "tr_client_name" | translate }}</th>
-              <th> {{"tr_phone_number" | translate}}</th>
-              <th>{{ "tr_branch" | translate }}</th>
-              <th>{{ "tr_order_subtotal" | translate }}</th>
-              <th>{{ "tr_invoice_extra_discount" | translate }}</th>
-              <th>{{ "tr_final_after_extra_discount" | translate }}</th>
-              <th>{{ "tr_paid" | translate }}</th>
-              <th>{{ "tr_remaining" | translate }}</th>
-              <th>{{ "tr_payment_method" | translate}}</th>
-              <th>{{ "tr_created_at" | translate}}</th>
-              <th>{{ "tr_status" | translate}}</th>
-              <th>{{ "tr_products" | translate}}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let order of ordersList">
-              <td>{{ order.orderNumber }}</td>
-              <td>{{ order.clientName }}</td>
-              <td>{{ order.clientPhoneNumber}}</td>
-              <td>{{ order.branch?.name }}</td>
-              <td>{{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-              <td>
-                <ng-container *ngIf="orderInvoiceExtraDiscount(order) > 0">
-                  −{{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
-                </ng-container>
-                <ng-container *ngIf="orderInvoiceSurcharge(order) > 0">
-                  <span *ngIf="orderInvoiceExtraDiscount(order) > 0"><br /></span>
-                  +{{ orderInvoiceSurcharge(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
-                  ({{ "tr_invoice_extra_surcharge" | translate }})
-                </ng-container>
-                <ng-container
-                  *ngIf="orderInvoiceExtraDiscount(order) <= 0 && orderInvoiceSurcharge(order) <= 0"
-                  >—</ng-container
-                >
-              </td>
-              <td>{{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-              <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-              <td>{{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-              <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
-              <td>{{ createdAtCairo(order) }}</td>
-              <td>{{ order.status }}</td>
-              <td>
-                <div >{{'tr_number_of_products' | translate}}: 
-                  <span class="text-primary weight-bold">  {{order.numberOfProducts}}  </span>
-                 </div>
-                <div *ngFor="let product of order.products">
-                  <span>{{product.quantity}} {{'tr_items'| translate}} {{'tr_from' | translate}} {{product.code}}</span>
-                  <div class="order-line-invoice-attrs" *ngIf="product.invoiceAttributes?.length">
-                    <span *ngFor="let ia of product.invoiceAttributes">{{ ia.label }}: {{ ia.value }}</span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class="options-menu" *ngIf="order.status != 'restored'">
-                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                  <div class="options-menu-container p-0">
-                    <div
-                      class="single-option"
-                      *ngIf="canPayOrder(order)"
-                      (click)="openPayDialog(order)"
-                    >
-                      {{ "tr_add_payment" | translate }}
-                    </div>
-                    <div
-                      class="single-option"
-                      (click)="restoreOrder( order._id!)"
-                    >
-                      {{ "tr_action.restore" | translate }}
-                    </div>
-                  </div>
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    @if (!ordersLoading) {
+      <div class="plr-4 mt-4">
+        @if (ordersList.length > 0) {
+          <div
+            class="table-container orders-list"
+            id="table-container"
+            >
+            <table class="s-table table orders-table layout-fixed orders-list">
+              <thead>
+                <tr>
+                  <th>{{ "tr_number" | translate }}</th>
+                  <th>{{ "tr_client_name" | translate }}</th>
+                  <th> {{"tr_phone_number" | translate}}</th>
+                  <th>{{ "tr_branch" | translate }}</th>
+                  <th>{{ "tr_order_subtotal" | translate }}</th>
+                  <th>{{ "tr_invoice_extra_discount" | translate }}</th>
+                  <th>{{ "tr_final_after_extra_discount" | translate }}</th>
+                  <th>{{ "tr_paid" | translate }}</th>
+                  <th>{{ "tr_remaining" | translate }}</th>
+                  <th>{{ "tr_payment_method" | translate}}</th>
+                  <th>{{ "tr_created_at" | translate}}</th>
+                  <th>{{ "tr_status" | translate}}</th>
+                  <th>{{ "tr_products" | translate}}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of ordersList; track order) {
+                  <tr>
+                    <td>{{ order.orderNumber }}</td>
+                    <td>{{ order.clientName }}</td>
+                    <td>{{ order.clientPhoneNumber}}</td>
+                    <td>{{ order.branch?.name }}</td>
+                    <td>{{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                    <td>
+                      @if (orderInvoiceExtraDiscount(order) > 0) {
+                        −{{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                      }
+                      @if (orderInvoiceSurcharge(order) > 0) {
+                        @if (orderInvoiceExtraDiscount(order) > 0) {
+                          <span><br /></span>
+                        }
+                        +{{ orderInvoiceSurcharge(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                        ({{ "tr_invoice_extra_surcharge" | translate }})
+                      }
+                      @if (orderInvoiceExtraDiscount(order) <= 0 && orderInvoiceSurcharge(order) <= 0) {
+                        —
+                      }
+                    </td>
+                    <td>{{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                    <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                    <td>{{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                    <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
+                    <td>{{ createdAtCairo(order) }}</td>
+                    <td>{{ order.status }}</td>
+                    <td>
+                      <div >{{'tr_number_of_products' | translate}}:
+                        <span class="text-primary weight-bold">  {{order.numberOfProducts}}  </span>
+                      </div>
+                      @for (product of order.products; track product) {
+                        <div>
+                          <span>{{product.quantity}} {{'tr_items'| translate}} {{'tr_from' | translate}} {{product.code}}</span>
+                          @if (product.invoiceAttributes?.length) {
+                            <div class="order-line-invoice-attrs">
+                              @for (ia of product.invoiceAttributes; track ia) {
+                                <span>{{ ia.label }}: {{ ia.value }}</span>
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </td>
+                    <td>
+                      @if (order.status != 'restored') {
+                        <span class="options-menu">
+                          <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                          <div class="options-menu-container p-0">
+                            @if (canPayOrder(order)) {
+                              <div
+                                class="single-option"
+                                (click)="openPayDialog(order)"
+                                >
+                                {{ "tr_add_payment" | translate }}
+                              </div>
+                            }
+                            <div
+                              class="single-option"
+                              (click)="restoreOrder( order._id!)"
+                              >
+                              {{ "tr_action.restore" | translate }}
+                            </div>
+                          </div>
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (ordersList.length == 0) {
+          <div
+            class="empty-state-here text-center ptb-8"
+            >
+            <img
+              class="placeholder-icon"
+              src="assets/images/placeholders/announcments.svg"
+              alt=""
+              />
+            <p>{{ "tr_empty_state" | translate }}</p>
+          </div>
+        }
+        <div class="plr-4 ptb-4">
+          <pagination
+            [paginationData]="paginationData"
+            [perPage]="paginationPerPage"
+            (paginationUpdate)="paginationUpdate($event)"
+          ></pagination>
+        </div>
       </div>
+    }
 
-      <div
-        class="empty-state-here text-center ptb-8"
-        *ngIf="ordersList.length == 0"
-      >
-        <img
-          class="placeholder-icon"
-          src="assets/images/placeholders/announcments.svg"
-          alt=""
-        />
-        <p>{{ "tr_empty_state" | translate }}</p>
+    @if (ordersLoading) {
+      <div>
+        <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
       </div>
-
-      <div class="plr-4 ptb-4">
-        <pagination
-          [paginationData]="paginationData"
-          [perPage]="paginationPerPage"
-          (paginationUpdate)="paginationUpdate($event)"
-        ></pagination>
-      </div>
-    </div>
-
-    <div *ngIf="ordersLoading">
-      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
-    </div>
+    }
   </div>
 </div>

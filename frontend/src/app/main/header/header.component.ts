@@ -1,5 +1,5 @@
 import { Component, ElementRef, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageSwitcherComponent } from '@shared/components/language-switcher/language-switcher.component';
 import { Globals } from 'src/app/core/globals';
@@ -17,9 +17,10 @@ import { ProductPurchaseApprovalDialogComponent } from '@shared/components/produ
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
 
 @Component({
-  selector: 'app-header',
-  templateUrl: './header.component.html',
-  styleUrls: ['./header.component.scss']
+    selector: 'app-header',
+    templateUrl: './header.component.html',
+    styleUrls: ['./header.component.scss'],
+    standalone: false
 })
 export class HeaderComponent implements OnInit {
   /** Desktop: collapse rail; mobile: open drawer */

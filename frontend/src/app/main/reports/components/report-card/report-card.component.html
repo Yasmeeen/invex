@@ -4,7 +4,9 @@
       <span class="report-card__icon-box" aria-hidden="true">
         <i class="fa" [ngClass]="headerIconClass"></i>
       </span>
-      <h3 class="report-card__title" *ngIf="titleKey">{{ titleKey | translate: titleParams }}</h3>
+      @if (titleKey) {
+        <h3 class="report-card__title">{{ titleKey | translate: titleParams }}</h3>
+      }
     </div>
     <button type="button" class="report-card__menu" [attr.aria-label]="'tr_menu' | translate">
       <i class="fa fa-ellipsis-h"></i>
@@ -13,19 +15,24 @@
   <div class="report-card__rule" role="presentation"></div>
   <div class="report-card__body">
     <p class="report-card__value">{{ value }}</p>
-    <div class="report-card__footer" *ngIf="showFooter">
-      <span
-        *ngIf="trendLabel"
-        class="report-card__pill"
-        [class.report-card__pill--down]="trendPositive === false"
-      >
-        <i
-          class="fa"
-          [ngClass]="trendPositive === false ? 'fa-long-arrow-down' : 'fa-long-arrow-up'"
-        ></i>
-        {{ trendLabel }}
-      </span>
-      <span class="report-card__note" *ngIf="hintKey">{{ hintKey | translate: hintParams }}</span>
-    </div>
+    @if (showFooter) {
+      <div class="report-card__footer">
+        @if (trendLabel) {
+          <span
+            class="report-card__pill"
+            [class.report-card__pill--down]="trendPositive === false"
+            >
+            <i
+              class="fa"
+              [ngClass]="trendPositive === false ? 'fa-long-arrow-down' : 'fa-long-arrow-up'"
+            ></i>
+            {{ trendLabel }}
+          </span>
+        }
+        @if (hintKey) {
+          <span class="report-card__note">{{ hintKey | translate: hintParams }}</span>
+        }
+      </div>
+    }
   </div>
 </article>

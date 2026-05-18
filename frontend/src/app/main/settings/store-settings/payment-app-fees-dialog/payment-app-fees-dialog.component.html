@@ -11,18 +11,20 @@
         <span>{{ 'tr_payment_app_fees_col_method' | translate }}</span>
         <span>{{ 'tr_payment_app_fees_col_percent' | translate }}</span>
       </div>
-      <div class="payment-app-fees-table__row" *ngFor="let row of rows">
-        <span class="payment-app-fees-table__method">{{ row.labelKey | translate }}</span>
-        <input
-          type="number"
-          class="s-control payment-app-fees-table__input"
-          min="0"
-          max="100"
-          step="0.01"
-          [(ngModel)]="percents[row.id]"
-          [name]="'feePct_' + row.id"
-        />
-      </div>
+      @for (row of rows; track row) {
+        <div class="payment-app-fees-table__row">
+          <span class="payment-app-fees-table__method">{{ row.labelKey | translate }}</span>
+          <input
+            type="number"
+            class="s-control payment-app-fees-table__input"
+            min="0"
+            max="100"
+            step="0.01"
+            [(ngModel)]="percents[row.id]"
+            [name]="'feePct_' + row.id"
+            />
+        </div>
+      }
     </div>
   </div>
 

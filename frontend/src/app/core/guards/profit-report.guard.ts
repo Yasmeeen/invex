@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
-import { CanActivate, ActivatedRouteSnapshot, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, Router } from '@angular/router';
 import { AuthenticationService } from '@core/services/authentication.service';
 
 /**
  * Co Admin / Branch Manager must not open the profit report. Other reports stay allowed.
  */
 @Injectable({ providedIn: 'root' })
-export class ProfitReportGuard implements CanActivate {
+export class ProfitReportGuard  {
   constructor(
     private router: Router,
     private authenticationService: AuthenticationService

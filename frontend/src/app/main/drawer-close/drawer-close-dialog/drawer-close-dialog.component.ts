@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { formatDate } from '@angular/common';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Branch } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -21,9 +21,10 @@ function round2(n: number): number {
 }
 
 @Component({
-  selector: 'app-drawer-close-dialog',
-  templateUrl: './drawer-close-dialog.component.html',
-  styleUrls: ['./drawer-close-dialog.component.scss'],
+    selector: 'app-drawer-close-dialog',
+    templateUrl: './drawer-close-dialog.component.html',
+    styleUrls: ['./drawer-close-dialog.component.scss'],
+    standalone: false
 })
 export class DrawerCloseDialogComponent implements OnInit {
   step: 1 | 2 = 1;
@@ -38,11 +39,11 @@ export class DrawerCloseDialogComponent implements OnInit {
 
   businessDateStr = '';
 
-  countForm: FormGroup;
-  shortageReasonForm: FormGroup;
+  countForm: UntypedFormGroup;
+  shortageReasonForm: UntypedFormGroup;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private dialogRef: MatDialogRef<DrawerCloseDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA) public data: DrawerCloseDialogData,
     private auth: AuthenticationService,

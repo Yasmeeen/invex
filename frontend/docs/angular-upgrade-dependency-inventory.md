@@ -1,47 +1,41 @@
-# Angular dependency inventory (12 → current)
+# Angular dependency inventory — completed upgrade
 
-Generated for staged major Angular upgrades alongside `ng update` runs.
+## Result
 
-## Core stack (must move in lockstep with `ng update`)
+| Item | Before | After |
+|------|--------|--------|
+| `@angular/core` | ~12.2 | **21.2.x** |
+| TypeScript | ~4.3 | **5.9** |
+| RxJS | 6 | **7.8** |
+| zone.js | ~0.11 | **0.15** |
+| Node (local) | 8 default | **22** ([`.nvmrc`](../.nvmrc)) |
 
-| Package | Current | Notes |
-|---------|---------|--------|
-| `@angular/*` | ~12.2 | Bump with `@angular/cli` each major. |
-| `@angular/material`, `@angular/cdk` | ^12.2.x | Same major as Angular. Expect SCSS theming mixin changes mid-stream. |
-| `@angular-devkit/build-angular` | ~12.2 | Moves with CLI. Later majors may migrate to `application` builder / esbuild. |
-| TypeScript | ~4.3.5 | Raised by schematic each major until modern TS required. |
-| `zone.js` | ~0.11.4 | Bumped alongside Angular majors. |
-| `rxjs` | ^6.x | Migrate to RxJS 7 typical by Angular 15+; codemods / manual fixes. |
+Production build verified: `ng build --configuration production`.
 
-## Third-party Angular libraries
+## Third-party versions aligned
 
-| Package | Current | Risk / upgrade path |
-|---------|---------|----------------------|
-| `@ng-select/ng-select` | ^7.3 | Upgrade per peer deps per Angular major; newer majors need newer `@ng-select`. |
-| `@ngx-translate/core` | ^13 | Move to Angular-matching major releases; check changelog for Ivy/standalone notes. |
-| `@ngx-translate/http-loader` | ^6 | Keep major aligned with `core` recommendation from maintainers. |
-| `@ngx-loading-bar/*` | ^5 | Verify peer Angular range each hop; bump if constrained. |
-| `ngx-toastr` | ^18 | Peer range must match Angular; align version after Framework stabilizes at target major. |
-| `highcharts-angular` | ^2.4 | Check Highcharts peer table; bump `highcharts` if required. |
-| `angular-font-awesome` | ^3.1 | **High risk** — unmaintained pattern; candidates: `@fortawesome/angular-fontawesome`, or FA CSS + `<i>`/SVG. Replace if upgrades block compilation. |
+| Package | Version (approx.) |
+|---------|-------------------|
+| `@angular/material` / `@angular/cdk` | **16.2.14** (legacy MDC migration pending) |
+| `@ng-select/ng-select` | 14 |
+| `ngx-toastr` | 19 |
+| `@ngx-translate/core` / `http-loader` | 16 |
+| `@ngx-loading-bar/*` | 6 |
+| `highcharts` / `highcharts-angular` | 11 / 4 |
 
-## Non-Angular (usually minor touch)
+## Code fixes during upgrade
 
-| Package | Notes |
-|---------|--------|
-| `moment` | Prefer `date-fns`/`luxon` long-term; not blocking upgrade. |
-| `@zxing/*`, `exceljs`, `jspdf`, `xlsx`, `socket.io-client` | Vanilla JS/libs; bump for security as needed after build passes. |
+- `ModuleWithProviders<CoreModule>` import from `@angular/core` (was `@angular/compiler/src/core`).
+- `window.location.reload()` without deprecated `forceReload` argument.
+- Route/guard migrations (functional guards, Material MDC prep).
+- `@for` track expressions: single-arg `trackByIndex(i)`.
+- `HostListener` signatures for Angular 21 (`Event` vs optional `KeyboardEvent`).
+- Removed obsolete `enableIvy: false` from `tsconfig.json`.
 
-## Environment
+## Deprecation / follow-up
 
-| Item | Requirement |
-|------|--------------|
-| Node | Angular 17+ expects Node 18.19+ / 20+; Angular 13–16 have lower floors — use **Node 20+** (or 22 LTS) during multi-hop migration for consistency with latest target. Do **not** use default NVM `node 8`; use `nvm use 20` (or `.nvmrc`). |
-| `NODE_OPTIONS=--openssl-legacy-provider` | Workaround for old webpack/crypto; revisit after toolchain upgrade ([package.json scripts](../package.json)). |
+1. Run **Material MDC migration** when ready: `ng generate @angular/material:mdc-migration`, then bump `@angular/material` and `@angular/cdk` to 21.
+2. Optional: `ng update @angular/cli --name use-application-builder` (esbuild application builder).
+3. Replace **angular-font-awesome** when convenient.
 
-## Deprecation checkpoints (manual after each major)
-
-- Migrate `TestBed.get` → `inject` where flagged.
-- Update `providedIn`, constructor DI patterns if strict mode tightens.
-- Router / guard functional APIs when schematics prompt.
-- Optional later: standalone migration, `@if`/`@for` control flow — **not** required for parity upgrade.
+See [angular-upgrade-smoke-test.md](./angular-upgrade-smoke-test.md) for manual regression steps.

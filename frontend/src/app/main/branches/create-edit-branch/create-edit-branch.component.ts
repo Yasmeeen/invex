@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit, ViewChild } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatLegacyDialogRef as MatDialogRef, MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA } from '@angular/material/legacy-dialog';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -7,9 +7,10 @@ import { Branch } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 
 @Component({
-  selector: 'app-create-edit-branch',
-  templateUrl: './create-edit-branch.component.html',
-  styleUrls: ['./create-edit-branch.component.scss']
+    selector: 'app-create-edit-branch',
+    templateUrl: './create-edit-branch.component.html',
+    styleUrls: ['./create-edit-branch.component.scss'],
+    standalone: false
 })
 export class CreateEditBranchComponent implements OnInit {
   branch: Branch ;

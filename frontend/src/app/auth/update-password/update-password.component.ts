@@ -7,7 +7,8 @@ import { AuthenticationService } from 'src/app/core/services/authentication.serv
 @Component({
     selector: 'update-password-components',
     templateUrl: './update-password.component.html',
-    styleUrls: ['./update-password.component.scss']
+    styleUrls: ['./update-password.component.scss'],
+    standalone: false
 })
 export class UpdatePasswordComponent implements OnInit {
     triedToLogin: boolean = false;

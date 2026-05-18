@@ -7,159 +7,181 @@
         <p class="size-small text-muted m-0 mt-1">{{ product.name }} — {{ product.code }}</p>
       </div>
       <div class="modal-body weight-medium steel plr-4 ptb-3">
-        <div *ngIf="loading" class="text-muted size-small">{{ 'tr_loading' | translate }}…</div>
-        <div *ngIf="!loading && loadError" class="text-error size-small">
-          {{ 'tr_unexpected_error_message' | translate }}
-        </div>
+        @if (loading) {
+          <div class="text-muted size-small">{{ 'tr_loading' | translate }}…</div>
+        }
+        @if (!loading && loadError) {
+          <div class="text-error size-small">
+            {{ 'tr_unexpected_error_message' | translate }}
+          </div>
+        }
 
-        <ng-container *ngIf="!loading && !loadError && summary">
+        @if (!loading && !loadError && summary) {
           <div class="booking-summary-banner">
             <i class="fa fa-bookmark booking-summary-banner__icon" aria-hidden="true"></i>
             <div>
               <div class="booking-summary-banner__title">
                 {{
-                  'tr_booking_reserved_line'
-                    | translate
-                      : {
-                          booked: summary.totalBookedQty,
-                          stock: summary.stock,
-                          free: summary.availableToBook
-                        }
-                }}
-              </div>
-              <div class="size-small text-muted">
-                {{ 'tr_booking_reserved_hint' | translate }}
-              </div>
+                'tr_booking_reserved_line'
+                | translate
+                : {
+                booked: summary.totalBookedQty,
+                stock: summary.stock,
+                free: summary.availableToBook
+              }
+              }}
+            </div>
+            <div class="size-small text-muted">
+              {{ 'tr_booking_reserved_hint' | translate }}
             </div>
           </div>
-
+        </div>
+        @if (bookingExceedsStock) {
           <div
-            *ngIf="bookingExceedsStock"
             class="booking-stock-warning size-small"
             role="alert"
-          >
+            >
             {{ 'tr_booking_oversubscribed_confirm_blocked' | translate }}
           </div>
-
-          <div *ngIf="bookings.length === 0" class="booking-empty size-small text-muted pt-2">
+        }
+        @if (bookings.length === 0) {
+          <div class="booking-empty size-small text-muted pt-2">
             {{ 'tr_booking_your_list_empty' | translate }}
           </div>
-
-          <ul class="booking-cards" *ngIf="bookings.length > 0">
-            <li *ngFor="let b of bookings" class="booking-card">
-              <div class="booking-card__head">
-                <span class="booking-card__qty"
-                  ><i class="fa fa-cubes" aria-hidden="true"></i>
-                  {{ b.quantity ?? 1 }}</span
-                >
-                <span *ngIf="b.confirmed" class="booking-card__badge booking-card__badge--ok">
-                  <i class="fa fa-check-circle" aria-hidden="true"></i>
-                  {{ 'tr_booking_confirmed_status' | translate }}
-                  <ng-container *ngIf="b.confirmedBy?.name">
-                    — {{ b.confirmedBy?.name }}</ng-container
-                  >
-                </span>
-                <div class="booking-card__actions" *ngIf="canConfirm(b) || canCancel(b)">
-                  <button
-                    *ngIf="canConfirm(b)"
-                    type="button"
-                    class="s-btn btn-primary btn-sm"
-                    [disabled]="confirmingId === b._id || cancellingId === b._id"
-                    (click)="confirmBooking(b)"
-                  >
-                    {{ 'tr_booking_confirm_action' | translate }}
-                  </button>
-                  <button
-                    *ngIf="canCancel(b)"
-                    type="button"
-                    class="s-btn btn-danger btn-sm"
-                    [disabled]="cancellingId === b._id || confirmingId === b._id"
-                    (click)="confirmCancel(b)"
-                  >
-                    {{ 'tr_product_cancel_booking' | translate }}
-                  </button>
-                </div>
-              </div>
-              <dl class="booking-details booking-details--compact">
-                <dt>{{ 'tr_booking_customer_name' | translate }}</dt>
-                <dd>{{ b.customerName }}</dd>
-                <dt>{{ 'tr_booking_customer_phone' | translate }}</dt>
-                <dd>{{ b.customerPhone }}</dd>
-                <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
-                <dd>{{ pickupLabel(b) }}</dd>
-                <ng-container *ngIf="b.pickupType === 'online_shipping' && b.shippingAddress">
-                  <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
-                  <dd>{{ b.shippingAddress }}</dd>
-                </ng-container>
-                <dt>{{ 'tr_booking_deposit' | translate }}</dt>
-                <dd>{{ b.depositAmount }}</dd>
-                <ng-container *ngIf="b.transferReferencePhone">
-                  <dt>{{ 'tr_booking_transfer_reference_phone' | translate }}</dt>
-                  <dd>{{ b.transferReferencePhone }}</dd>
-                </ng-container>
-                <dt>{{ 'tr_booking_recorded_at' | translate }}</dt>
-                <dd>
-                  {{
-                    (b.createdAt ? b.createdAt : b.bookingDate) | date : 'medium'
-                  }}
-                </dd>
-                <dt *ngIf="b.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
-                <dd *ngIf="b.createdBy?.name">{{ b.createdBy?.name }}</dd>
-                <ng-container *ngIf="depositProofUrls(b).length">
-                  <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
-                  <dd class="booking-deposit-proof-dd">
-                    <div class="booking-detail-deposit-thumbs" role="list">
-                      <div
-                        *ngFor="let proofUrl of depositProofUrls(b)"
-                        class="booking-detail-deposit-thumb"
-                        role="listitem"
-                      >
-                        <button
-                          type="button"
-                          class="booking-detail-deposit-thumb__open"
-                          (click)="openDepositPreview(proofUrl)"
-                          [attr.aria-label]="'tr_booking_deposit_preview' | translate"
-                          [attr.title]="'tr_booking_deposit_preview' | translate"
-                        >
-                          <img [src]="proofUrl" alt="" loading="lazy" />
-                        </button>
+        }
+        @if (bookings.length > 0) {
+          <ul class="booking-cards">
+            @for (b of bookings; track b) {
+              <li class="booking-card">
+                <div class="booking-card__head">
+                  <span class="booking-card__qty"
+                    ><i class="fa fa-cubes" aria-hidden="true"></i>
+                    {{ b.quantity ?? 1 }}</span
+                    >
+                    @if (b.confirmed) {
+                      <span class="booking-card__badge booking-card__badge--ok">
+                        <i class="fa fa-check-circle" aria-hidden="true"></i>
+                        {{ 'tr_booking_confirmed_status' | translate }}
+                        @if (b.confirmedBy?.name) {
+                          — {{ b.confirmedBy?.name }}
+                        }
+                      </span>
+                    }
+                    @if (canConfirm(b) || canCancel(b)) {
+                      <div class="booking-card__actions">
+                        @if (canConfirm(b)) {
+                          <button
+                            type="button"
+                            class="s-btn btn-primary btn-sm"
+                            [disabled]="confirmingId === b._id || cancellingId === b._id"
+                            (click)="confirmBooking(b)"
+                            >
+                            {{ 'tr_booking_confirm_action' | translate }}
+                          </button>
+                        }
+                        @if (canCancel(b)) {
+                          <button
+                            type="button"
+                            class="s-btn btn-danger btn-sm"
+                            [disabled]="cancellingId === b._id || confirmingId === b._id"
+                            (click)="confirmCancel(b)"
+                            >
+                            {{ 'tr_product_cancel_booking' | translate }}
+                          </button>
+                        }
                       </div>
-                    </div>
-                  </dd>
-                </ng-container>
-              </dl>
-            </li>
-          </ul>
-        </ng-container>
+                    }
+                  </div>
+                  <dl class="booking-details booking-details--compact">
+                    <dt>{{ 'tr_booking_customer_name' | translate }}</dt>
+                    <dd>{{ b.customerName }}</dd>
+                    <dt>{{ 'tr_booking_customer_phone' | translate }}</dt>
+                    <dd>{{ b.customerPhone }}</dd>
+                    <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
+                    <dd>{{ pickupLabel(b) }}</dd>
+                    @if (b.pickupType === 'online_shipping' && b.shippingAddress) {
+                      <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
+                      <dd>{{ b.shippingAddress }}</dd>
+                    }
+                    <dt>{{ 'tr_booking_deposit' | translate }}</dt>
+                    <dd>{{ b.depositAmount }}</dd>
+                    @if (b.transferReferencePhone) {
+                      <dt>{{ 'tr_booking_transfer_reference_phone' | translate }}</dt>
+                      <dd>{{ b.transferReferencePhone }}</dd>
+                    }
+                    <dt>{{ 'tr_booking_recorded_at' | translate }}</dt>
+                    <dd>
+                      {{
+                      (b.createdAt ? b.createdAt : b.bookingDate) | date : 'medium'
+                      }}
+                    </dd>
+                    @if (b.createdBy?.name) {
+                      <dt>{{ 'tr_requested_by' | translate }}</dt>
+                    }
+                    @if (b.createdBy?.name) {
+                      <dd>{{ b.createdBy?.name }}</dd>
+                    }
+                    @if (depositProofUrls(b).length) {
+                      <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
+                      <dd class="booking-deposit-proof-dd">
+                        <div class="booking-detail-deposit-thumbs" role="list">
+                          @for (proofUrl of depositProofUrls(b); track proofUrl) {
+                            <div
+                              class="booking-detail-deposit-thumb"
+                              role="listitem"
+                              >
+                              <button
+                                type="button"
+                                class="booking-detail-deposit-thumb__open"
+                                (click)="openDepositPreview(proofUrl)"
+                                [attr.aria-label]="'tr_booking_deposit_preview' | translate"
+                                [attr.title]="'tr_booking_deposit_preview' | translate"
+                                >
+                                <img [src]="proofUrl" alt="" loading="lazy" />
+                              </button>
+                            </div>
+                          }
+                        </div>
+                      </dd>
+                    }
+                  </dl>
+                </li>
+              }
+            </ul>
+          }
+        }
       </div>
       <div class="modal-footer border-top plr-4 ptb-3 booking-footer">
         <button type="button" class="s-btn btn-secondary" (click)="close()">
           {{ 'tr_action.close' | translate }}
         </button>
-        <button type="button" class="s-btn btn-primary" *ngIf="showAddBooking" (click)="openNewBooking()">
-          {{ 'tr_product_book' | translate }}
-        </button>
+        @if (showAddBooking) {
+          <button type="button" class="s-btn btn-primary" (click)="openNewBooking()">
+            {{ 'tr_product_book' | translate }}
+          </button>
+        }
       </div>
     </div>
-    <div
-      *ngIf="depositPreviewUrl"
-      class="booking-deposit-lightbox"
-      (click)="closeDepositPreview()"
-      role="dialog"
-      [attr.aria-modal]="true"
-      [attr.aria-label]="'tr_booking_deposit_preview' | translate"
-    >
-      <div class="booking-deposit-lightbox__panel" (click)="$event.stopPropagation()">
-        <button
-          type="button"
-          class="booking-deposit-lightbox__close"
-          (click)="closeDepositPreview()"
-          [attr.aria-label]="'tr_close' | translate"
+    @if (depositPreviewUrl) {
+      <div
+        class="booking-deposit-lightbox"
+        (click)="closeDepositPreview()"
+        role="dialog"
+        [attr.aria-modal]="true"
+        [attr.aria-label]="'tr_booking_deposit_preview' | translate"
         >
-          <i class="fa fa-times" aria-hidden="true"></i>
-        </button>
-        <img [src]="depositPreviewUrl" alt="" />
+        <div class="booking-deposit-lightbox__panel" (click)="$event.stopPropagation()">
+          <button
+            type="button"
+            class="booking-deposit-lightbox__close"
+            (click)="closeDepositPreview()"
+            [attr.aria-label]="'tr_close' | translate"
+            >
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+          <img [src]="depositPreviewUrl" alt="" />
+        </div>
       </div>
-    </div>
+    }
   </div>
 </div>

@@ -4,27 +4,29 @@
     <div class="cashier-header__left flex flex-middle flex-wrap">
       <span class="cashier-header__title text-white">{{ "tr_cashier.TITLE" | translate }}</span>
       <!-- Branch Selection (Super Admin / Co Admin) -->
-      <div *ngIf="curentUser.role === 'Super Admin' || curentUser.role === 'Co Admin'" class="branch-selection max-300 width-100">
-        <div class="form-group mb-0">
-          <label>{{ 'tr_branches' | translate }}</label>
-          <div class="input-with-icon">
-            <ng-select
-              class="s-control s-select"
-              [items]="branches"
-              bindLabel="name"
-              bindValue="_id"
-              [clearable]="false"
-              placeholder="{{ 'tr_branches' | translate }}"
-              [(ngModel)]="adminSelectedBranchId"
-              #branch="ngModel"
-              name="branchId"
-              (change)="loadProducts()"
-            >
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
+      @if (curentUser.role === 'Super Admin' || curentUser.role === 'Co Admin') {
+        <div class="branch-selection max-300 width-100">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_branches' | translate }}</label>
+            <div class="input-with-icon">
+              <ng-select
+                class="s-control s-select"
+                [items]="branches"
+                bindLabel="name"
+                bindValue="_id"
+                [clearable]="false"
+                placeholder="{{ 'tr_branches' | translate }}"
+                [(ngModel)]="adminSelectedBranchId"
+                #branch="ngModel"
+                name="branchId"
+                (change)="loadProducts()"
+                >
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
           </div>
         </div>
-      </div>
+      }
     </div>
 
     <div class="cashier-header__actions flex flex-middle">
@@ -33,7 +35,7 @@
         class="cashier-header__expense-btn"
         (click)="openDailyExpenseDialog()"
         [attr.title]="'tr_daily_expense_title' | translate"
-      >
+        >
         <i class="fa fa-money" aria-hidden="true"></i>
         <span class="cashier-header__expense-label">{{ 'tr_daily_expense_title' | translate }}</span>
       </button>
@@ -43,172 +45,188 @@
         class="cashier-header__drawer-btn"
         (click)="openDrawerCloseDialog()"
         [attr.title]="'tr_drawer_close_title' | translate"
-      >
+        >
         <i class="fa fa-inbox" aria-hidden="true"></i>
         <span class="cashier-header__drawer-label">{{ 'tr_drawer_close_toolbar' | translate }}</span>
       </button>
 
-      <button class="close-btn" *ngIf="isCashierFullScreen" (click)="closeCashier()">✖</button>
+      @if (isCashierFullScreen) {
+        <button class="close-btn" (click)="closeCashier()">✖</button>
+      }
 
-      <i class="fa fa-arrows-alt pointer cashier-header__zoom" *ngIf="!isCashierFullScreen" (click)="isCashierFullScreen = true" aria-hidden="true"></i>
+      @if (!isCashierFullScreen) {
+        <i class="fa fa-arrows-alt pointer cashier-header__zoom" (click)="isCashierFullScreen = true" aria-hidden="true"></i>
+      }
     </div>
   </div>
 
   <!-- Body -->
   <div class="cashier-body">
 
-    
+
     <!-- Products Panel -->
     <div class="products-panel">
       <input
-      type="text"
-      placeholder="{{ 'tr_cashier.SCAN_PRODUCT' | translate }}"
-      [(ngModel)]="barcode"
-      #barcodeInput
-      (keyup.enter)="scanProduct(barcode); barcode = ''"
-      autofocus
-    />
-           <!-- Client Information (collapsible): payment + client fields -->
-           <div class="card mb-3">
-            <div class="card-header flex flex-space-between pointer" (click)="toggleClientInfo()">
-              <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
-              <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
-            </div>
-            <div class="card-body" *ngIf="isClientInfoOpen">
-              <div [formGroup]="clientForm">
-    
+        type="text"
+        placeholder="{{ 'tr_cashier.SCAN_PRODUCT' | translate }}"
+        [(ngModel)]="barcode"
+        #barcodeInput
+        (keyup.enter)="scanProduct(barcode); barcode = ''"
+        autofocus
+        />
+      <!-- Client Information (collapsible): payment + client fields -->
+      <div class="card mb-3">
+        <div class="card-header flex flex-space-between pointer" (click)="toggleClientInfo()">
+          <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
+          <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
+        </div>
+        @if (isClientInfoOpen) {
+          <div class="card-body">
+            <div [formGroup]="clientForm">
               <div class="row">
-                
                 <div
                   class="col-md-4"
                   [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
-                >
+                  >
                   <div class="form-group">
                     <label>{{ 'tr_client_phone' | translate }}</label>
                     <div class="input-with-icon bg-white width-100">
                       <input type="text" class="s-control width-100" formControlName="phone" />
                     </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('phone')?.errors?.required && clientForm.get('phone')?.touched"
-                    >
-                      {{ 'tr_client_phone_required' | translate }}
-                    </span>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('phone')?.errors?.phoneFormat && clientForm.get('phone')?.touched"
-                    >
-                      {{ 'tr_client_phone_invalid' | translate }}
-                    </span>
+                    @if (clientForm.get('phone')?.errors?.required && clientForm.get('phone')?.touched) {
+                      <span
+                        class="text-error size-small validator"
+                        >
+                        {{ 'tr_client_phone_required' | translate }}
+                      </span>
+                    }
+                    @if (clientForm.get('phone')?.errors?.phoneFormat && clientForm.get('phone')?.touched) {
+                      <span
+                        class="text-error size-small validator"
+                        >
+                        {{ 'tr_client_phone_invalid' | translate }}
+                      </span>
+                    }
                   </div>
                 </div>
                 <div
                   class="col-md-4"
                   [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
-                >
+                  >
                   <div class="form-group">
                     <label>{{ 'tr_client_name' | translate }}</label>
                     <div class="input-with-icon bg-white width-100">
                       <input type="text" class="s-control width-100" formControlName="name" />
                     </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
-                    >
-                      {{ 'tr_client_name_required' | translate }}
-                    </span>
+                    @if (clientForm.get('name')?.invalid && clientForm.get('name')?.touched) {
+                      <span
+                        class="text-error size-small validator"
+                        >
+                        {{ 'tr_client_name_required' | translate }}
+                      </span>
+                    }
                   </div>
                 </div>
                 <div
-                class="col-md-4"
-                [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
-              >
-                <div class="form-group mb-0">
-                  <label>{{ 'tr_client_address' | translate }}</label>
-                  <div class="input-with-icon bg-white width-100">
-                    <input type="text" class="s-control width-100" formControlName="address" />
-                  </div>
-                  <span
-                    class="text-error size-small validator"
-                    *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                  class="col-md-4"
+                  [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
                   >
-                    {{ 'tr_client_address_required' | translate }}
-                  </span>
+                  <div class="form-group mb-0">
+                    <label>{{ 'tr_client_address' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <input type="text" class="s-control width-100" formControlName="address" />
+                    </div>
+                    @if (clientForm.get('address')?.invalid && clientForm.get('address')?.touched) {
+                      <span
+                        class="text-error size-small validator"
+                        >
+                        {{ 'tr_client_address_required' | translate }}
+                      </span>
+                    }
+                  </div>
                 </div>
               </div>
-              </div>
-              </div>
-
-              <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
-                <div class="form-group mb-0">
-                  <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
-                  <div class="input-with-icon">
-                    <ng-select
-                      class="s-control s-select"
-                      [items]="paymentMethodsForSplit"
-                      bindLabel="labelKey"
-                      bindValue="id"
-                      [multiple]="true"
-                      [closeOnSelect]="false"
-                      [clearable]="true"
-                      [searchable]="true"
-                      placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-                      [(ngModel)]="selectedPayMethods"
-                      [ngModelOptions]="{ standalone: true }"
-                      name="payMethodsMulti"
-                      (ngModelChange)="onSelectedPayMethodsChange($event)"
+            </div>
+            <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
+              <div class="form-group mb-0">
+                <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
+                <div class="input-with-icon">
+                  <ng-select
+                    class="s-control s-select"
+                    [items]="paymentMethodsForSplit"
+                    bindLabel="labelKey"
+                    bindValue="id"
+                    [multiple]="true"
+                    [closeOnSelect]="false"
+                    [clearable]="true"
+                    [searchable]="true"
+                    placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
+                    [(ngModel)]="selectedPayMethods"
+                    [ngModelOptions]="{ standalone: true }"
+                    name="payMethodsMulti"
+                    (ngModelChange)="onSelectedPayMethodsChange($event)"
                     >
-                      <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                        <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                    <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                      @for (item of items | slice:0:2; track item) {
+                        <div class="ng-value">
                           <span class="ng-value-label">{{ $any(item).labelKey | translate }}</span>
                           <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
                         </div>
+                      }
+                      @if (items.length > 2) {
                         <div
                           class="ng-value"
-                          *ngIf="items.length > 2"
                           [attr.title]="payMethodsOverflowTitle(items)"
-                        >
+                          >
                           <span class="ng-value-label">+ {{ items.length - 2 }}</span>
                         </div>
-                      </ng-template>
-                      <ng-template ng-option-tmp let-item="item">
-                        <span class="payment-option">
-                          <img [src]="$any(item).logo" class="payment-logo" alt="" />
-                          {{ $any(item).labelKey | translate }}
-                          <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
+                      }
+                    </ng-template>
+                    <ng-template ng-option-tmp let-item="item">
+                      <span class="payment-option">
+                        <img [src]="$any(item).logo" class="payment-logo" alt="" />
+                        {{ $any(item).labelKey | translate }}
+                        @if (paymentAppFeePercent($any(item).id) > 0) {
+                          <span class="text-muted size-small">
                             (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
                           </span>
-                        </span>
-                      </ng-template>
-                    </ng-select>
-                    <i class="fa fa-caret-down input-icon"></i>
-                  </div>
+                        }
+                      </span>
+                    </ng-template>
+                  </ng-select>
+                  <i class="fa fa-caret-down input-icon"></i>
                 </div>
-
-                <div class="cashier-payment-amount-heading size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
+              </div>
+              @if (selectedPayMethods?.length) {
+                <div class="cashier-payment-amount-heading size-small text-muted mb-1">
                   {{ 'tr_cashier_payment_amounts_hint' | translate }}
                 </div>
+              }
+              @if (selectedPayMethods?.length && cashierPaymentHasAnyFee()) {
                 <div
                   class="cashier-payment-amount-heading size-small text-muted mb-2"
-                  *ngIf="selectedPayMethods?.length && cashierPaymentHasAnyFee()"
-                >
+                  >
                   {{ 'tr_cashier_payment_gross_fee_hint' | translate }}
                 </div>
+              }
+              @for (mid of selectedPayMethods; track trackPayMethodId($index, mid)) {
                 <div
                   class="cashier-payment-split-row"
-                  *ngFor="let mid of selectedPayMethods; trackBy: trackPayMethodId"
-                >
+                  >
                   <div class="cashier-payment-split-row__method cashier-payment-split-row__method--labeled">
-                    <img
-                      *ngIf="getPayMethodDef(mid) as pm"
-                      [src]="pm.logo"
-                      class="payment-logo"
-                      alt=""
-                    />
+                    @if (getPayMethodDef(mid); as pm) {
+                      <img
+                        [src]="pm.logo"
+                        class="payment-logo"
+                        alt=""
+                        />
+                    }
                     <span class="cashier-payment-split-row__label">{{ payMethodLabelKey(mid) | translate }}</span>
-                    <span *ngIf="paymentAppFeePercent(mid) > 0" class="cashier-payment-split-row__fee-pct text-muted size-small">
-                      (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
-                    </span>
+                    @if (paymentAppFeePercent(mid) > 0) {
+                      <span class="cashier-payment-split-row__fee-pct text-muted size-small">
+                        (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
+                      </span>
+                    }
                   </div>
                   <input
                     type="number"
@@ -218,84 +236,100 @@
                     [(ngModel)]="payAmounts[mid]"
                     [ngModelOptions]="{ standalone: true }"
                     [name]="'payAmt_' + mid"
-                  />
+                    />
                 </div>
-                <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
-                  {{ 'tr_cashier_payment_allocated' | translate }}:
-                  <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-                  /
-                  {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
-                </div>
-                <div class="size-small text-muted mt-1" *ngIf="paymentRemaining() > 0.005">
+              }
+              <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
+                {{ 'tr_cashier_payment_allocated' | translate }}:
+                <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                /
+                {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+              </div>
+              @if (paymentRemaining() > 0.005) {
+                <div class="size-small text-muted mt-1">
                   {{ 'tr_cashier_payment_remaining_credit' | translate }}:
                   <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
                 </div>
-              </div>
-          
+              }
             </div>
           </div>
+        }
+      </div>
 
- 
+
       <div class="products-grid">
-        <div [class.disabled-container]="product.stock == 0"
-          class="product-card"
-          *ngFor="let product of filteredProducts()"
-          (click)="addProduct(product)"
-        >
-          <div class="product-card__image-wrap">
-            <img
-              *ngIf="product.imageUrl"
-              [src]="product.imageUrl"
-              alt=""
-            />
-            <div *ngIf="!product.imageUrl" class="product-card__image-placeholder" aria-hidden="true">
-              <i class="fa fa-cube"></i>
+        @for (product of filteredProducts(); track product) {
+          <div [class.disabled-container]="product.stock == 0"
+            class="product-card"
+            (click)="addProduct(product)"
+            >
+            <div class="product-card__image-wrap">
+              @if (product.imageUrl) {
+                <img
+                  [src]="product.imageUrl"
+                  alt=""
+                  />
+              }
+              @if (!product.imageUrl) {
+                <div class="product-card__image-placeholder" aria-hidden="true">
+                  <i class="fa fa-cube"></i>
+                </div>
+              }
             </div>
-          </div>
-           <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
-          <div *ngIf="bookedQty(product) > 0" class="cashier-booking-hint">
-            {{
-              'tr_cashier_booking_on_card'
+            <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
+            @if (bookedQty(product) > 0) {
+              <div class="cashier-booking-hint">
+                {{
+                'tr_cashier_booking_on_card'
                 | translate
-                  : {
-                      booked: bookedQty(product),
-                      free: freeSellableQty(product),
-                      stock: product.stock
-                    }
-            }}
-          </div>
+                : {
+                booked: bookedQty(product),
+                free: freeSellableQty(product),
+                stock: product.stock
+              }
+              }}
+            </div>
+          }
           <div class="product-name">{{ product.name }}</div>
-          <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
-          <div class="product-price" *ngIf="!cardHasDiscount(product)">
-            {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
-          </div>
-          <div class="product-price product-price--with-discount" *ngIf="cardHasDiscount(product)">
-            <div class="product-price__old">
+          @if (product.code) {
+            <div class="product-code">{{ product.code }}</div>
+          }
+          @if (!cardHasDiscount(product)) {
+            <div class="product-price">
               {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
             </div>
-            <div class="product-price__new">
-              {{ cardDiscountedPrice(product) | currency:'EGP ':'symbol':'1.2-2' }}
+          }
+          @if (cardHasDiscount(product)) {
+            <div class="product-price product-price--with-discount">
+              <div class="product-price__old">
+                {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
+              </div>
+              <div class="product-price__new">
+                {{ cardDiscountedPrice(product) | currency:'EGP ':'symbol':'1.2-2' }}
+              </div>
             </div>
-          </div>
+          }
         </div>
-      </div>
+      }
+    </div>
+  </div>
+
+
+  <!-- Order Panel -->
+  <div class="order-panel">
+    <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
+
+    <div class="cashier-desk-actions mb-3 ">
+      <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="openDeskPurchaseProductDialog()">
+        {{ 'tr_product_purchase_button' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="startExchangeFlow()">
+        {{ 'tr_exchange_button' | translate }}
+      </button>
     </div>
 
-
-    <!-- Order Panel -->
-    <div class="order-panel">
-      <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
-
-      <div class="cashier-desk-actions mb-3 ">
-        <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="openDeskPurchaseProductDialog()">
-          {{ 'tr_product_purchase_button' | translate }}
-        </button>
-        <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="startExchangeFlow()">
-          {{ 'tr_exchange_button' | translate }}
-        </button>
-      </div>
-
-      <div class="card mb-3 plr-3 ptb-3" *ngIf="exchangeTradeInPurchase">
+    @if (exchangeTradeInPurchase) {
+      <div class="card mb-3 plr-3 ptb-3">
         <div class="flex flex-space-between flex-wrap gap-sm mb-2">
           <span class="weight-bold">{{ 'tr_exchange_active_title' | translate }}</span>
           <button type="button" class="s-btn btn-secondary size-small" (click)="cancelExchangeFlow()">
@@ -307,38 +341,45 @@
           <div>{{ 'tr_exchange_trade_in_item' | translate }}: {{ exchangeTradeInPurchase?.productPayload?.name }}</div>
           <div>{{ 'tr_exchange_trade_in_credit' | translate }}: {{ exchangeTradeInCredit() | currency:'EGP ':'symbol':'1.2-2' }}</div>
           <div class="weight-bold mt-1">{{ 'tr_exchange_amount_to_collect' | translate }}: {{ exchangeAmountDue() | currency:'EGP ':'symbol':'1.2-2' }}</div>
-          <div class="text-warning mt-1" *ngIf="exchangeStoreOwesCustomer() > 0">
-            {{ 'tr_exchange_store_owes_customer' | translate }}: {{ exchangeStoreOwesCustomer() | currency:'EGP ':'symbol':'1.2-2' }}
-          </div>
+          @if (exchangeStoreOwesCustomer() > 0) {
+            <div class="text-warning mt-1">
+              {{ 'tr_exchange_store_owes_customer' | translate }}: {{ exchangeStoreOwesCustomer() | currency:'EGP ':'symbol':'1.2-2' }}
+            </div>
+          }
         </div>
       </div>
+    }
 
-      <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
+    <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
 
- 
-      <table class="products-table-casheier ">
-        <thead>
+
+    <table class="products-table-casheier ">
+      <thead>
+        <tr>
+          <th>{{ "tr_cashier.PRODUCT" | translate }}</th>
+          <th>{{ "tr_cashier.QTY" | translate }}</th>
+          <th>{{ "tr_cashier.PRICE" | translate }}</th>
+          <th>{{ "tr_cashier.TOTAL" | translate }}</th>
+          <th>x</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of orderItems; track item; let i = $index) {
           <tr>
-            <th>{{ "tr_cashier.PRODUCT" | translate }}</th>
-            <th>{{ "tr_cashier.QTY" | translate }}</th>
-            <th>{{ "tr_cashier.PRICE" | translate }}</th>
-            <th>{{ "tr_cashier.TOTAL" | translate }}</th>
-            <th>x</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let item of orderItems; let i = index">
             <td>
               <span class="order-line-product">
-                <img
-                  *ngIf="item.imageUrl"
-                  class="order-line-thumb"
-                  [src]="item.imageUrl"
-                  alt=""
-                />
+                @if (item.imageUrl) {
+                  <img
+                    class="order-line-thumb"
+                    [src]="item.imageUrl"
+                    alt=""
+                    />
+                }
                 <span class="order-line-product__text">
                   <span class="order-line-product__name">{{ item.name }}</span>
-                  <span class="order-line-product__code" *ngIf="item.code">{{ item.code }}</span>
+                  @if (item.code) {
+                    <span class="order-line-product__code">{{ item.code }}</span>
+                  }
                 </span>
               </span>
             </td>
@@ -351,146 +392,161 @@
             <td>{{ lineUnitPrice(item) * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
             <td><button (click)="removeItem(i)">x</button></td>
           </tr>
-        </tbody>
-      </table>
+        }
+      </tbody>
+    </table>
 
-      <div class="order-summary">
-        <div class="order-summary__lines">
-          <div>
-            {{ "tr_order_subtotal" | translate }}:
-            {{ orderSubtotal() | currency:'EGP ':'symbol':'1.2-2' }}
-          </div>
-          <div class="form-group mb-0 mt-2">
-            <label class="size-small">{{ "tr_invoice_discount_mode" | translate }}</label>
-            <select
-              class="s-control width-100"
-              [(ngModel)]="invoiceDiscountMode"
-              (ngModelChange)="onInvoiceDiscountModeChange()"
-              [disabled]="!canApplyInvoiceDiscount()"
+    <div class="order-summary">
+      <div class="order-summary__lines">
+        <div>
+          {{ "tr_order_subtotal" | translate }}:
+          {{ orderSubtotal() | currency:'EGP ':'symbol':'1.2-2' }}
+        </div>
+        <div class="form-group mb-0 mt-2">
+          <label class="size-small">{{ "tr_invoice_discount_mode" | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="invoiceDiscountMode"
+            (ngModelChange)="onInvoiceDiscountModeChange()"
+            [disabled]="!canApplyInvoiceDiscount()"
             >
-              <option value="percent">{{ "tr_invoice_discount_mode_percent" | translate }}</option>
-              <option value="amount">{{ "tr_invoice_discount_mode_amount" | translate }}</option>
-              <option value="final">{{ "tr_invoice_discount_mode_final" | translate }}</option>
-            </select>
-          </div>
-          <div class="form-group mb-0 mt-2">
-            <label *ngIf="invoiceDiscountMode === 'percent'" class="size-small">{{
+            <option value="percent">{{ "tr_invoice_discount_mode_percent" | translate }}</option>
+            <option value="amount">{{ "tr_invoice_discount_mode_amount" | translate }}</option>
+            <option value="final">{{ "tr_invoice_discount_mode_final" | translate }}</option>
+          </select>
+        </div>
+        <div class="form-group mb-0 mt-2">
+          @if (invoiceDiscountMode === 'percent') {
+            <label class="size-small">{{
               "tr_invoice_discount_input_percent" | translate
             }}</label>
-            <label *ngIf="invoiceDiscountMode === 'amount'" class="size-small">{{
+          }
+          @if (invoiceDiscountMode === 'amount') {
+            <label class="size-small">{{
               "tr_invoice_discount_input_amount" | translate
             }}</label>
-            <label *ngIf="invoiceDiscountMode === 'final'" class="size-small">{{
+          }
+          @if (invoiceDiscountMode === 'final') {
+            <label class="size-small">{{
               "tr_invoice_discount_input_final" | translate
             }}</label>
-            <input
-              type="number"
-              class="s-control width-100"
-              min="0"
-              [max]="invoiceExtraInputMax()"
-              step="0.01"
-              [(ngModel)]="invoiceExtraValue"
-              (ngModelChange)="onInvoiceExtraValueChange()"
-              [disabled]="!canApplyInvoiceDiscount()"
+          }
+          <input
+            type="number"
+            class="s-control width-100"
+            min="0"
+            [max]="invoiceExtraInputMax()"
+            step="0.01"
+            [(ngModel)]="invoiceExtraValue"
+            (ngModelChange)="onInvoiceExtraValueChange()"
+            [disabled]="!canApplyInvoiceDiscount()"
             />
-          </div>
-          <div *ngIf="invoiceDiscountMode === 'percent' && appliedInvoiceDiscount() > 0" class="size-small text-muted mt-1">
+        </div>
+        @if (invoiceDiscountMode === 'percent' && appliedInvoiceDiscount() > 0) {
+          <div class="size-small text-muted mt-1">
             {{ "tr_invoice_discount_derived_amount" | translate }}:
             {{ appliedInvoiceDiscount() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
+        }
+        @if (invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() > 0) {
           <div
-            *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() > 0"
             class="size-small text-muted mt-1"
-          >
+            >
             {{ "tr_invoice_discount_derived_percent" | translate }}:
             {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
           </div>
+        }
+        @if (invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() < 0) {
           <div
-            *ngIf="invoiceDiscountMode !== 'percent' && appliedInvoiceDiscount() < 0"
             class="size-small text-muted mt-1"
-          >
+            >
             {{ "tr_invoice_surcharge_derived_percent" | translate }}:
             {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
           </div>
-          <div class="weight-bold mt-2">
-            {{ "tr_final_after_extra_discount" | translate }}:
-            {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
-          </div>
+        }
+        <div class="weight-bold mt-2">
+          {{ "tr_final_after_extra_discount" | translate }}:
+          {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
         </div>
-        <button class="pay-btn" (click)="checkout()">
-          {{ "tr_cashier.PAY" | translate }}
-        </button>
       </div>
+      <button class="pay-btn" (click)="checkout()">
+        {{ "tr_cashier.PAY" | translate }}
+      </button>
     </div>
   </div>
 </div>
+</div>
 
-  
+
 <!-- Invoice (labels follow store receipt language, not UI language) -->
-<div
-  class="invoice-container"
-  id="print-container"
-  [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
-  *ngIf="printMode === 'sale'"
->
-  <ng-container *ngIf="storeSettings.settings$ | async as st">
-    <!-- Store logo (from Settings) -->
-    <div class="center mb-2" *ngIf="st.logoUrl">
-      <img class="invoice-logo" [src]="st.logoUrl" alt="" />
-    </div>
-
-    <!-- Store Name -->
-    <div class="store-name center mtb-4 bold">
-      {{ st.storeName }}
-    </div>
-
-    <!-- Invoice Meta -->
-    <table class="invoice-table meta-table">
-      <tr>
-        <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ createdOrder?.orderNumber }}</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ createdOrder?.numberOfProducts }}</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ todayDate | date: 'dd MMM y' }}</td>
-      </tr>
-    </table>
-
-    <ng-container *ngIf="showReceiptClientSection">
-      <div class="invoice-client-block">
-        <div class="invoice-client-block__title">
-          {{ 'tr_client_info' | receiptTranslate: st.receiptLanguage }}
+@if (printMode === 'sale') {
+  <div
+    class="invoice-container"
+    id="print-container"
+    [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
+    >
+    @if (storeSettings.settings$ | async; as st) {
+      <!-- Store logo (from Settings) -->
+      @if (st.logoUrl) {
+        <div class="center mb-2">
+          <img class="invoice-logo" [src]="st.logoUrl" alt="" />
         </div>
-        <table class="invoice-table invoice-client-block__table">
-          <tr *ngIf="createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00'">
-            <td class="invoice-client-block__label">
-              {{ 'tr_phone_number' | receiptTranslate: st.receiptLanguage }}
-            </td>
-            <td>{{ createdOrder.clientPhoneNumber }}</td>
-          </tr>
-          <tr *ngIf="createdOrder?.clientName && createdOrder.clientName !== 'Walk-in'">
-            <td class="invoice-client-block__label">
-              {{ 'tr_client_name' | receiptTranslate: st.receiptLanguage }}
-            </td>
-            <td>{{ createdOrder.clientName }}</td>
-          </tr>
-          <tr *ngIf="createdOrder?.clientAddress && createdOrder.clientAddress !== '-'">
-            <td class="invoice-client-block__label">
-              {{ 'tr_client_address' | receiptTranslate: st.receiptLanguage }}
-            </td>
-            <td>{{ createdOrder.clientAddress }}</td>
-          </tr>
-        </table>
+      }
+      <!-- Store Name -->
+      <div class="store-name center mtb-4 bold">
+        {{ st.storeName }}
       </div>
-    </ng-container>
-
-    <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
-    <table class="invoice-table products-table">
-      <colgroup>
+      <!-- Invoice Meta -->
+      <table class="invoice-table meta-table">
+        <tr>
+          <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ createdOrder?.orderNumber }}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ createdOrder?.numberOfProducts }}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ todayDate | date: 'dd MMM y' }}</td>
+        </tr>
+      </table>
+      @if (showReceiptClientSection) {
+        <div class="invoice-client-block">
+          <div class="invoice-client-block__title">
+            {{ 'tr_client_info' | receiptTranslate: st.receiptLanguage }}
+          </div>
+          <table class="invoice-table invoice-client-block__table">
+            @if (createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00') {
+              <tr>
+                <td class="invoice-client-block__label">
+                  {{ 'tr_phone_number' | receiptTranslate: st.receiptLanguage }}
+                </td>
+                <td>{{ createdOrder.clientPhoneNumber }}</td>
+              </tr>
+            }
+            @if (createdOrder?.clientName && createdOrder.clientName !== 'Walk-in') {
+              <tr>
+                <td class="invoice-client-block__label">
+                  {{ 'tr_client_name' | receiptTranslate: st.receiptLanguage }}
+                </td>
+                <td>{{ createdOrder.clientName }}</td>
+              </tr>
+            }
+            @if (createdOrder?.clientAddress && createdOrder.clientAddress !== '-') {
+              <tr>
+                <td class="invoice-client-block__label">
+                  {{ 'tr_client_address' | receiptTranslate: st.receiptLanguage }}
+                </td>
+                <td>{{ createdOrder.clientAddress }}</td>
+              </tr>
+            }
+          </table>
+        </div>
+      }
+      <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
+      <table class="invoice-table products-table">
+        <colgroup>
         <col class="products-table__col-name" />
         <col class="products-table__col-qty" />
         <col class="products-table__col-price" />
@@ -502,26 +558,30 @@
         <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
         <td>{{ 'tr_total' | receiptTranslate: st.receiptLanguage }}</td>
       </tr>
-
-      <tr *ngFor="let item of createdOrder?.products">
-        <td class="item-name">
-          {{ item.name }}
-          <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
-            <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
-              {{ ia.label }}: {{ ia.value }}
-            </span>
-          </div>
-        </td>
-        <td>{{ item.quantity }}</td>
-        <td class="money">
-          {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-        <td class="money">
-          {{ formatReceiptAmount(item.price * item.quantity) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
+      @for (item of createdOrder?.products; track item) {
+        <tr>
+          <td class="item-name">
+            {{ item.name }}
+            @if (item.invoiceAttributes?.length) {
+              <div class="invoice-item-attrs">
+                @for (ia of item.invoiceAttributes; track ia) {
+                  <span class="invoice-item-attr">
+                    {{ ia.label }}: {{ ia.value }}
+                  </span>
+                }
+              </div>
+            }
+          </td>
+          <td>{{ item.quantity }}</td>
+          <td class="money">
+            {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+          <td class="money">
+            {{ formatReceiptAmount(item.price * item.quantity) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+        </tr>
+      }
     </table>
-
     <!-- Totals (from saved order; includes invoice-level extra discount) -->
     <table class="invoice-table totals-table">
       <tr class="bold">
@@ -530,65 +590,73 @@
           {{ formatReceiptAmount(receiptLinesSubtotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
-        <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
-        <td class="money">
-          {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
-          {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
-      <tr *ngIf="receiptInvoiceSurchargeAmount() > 0">
-        <td>{{ 'tr_invoice_extra_surcharge' | receiptTranslate: st.receiptLanguage }}</td>
-        <td class="money">
-          {{ formatReceiptAmount(receiptInvoiceSurchargeAmount()) }}
-          {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
+      @if (receiptInvoiceExtraDiscount() > 0) {
+        <tr>
+          <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
+          <td class="money">
+            {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
+            {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+        </tr>
+      }
+      @if (receiptInvoiceSurchargeAmount() > 0) {
+        <tr>
+          <td>{{ 'tr_invoice_extra_surcharge' | receiptTranslate: st.receiptLanguage }}</td>
+          <td class="money">
+            {{ formatReceiptAmount(receiptInvoiceSurchargeAmount()) }}
+            {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+        </tr>
+      }
       <tr class="bold">
         <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr *ngIf="receiptExchangeCredit() > 0">
-        <td>{{ 'tr_exchange_trade_in_credit_line' | receiptTranslate: st.receiptLanguage }}</td>
-        <td class="money">
-          -{{ formatReceiptAmount(receiptExchangeCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
-      <tr class="bold" *ngIf="receiptExchangeCredit() > 0">
-        <td>{{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}</td>
-        <td class="money">
-          {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
+      @if (receiptExchangeCredit() > 0) {
+        <tr>
+          <td>{{ 'tr_exchange_trade_in_credit_line' | receiptTranslate: st.receiptLanguage }}</td>
+          <td class="money">
+            -{{ formatReceiptAmount(receiptExchangeCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+        </tr>
+      }
+      @if (receiptExchangeCredit() > 0) {
+        <tr class="bold">
+          <td>{{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}</td>
+          <td class="money">
+            {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </td>
+        </tr>
+      }
     </table>
-
-    <table
-      class="invoice-table invoice-payments-table"
-      *ngIf="createdOrder?.payments?.length && receiptPaidPayments().length"
-    >
-      <tr class="header bold">
-        <td colspan="2">{{ 'tr_invoice_payments' | receiptTranslate: st.receiptLanguage }}</td>
-      </tr>
-      <tr *ngFor="let p of receiptPaidPayments()">
-        <td>{{ payMethodLabelKey(p.method) | receiptTranslate: st.receiptLanguage }}</td>
-        <td class="money">
-          {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
-        </td>
-      </tr>
-    </table>
-
+    @if (createdOrder?.payments?.length && receiptPaidPayments().length) {
+      <table
+        class="invoice-table invoice-payments-table"
+        >
+        <tr class="header bold">
+          <td colspan="2">{{ 'tr_invoice_payments' | receiptTranslate: st.receiptLanguage }}</td>
+        </tr>
+        @for (p of receiptPaidPayments(); track p) {
+          <tr>
+            <td>{{ payMethodLabelKey(p.method) | receiptTranslate: st.receiptLanguage }}</td>
+            <td class="money">
+              {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+            </td>
+          </tr>
+        }
+      </table>
+    }
     <div class="separator double-border"></div>
-
     <div class="final-total center bold">
-      <ng-container *ngIf="receiptExchangeCredit() <= 0">
+      @if (receiptExchangeCredit() <= 0) {
         {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>
-      </ng-container>
-      <ng-container *ngIf="receiptExchangeCredit() > 0">
+      }
+      @if (receiptExchangeCredit() > 0) {
         {{ 'tr_exchange_sale_and_trade_in' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
@@ -599,25 +667,26 @@
             {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
           </span>
         </div>
-      </ng-container>
+      }
     </div>
-
     <div class="separator double-border"></div>
-
     <div class="footer center">
       <div class="bold">{{ st.storeName }}</div>
       <div>{{ st.storePhoneNumber }}</div>
     </div>
-
-    <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
-      <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
-      <div class="invoice-qr__caption">innovation-tec.com</div>
-    </div>
-  </ng-container>
+    @if (invoiceQrDataUrl) {
+      <div class="invoice-qr center">
+        <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
+        <div class="invoice-qr__caption">innovation-tec.com</div>
+      </div>
+    }
+  }
 </div>
+}
 
-<app-purchase-receipt-print
-  *ngIf="printMode === 'deskPurchase'"
-  [purchase]="createdDeskPurchase"
-  [printDate]="todayDate"
-></app-purchase-receipt-print>
+@if (printMode === 'deskPurchase') {
+  <app-purchase-receipt-print
+    [purchase]="createdDeskPurchase"
+    [printDate]="todayDate"
+  ></app-purchase-receipt-print>
+}

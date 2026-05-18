@@ -4,7 +4,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { UserSerivce } from '@shared/services/user.service';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatLegacyDialogRef as MatDialogRef, MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA } from '@angular/material/legacy-dialog';
 import { CurrentUser } from '@core/models/users-interfaces.model';
 
 
@@ -12,7 +12,8 @@ import { CurrentUser } from '@core/models/users-interfaces.model';
 @Component({
     selector: 'app-language-switcher',
     templateUrl: './language-switcher.component.html',
-    styleUrls: ['./language-switcher.component.scss']
+    styleUrls: ['./language-switcher.component.scss'],
+    standalone: false
 })
 export class LanguageSwitcherComponent implements OnInit {
 

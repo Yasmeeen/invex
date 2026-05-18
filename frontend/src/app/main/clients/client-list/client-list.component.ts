@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Globals } from '@core/globals';
 import { Client, PaginationData } from '@core/models/users-interfaces.model';
 import { TranslateService } from '@ngx-translate/core';
@@ -9,9 +9,10 @@ import { Subscription } from 'rxjs';
 import { isBranchManager } from '@core/utils/role-utils';
 
 @Component({
-  selector: 'app-client-list',
-  templateUrl: './client-list.component.html',
-  styleUrls: ['./client-list.component.scss']
+    selector: 'app-client-list',
+    templateUrl: './client-list.component.html',
+    styleUrls: ['./client-list.component.scss'],
+    standalone: false
 })
 export class ClientListComponent implements OnInit {
 

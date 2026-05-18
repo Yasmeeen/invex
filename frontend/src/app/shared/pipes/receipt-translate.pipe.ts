@@ -3,7 +3,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { RECEIPT_LANGUAGE_CODES } from '@shared/services/store-settings.service';
 
 /** impure: re-run when translation packs load async or UI lang changes; avoids stale EN fallback. */
-@Pipe({ name: 'receiptTranslate', pure: false })
+@Pipe({
+    name: 'receiptTranslate', pure: false,
+    standalone: false
+})
 export class ReceiptTranslatePipe implements PipeTransform {
   constructor(private translate: TranslateService) {}
 

@@ -2,7 +2,7 @@
   class="content-shadow bg-white mb-5"
   not-authorized
   [notAuthorized]="isNotAuthorized"
->
+  >
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ "tr_branches" | translate }}</span>
     <div class="btn-group">
@@ -12,104 +12,110 @@
       <button
         class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
-      >
+        >
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
     </div>
   </h2>
 
-  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
-    <div class="row">
-      <div class="col-md-3">
-        <div class="form-group mb-0">
-          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <input
-              class="text s-control"
-              (keyup)="filterbranches($event, 'searchTerm')"
-              placeholder="{{ 'tr_search' | translate }}"
-              [(ngModel)]="nameSearchTerm"
-            />
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="text s-control"
+                (keyup)="filterbranches($event, 'searchTerm')"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="nameSearchTerm"
+                />
+            </div>
           </div>
         </div>
       </div>
-      
     </div>
-  </div>
+  }
 
   <div>
-    <div class="plr-4 mt-4" *ngIf="!branchesLoading">
-      <div
-        class="table-container branches-list"
-        id="table-container"
-        *ngIf="branchesList.length > 0"
-      >
-      <table class="s-table table layout-fixed branches-list branches-list">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>{{ 'tr_branch_name' | translate }}</th>
-            <th>{{ 'tr_branch_address' | translate }}</th>
-            <th>{{ 'tr_rent' | translate }}</th>
-            <th>{{ 'tr_employees_salary' | translate }}</th>
-            <th>{{ 'tr_branch_invoices' | translate }}</th>
-            <th>{{ 'tr_expenses' | translate }}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let branch of branchesList; let i = index">
-            <td>{{ i + 1 }}</td>
-            <td>{{ branch.name }}</td>
-            <td>{{ branch.storeAddress }}</td>
-            <td>{{ branch.rent | currency:'EGP ':'symbol':'1.2-2' }}</td>
-            <td>{{ branch.employeesSalary | currency:'EGP ':'symbol':'1.2-2' }}</td>
-            <td>{{ branch.branchInvoices | currency:'EGP ':'symbol':'1.2-2' }}</td>
-            <td>{{ branch.expenses | currency:'EGP ':'symbol':'1.2-2' }}</td>
-            <td>
-              <span class="options-menu">
-                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                <div class="options-menu-container p-0">
-                  <div
-                    class="single-option"
-                    (click)="createOrEditbranch(true, branch)"
-                  >
-                    {{ "tr_action.edit" | translate }}
-                  </div>
-                  <div class="border-bottom"></div>
-                  <div class="single-option" (click)="deleteBranch(branch._id)">
-                    <div class="text-error">
-                      {{ "tr_action.delete" | translate }}
-                    </div>
-                  </div>
-                </div>
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      
+    @if (!branchesLoading) {
+      <div class="plr-4 mt-4">
+        @if (branchesList.length > 0) {
+          <div
+            class="table-container branches-list"
+            id="table-container"
+            >
+            <table class="s-table table layout-fixed branches-list branches-list">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>{{ 'tr_branch_name' | translate }}</th>
+                  <th>{{ 'tr_branch_address' | translate }}</th>
+                  <th>{{ 'tr_rent' | translate }}</th>
+                  <th>{{ 'tr_employees_salary' | translate }}</th>
+                  <th>{{ 'tr_branch_invoices' | translate }}</th>
+                  <th>{{ 'tr_expenses' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (branch of branchesList; track branch; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ branch.name }}</td>
+                    <td>{{ branch.storeAddress }}</td>
+                    <td>{{ branch.rent | currency:'EGP ':'symbol':'1.2-2' }}</td>
+                    <td>{{ branch.employeesSalary | currency:'EGP ':'symbol':'1.2-2' }}</td>
+                    <td>{{ branch.branchInvoices | currency:'EGP ':'symbol':'1.2-2' }}</td>
+                    <td>{{ branch.expenses | currency:'EGP ':'symbol':'1.2-2' }}</td>
+                    <td>
+                      <span class="options-menu">
+                        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                        <div class="options-menu-container p-0">
+                          <div
+                            class="single-option"
+                            (click)="createOrEditbranch(true, branch)"
+                            >
+                            {{ "tr_action.edit" | translate }}
+                          </div>
+                          <div class="border-bottom"></div>
+                          <div class="single-option" (click)="deleteBranch(branch._id)">
+                            <div class="text-error">
+                              {{ "tr_action.delete" | translate }}
+                            </div>
+                          </div>
+                        </div>
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (branchesList.length == 0) {
+          <div
+            class="empty-state-here text-center ptb-8"
+            >
+            <i class="fas fa-box-open empty-icon"></i>
+            <p class="empty-text">{{ "tr_no_items_found" | translate }}</p>
+          </div>
+        }
+        <div class="plr-4 ptb-4">
+          <pagination
+            [paginationData]="paginationData"
+            [perPage]="paginationPerPage"
+            (paginationUpdate)="paginationUpdate($event)"
+          ></pagination>
+        </div>
       </div>
+    }
 
-      <div
-        class="empty-state-here text-center ptb-8"
-        *ngIf="branchesList.length == 0"
-      >
-        <i class="fas fa-box-open empty-icon"></i>
-        <p class="empty-text">{{ "tr_no_items_found" | translate }}</p>
+    @if (branchesLoading) {
+      <div>
+        <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
       </div>
-
-      <div class="plr-4 ptb-4">
-        <pagination
-          [paginationData]="paginationData"
-          [perPage]="paginationPerPage"
-          (paginationUpdate)="paginationUpdate($event)"
-        ></pagination>
-      </div>
-    </div>
-
-    <div *ngIf="branchesLoading">
-      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
-    </div>
+    }
   </div>
 </div>

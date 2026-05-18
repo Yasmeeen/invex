@@ -2,9 +2,10 @@ import { Component, Input } from '@angular/core';
 import * as Highcharts from 'highcharts';
 
 @Component({
-  selector: 'app-chart-wrapper',
-  templateUrl: './chart-wrapper.component.html',
-  styleUrls: ['./chart-wrapper.component.scss'],
+    selector: 'app-chart-wrapper',
+    templateUrl: './chart-wrapper.component.html',
+    styleUrls: ['./chart-wrapper.component.scss'],
+    standalone: false
 })
 export class ChartWrapperComponent {
   @Input() title = '';

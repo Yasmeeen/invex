@@ -5,15 +5,17 @@
       class="app-topbar__icon-btn app-topbar__menu-btn"
       (click)="onMenuClick()"
       [attr.aria-label]="'tr_menu' | translate"
-    >
+      >
       <i class="fa fa-bars" aria-hidden="true"></i>
     </button>
 
     <a routerLink="/home" class="app-topbar__brand app-topbar__brand--inline hidden-mobile">
       <span class="app-topbar__brand-name">INVEX</span>
-      <ng-container *ngIf="storeSettings.settings$ | async as store">
-        <span class="app-topbar__brand-sub" *ngIf="store?.storeName">{{ store.storeName }}</span>
-      </ng-container>
+      @if (storeSettings.settings$ | async; as store) {
+        @if (store?.storeName) {
+          <span class="app-topbar__brand-sub">{{ store.storeName }}</span>
+        }
+      }
     </a>
   </div>
 
@@ -24,10 +26,12 @@
         class="app-topbar__icon-btn app-topbar__icon-btn--ghost"
         [class.app-topbar__icon-btn--ring]="globals.unseenNotificationsCount > 0"
         [attr.aria-label]="'tr_notifications' | translate"
-      >
-        <span class="app-topbar__notify-count" *ngIf="globals.unseenNotificationsCount > 0">
-          {{ globals.unseenNotificationsCount }}
-        </span>
+        >
+        @if (globals.unseenNotificationsCount > 0) {
+          <span class="app-topbar__notify-count">
+            {{ globals.unseenNotificationsCount }}
+          </span>
+        }
         <i class="fa fa-bell-o" aria-hidden="true"></i>
       </button>
       <div class="options-menu-container p-0">
@@ -38,41 +42,50 @@
             class="s-btn btn-secondary btn-sm close-notifications-menu"
             (click)="markAllNotificationsRead()"
             [disabled]="notificationsLoading || notifications.length === 0"
-          >
+            >
             {{ 'tr_mark_all_read' | translate }}
           </button>
         </div>
         <div class="notifications-body">
-          <div class="ptb-4 text-center text-muted" *ngIf="notificationsLoading">
-            {{ 'tr_loading' | translate }}…
-          </div>
-          <div class="ptb-4 text-center text-muted" *ngIf="!notificationsLoading && notifications.length === 0">
-            {{ 'tr_no_notifications' | translate }}
-          </div>
-          <div
-            class="single-notification plr-4 ptb-3 border-bottom"
-            *ngFor="let n of notifications"
-            [class.unread]="isUnread(n)"
-            (click)="openNotification(n)"
-          >
-            <div class="notification-row">
-              <div class="notification-icon" aria-hidden="true">
-                <i class="fa" [ngClass]="notificationIconClass(n)"></i>
-              </div>
-              <div class="notification-content">
-                <div class="weight-medium steel notification-content__title">
-                  <ng-container [ngSwitch]="n.type">
-                    <span *ngSwitchCase="'product_purchase_pending'">{{
-                      'tr_notification_product_purchase_pending_title' | translate
-                    }}</span>
-                    <span *ngSwitchDefault>{{ n.title || ('tr_notifications' | translate) }}</span>
-                  </ng-container>
+          @if (notificationsLoading) {
+            <div class="ptb-4 text-center text-muted">
+              {{ 'tr_loading' | translate }}…
+            </div>
+          }
+          @if (!notificationsLoading && notifications.length === 0) {
+            <div class="ptb-4 text-center text-muted">
+              {{ 'tr_no_notifications' | translate }}
+            </div>
+          }
+          @for (n of notifications; track n) {
+            <div
+              class="single-notification plr-4 ptb-3 border-bottom"
+              [class.unread]="isUnread(n)"
+              (click)="openNotification(n)"
+              >
+              <div class="notification-row">
+                <div class="notification-icon" aria-hidden="true">
+                  <i class="fa" [ngClass]="notificationIconClass(n)"></i>
                 </div>
-                <div class="size-small text-muted mt-1">{{ n.body }}</div>
-                <div class="size-small text-muted mt-1">{{ n.createdAt | date : 'short' }}</div>
+                <div class="notification-content">
+                  <div class="weight-medium steel notification-content__title">
+                    @switch (n.type) {
+                      @case ('product_purchase_pending') {
+                        <span>{{
+                          'tr_notification_product_purchase_pending_title' | translate
+                        }}</span>
+                      }
+                      @default {
+                        <span>{{ n.title || ('tr_notifications' | translate) }}</span>
+                      }
+                    }
+                  </div>
+                  <div class="size-small text-muted mt-1">{{ n.body }}</div>
+                  <div class="size-small text-muted mt-1">{{ n.createdAt | date : 'short' }}</div>
+                </div>
               </div>
             </div>
-          </div>
+          }
         </div>
         <div class="notifications-footer">
           <button type="button" class="s-btn btn-secondary btn-sm" (click)="refreshNotifications()">
@@ -87,24 +100,25 @@
       class="app-topbar__icon-btn hidden-mobile"
       (click)="openChangeLanguageDailog()"
       [attr.aria-label]="('tr_language' | translate)"
-    >
+      >
       <i class="fa fa-language" aria-hidden="true"></i>
     </button>
 
-    <a
-      *ngIf="showOpenCashierLink"
-      routerLink="/cashier"
-      class="s-btn btn-primary btn-sm app-topbar__cta hidden-mobile"
-    >
-      {{ 'tr_open_cashier' | translate }}
-    </a>
+    @if (showOpenCashierLink) {
+      <a
+        routerLink="/cashier"
+        class="s-btn btn-primary btn-sm app-topbar__cta hidden-mobile"
+        >
+        {{ 'tr_open_cashier' | translate }}
+      </a>
+    }
 
     <a
       href="http://www.innovation-tec.com"
       target="_blank"
       rel="noopener noreferrer"
       class="s-btn btn-secondary btn-sm app-topbar__cta-secondary hidden-mobile"
-    >
+      >
       {{ 'tr_contact_us' | translate }}
     </a>
 
@@ -115,56 +129,56 @@
         (click)="toggleUserMenu($event)"
         [attr.aria-expanded]="userMenuOpen"
         [attr.aria-haspopup]="true"
-      >
+        >
         <span class="app-topbar__avatar" aria-hidden="true">{{ userInitials }}</span>
         <span class="app-topbar__user-name hidden-mobile">{{ userDisplayName }}</span>
         <i class="fa fa-caret-down app-topbar__caret" aria-hidden="true"></i>
       </button>
 
-      <div class="app-topbar__dropdown" *ngIf="userMenuOpen">
-        <button type="button" class="app-topbar__dropdown-item hidden-desktop" (click)="closeUserMenu(); openChangeLanguageDailog()">
-          <i class="fa fa-language steel" aria-hidden="true"></i>
-          {{ 'tr_language' | translate }}
-        </button>
-
-        <div class="app-topbar__dropdown-section">
-          <div class="app-topbar__dropdown-title">
-            <i class="fa fa-text-height steel" aria-hidden="true"></i>
-            {{ 'tr_font_size' | translate }}
+      @if (userMenuOpen) {
+        <div class="app-topbar__dropdown">
+          <button type="button" class="app-topbar__dropdown-item hidden-desktop" (click)="closeUserMenu(); openChangeLanguageDailog()">
+            <i class="fa fa-language steel" aria-hidden="true"></i>
+            {{ 'tr_language' | translate }}
+          </button>
+          <div class="app-topbar__dropdown-section">
+            <div class="app-topbar__dropdown-title">
+              <i class="fa fa-text-height steel" aria-hidden="true"></i>
+              {{ 'tr_font_size' | translate }}
+            </div>
+            <div class="font-size-pills" role="group" [attr.aria-label]="'tr_font_size' | translate">
+              <button
+                type="button"
+                class="font-pill font-pill--sm"
+                [class.is-active]="fontSizeChoice === 'small'"
+                (click)="setFontSize('small')"
+                >
+                {{ 'tr_font_small' | translate }}
+              </button>
+              <button
+                type="button"
+                class="font-pill font-pill--md"
+                [class.is-active]="fontSizeChoice === 'medium'"
+                (click)="setFontSize('medium')"
+                >
+                {{ 'tr_font_medium' | translate }}
+              </button>
+              <button
+                type="button"
+                class="font-pill font-pill--lg"
+                [class.is-active]="fontSizeChoice === 'large'"
+                (click)="setFontSize('large')"
+                >
+                {{ 'tr_font_large' | translate }}
+              </button>
+            </div>
           </div>
-          <div class="font-size-pills" role="group" [attr.aria-label]="'tr_font_size' | translate">
-            <button
-              type="button"
-              class="font-pill font-pill--sm"
-              [class.is-active]="fontSizeChoice === 'small'"
-              (click)="setFontSize('small')"
-            >
-              {{ 'tr_font_small' | translate }}
-            </button>
-            <button
-              type="button"
-              class="font-pill font-pill--md"
-              [class.is-active]="fontSizeChoice === 'medium'"
-              (click)="setFontSize('medium')"
-            >
-              {{ 'tr_font_medium' | translate }}
-            </button>
-            <button
-              type="button"
-              class="font-pill font-pill--lg"
-              [class.is-active]="fontSizeChoice === 'large'"
-              (click)="setFontSize('large')"
-            >
-              {{ 'tr_font_large' | translate }}
-            </button>
-          </div>
+          <button type="button" class="app-topbar__dropdown-item app-topbar__dropdown-item--danger" (click)="logout(); closeUserMenu()">
+            <i class="fa fa-sign-out" aria-hidden="true"></i>
+            {{ 'tr_signin.logout' | translate }}
+          </button>
         </div>
-
-        <button type="button" class="app-topbar__dropdown-item app-topbar__dropdown-item--danger" (click)="logout(); closeUserMenu()">
-          <i class="fa fa-sign-out" aria-hidden="true"></i>
-          {{ 'tr_signin.logout' | translate }}
-        </button>
-      </div>
+      }
     </div>
   </div>
 </header>

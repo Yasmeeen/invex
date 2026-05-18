@@ -13,10 +13,11 @@ import { toDataURL as qrToDataUrl } from 'qrcode';
 import { take } from 'rxjs/operators';
 
 @Component({
-  selector: 'app-purchase-receipt-print',
-  templateUrl: './purchase-receipt-print.component.html',
-  styleUrls: ['./purchase-receipt-print.component.scss'],
-  encapsulation: ViewEncapsulation.None,
+    selector: 'app-purchase-receipt-print',
+    templateUrl: './purchase-receipt-print.component.html',
+    styleUrls: ['./purchase-receipt-print.component.scss'],
+    encapsulation: ViewEncapsulation.None,
+    standalone: false
 })
 export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
   @Input() purchase: any;

@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, Inject, OnInit, ViewChild } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatLegacyDialogRef as MatDialogRef, MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA } from '@angular/material/legacy-dialog';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 import { Category } from '@core/models/products.model';
@@ -13,9 +13,10 @@ export interface CategoryAttributeRow {
 }
 
 @Component({
-  selector: 'app-create-edit-category',
-  templateUrl: './create-edit-category.component.html',
-  styleUrls: ['./create-edit-category.component.scss'],
+    selector: 'app-create-edit-category',
+    templateUrl: './create-edit-category.component.html',
+    styleUrls: ['./create-edit-category.component.scss'],
+    standalone: false
 })
 export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   category: Category;

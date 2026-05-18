@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CategoriesServce } from './../../../shared/services/categories.service';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { PaginationData, User } from '@core/models/users-interfaces.model'
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -13,9 +13,10 @@ import { ConfirmationDialogComponent } from '@shared/components/confirmation-dia
 
 
 @Component({
-  selector: 'app-category-list',
-  templateUrl: './category-list.component.html',
-  styleUrls: ['./category-list.component.scss']
+    selector: 'app-category-list',
+    templateUrl: './category-list.component.html',
+    styleUrls: ['./category-list.component.scss'],
+    standalone: false
 })
 export class CategoryListComponent implements OnInit {
 

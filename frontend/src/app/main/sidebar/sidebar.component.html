@@ -3,94 +3,105 @@
   id="main-sidebar"
   class="main-sidebar"
   [class.main-sidebar--collapsed]="isCollapsed"
->
+  >
   <div class="app-sidebar">
     <a routerLink="/home" class="logo-container" (click)="closeSidebar()">
-      <ng-container *ngIf="storeSettings.settings$ | async as store">
+      @if (storeSettings.settings$ | async; as store) {
         <img class="logo" src="/assets/images/logo3.png" alt="" />
         <div class="logo-container__text">
           <span class="logo-container__brand">INVEX</span>
           <div class="store-name">{{ store.storeName }}</div>
         </div>
-      </ng-container>
+      }
     </a>
 
-    <div class="sidebar-user-card" *ngIf="globals.currentUser">
-      <div class="sidebar-user-card__avatar" aria-hidden="true">{{ userInitials }}</div>
-      <div class="sidebar-user-card__meta">
-        <div class="sidebar-user-card__name-row">
-          <span class="sidebar-user-card__name">{{ userDisplayName }}</span>
-          <span class="sidebar-user-card__badge" title="Active" aria-hidden="true">✓</span>
+    @if (globals.currentUser) {
+      <div class="sidebar-user-card">
+        <div class="sidebar-user-card__avatar" aria-hidden="true">{{ userInitials }}</div>
+        <div class="sidebar-user-card__meta">
+          <div class="sidebar-user-card__name-row">
+            <span class="sidebar-user-card__name">{{ userDisplayName }}</span>
+            <span class="sidebar-user-card__badge" title="Active" aria-hidden="true">✓</span>
+          </div>
+          @if (userRoleLabel) {
+            <div class="sidebar-user-card__role">{{ userRoleLabel }}</div>
+          }
         </div>
-        <div class="sidebar-user-card__role" *ngIf="userRoleLabel">{{ userRoleLabel }}</div>
       </div>
-    </div>
+    }
 
     <nav class="main-routing-links plr-2" aria-label="Main">
-      <div
-        *ngFor="let link of appSidebar"
-        routerLinkActive="active-link"
-        class="anchor-container"
-        [class.anchor-container--parent]="link.children"
-      >
-        <div>
-          <a
-            *ngIf="link.routerLink !== 'null'"
-            [routerLink]="link.routerLink"
-            [attr.title]="link.name | translate"
-            (click)="closeSidebar()"
+      @for (link of appSidebar; track link) {
+        <div
+          routerLinkActive="active-link"
+          class="anchor-container"
+          [class.anchor-container--parent]="link.children"
           >
-            <div class="link-content">
-              <span class="link-content__icon-wrap" aria-hidden="true">
-                <span [class]="link.icon"></span>
-              </span>
-              <span class="main-icon-text">{{ link.name | translate }}</span>
-            </div>
-          </a>
-          <div
-            *ngIf="link.routerLink === 'null'"
-            class="link-content link-content--nonav"
-            role="button"
-            tabindex="0"
-            (click)="toggleParentSection($event)"
-            (keydown.enter)="toggleParentSection($event)"
-            (keydown.space)="$event.preventDefault(); toggleParentSection($event)"
-          >
-            <span class="link-content__icon-wrap" aria-hidden="true">
-              <span [class]="link.icon"></span>
-            </span>
-            <span class="main-icon-text">{{ link.name | translate }}</span>
-          </div>
-        </div>
-        <span
-          *ngIf="link.children"
-          class="fa fa-chevron-down children-arrow"
-          role="button"
-          tabindex="0"
-          (click)="toggleChildren($event)"
-          (keydown.enter)="toggleChildren($event)"
-        ></span>
-        <div *ngIf="link.children" class="child-menu">
-          <div
-            *ngFor="let child of link.children"
-            routerLinkActive="child-active"
-            class="anchor-container"
-          >
-            <a
-              [routerLink]="child.routerLink"
-              [attr.title]="child.name | translate"
-              (click)="closeSidebar()"
-            >
-              <div class="link-content link-content--child">
+          <div>
+            @if (link.routerLink !== 'null') {
+              <a
+                [routerLink]="link.routerLink"
+                [attr.title]="link.name | translate"
+                (click)="closeSidebar()"
+                >
+                <div class="link-content">
+                  <span class="link-content__icon-wrap" aria-hidden="true">
+                    <span [class]="link.icon"></span>
+                  </span>
+                  <span class="main-icon-text">{{ link.name | translate }}</span>
+                </div>
+              </a>
+            }
+            @if (link.routerLink === 'null') {
+              <div
+                class="link-content link-content--nonav"
+                role="button"
+                tabindex="0"
+                (click)="toggleParentSection($event)"
+                (keydown.enter)="toggleParentSection($event)"
+                (keydown.space)="$event.preventDefault(); toggleParentSection($event)"
+                >
                 <span class="link-content__icon-wrap" aria-hidden="true">
-                  <span [class]="child.icon"></span>
+                  <span [class]="link.icon"></span>
                 </span>
-                <span class="main-icon-text size-small ml-2">{{ child.name | translate }}</span>
+                <span class="main-icon-text">{{ link.name | translate }}</span>
               </div>
-            </a>
+            }
           </div>
+          @if (link.children) {
+            <span
+              class="fa fa-chevron-down children-arrow"
+              role="button"
+              tabindex="0"
+              (click)="toggleChildren($event)"
+              (keydown.enter)="toggleChildren($event)"
+            ></span>
+          }
+          @if (link.children) {
+            <div class="child-menu">
+              @for (child of link.children; track child) {
+                <div
+                  routerLinkActive="child-active"
+                  class="anchor-container"
+                  >
+                  <a
+                    [routerLink]="child.routerLink"
+                    [attr.title]="child.name | translate"
+                    (click)="closeSidebar()"
+                    >
+                    <div class="link-content link-content--child">
+                      <span class="link-content__icon-wrap" aria-hidden="true">
+                        <span [class]="child.icon"></span>
+                      </span>
+                      <span class="main-icon-text size-small ml-2">{{ child.name | translate }}</span>
+                    </div>
+                  </a>
+                </div>
+              }
+            </div>
+          }
         </div>
-      </div>
+      }
     </nav>
   </div>
 </div>

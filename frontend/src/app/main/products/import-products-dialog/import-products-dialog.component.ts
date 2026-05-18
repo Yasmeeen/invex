@@ -1,5 +1,5 @@
 import { Component, Inject } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import * as ExcelJS from 'exceljs';
@@ -19,9 +19,10 @@ type DialogData = {
 };
 
 @Component({
-  selector: 'app-import-products-dialog',
-  templateUrl: './import-products-dialog.component.html',
-  styleUrls: ['./import-products-dialog.component.scss'],
+    selector: 'app-import-products-dialog',
+    templateUrl: './import-products-dialog.component.html',
+    styleUrls: ['./import-products-dialog.component.scss'],
+    standalone: false
 })
 export class ImportProductsDialogComponent {
   allowPartial = true;

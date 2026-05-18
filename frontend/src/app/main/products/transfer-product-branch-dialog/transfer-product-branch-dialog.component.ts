@@ -1,6 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Branch, Product } from '@core/models/products.model';
@@ -8,19 +8,20 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { ProductsSerivce } from '@shared/services/products.service';
 
 @Component({
-  selector: 'app-transfer-product-branch-dialog',
-  templateUrl: './transfer-product-branch-dialog.component.html',
-  styleUrls: ['./transfer-product-branch-dialog.component.scss'],
+    selector: 'app-transfer-product-branch-dialog',
+    templateUrl: './transfer-product-branch-dialog.component.html',
+    styleUrls: ['./transfer-product-branch-dialog.component.scss'],
+    standalone: false
 })
 export class TransferProductBranchDialogComponent implements OnInit {
-  form: FormGroup;
+  form: UntypedFormGroup;
   saving = false;
   product: Product;
   branches: Branch[];
   readonly maxQuantity: number;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private dialogRef: MatDialogRef<TransferProductBranchDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA)
     public data: { product: Product; branches: Branch[]; maxQuantity: number },

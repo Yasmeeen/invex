@@ -1,7 +1,7 @@
 import { map } from 'rxjs/operators';
 import { Component, OnInit, ViewChild, ElementRef, Inject, Output, EventEmitter } from '@angular/core';
 import { NgForm } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -11,9 +11,10 @@ import { Vendor } from '@core/models/products.model';
 
 
 @Component({
-  selector: 'app-create-edit-vendor',
-  templateUrl: './create-edit-vendor.component.html',
-  styleUrls: ['./create-edit-vendor.component.scss']
+    selector: 'app-create-edit-vendor',
+    templateUrl: './create-edit-vendor.component.html',
+    styleUrls: ['./create-edit-vendor.component.scss'],
+    standalone: false
 })
 export class CreateEditVendorComponent implements OnInit {
   @ViewChild('vendorForm') vendorForm: NgForm;

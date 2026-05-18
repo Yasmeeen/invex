@@ -6,9 +6,10 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 
 @Component({
-  selector: 'app-report-filters',
-  templateUrl: './report-filters.component.html',
-  styleUrls: ['./report-filters.component.scss'],
+    selector: 'app-report-filters',
+    templateUrl: './report-filters.component.html',
+    styleUrls: ['./report-filters.component.scss'],
+    standalone: false
 })
 export class ReportFiltersComponent implements OnInit {
   /** When `bookings`, show booking-specific filters and hide group-by. */

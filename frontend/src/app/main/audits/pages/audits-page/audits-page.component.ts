@@ -5,9 +5,10 @@ import { AuditsService, AuditLogRow } from '@shared/services/audits.service';
 type Col = { key: string; labelKey: string };
 
 @Component({
-  selector: 'app-audits-page',
-  templateUrl: './audits-page.component.html',
-  styleUrls: ['./audits-page.component.scss'],
+    selector: 'app-audits-page',
+    templateUrl: './audits-page.component.html',
+    styleUrls: ['./audits-page.component.scss'],
+    standalone: false
 })
 export class AuditsPageComponent implements OnInit {
   loading = false;

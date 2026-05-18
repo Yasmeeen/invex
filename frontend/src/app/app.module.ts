@@ -1,4 +1,4 @@
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
@@ -25,30 +25,22 @@ export function HttpLoaderFactory(http: HttpClient): TranslateHttpLoader {
   return new TranslateHttpLoader(http);
 }
 
-@NgModule({
-  declarations: [
-    AppComponent
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    HttpClientModule,
-    LoadingBarRouterModule,
-    CommonModule,
-    SharedModule,
-    MainModule,
-    BrowserAnimationsModule,
-    CoreModule.forRoot(),
-    TranslateModule.forRoot({
-      loader: {
-      provide: TranslateLoader,
-      useFactory: HttpLoaderFactory,
-      deps: [HttpClient],
-      }
-    })
-  ],
-
-  providers: [Globals, AuthenticationGuard, AuthenticationService, UserSerivce, UploadFilesWithPreSignedUrlService],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        AppRoutingModule,
+        LoadingBarRouterModule,
+        CommonModule,
+        SharedModule,
+        MainModule,
+        BrowserAnimationsModule,
+        CoreModule.forRoot(),
+        TranslateModule.forRoot({
+            loader: {
+                provide: TranslateLoader,
+                useFactory: HttpLoaderFactory,
+                deps: [HttpClient],
+            }
+        })], providers: [Globals, AuthenticationGuard, AuthenticationService, UserSerivce, UploadFilesWithPreSignedUrlService, provideHttpClient(withInterceptorsFromDi())] })
 export class AppModule { }

@@ -20,7 +20,7 @@
             [items]="branches"
             (change)="changeBranch()"
             [clearable]="true"
-          >
+            >
           </ng-select>
           <i class="fa fa-caret-down input-icon"></i>
         </div>
@@ -35,7 +35,7 @@
             placeholder="{{ 'tr_pick_date' | translate }}"
             [matDatepicker]="pickFrom"
             class="s-control bg-white"
-          />
+            />
           <mat-datepicker #pickFrom></mat-datepicker>
           <mat-datepicker-toggle class="input-icon date-picker" [for]="pickFrom"></mat-datepicker-toggle>
         </div>
@@ -50,7 +50,7 @@
             placeholder="{{ 'tr_pick_date' | translate }}"
             [matDatepicker]="pickTo"
             class="s-control bg-white"
-          />
+            />
           <mat-datepicker #pickTo></mat-datepicker>
           <mat-datepicker-toggle class="input-icon date-picker" [for]="pickTo"></mat-datepicker-toggle>
         </div>
@@ -68,10 +68,14 @@
   <!-- KPIs -->
   <section class="dashboard-section">
     <div class="dashboard-section__head">
-      <p class="dashboard-section__subtitle" *ngIf="!isToday">
-        {{ fromDate | date: 'dd/M/yyyy' }} {{ 'tr_to' | translate }} {{ toDate | date: 'dd/M/yyyy' }}
-      </p>
-      <p class="dashboard-section__subtitle" *ngIf="isToday">{{ 'tr_today' | translate }}</p>
+      @if (!isToday) {
+        <p class="dashboard-section__subtitle">
+          {{ fromDate | date: 'dd/M/yyyy' }} {{ 'tr_to' | translate }} {{ toDate | date: 'dd/M/yyyy' }}
+        </p>
+      }
+      @if (isToday) {
+        <p class="dashboard-section__subtitle">{{ 'tr_today' | translate }}</p>
+      }
     </div>
 
     <div class="dashboard-kpi-grid">
@@ -105,15 +109,17 @@
         </div>
       </article>
 
-      <article class="dashboard-kpi-card dashboard-kpi-card--avg" *ngIf="averageOrderDisplay !== null">
-        <div class="dashboard-kpi-card__icon" aria-hidden="true">
-          <i class="fa fa-calculator"></i>
-        </div>
-        <div class="dashboard-kpi-card__body">
-          <span class="dashboard-kpi-card__label">{{ 'tr_average_order' | translate }}</span>
-          <span class="dashboard-kpi-card__value">{{ averageOrderDisplay }}</span>
-        </div>
-      </article>
+      @if (averageOrderDisplay !== null) {
+        <article class="dashboard-kpi-card dashboard-kpi-card--avg">
+          <div class="dashboard-kpi-card__icon" aria-hidden="true">
+            <i class="fa fa-calculator"></i>
+          </div>
+          <div class="dashboard-kpi-card__body">
+            <span class="dashboard-kpi-card__label">{{ 'tr_average_order' | translate }}</span>
+            <span class="dashboard-kpi-card__value">{{ averageOrderDisplay }}</span>
+          </div>
+        </article>
+      }
     </div>
   </section>
 
@@ -123,9 +129,11 @@
       <div class="dashboard-chart-card">
         <div class="dashboard-chart-card__header">
           <span class="dashboard-chart-card__title">{{ 'tr_products' | translate }}</span>
-          <span class="dashboard-chart-card__badge" *ngIf="productsStats?.totalProducts != null">{{
-            productsStats?.totalProducts
-          }}</span>
+          @if (productsStats?.totalProducts != null) {
+            <span class="dashboard-chart-card__badge">{{
+              productsStats?.totalProducts
+            }}</span>
+          }
         </div>
         <p class="dashboard-chart-card__caption">{{ 'tr_stock_status' | translate }}</p>
         <div id="products-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
@@ -141,13 +149,15 @@
       <div class="dashboard-chart-card">
         <div class="dashboard-chart-card__header">
           <span class="dashboard-chart-card__title">{{ 'tr_orders' | translate }}</span>
-          <span class="dashboard-chart-card__badge" *ngIf="ordersTotal != null">{{ ordersTotal }}</span>
+          @if (ordersTotal != null) {
+            <span class="dashboard-chart-card__badge">{{ ordersTotal }}</span>
+          }
         </div>
         <p class="dashboard-chart-card__caption">{{ 'tr_order_status' | translate }}</p>
         <div id="orders-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
       </div>
 
-  
+
 
       <div class="dashboard-chart-card">
         <div class="dashboard-chart-card__header">
@@ -170,7 +180,7 @@
           (click)="installmentsTab = 'upcoming'"
           role="tab"
           [attr.aria-selected]="installmentsTab === 'upcoming'"
-        >
+          >
           {{ 'tr_tab_upcoming' | translate }}
         </button>
         <button
@@ -180,80 +190,88 @@
           (click)="installmentsTab = 'past'"
           role="tab"
           [attr.aria-selected]="installmentsTab === 'past'"
-        >
+          >
           {{ 'tr_tab_past' | translate }}
         </button>
       </div>
 
-      <div
-        class="dashboard-installments__panel"
-        *ngIf="installmentsTab === 'upcoming'"
-        role="tabpanel"
-      >
-        <h3 class="dashboard-installments__heading">{{ 'tr_upcoming_unpaid_installments' | translate }}</h3>
-        <div *ngIf="installments.length; else noUpcomingTpl" class="dashboard-table-wrap">
-          <table class="table s-table dashboard-table">
-            <thead>
-              <tr>
-                <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_due_date' | translate }}</th>
-                <th>{{ 'tr_amount' | translate }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let inst of installments">
-                <td>{{ inst.vendor?.name }}</td>
-                <td>{{ inst.dueDate | date }}</td>
-                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
-                <td class="dashboard-table__actions">
-                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
-                    {{ 'tr_mark_paid' | translate }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      @if (installmentsTab === 'upcoming') {
+        <div
+          class="dashboard-installments__panel"
+          role="tabpanel"
+          >
+          <h3 class="dashboard-installments__heading">{{ 'tr_upcoming_unpaid_installments' | translate }}</h3>
+          @if (installments.length) {
+            <div class="dashboard-table-wrap">
+              <table class="table s-table dashboard-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'tr_supplier' | translate }}</th>
+                    <th>{{ 'tr_due_date' | translate }}</th>
+                    <th>{{ 'tr_amount' | translate }}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (inst of installments; track inst) {
+                    <tr>
+                      <td>{{ inst.vendor?.name }}</td>
+                      <td>{{ inst.dueDate | date }}</td>
+                      <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                      <td class="dashboard-table__actions">
+                        <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                          {{ 'tr_mark_paid' | translate }}
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="dashboard-installments__empty">{{ 'tr_empty_state' | translate }}</p>
+          }
         </div>
-        <ng-template #noUpcomingTpl>
-          <p class="dashboard-installments__empty">{{ 'tr_empty_state' | translate }}</p>
-        </ng-template>
-      </div>
+      }
 
-      <div
-        class="dashboard-installments__panel"
-        *ngIf="installmentsTab === 'past'"
-        role="tabpanel"
-      >
-        <h3 class="dashboard-installments__heading">{{ 'tr_past_unpaid_installments' | translate }}</h3>
-        <div *ngIf="pastInstallments.length; else noPastTpl" class="dashboard-table-wrap">
-          <table class="table s-table dashboard-table">
-            <thead>
-              <tr>
-                <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_due_date' | translate }}</th>
-                <th>{{ 'tr_amount' | translate }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let inst of pastInstallments">
-                <td>{{ inst.vendor?.name }}</td>
-                <td>{{ inst.dueDate | date }}</td>
-                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
-                <td class="dashboard-table__actions">
-                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
-                    {{ 'tr_mark_paid' | translate }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      @if (installmentsTab === 'past') {
+        <div
+          class="dashboard-installments__panel"
+          role="tabpanel"
+          >
+          <h3 class="dashboard-installments__heading">{{ 'tr_past_unpaid_installments' | translate }}</h3>
+          @if (pastInstallments.length) {
+            <div class="dashboard-table-wrap">
+              <table class="table s-table dashboard-table">
+                <thead>
+                  <tr>
+                    <th>{{ 'tr_supplier' | translate }}</th>
+                    <th>{{ 'tr_due_date' | translate }}</th>
+                    <th>{{ 'tr_amount' | translate }}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (inst of pastInstallments; track inst) {
+                    <tr>
+                      <td>{{ inst.vendor?.name }}</td>
+                      <td>{{ inst.dueDate | date }}</td>
+                      <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                      <td class="dashboard-table__actions">
+                        <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                          {{ 'tr_mark_paid' | translate }}
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="dashboard-installments__empty">{{ 'tr_no_past_unpaid_installments' | translate }}</p>
+          }
         </div>
-        <ng-template #noPastTpl>
-          <p class="dashboard-installments__empty">{{ 'tr_no_past_unpaid_installments' | translate }}</p>
-        </ng-template>
-      </div>
+      }
     </div>
   </section>
 </div>

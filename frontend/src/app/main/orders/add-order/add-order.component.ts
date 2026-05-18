@@ -2,7 +2,7 @@
 import { OnInit } from "@angular/core";
 import { Component } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MatLegacyDialogRef as MatDialogRef } from "@angular/material/legacy-dialog";
 import { Branch, Order, Product, productOrder } from "@core/models/products.model";
 // import { ProductsSerivce } from "@shared/services/products.service copy";
 import { OrdersSerivce } from "@shared/services/orders.service";
@@ -18,9 +18,10 @@ import { BrowserMultiFormatReader } from '@zxing/browser';
 import { canPickBranchRole } from '@core/utils/role-utils';
 
 @Component({
-  selector: "app-add-order",
-  templateUrl: "./add-order.component.html",
-  styleUrls: ["./add-order.component.scss"],
+    selector: "app-add-order",
+    templateUrl: "./add-order.component.html",
+    styleUrls: ["./add-order.component.scss"],
+    standalone: false
 })
 export class AddOrderComponent implements OnInit {
 

@@ -23,18 +23,23 @@
                 min="1"
                 [max]="maxQuantity"
                 formControlName="quantity"
-              />
-              <div
-                class="text-error size-small mt-1"
-                *ngIf="form.get('quantity')?.invalid && form.get('quantity')?.touched"
-              >
-                <span *ngIf="form.get('quantity')?.errors?.['max']">{{
-                  'tr_booking_quantity_too_high' | translate : { max: maxQuantity }
-                }}</span>
-                <span *ngIf="form.get('quantity')?.errors?.['min'] && !form.get('quantity')?.errors?.['max']">{{
-                  'tr_booking_quantity_invalid' | translate
-                }}</span>
-              </div>
+                />
+              @if (form.get('quantity')?.invalid && form.get('quantity')?.touched) {
+                <div
+                  class="text-error size-small mt-1"
+                  >
+                  @if (form.get('quantity')?.errors?.['max']) {
+                    <span>{{
+                      'tr_booking_quantity_too_high' | translate : { max: maxQuantity }
+                    }}</span>
+                  }
+                  @if (form.get('quantity')?.errors?.['min'] && !form.get('quantity')?.errors?.['max']) {
+                    <span>{{
+                      'tr_booking_quantity_invalid' | translate
+                    }}</span>
+                  }
+                </div>
+              }
             </div>
           </div>
           <div class="col-md-6">
@@ -48,22 +53,29 @@
                 type="tel"
                 autocomplete="tel"
                 formControlName="customerPhone"
-              />
+                />
               <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_phone_lookup_hint' | translate }}</p>
-              <div
-                class="text-error size-small mt-1"
-                *ngIf="form.get('customerPhone')?.invalid && form.get('customerPhone')?.touched"
-              >
-                <span *ngIf="form.get('customerPhone')?.errors?.['required']">{{
-                  'tr_client_phone_required' | translate
-                }}</span>
-                <span *ngIf="form.get('customerPhone')?.errors?.['phoneFormat']">{{
-                  'tr_client_phone_invalid' | translate
-                }}</span>
-              </div>
-              <div *ngIf="clientLookupLoading" class="size-small text-muted mt-1">
-                {{ 'tr_booking_phone_lookup_loading' | translate }}…
-              </div>
+              @if (form.get('customerPhone')?.invalid && form.get('customerPhone')?.touched) {
+                <div
+                  class="text-error size-small mt-1"
+                  >
+                  @if (form.get('customerPhone')?.errors?.['required']) {
+                    <span>{{
+                      'tr_client_phone_required' | translate
+                    }}</span>
+                  }
+                  @if (form.get('customerPhone')?.errors?.['phoneFormat']) {
+                    <span>{{
+                      'tr_client_phone_invalid' | translate
+                    }}</span>
+                  }
+                </div>
+              }
+              @if (clientLookupLoading) {
+                <div class="size-small text-muted mt-1">
+                  {{ 'tr_booking_phone_lookup_loading' | translate }}…
+                </div>
+              }
             </div>
           </div>
           <div class="col-md-6">
@@ -80,7 +92,7 @@
                 class="s-control width-100"
                 formControlName="registeredAddress"
                 autocomplete="street-address"
-              />
+                />
               <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_registered_address_hint' | translate }}</p>
             </div>
           </div>
@@ -96,7 +108,7 @@
                 [clearable]="false"
                 [searchable]="false"
                 appendTo="body"
-              >
+                >
                 <ng-template ng-label-tmp let-item="item">
                   {{ item.labelKey | translate }}
                 </ng-template>
@@ -106,17 +118,19 @@
               </ng-select>
             </div>
           </div>
-          <div class="col-md-12" *ngIf="form.get('pickupType')?.value === 'online_shipping'">
-            <div class="form-group">
-              <label>{{ 'tr_booking_shipping_address' | translate }}</label>
-              <textarea
-                class="s-control width-100 booking-shipping-address"
-                rows="2"
-                formControlName="shippingAddress"
-              ></textarea>
-              <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_shipping_address_hint' | translate }}</p>
+          @if (form.get('pickupType')?.value === 'online_shipping') {
+            <div class="col-md-12">
+              <div class="form-group">
+                <label>{{ 'tr_booking_shipping_address' | translate }}</label>
+                <textarea
+                  class="s-control width-100 booking-shipping-address"
+                  rows="2"
+                  formControlName="shippingAddress"
+                ></textarea>
+                <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_shipping_address_hint' | translate }}</p>
+              </div>
             </div>
-          </div>
+          }
           <div class="col-md-6">
             <div class="form-group">
               <label>{{ 'tr_booking_deposit' | translate }}</label>
@@ -145,47 +159,53 @@
                     isUploadingDepositProof || !isCloudinaryConfigured() || depositProofUrls.length >= maxDepositProofImages
                   "
                   (change)="onDepositProofSelected($event)"
-                />
-                <button
-                  type="button"
-                  class="s-btn btn-secondary btn-sm booking-deposit-clear-all"
-                  *ngIf="depositProofUrls.length"
-                  (click)="clearDepositProofs()"
-                  [attr.aria-label]="'tr_clear' | translate"
-                  [attr.title]="'tr_clear' | translate"
-                >
-                  <i class="fa fa-trash" aria-hidden="true"></i>
-                </button>
-              </div>
-              <div *ngIf="isUploadingDepositProof" class="size-small text-muted mt-1">
-                {{ 'tr_booking_deposit_proof_uploading' | translate }}…
-              </div>
-              <div *ngIf="depositProofUrls.length" class="booking-deposit-thumbs" role="list">
-                <div
-                  *ngFor="let url of depositProofUrls; let i = index"
-                  class="booking-deposit-thumb"
-                  role="listitem"
-                >
+                  />
+                @if (depositProofUrls.length) {
                   <button
                     type="button"
-                    class="booking-deposit-thumb__remove"
-                    (click)="removeDepositProofAt(i)"
-                    [attr.aria-label]="'tr_remove' | translate"
-                    [attr.title]="'tr_remove' | translate"
-                  >
-                    <i class="fa fa-times-circle" aria-hidden="true"></i>
+                    class="s-btn btn-secondary btn-sm booking-deposit-clear-all"
+                    (click)="clearDepositProofs()"
+                    [attr.aria-label]="'tr_clear' | translate"
+                    [attr.title]="'tr_clear' | translate"
+                    >
+                    <i class="fa fa-trash" aria-hidden="true"></i>
                   </button>
-                  <button
-                    type="button"
-                    class="booking-deposit-thumb__open"
-                    (click)="openDepositPreview(url)"
-                    [attr.aria-label]="'tr_booking_deposit_preview' | translate"
-                    [attr.title]="'tr_booking_deposit_preview' | translate"
-                  >
-                    <img [src]="url" alt="" loading="lazy" />
-                  </button>
+                }
+              </div>
+              @if (isUploadingDepositProof) {
+                <div class="size-small text-muted mt-1">
+                  {{ 'tr_booking_deposit_proof_uploading' | translate }}…
                 </div>
-              </div>
+              }
+              @if (depositProofUrls.length) {
+                <div class="booking-deposit-thumbs" role="list">
+                  @for (url of depositProofUrls; track url; let i = $index) {
+                    <div
+                      class="booking-deposit-thumb"
+                      role="listitem"
+                      >
+                      <button
+                        type="button"
+                        class="booking-deposit-thumb__remove"
+                        (click)="removeDepositProofAt(i)"
+                        [attr.aria-label]="'tr_remove' | translate"
+                        [attr.title]="'tr_remove' | translate"
+                        >
+                        <i class="fa fa-times-circle" aria-hidden="true"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="booking-deposit-thumb__open"
+                        (click)="openDepositPreview(url)"
+                        [attr.aria-label]="'tr_booking_deposit_preview' | translate"
+                        [attr.title]="'tr_booking_deposit_preview' | translate"
+                        >
+                        <img [src]="url" alt="" loading="lazy" />
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
             </div>
           </div>
         </div>
@@ -199,31 +219,32 @@
           class="s-btn btn-primary"
           [disabled]="saving || isUploadingDepositProof || clientLookupLoading"
           (click)="submit()"
-        >
+          >
           {{ 'tr_booking_save' | translate }}
         </button>
       </div>
     </div>
     <!-- Full image preview above dialog chrome -->
-    <div
-      *ngIf="depositPreviewUrl"
-      class="booking-deposit-lightbox"
-      (click)="closeDepositPreview()"
-      role="dialog"
-      [attr.aria-modal]="true"
-      [attr.aria-label]="'tr_booking_deposit_preview' | translate"
-    >
-      <div class="booking-deposit-lightbox__panel" (click)="$event.stopPropagation()">
-        <button
-          type="button"
-          class="booking-deposit-lightbox__close"
-          (click)="closeDepositPreview()"
-          [attr.aria-label]="'tr_close' | translate"
+    @if (depositPreviewUrl) {
+      <div
+        class="booking-deposit-lightbox"
+        (click)="closeDepositPreview()"
+        role="dialog"
+        [attr.aria-modal]="true"
+        [attr.aria-label]="'tr_booking_deposit_preview' | translate"
         >
-          <i class="fa fa-times" aria-hidden="true"></i>
-        </button>
-        <img [src]="depositPreviewUrl" alt="" />
+        <div class="booking-deposit-lightbox__panel" (click)="$event.stopPropagation()">
+          <button
+            type="button"
+            class="booking-deposit-lightbox__close"
+            (click)="closeDepositPreview()"
+            [attr.aria-label]="'tr_close' | translate"
+            >
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+          <img [src]="depositPreviewUrl" alt="" />
+        </div>
       </div>
-    </div>
+    }
   </div>
 </div>

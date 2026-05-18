@@ -1,14 +1,6 @@
 import { Injectable } from '@angular/core';
 // import { ErrorDialogService } from '../error-dialog/errordialog.service';
-import {
-    HttpInterceptor,
-    HttpRequest,
-    HttpResponse,
-    HttpHandler,
-    HttpEvent,
-    HttpErrorResponse,
-    HttpHeaders
-} from '@angular/common/http';
+import { HttpInterceptor, HttpRequest, HttpResponse, HttpHandler, HttpEvent, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 
 import { Observable, throwError, of, EMPTY } from 'rxjs';
 import { map, catchError, retry, tap, retryWhen, delay, take, mergeMap } from 'rxjs/operators';

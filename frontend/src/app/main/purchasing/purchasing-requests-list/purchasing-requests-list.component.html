@@ -1,20 +1,21 @@
 <div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
-    <h2 class="size-body title-with-btn plr-4 ptb-4">
-      <span class="page-title">
-        <span class="text-primary">{{ totalNumberOfPurchasingRequests }}-</span>
-        {{ 'tr_purchasing_requests' | translate }}
-      </span>
-      <div class="btn-group">
-        <button class="s-btn btn-primary" (click)="createOrEditPurchasing(false)">
-          {{ 'tr_add_purchasing_request' | translate }}
-        </button>
-        <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
-          <i class="fa fa-filter text-primary" aria-hidden="false"></i>
-        </button>
-      </div>
-    </h2>
-  
-    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">
+      <span class="text-primary">{{ totalNumberOfPurchasingRequests }}-</span>
+      {{ 'tr_purchasing_requests' | translate }}
+    </span>
+    <div class="btn-group">
+      <button class="s-btn btn-primary" (click)="createOrEditPurchasing(false)">
+        {{ 'tr_add_purchasing_request' | translate }}
+      </button>
+      <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary" aria-hidden="false"></i>
+      </button>
+    </div>
+  </h2>
+
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
       <div class="row">
         <div class="col-md-3">
           <div class="form-group mb-0">
@@ -25,73 +26,82 @@
                 (keyup)="filterPurchasingRequests($event)"
                 placeholder="{{ 'tr_search' | translate }}"
                 [(ngModel)]="supplierSearchTerm"
-              />
+                />
             </div>
           </div>
         </div>
       </div>
     </div>
-  
-    <div>
-      <div class="plr-4 mt-4" *ngIf="!isLoading">
-        <div
-          class="table-container purchasing-request-list"
-          *ngIf="purchasingRequestsList.length > 0"
-        >
-          <table class="s-table table layout-fixed">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_request_date' | translate }}</th>
-                <th>{{ 'tr_status' | translate }}</th>
-                <th>{{ 'tr_payment_terms' | translate }}</th>
-                <th>{{ 'tr_total_amount' | translate }}</th>
-                <th>{{ 'tr_installments' | translate }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let request of purchasingRequestsList; let i = index">
-                <td>{{ i + 1 }}</td>
-                <td>{{ request.supplier?.name }}</td>
-                <td>{{ request.requestDate | date: 'dd/M/YYYY' }}</td>
-                <td>{{ request.status }}</td>
-                <td>{{ request.paymentStatus}}</td>
-                <td>{{ request.totalAmount }}</td>
-                <td>
-                  <div *ngFor="let installment of request.installments">
+  }
 
-                    {{installment.dueDate | date: 'dd/M/YYYY'}} 
-                    <i class="fa fa-check text-success" aria-hidden="true" *ngIf="installment.paid"></i>
-                    <i class="fa fa-times-circle text-error" aria-hidden="true" *ngIf="!installment.paid"></i>
-                    <span>  {{installment.amount | currency:'EGP'}} </span>
-         
-                  </div>
-                </td>
-                <td>
-                  <span class="options-menu">
-                    <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                    <div class="options-menu-container p-0">
-                      <div class="single-option" (click)="deletePurchasingRequest(request._id!)">
-                        <div class="text-error">{{ 'tr_action.delete' | translate }}</div>
-                      </div>
-                      <div class="single-option" (click)="createOrEditPurchasing(true, request)">
-                        {{ 'tr_action.edit' | translate }}
-                      </div>
-                    </div>
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-  
-        <div class="empty-state-here text-center ptb-8" *ngIf="purchasingRequestsList.length == 0">
-          <i class="fa fa-folder-open empty-icon text-primary"></i>
-          <p>{{ 'tr_empty_state' | translate }}</p>
-        </div>
-  
+  <div>
+    @if (!isLoading) {
+      <div class="plr-4 mt-4">
+        @if (purchasingRequestsList.length > 0) {
+          <div
+            class="table-container purchasing-request-list"
+            >
+            <table class="s-table table layout-fixed">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>{{ 'tr_supplier' | translate }}</th>
+                  <th>{{ 'tr_request_date' | translate }}</th>
+                  <th>{{ 'tr_status' | translate }}</th>
+                  <th>{{ 'tr_payment_terms' | translate }}</th>
+                  <th>{{ 'tr_total_amount' | translate }}</th>
+                  <th>{{ 'tr_installments' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (request of purchasingRequestsList; track request; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ request.supplier?.name }}</td>
+                    <td>{{ request.requestDate | date: 'dd/M/YYYY' }}</td>
+                    <td>{{ request.status }}</td>
+                    <td>{{ request.paymentStatus}}</td>
+                    <td>{{ request.totalAmount }}</td>
+                    <td>
+                      @for (installment of request.installments; track installment) {
+                        <div>
+                          {{installment.dueDate | date: 'dd/M/YYYY'}}
+                          @if (installment.paid) {
+                            <i class="fa fa-check text-success" aria-hidden="true"></i>
+                          }
+                          @if (!installment.paid) {
+                            <i class="fa fa-times-circle text-error" aria-hidden="true"></i>
+                          }
+                          <span>  {{installment.amount | currency:'EGP'}} </span>
+                        </div>
+                      }
+                    </td>
+                    <td>
+                      <span class="options-menu">
+                        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                        <div class="options-menu-container p-0">
+                          <div class="single-option" (click)="deletePurchasingRequest(request._id!)">
+                            <div class="text-error">{{ 'tr_action.delete' | translate }}</div>
+                          </div>
+                          <div class="single-option" (click)="createOrEditPurchasing(true, request)">
+                            {{ 'tr_action.edit' | translate }}
+                          </div>
+                        </div>
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (purchasingRequestsList.length == 0) {
+          <div class="empty-state-here text-center ptb-8">
+            <i class="fa fa-folder-open empty-icon text-primary"></i>
+            <p>{{ 'tr_empty_state' | translate }}</p>
+          </div>
+        }
         <div class="plr-4 ptb-4">
           <pagination
             [paginationData]="paginationData"
@@ -100,10 +110,12 @@
           ></pagination>
         </div>
       </div>
-  
-      <div *ngIf="isLoading">
+    }
+
+    @if (isLoading) {
+      <div>
         <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
       </div>
-    </div>
+    }
+  </div>
 </div>
-  

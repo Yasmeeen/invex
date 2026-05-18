@@ -1,119 +1,127 @@
 <div class="complex-modal">
-    <div class="modal-wrapper">
-      <div class="close-modal-icon" (click)="closeModal()"></div>
-      <div class="modal-content" #modalContent>
-        <div class="modal-header border-bottom">
-          <h3 class="steel weight-medium size-default m-0">
-            {{ isEdit ? ('tr_edit_purchasing_request' | translate) : ('tr_new_purchasing_request' | translate) }}
-          </h3>
-        </div>
-        <form #purchasingForm="ngForm">
-  
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="closeModal()"></div>
+    <div class="modal-content" #modalContent>
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">
+          {{ isEdit ? ('tr_edit_purchasing_request' | translate) : ('tr_new_purchasing_request' | translate) }}
+        </h3>
+      </div>
+      <form #purchasingForm="ngForm">
+
         <div class="modal-body weight-medium steel">
           <div class="content-container plr-4 ptb-3">
-            <div class="alert alert-error mb-3" *ngIf="purchasingForm.invalid && purchasingForm.submitted">
-              {{ 'tr_fill_required_fields' | translate }}
-            </div>
-  
-          
-              <div class="row">
-                <!-- Vendor -->
-                <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="vendor.invalid && purchasingForm.submitted">
-                    <label>{{ 'tr_supplier' | translate }}</label>
-                    <div class="input-with-icon bg-white">
-                      <ng-select
-                        class="s-control s-select"
-                        name="supplier"
-                        #vendor="ngModel"
-                        [items]="vendorsList"
-                        [(ngModel)]="selectedVendor"
-                        bindLabel="nameOfcompany"
-                        required
-                      ></ng-select>
-                      <i class="fa fa-caret-down input-icon"></i>
-                    </div>
-                    <span class="text-error size-small validator" *ngIf="vendor.invalid && purchasingForm.submitted">
-                      {{ 'tr_vendor_required' | translate }}
-                    </span>
-                  </div>
-                </div>
+            @if (purchasingForm.invalid && purchasingForm.submitted) {
+              <div class="alert alert-error mb-3">
+                {{ 'tr_fill_required_fields' | translate }}
+              </div>
+            }
 
-                <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="paymentStatus.invalid && purchasingForm.submitted">
-                    <label>{{ 'tr_payment_terms' | translate }}</label>
+
+            <div class="row">
+              <!-- Vendor -->
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="vendor.invalid && purchasingForm.submitted">
+                  <label>{{ 'tr_supplier' | translate }}</label>
+                  <div class="input-with-icon bg-white">
                     <ng-select
-                      name="paymentStatus"
                       class="s-control s-select"
-                      [(ngModel)]="selectedPaymentTerm"
-                      (ngModelChange)="onPaymentTermChange()"
-                      #paymentStatus="ngModel"
-                      [items]="selectedVendor?.paymentTerms!"
-                      bindLabel="label"
-                      bindValue="value"
+                      name="supplier"
+                      #vendor="ngModel"
+                      [items]="vendorsList"
+                      [(ngModel)]="selectedVendor"
+                      bindLabel="nameOfcompany"
                       required
                     ></ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
                   </div>
+                  @if (vendor.invalid && purchasingForm.submitted) {
+                    <span class="text-error size-small validator">
+                      {{ 'tr_vendor_required' | translate }}
+                    </span>
+                  }
                 </div>
-  
-                <!-- Request Date -->
-                <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="requestDate.invalid && purchasingForm.submitted">
-                    <label>{{ 'tr_request_date' | translate }}</label>
-                 
-                    <div class="input-with-icon">
-                      <input
+              </div>
+
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="paymentStatus.invalid && purchasingForm.submitted">
+                  <label>{{ 'tr_payment_terms' | translate }}</label>
+                  <ng-select
+                    name="paymentStatus"
+                    class="s-control s-select"
+                    [(ngModel)]="selectedPaymentTerm"
+                    (ngModelChange)="onPaymentTermChange()"
+                    #paymentStatus="ngModel"
+                    [items]="selectedVendor?.paymentTerms!"
+                    bindLabel="label"
+                    bindValue="value"
+                    required
+                  ></ng-select>
+                </div>
+              </div>
+
+              <!-- Request Date -->
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="requestDate.invalid && purchasingForm.submitted">
+                  <label>{{ 'tr_request_date' | translate }}</label>
+
+                  <div class="input-with-icon">
+                    <input
                       name="requestDate"
                       ngModel
                       #requestDate="ngModel"
                       (ngModelChange)="onRequestDatePicked($event)"
                       placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="pickId" class="s-control bg-white" required>
-                      <mat-datepicker #pickId></mat-datepicker>
-                      <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
-                      </mat-datepicker-toggle>
+                    <mat-datepicker #pickId></mat-datepicker>
+                    <mat-datepicker-toggle class="input-icon date-picker" [for]="pickId">
+                    </mat-datepicker-toggle>
                   </div>
-                    <span class="text-error size-small validator" *ngIf="requestDate.invalid && purchasingForm.submitted">
+                  @if (requestDate.invalid && purchasingForm.submitted) {
+                    <span class="text-error size-small validator">
                       {{ 'tr_request_date_required' | translate }}
                     </span>
-                  </div>
+                  }
                 </div>
-  
-                <!-- Requested By -->
-                <div class="col-md-6">
-                  <div class="form-group">
-                    <label>{{ 'tr_requested_by' | translate }}</label>
-                    <input
-                      type="text"
-                      class="s-control"
-                      name="requestedBy"
-                      ngModel
-                      #requestedBy="ngModel"
+              </div>
+
+              <!-- Requested By -->
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_requested_by' | translate }}</label>
+                  <input
+                    type="text"
+                    class="s-control"
+                    name="requestedBy"
+                    ngModel
+                    #requestedBy="ngModel"
                     />
-                  </div>
                 </div>
-  
-        
-  
-                <!-- Total Amount -->
-                <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="totalAmount.invalid && purchasingForm.submitted">
-                    <label>{{ 'tr_total_amount' | translate }}</label>
-                    <input
-                      type="number"
-                      class="s-control"
-                      name="totalAmount"
-                      ngModel
-                      #totalAmount="ngModel"
-                      (blur)="onTotalAmountBlur()"
-                      required
+              </div>
+
+
+
+              <!-- Total Amount -->
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="totalAmount.invalid && purchasingForm.submitted">
+                  <label>{{ 'tr_total_amount' | translate }}</label>
+                  <input
+                    type="number"
+                    class="s-control"
+                    name="totalAmount"
+                    ngModel
+                    #totalAmount="ngModel"
+                    (blur)="onTotalAmountBlur()"
+                    required
                     />
-                    <span class="text-error size-small validator" *ngIf="totalAmount.invalid && purchasingForm.submitted">
+                  @if (totalAmount.invalid && purchasingForm.submitted) {
+                    <span class="text-error size-small validator">
                       {{ 'tr_total_amount_required' | translate }}
                     </span>
-                  </div>
+                  }
                 </div>
+              </div>
 
-                  <!-- Purchasing Status -->
+              <!-- Purchasing Status -->
               <div class="col-md-6">
                 <div class="form-group" [class.has-error]="status.invalid && purchasingForm.submitted">
                   <label>{{ 'tr_purchasing_status' | translate }}</label>
@@ -128,143 +136,144 @@
                     placeholder="{{ 'tr_choose_status' | translate }}"
                     required
                   ></ng-select>
-                  <span class="text-error size-small validator" *ngIf="status.invalid && purchasingForm.submitted">
-                    {{ 'tr_total_amount_required' | translate }}
-                  </span>
-                </div>
-              </div>
-              
-       
-  
-                <!-- Notes (Optional) -->
-                <div class="col-md-12">
-                  <div class="form-group">
-                    <label>{{ 'tr_notes' | translate }} ({{ 'tr_optional' | translate }})</label>
-                    <textarea
-                      class="s-control"
-                      name="notes"
-                      ngModel
-                      #notes="ngModel"
-                      rows="2"
-                    ></textarea>
-                  </div>
-                </div>
-
-           
-              </div>
-
-
-               <!-- Installments Section (Visible if paymentTerms = 'installment') -->
-            <div *ngIf="selectedPaymentTerm === 'Installments'" class="mt-4">
-              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                <h5 class="m-0">{{ 'tr_installments' | translate }}</h5>
-                <button type="button" class="s-btn btn-secondary" (click)="addInstallment()">
-                  + {{ 'tr_add_installment' | translate }}
-                </button>
-              </div>
-
-              <p class="size-small text-muted mb-3">{{ 'tr_installment_schedule_hint' | translate }}</p>
-
-              <div class="pr-installment-generator plr-3 ptb-3 rounded mb-3">
-                <div class="row align-items-end">
-                  <div class="col-md-3 col-12 mb-2 mb-md-0">
-                    <label class="d-block">{{ 'tr_installment_schedule_period' | translate }}</label>
-                    <select
-                      class="s-control"
-                      [ngModelOptions]="{ standalone: true }"
-                      [(ngModel)]="installmentSchedulePeriod"
-                      (change)="onInstallmentScheduleControlsChange()"
-                    >
-                      <option *ngFor="let opt of installmentPeriodOptions" [value]="opt.value">
-                        {{ opt.labelKey | translate }}
-                      </option>
-                    </select>
-                  </div>
-                  <div class="col-md-2 col-6 mb-2 mb-md-0">
-                    <label class="d-block">{{ 'tr_installment_schedule_count' | translate }}</label>
-                    <input
-                      type="number"
-                      class="s-control"
-                      min="1"
-                      step="1"
-                      [ngModelOptions]="{ standalone: true }"
-                      [(ngModel)]="installmentScheduleCount"
-                      (ngModelChange)="onInstallmentScheduleControlsChange()"
-                    />
-                  </div>
-                  <div class="col-md-4 col-12 mb-2 mb-md-0">
-                    <label class="d-block">{{ 'tr_installment_schedule_start' | translate }}</label>
-                    <div class="input-with-icon">
-                      <input
-                        [ngModelOptions]="{ standalone: true }"
-                        [(ngModel)]="installmentScheduleStart"
-                        (ngModelChange)="onInstallmentScheduleControlsChange()"
-                        [matDatepicker]="schedStartPick"
-                        class="s-control bg-white"
-                        placeholder="{{ 'tr_pick_date' | translate }}"
-                      />
-                      <mat-datepicker #schedStartPick></mat-datepicker>
-                      <mat-datepicker-toggle class="input-icon date-picker" [for]="schedStartPick"></mat-datepicker-toggle>
-                    </div>
-                  </div>
-                  <div class="col-md-3 col-12">
-                    <button type="button" class="s-btn btn-primary width-100" (click)="generateInstallmentSchedule()">
-                      {{ 'tr_installment_generate_schedule' | translate }}
-                    </button>
-                  </div>
+                  @if (status.invalid && purchasingForm.submitted) {
+                    <span class="text-error size-small validator">
+                      {{ 'tr_total_amount_required' | translate }}
+                    </span>
+                  }
                 </div>
               </div>
 
-              <div *ngFor="let inst of installments; let i = index" class="ptb-2 plr-3 rounded mb-3 bg-secondary">
-                <div class="row">
-                  <div class="col-md-4">
-                    <label>{{ 'tr_due_date' | translate }}</label>
-                
-                    <div class="input-with-icon">
-                      <input
-                      [name]="'dueDate' + i"
-                      [(ngModel)]="inst.dueDate"
-                      placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="duePick" class="s-control bg-white" required>
-                      <mat-datepicker #duePick></mat-datepicker>
-                      <mat-datepicker-toggle class="input-icon date-picker" [for]="duePick">
-                      </mat-datepicker-toggle>
-                  </div>
-                  </div>
-                  <div class="col-md-4">
-                    <label>{{ 'tr_amount' | translate }}</label>
-                    <input
-                      type="number"
-                      class="s-control"
-                      [(ngModel)]="inst.amount"
-                      name="amount{{i}}"
-                      required
-                    />
-                  </div>
-                
 
-                  <div class="col-md-3">
-                    <label>{{ 'tr_paid' | translate }}</label>
-                    <div class="s-checkbox size-small mtb-1">
-                      <input type="checkbox" id="paid{{i}}" name="paid{{i}}" [(ngModel)]="inst.paid">
-                      <label for="paid{{i}}"> </label>
-                    </div>
-                  </div>
 
-                  <div class="col-md-1 d-flex align-items-center mt-4">
-                    <button type="button" class="btn btn-danger btn-sm" (click)="removeInstallment(i)">
-                      <i class="fa fa-trash"></i>
-                    </button>
-                  </div>
+              <!-- Notes (Optional) -->
+              <div class="col-md-12">
+                <div class="form-group">
+                  <label>{{ 'tr_notes' | translate }} ({{ 'tr_optional' | translate }})</label>
+                  <textarea
+                    class="s-control"
+                    name="notes"
+                    ngModel
+                    #notes="ngModel"
+                    rows="2"
+                  ></textarea>
                 </div>
               </div>
+
+
             </div>
 
 
-        
-     
+            <!-- Installments Section (Visible if paymentTerms = 'installment') -->
+            @if (selectedPaymentTerm === 'Installments') {
+              <div class="mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                  <h5 class="m-0">{{ 'tr_installments' | translate }}</h5>
+                  <button type="button" class="s-btn btn-secondary" (click)="addInstallment()">
+                    + {{ 'tr_add_installment' | translate }}
+                  </button>
+                </div>
+                <p class="size-small text-muted mb-3">{{ 'tr_installment_schedule_hint' | translate }}</p>
+                <div class="pr-installment-generator plr-3 ptb-3 rounded mb-3">
+                  <div class="row align-items-end">
+                    <div class="col-md-3 col-12 mb-2 mb-md-0">
+                      <label class="d-block">{{ 'tr_installment_schedule_period' | translate }}</label>
+                      <select
+                        class="s-control"
+                        [ngModelOptions]="{ standalone: true }"
+                        [(ngModel)]="installmentSchedulePeriod"
+                        (change)="onInstallmentScheduleControlsChange()"
+                        >
+                        @for (opt of installmentPeriodOptions; track opt) {
+                          <option [value]="opt.value">
+                            {{ opt.labelKey | translate }}
+                          </option>
+                        }
+                      </select>
+                    </div>
+                    <div class="col-md-2 col-6 mb-2 mb-md-0">
+                      <label class="d-block">{{ 'tr_installment_schedule_count' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        min="1"
+                        step="1"
+                        [ngModelOptions]="{ standalone: true }"
+                        [(ngModel)]="installmentScheduleCount"
+                        (ngModelChange)="onInstallmentScheduleControlsChange()"
+                        />
+                    </div>
+                    <div class="col-md-4 col-12 mb-2 mb-md-0">
+                      <label class="d-block">{{ 'tr_installment_schedule_start' | translate }}</label>
+                      <div class="input-with-icon">
+                        <input
+                          [ngModelOptions]="{ standalone: true }"
+                          [(ngModel)]="installmentScheduleStart"
+                          (ngModelChange)="onInstallmentScheduleControlsChange()"
+                          [matDatepicker]="schedStartPick"
+                          class="s-control bg-white"
+                          placeholder="{{ 'tr_pick_date' | translate }}"
+                          />
+                        <mat-datepicker #schedStartPick></mat-datepicker>
+                        <mat-datepicker-toggle class="input-icon date-picker" [for]="schedStartPick"></mat-datepicker-toggle>
+                      </div>
+                    </div>
+                    <div class="col-md-3 col-12">
+                      <button type="button" class="s-btn btn-primary width-100" (click)="generateInstallmentSchedule()">
+                        {{ 'tr_installment_generate_schedule' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                @for (inst of installments; track inst; let i = $index) {
+                  <div class="ptb-2 plr-3 rounded mb-3 bg-secondary">
+                    <div class="row">
+                      <div class="col-md-4">
+                        <label>{{ 'tr_due_date' | translate }}</label>
+                        <div class="input-with-icon">
+                          <input
+                            [name]="'dueDate' + i"
+                            [(ngModel)]="inst.dueDate"
+                            placeholder="{{'tr_pick_date' | translate}}"  [matDatepicker]="duePick" class="s-control bg-white" required>
+                          <mat-datepicker #duePick></mat-datepicker>
+                          <mat-datepicker-toggle class="input-icon date-picker" [for]="duePick">
+                          </mat-datepicker-toggle>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <label>{{ 'tr_amount' | translate }}</label>
+                        <input
+                          type="number"
+                          class="s-control"
+                          [(ngModel)]="inst.amount"
+                          name="amount{{i}}"
+                          required
+                          />
+                      </div>
+                      <div class="col-md-3">
+                        <label>{{ 'tr_paid' | translate }}</label>
+                        <div class="s-checkbox size-small mtb-1">
+                          <input type="checkbox" id="paid{{i}}" name="paid{{i}}" [(ngModel)]="inst.paid">
+                          <label for="paid{{i}}"> </label>
+                        </div>
+                      </div>
+                      <div class="col-md-1 d-flex align-items-center mt-4">
+                        <button type="button" class="btn btn-danger btn-sm" (click)="removeInstallment(i)">
+                          <i class="fa fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+
+
+
           </div>
         </div>
-  
+
         <div class="modal-footer mt-3 text-right">
           <button class="s-btn btn-secondary mr-3" (click)="closeModal()">
             {{ 'tr_cancel' | translate }}
@@ -274,7 +283,6 @@
           </button>
         </div>
       </form>
-      </div>
     </div>
   </div>
-  
+</div>

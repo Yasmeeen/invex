@@ -1,14 +1,15 @@
 <div class="chart-wrapper card">
   <div class="chart-title">{{ title }}</div>
-  <ng-container *ngFor="let _ of [renderKey]">
-    <highcharts-chart
-      *ngIf="options?.series?.length"
-      [Highcharts]="highcharts"
-      [options]="options"
-      [oneToOne]="true"
-      style="width: 100%; height: 320px; display: block;"
-      (chartInstance)="onChartInstance($event)"
-    ></highcharts-chart>
-  </ng-container>
+  @for (_ of [renderKey]; track _) {
+    @if (options?.series?.length) {
+      <highcharts-chart
+        [Highcharts]="highcharts"
+        [options]="options"
+        [oneToOne]="true"
+        style="width: 100%; height: 320px; display: block;"
+        (chartInstance)="onChartInstance($event)"
+      ></highcharts-chart>
+    }
+  }
 </div>
 

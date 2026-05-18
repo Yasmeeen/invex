@@ -11,18 +11,20 @@
         <div class="add-student-modal-container">
           <div>
             <div class="content-container plr-4 ptb-3">
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
-              >
-                {{ 'tr_fill_required_fields' | translate }}
-              </div>
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="basicInfoForm.valid && basicInfoForm.submitted"
-              >
-                {{ 'tr_leaving_before_admission' | translate }}
-              </div>
+              @if (basicInfoForm.invalid && basicInfoForm.submitted) {
+                <div
+                  class="alert alert-error mb-3"
+                  >
+                  {{ 'tr_fill_required_fields' | translate }}
+                </div>
+              }
+              @if (basicInfoForm.valid && basicInfoForm.submitted) {
+                <div
+                  class="alert alert-error mb-3"
+                  >
+                  {{ 'tr_leaving_before_admission' | translate }}
+                </div>
+              }
               <form #basicInfoForm="ngForm">
                 <div class="row">
                   <div class="col-md-6">
@@ -31,7 +33,7 @@
                       [class.has-error]="
                         username_en.invalid && basicInfoForm.submitted
                       "
-                    >
+                      >
                       <label>{{ 'tr_name' | translate }}</label>
                       <input
                         #username_en="ngModel"
@@ -40,13 +42,14 @@
                         name="name"
                         ngModel
                         required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="username_en.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_name_required' | translate }}
-                      </span>
+                        />
+                      @if (username_en.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_name_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -56,7 +59,7 @@
                       [class.has-error]="
                         email.invalid && basicInfoForm.submitted
                       "
-                    >
+                      >
                       <label>{{ 'tr_email' | translate }}</label>
                       <input
                         type="string"
@@ -65,13 +68,14 @@
                         #email="ngModel"
                         ngModel
                         required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="email.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_email_required' | translate }}
-                      </span>
+                        />
+                      @if (email.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_email_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -81,7 +85,7 @@
                       [class.has-error]="
                         roleNg.invalid && basicInfoForm.submitted
                       "
-                    >
+                      >
                       <label>{{ 'tr_role' | translate }}</label>
                       <div class="input-with-icon bg-white">
                         <ng-select
@@ -94,56 +98,61 @@
                           [items]="roles"
                           required
                           (ngModelChange)="onRoleChange($event)"
-                        >
+                          >
                         </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
-                      <p class="size-small steel mt-2 mb-0" *ngIf="isGlobalAdminRole(roleNg.value)">
-                        {{ 'tr_user_all_branches_access_hint' | translate }}
-                      </p>
+                      @if (isGlobalAdminRole(roleNg.value)) {
+                        <p class="size-small steel mt-2 mb-0">
+                          {{ 'tr_user_all_branches_access_hint' | translate }}
+                        </p>
+                      }
 
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="roleNg.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_role_required' | translate }}
-                      </span>
+                      @if (roleNg.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_role_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
-                  <div class="col-md-6" *ngIf="showBranchField(roleNg.value)">
-                    <div
-                      class="form-group"
+                  @if (showBranchField(roleNg.value)) {
+                    <div class="col-md-6">
+                      <div
+                        class="form-group"
                       [class.has-error]="
                         branch.invalid && basicInfoForm.submitted
                       "
-                    >
-                      <label>{{ 'tr_branches' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          bindValue="_id"
-                          [clearable]="false"
-                          ngModel
-                          #branch="ngModel"
-                          name="branchId"
-                          [items]="branches"
-                          [required]="showBranchField(roleNg.value)"
                         >
-                        </ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
+                        <label>{{ 'tr_branches' | translate }}</label>
+                        <div class="input-with-icon bg-white">
+                          <ng-select
+                            class="s-control s-select"
+                            placeholder="{{ 'tr_select' | translate }}"
+                            bindLabel="name"
+                            bindValue="_id"
+                            [clearable]="false"
+                            ngModel
+                            #branch="ngModel"
+                            name="branchId"
+                            [items]="branches"
+                            [required]="showBranchField(roleNg.value)"
+                            >
+                          </ng-select>
+                          <i class="fa fa-caret-down input-icon"></i>
+                        </div>
+                        @if (branch.invalid && basicInfoForm.submitted) {
+                          <span
+                            class="text-error size-small validator"
+                            >
+                            {{ 'tr_branch_required' | translate }}
+                          </span>
+                        }
                       </div>
-
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="branch.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_branch_required' | translate }}
-                      </span>
                     </div>
-                  </div>
+                  }
 
                   <div
                     class="col-md-6 form-group mb-6"
@@ -152,11 +161,13 @@
                       ((password.invalid && password.dirty) ||
                         (basicInfoForm.submitted && password.invalid))
                     "
-                  >
+                    >
                     <label class="login-label">{{ 'tr_password' | translate }}</label>
-                    <p class="size-small steel mt-0 mb-2" *ngIf="isEdit">
-                      {{ 'tr_password_optional_edit' | translate }}
-                    </p>
+                    @if (isEdit) {
+                      <p class="size-small steel mt-0 mb-2">
+                        {{ 'tr_password_optional_edit' | translate }}
+                      </p>
+                    }
                     <div class="flex flex-middle">
                       <input
                         class="s-control"
@@ -167,30 +178,33 @@
                         #password="ngModel"
                         ngModel
                         [required]="!isEdit"
-                      />
-                      <i
-                        class="fa fa-eye eye-icon text-primary"
-                        *ngIf="!show"
-                        (click)="show = true"
-                      ></i>
-                      <i
-                        class="fa fa-eye-slash eye-icon text-primary"
-                        *ngIf="show"
-                        (click)="show = false"
-                      >
-                      </i>
+                        />
+                      @if (!show) {
+                        <i
+                          class="fa fa-eye eye-icon text-primary"
+                          (click)="show = true"
+                        ></i>
+                      }
+                      @if (show) {
+                        <i
+                          class="fa fa-eye-slash eye-icon text-primary"
+                          (click)="show = false"
+                          >
+                        </i>
+                      }
                     </div>
 
-                    <span
-                      class="text-error size-small mt-2 validator"
-                      *ngIf="
-                        !isEdit &&
-                        ((password.invalid && password.dirty) ||
-                          (basicInfoForm.submitted && password.invalid))
-                      "
-                    >
-                      {{ 'tr_password_required' | translate }}
-                    </span>
+                    @if (
+                      !isEdit &&
+                      ((password.invalid && password.dirty) ||
+                      (basicInfoForm.submitted && password.invalid))
+                      ) {
+                      <span
+                        class="text-error size-small mt-2 validator"
+                        >
+                        {{ 'tr_password_required' | translate }}
+                      </span>
+                    }
                   </div>
                 </div>
               </form>

@@ -4,7 +4,8 @@ import { Globals } from '@core/globals';
 @Component({
     selector: 'system-alerts',
     templateUrl: './system-alerts.component.html',
-    styleUrls: ['./system-alerts.component.scss']
+    styleUrls: ['./system-alerts.component.scss'],
+    standalone: false
 })
 export class SystemAlertsComponent implements OnInit {
 
@@ -17,7 +18,7 @@ export class SystemAlertsComponent implements OnInit {
 
     reload() {
         //window.location.reload();
-        window.location.reload(true);
+        window.location.reload();
         this.globals.systemAlerts.newVersion = false;
     }
 }

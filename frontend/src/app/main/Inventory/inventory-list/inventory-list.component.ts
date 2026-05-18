@@ -1,5 +1,5 @@
 import { CategoriesServce } from './../../../shared/services/categories.service';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Component, OnInit } from '@angular/core';
 // import { productsSerivce } from '@shared/services/products.services';
 import { PaginationData, User } from '@core/models/users-interfaces.model'
@@ -15,9 +15,10 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { isBranchManager, isModerator } from '@core/utils/role-utils';
 
 @Component({
-  selector: 'app-inventory-list',
-  templateUrl: './inventory-list.component.html',
-  styleUrls: ['./inventory-list.component.scss']
+    selector: 'app-inventory-list',
+    templateUrl: './inventory-list.component.html',
+    styleUrls: ['./inventory-list.component.scss'],
+    standalone: false
 })
 export class InventoryListComponent implements OnInit {
   productsLoading: boolean = true;

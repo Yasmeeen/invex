@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { CanActivate, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthenticationService } from '@core/services/authentication.service';
 
 /**
@@ -7,7 +7,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
  * This guard prevents opening Vixa when not logged in.
  */
 @Injectable({ providedIn: 'root' })
-export class VixaGuard implements CanActivate {
+export class VixaGuard  {
   constructor(
     private router: Router,
     private authenticationService: AuthenticationService

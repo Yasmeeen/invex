@@ -1,12 +1,12 @@
 import { Component, HostListener, Inject, OnDestroy, OnInit } from '@angular/core';
 import {
   AbstractControl,
-  FormBuilder,
-  FormGroup,
+  UntypedFormBuilder,
+  UntypedFormGroup,
   ValidationErrors,
   Validators,
 } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import {
@@ -27,12 +27,13 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
 
 @Component({
-  selector: 'app-book-product-dialog',
-  templateUrl: './book-product-dialog.component.html',
-  styleUrls: ['./book-product-dialog.component.scss'],
+    selector: 'app-book-product-dialog',
+    templateUrl: './book-product-dialog.component.html',
+    styleUrls: ['./book-product-dialog.component.scss'],
+    standalone: false
 })
 export class BookProductDialogComponent implements OnInit, OnDestroy {
-  form: FormGroup;
+  form: UntypedFormGroup;
   saving = false;
   isUploadingDepositProof = false;
   readonly maxImageBytes = 5 * 1024 * 1024;
@@ -56,7 +57,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private dialogRef: MatDialogRef<BookProductDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA) public data: { product: Product; maxQuantity: number },
     private auth: AuthenticationService,
@@ -188,9 +189,9 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   }
 
   @HostListener('document:keydown.escape', ['$event'])
-  onEscape(event?: KeyboardEvent): void {
+  onEscape(event: Event): void {
     if (this.depositPreviewUrl) {
-      event?.preventDefault?.();
+      event.preventDefault();
       this.closeDepositPreview();
     }
   }

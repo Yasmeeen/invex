@@ -1,9 +1,8 @@
-import {NgModule} from '@angular/core';
+import {NgModule, ModuleWithProviders} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {AuthenticationGuard} from './guards';
-import {HTTP_INTERCEPTORS, HttpClientModule} from '@angular/common/http';
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
 import { AuthenticationService } from './services/authentication.service';
-import { ModuleWithProviders } from '@angular/compiler/src/core';
 import { HttpConfigInterceptor } from './interceptors/httpconfig.interceptor';
 import { RoleGuard } from './guards/role.guard';
 
@@ -16,7 +15,7 @@ import { RoleGuard } from './guards/role.guard';
   exports: []
 })
 export class CoreModule {
-  static forRoot(): ModuleWithProviders{
+  static forRoot(): ModuleWithProviders<CoreModule>{
     return {
       ngModule: CoreModule,
       providers: [
@@ -32,7 +31,7 @@ export class CoreModule {
     };
   }
 
-  static forChild(): ModuleWithProviders {
+  static forChild(): ModuleWithProviders<CoreModule> {
     return {
       ngModule: CoreModule,
       providers: [

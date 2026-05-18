@@ -1,6 +1,6 @@
 import { Component, Inject } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -11,17 +11,18 @@ import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-displ
 export type PayOrderDialogData = { order: Order };
 
 @Component({
-  selector: 'app-pay-order-dialog',
-  templateUrl: './pay-order-dialog.component.html',
-  styleUrls: ['./pay-order-dialog.component.scss'],
+    selector: 'app-pay-order-dialog',
+    templateUrl: './pay-order-dialog.component.html',
+    styleUrls: ['./pay-order-dialog.component.scss'],
+    standalone: false
 })
 export class PayOrderDialogComponent {
   saving = false;
-  form: FormGroup;
+  form: UntypedFormGroup;
   readonly order: Order;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private orders: OrdersSerivce,
     private auth: AuthenticationService,
     private translate: TranslateService,

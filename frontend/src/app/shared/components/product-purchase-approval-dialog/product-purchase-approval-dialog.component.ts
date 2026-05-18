@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { ProductPurchaseRequestsService } from '@shared/services/product-purchase-requests.service';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -13,9 +13,10 @@ export interface ProductPurchaseApprovalDialogData {
 }
 
 @Component({
-  selector: 'app-product-purchase-approval-dialog',
-  templateUrl: './product-purchase-approval-dialog.component.html',
-  styleUrls: ['./product-purchase-approval-dialog.component.scss'],
+    selector: 'app-product-purchase-approval-dialog',
+    templateUrl: './product-purchase-approval-dialog.component.html',
+    styleUrls: ['./product-purchase-approval-dialog.component.scss'],
+    standalone: false
 })
 export class ProductPurchaseApprovalDialogComponent implements OnInit {
   saving = false;

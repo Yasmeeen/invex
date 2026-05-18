@@ -7,35 +7,41 @@ import { UpdateService } from '@shared/services/update.service';
     selector: 'pagination',
     template: `
         <div class="flex-space-between flex-middle flex-wrap pagination-container">
-            <div class="s-pagination-info mtb-1 text-left">
-                <span class="size-tiny">
-                    {{'tr_showing' | translate }} {{this.paginationData.totalCount > 0? perPage * (paginationData.currentPage - 1) + 1 : 0}} {{'tr_to' | translate}} {{perPage * (paginationData.currentPage - 1) + perPage < this.paginationData.totalCount? perPage * (paginationData.currentPage - 1) + perPage : this.paginationData.totalCount}}  {{'tr_of' | translate}} {{this.paginationData.totalCount || 0}}
+          <div class="s-pagination-info mtb-1 text-left">
+            <span class="size-tiny">
+              {{'tr_showing' | translate }} {{this.paginationData.totalCount > 0? perPage * (paginationData.currentPage - 1) + 1 : 0}} {{'tr_to' | translate}} {{perPage * (paginationData.currentPage - 1) + perPage < this.paginationData.totalCount? perPage * (paginationData.currentPage - 1) + perPage : this.paginationData.totalCount}}  {{'tr_of' | translate}} {{this.paginationData.totalCount || 0}}
+            </span>
+          </div>
+          <div class="s-pagination mtb-1 text-right">
+            <div class="pagination-btn" [class.btn-disabled]="activeCell <= 1" (click)="goPrev()">
+              {{'tr_previous' | translate}}
+            </div>
+            <div class="pagination-cells">
+              @if (canGoBackward) {
+                <span class="pagination-cell" (click)="fastBackward()"><i class="fa fa-angle-double-left"></i></span>
+              }
+              @for (cell of currentCells; track cell) {
+                <span
+                  class="pagination-cell"
+                  [class.active]="cell == activeCell"
+                  (click)="cellClicked(cell)">
+                  {{cell}}
                 </span>
+              }
+              @if (canGoForward) {
+                <span class="pagination-cell" (click)="fastForward()"><i class="fa fa-angle-double-right"></i></span>
+              }
             </div>
-            <div class="s-pagination mtb-1 text-right">
-                <div class="pagination-btn" [class.btn-disabled]="activeCell <= 1" (click)="goPrev()">
-                    {{'tr_previous' | translate}}
-                </div>
-                <div class="pagination-cells">
-                    <span *ngIf="canGoBackward" class="pagination-cell" (click)="fastBackward()"><i class="fa fa-angle-double-left"></i></span>
-                    <span
-                        *ngFor="let cell of currentCells"
-                        class="pagination-cell"
-                        [class.active]="cell == activeCell"
-                        (click)="cellClicked(cell)">
-                        {{cell}}
-                    </span>
-                    <span *ngIf="canGoForward" class="pagination-cell" (click)="fastForward()"><i class="fa fa-angle-double-right"></i></span>
-                </div>
-                <div class="pagination-btn" [class.btn-disabled]="!(remainingPages > 0)" (click)="goNext()">
-                    {{'tr_next' | translate}}
-                </div>
+            <div class="pagination-btn" [class.btn-disabled]="!(remainingPages > 0)" (click)="goNext()">
+              {{'tr_next' | translate}}
             </div>
+          </div>
         </div>
-    `,
+        `,
     styles: [`
 
-    `]
+    `],
+    standalone: false
 })
 
 export class Pagination implements OnChanges {

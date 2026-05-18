@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Globals } from '@core/globals';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
@@ -15,9 +15,10 @@ import { canPickBranchRole } from '@core/utils/role-utils';
 import { DailyExpenseDialogComponent } from '../daily-expense-dialog/daily-expense-dialog.component';
 
 @Component({
-  selector: 'app-expenses-list',
-  templateUrl: './expenses-list.component.html',
-  styleUrls: ['./expenses-list.component.scss'],
+    selector: 'app-expenses-list',
+    templateUrl: './expenses-list.component.html',
+    styleUrls: ['./expenses-list.component.scss'],
+    standalone: false
 })
 export class ExpensesListComponent implements OnInit, OnDestroy {
   expenses: DailyExpenseDto[] = [];

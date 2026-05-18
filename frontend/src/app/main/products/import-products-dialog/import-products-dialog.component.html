@@ -15,8 +15,10 @@
         type="file"
         accept=".xlsx,.xls"
         (change)="onFileSelected($any($event.target).files?.[0] || null)"
-      />
-      <div class="muted mt-2" *ngIf="fileName">{{ fileName }}</div>
+        />
+      @if (fileName) {
+        <div class="muted mt-2">{{ fileName }}</div>
+      }
     </div>
   </div>
 
@@ -35,12 +37,18 @@
     </div>
   </div>
 
-  <div class="alert alert-danger mb-4" *ngIf="parseErrors?.length">
-    <div *ngFor="let e of parseErrors">
-      <strong *ngIf="e.sheetName">{{ e.sheetName }}:</strong>
-      {{ e.message }}
+  @if (parseErrors?.length) {
+    <div class="alert alert-danger mb-4">
+      @for (e of parseErrors; track e) {
+        <div>
+          @if (e.sheetName) {
+            <strong>{{ e.sheetName }}:</strong>
+          }
+          {{ e.message }}
+        </div>
+      }
     </div>
-  </div>
+  }
 
   <div class="row mb-4">
     <div class="col-md-12">
@@ -51,37 +59,43 @@
     </div>
   </div>
 
-  <div class="result-card" *ngIf="result">
-    <div class="mb-2"><strong>{{ 'tr_products_import_created' | translate }}:</strong> {{ result.createdCount }}</div>
-    <div class="mb-2"><strong>{{ 'tr_products_import_failed' | translate }}:</strong> {{ result.failedCount }}</div>
-
-    <div *ngIf="result.errors?.length">
-      <div class="import-errors__header mb-3">
-        <div class="import-errors__title">
-          <span class="import-errors__badge">!</span>
-          <strong>{{ 'tr_products_import_has_errors' | translate }}</strong>
-          <span class="muted">({{ result.errors.length }} {{ 'tr_products_import_total' | translate }})</span>
+  @if (result) {
+    <div class="result-card">
+      <div class="mb-2"><strong>{{ 'tr_products_import_created' | translate }}:</strong> {{ result.createdCount }}</div>
+      <div class="mb-2"><strong>{{ 'tr_products_import_failed' | translate }}:</strong> {{ result.failedCount }}</div>
+      @if (result.errors?.length) {
+        <div>
+          <div class="import-errors__header mb-3">
+            <div class="import-errors__title">
+              <span class="import-errors__badge">!</span>
+              <strong>{{ 'tr_products_import_has_errors' | translate }}</strong>
+              <span class="muted">({{ result.errors.length }} {{ 'tr_products_import_total' | translate }})</span>
+            </div>
+            <button class="s-btn btn-secondary" (click)="downloadErrorReport()">
+              {{ 'tr_products_import_download_error_report' | translate }}
+            </button>
+          </div>
+          <div class="errors-table">
+            @for (e of result.errors | slice:0:50; track e) {
+              <div class="error-row">
+                <div class="error-cell sheet">{{ e.sheetName }}</div>
+                <div class="error-cell row">#{{ e.rowNumber }}</div>
+                <div class="error-cell field">{{ e.field || '-' }}</div>
+                <div class="error-cell msg">{{ e.message }}</div>
+              </div>
+            }
+            @if (result.errors.length > 50) {
+              <div class="import-errors__notice mt-3">
+                <strong>{{ 'tr_products_import_notice' | translate }}:</strong>
+                {{ 'tr_products_import_showing_first_50_errors' | translate }}
+                {{ 'tr_products_import_use_download_error_report' | translate }}
+                ({{ result.errors.length }}).
+              </div>
+            }
+          </div>
         </div>
-        <button class="s-btn btn-secondary" (click)="downloadErrorReport()">
-          {{ 'tr_products_import_download_error_report' | translate }}
-        </button>
-      </div>
-
-      <div class="errors-table">
-        <div class="error-row" *ngFor="let e of result.errors | slice:0:50">
-          <div class="error-cell sheet">{{ e.sheetName }}</div>
-          <div class="error-cell row">#{{ e.rowNumber }}</div>
-          <div class="error-cell field">{{ e.field || '-' }}</div>
-          <div class="error-cell msg">{{ e.message }}</div>
-        </div>
-        <div class="import-errors__notice mt-3" *ngIf="result.errors.length > 50">
-          <strong>{{ 'tr_products_import_notice' | translate }}:</strong>
-          {{ 'tr_products_import_showing_first_50_errors' | translate }}
-          {{ 'tr_products_import_use_download_error_report' | translate }}
-          ({{ result.errors.length }}).
-        </div>
-      </div>
+      }
     </div>
-  </div>
+  }
 </div>
 

@@ -8,62 +8,74 @@
       <label>{{ 'tr_to' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.to" />
     </div>
-    <div class="col-md-3" *ngIf="!branchFilterLocked">
-      <label>{{ 'tr_branches' | translate }}</label>
-      <ng-select
-        class="s-control s-select report-filters__select"
-        [placeholder]="'tr_report_all_branches' | translate"
-        bindLabel="name"
-        bindValue="_id"
-        [items]="branches"
-        [(ngModel)]="filters.branch_id"
-        name="reportBranch"
-        [clearable]="true"
-        [searchable]="true"
-        (change)="onBranchChange()"
-      >
-      </ng-select>
-    </div>
-    <div class="col-md-3" *ngIf="branchFilterLocked">
-      <label>{{ 'tr_branches' | translate }}</label>
-      <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
-    </div>
-    <div class="col-md-3" *ngIf="reportType !== 'deskPurchases'">
-      <label>{{ 'tr_report_filter_product_id' | translate }}</label>
-      <ng-select
-        class="s-control s-select report-filters__select"
-        [placeholder]="'tr_report_all_products' | translate"
-        bindLabel="name"
-        bindValue="_id"
-        [items]="products"
-        [(ngModel)]="filters.product_id"
-        name="reportProduct"
-        [clearable]="true"
-        [searchable]="true"
-      >
-        <ng-template ng-option-tmp let-item="item">
-          <span>{{ item.name }}</span>
-          <span class="report-filters__opt-code" *ngIf="item?.code"> ({{ item.code }})</span>
-        </ng-template>
-      </ng-select>
-    </div>
-    <div class="col-md-2" *ngIf="reportType !== 'deskPurchases'">
-      <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
-      <input
-        class="s-control"
-        type="tel"
-        [(ngModel)]="filters.customer_phone"
-        [placeholder]="'tr_report_placeholder_customer_phone' | translate"
-        autocomplete="tel"
-      />
-    </div>
-    <div class="col-md-2 mt-4" *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases'">
-      <label>{{ 'tr_report_filter_group' | translate }}</label>
-      <select class="s-control" [(ngModel)]="filters.groupBy">
-        <option value="daily">{{ 'tr_report_group_daily' | translate }}</option>
-        <option value="monthly">{{ 'tr_report_group_monthly' | translate }}</option>
-      </select>
-    </div>
+    @if (!branchFilterLocked) {
+      <div class="col-md-3">
+        <label>{{ 'tr_branches' | translate }}</label>
+        <ng-select
+          class="s-control s-select report-filters__select"
+          [placeholder]="'tr_report_all_branches' | translate"
+          bindLabel="name"
+          bindValue="_id"
+          [items]="branches"
+          [(ngModel)]="filters.branch_id"
+          name="reportBranch"
+          [clearable]="true"
+          [searchable]="true"
+          (change)="onBranchChange()"
+          >
+        </ng-select>
+      </div>
+    }
+    @if (branchFilterLocked) {
+      <div class="col-md-3">
+        <label>{{ 'tr_branches' | translate }}</label>
+        <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
+      </div>
+    }
+    @if (reportType !== 'deskPurchases') {
+      <div class="col-md-3">
+        <label>{{ 'tr_report_filter_product_id' | translate }}</label>
+        <ng-select
+          class="s-control s-select report-filters__select"
+          [placeholder]="'tr_report_all_products' | translate"
+          bindLabel="name"
+          bindValue="_id"
+          [items]="products"
+          [(ngModel)]="filters.product_id"
+          name="reportProduct"
+          [clearable]="true"
+          [searchable]="true"
+          >
+          <ng-template ng-option-tmp let-item="item">
+            <span>{{ item.name }}</span>
+            @if (item?.code) {
+              <span class="report-filters__opt-code"> ({{ item.code }})</span>
+            }
+          </ng-template>
+        </ng-select>
+      </div>
+    }
+    @if (reportType !== 'deskPurchases') {
+      <div class="col-md-2">
+        <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
+        <input
+          class="s-control"
+          type="tel"
+          [(ngModel)]="filters.customer_phone"
+          [placeholder]="'tr_report_placeholder_customer_phone' | translate"
+          autocomplete="tel"
+          />
+      </div>
+    }
+    @if (reportType !== 'bookings' && reportType !== 'deskPurchases') {
+      <div class="col-md-2 mt-4">
+        <label>{{ 'tr_report_filter_group' | translate }}</label>
+        <select class="s-control" [(ngModel)]="filters.groupBy">
+          <option value="daily">{{ 'tr_report_group_daily' | translate }}</option>
+          <option value="monthly">{{ 'tr_report_group_monthly' | translate }}</option>
+        </select>
+      </div>
+    }
     <div class="col-md-4">
       <div class="actions">
         <button class="s-btn btn-primary" type="button" (click)="applyFilters()">{{ 'tr_apply' | translate }}</button>
@@ -72,39 +84,41 @@
     </div>
   </div>
 
-  <div class="row mt-2" *ngIf="reportType === 'bookings'">
-    <div class="col-md-2">
-      <label>{{ 'tr_bookings_report_filter_status' | translate }}</label>
-      <select class="s-control" [(ngModel)]="filters.booking_status" name="bookingStatus">
-        <option value="all">{{ 'tr_bookings_report_status_all' | translate }}</option>
-        <option value="active">{{ 'tr_bookings_report_status_active' | translate }}</option>
-        <option value="cancelled">{{ 'tr_bookings_report_status_cancelled' | translate }}</option>
-      </select>
+  @if (reportType === 'bookings') {
+    <div class="row mt-2">
+      <div class="col-md-2">
+        <label>{{ 'tr_bookings_report_filter_status' | translate }}</label>
+        <select class="s-control" [(ngModel)]="filters.booking_status" name="bookingStatus">
+          <option value="all">{{ 'tr_bookings_report_status_all' | translate }}</option>
+          <option value="active">{{ 'tr_bookings_report_status_active' | translate }}</option>
+          <option value="cancelled">{{ 'tr_bookings_report_status_cancelled' | translate }}</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label>{{ 'tr_bookings_report_filter_confirmed' | translate }}</label>
+        <select class="s-control" [(ngModel)]="filters.booking_confirmed" name="bookingConfirmed">
+          <option value="all">{{ 'tr_bookings_report_confirmed_all' | translate }}</option>
+          <option value="true">{{ 'tr_bookings_report_confirmed_yes' | translate }}</option>
+          <option value="false">{{ 'tr_bookings_report_confirmed_no' | translate }}</option>
+        </select>
+      </div>
+      <div class="col-md-2 mt-4">
+        <label class="report-filters__check">
+          <input type="checkbox" [(ngModel)]="filters.warehouse_only" name="warehouseOnly" />
+          {{ 'tr_bookings_report_warehouse_only' | translate }}
+        </label>
+      </div>
+      <div class="col-md-4">
+        <label>{{ 'tr_bookings_report_search' | translate }}</label>
+        <input
+          class="s-control"
+          type="text"
+          [(ngModel)]="filters.booking_search"
+          name="bookingSearch"
+          [placeholder]="'tr_bookings_report_search_ph' | translate"
+          />
+      </div>
     </div>
-    <div class="col-md-2">
-      <label>{{ 'tr_bookings_report_filter_confirmed' | translate }}</label>
-      <select class="s-control" [(ngModel)]="filters.booking_confirmed" name="bookingConfirmed">
-        <option value="all">{{ 'tr_bookings_report_confirmed_all' | translate }}</option>
-        <option value="true">{{ 'tr_bookings_report_confirmed_yes' | translate }}</option>
-        <option value="false">{{ 'tr_bookings_report_confirmed_no' | translate }}</option>
-      </select>
-    </div>
-    <div class="col-md-2 mt-4">
-      <label class="report-filters__check">
-        <input type="checkbox" [(ngModel)]="filters.warehouse_only" name="warehouseOnly" />
-        {{ 'tr_bookings_report_warehouse_only' | translate }}
-      </label>
-    </div>
-    <div class="col-md-4">
-      <label>{{ 'tr_bookings_report_search' | translate }}</label>
-      <input
-        class="s-control"
-        type="text"
-        [(ngModel)]="filters.booking_search"
-        name="bookingSearch"
-        [placeholder]="'tr_bookings_report_search_ph' | translate"
-      />
-    </div>
-  </div>
+  }
 
 </div>

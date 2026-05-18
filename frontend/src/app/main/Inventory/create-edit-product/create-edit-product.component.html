@@ -10,22 +10,23 @@
 
       <div class="modal-body weight-medium steel">
         <div class="content-container plr-4 ptb-3">
-          <div
-            class="alert alert-error mb-3"
-            *ngIf="warehouseForm.invalid && warehouseForm.submitted"
-          >
-            {{ "tr_fill_required_fields" | translate }}
-          </div>
+          @if (warehouseForm.invalid && warehouseForm.submitted) {
+            <div
+              class="alert alert-error mb-3"
+              >
+              {{ "tr_fill_required_fields" | translate }}
+            </div>
+          }
 
           <form #warehouseForm="ngForm">
             <div class="row">
               <div
                 class="col-md-6"
-              >
+                >
                 <div
                   class="form-group"
                   [class.has-error]="productId.invalid && warehouseForm.submitted"
-                >
+                  >
                   <label>{{ "tr_product_name" | translate }}</label>
                   <div class="input-with-icon bg-white">
                     <ng-select
@@ -49,7 +50,7 @@
                 <div
                   class="form-group"
                   [class.has-error]="quantity.invalid && warehouseForm.submitted"
-                >
+                  >
                   <label>{{ "tr_quantity" | translate }}</label>
                   <input
                     type="number"
@@ -59,7 +60,7 @@
                     name="quantity"
                     min="1"
                     required
-                  />
+                    />
                 </div>
               </div>
 
@@ -71,7 +72,7 @@
                 <div
                   class="form-group"
                   [class.has-error]="toBranchId.invalid && warehouseForm.submitted"
-                >
+                  >
                   <label>{{ "tr_to_branch" | translate }}</label>
                   <div class="input-with-icon bg-white">
                     <ng-select
@@ -104,7 +105,7 @@
           type="button"
           [disabled]="isSubmitting"
           (click)="submitForm()"
-        >
+          >
           {{ "tr_transfer" | translate }}
         </button>
       </div>

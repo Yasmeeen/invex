@@ -9,9 +9,10 @@ import { RealtimeNotificationsService } from '@shared/services/realtime-notifica
 import { applyUiLanguage } from './core/i18n/ui-language';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    standalone: false
 })
 export class AppComponent {
     onlineEvent: Observable<Event>;
@@ -105,8 +106,7 @@ export class AppComponent {
             ev.stopPropagation();
         }
     }
-    @HostListener("document:keydown", ["$event"])
-    @HostListener('window:resize', ['$event'])
+    @HostListener('window:resize')
     onResize() {
         let optionsMenuElements = document.querySelectorAll('.options-menu.active');
         for (let i = 0; i < optionsMenuElements.length; i++) {

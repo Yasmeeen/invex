@@ -1,9 +1,10 @@
 import { Component, OnInit, Input } from '@angular/core';
 
 @Component({
-  selector: 'app-ghost-line',
-  templateUrl: './ghost-line.component.html',
-  styleUrls: ['./ghost-line.component.scss']
+    selector: 'app-ghost-line',
+    templateUrl: './ghost-line.component.html',
+    styleUrls: ['./ghost-line.component.scss'],
+    standalone: false
 })
 export class GhostLineComponent implements OnInit {
 

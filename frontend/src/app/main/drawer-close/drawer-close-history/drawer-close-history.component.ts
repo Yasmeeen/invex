@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Globals } from '@core/globals';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
@@ -18,9 +18,10 @@ import {
 } from '../drawer-close-dialog/drawer-close-dialog.component';
 
 @Component({
-  selector: 'app-drawer-close-history',
-  templateUrl: './drawer-close-history.component.html',
-  styleUrls: ['./drawer-close-history.component.scss'],
+    selector: 'app-drawer-close-history',
+    templateUrl: './drawer-close-history.component.html',
+    styleUrls: ['./drawer-close-history.component.scss'],
+    standalone: false
 })
 export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
   closes: DrawerCloseRecord[] = [];

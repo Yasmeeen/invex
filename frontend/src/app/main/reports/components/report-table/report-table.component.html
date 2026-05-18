@@ -2,68 +2,76 @@
   <table class="s-table table border-table" [class.layout-fixed]="!roomy">
     <thead>
       <tr>
-        <th *ngFor="let col of columns" [attr.data-col]="col.key">{{ col.labelKey | translate }}</th>
+        @for (col of columns; track col) {
+          <th [attr.data-col]="col.key">{{ col.labelKey | translate }}</th>
+        }
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let row of rows">
-        <td *ngFor="let col of columns" [attr.data-col]="col.key">
-          <ng-container [ngSwitch]="col.key">
-            <!-- Booking deposit proof: show image preview instead of raw URL -->
-            <ng-container *ngSwitchCase="'depositProof'">
-              <ng-container *ngIf="isImageUrl(row[col.key]); else depositProofFallback">
-                <button
-                  type="button"
-                  class="report-img-btn"
-                  (click)="openPreview(row[col.key])"
-                  [attr.aria-label]="col.labelKey | translate"
-                >
-                  <img class="report-img-thumb" [src]="row[col.key]" alt="" loading="lazy" />
-                </button>
-                <a
-                  class="report-img-download"
-                  [href]="row[col.key]"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                >
-                  {{ 'download' | translate }}
-                </a>
-              </ng-container>
-              <ng-template #depositProofFallback>
-                {{ row[col.key] }}
-              </ng-template>
-            </ng-container>
-
-            <ng-container *ngSwitchDefault>
-              {{ row[col.key] }}
-            </ng-container>
-          </ng-container>
-        </td>
-      </tr>
-      <tr *ngIf="!rows || rows.length === 0">
-        <td [attr.colspan]="columns.length" class="text-center">{{ 'tr_report_no_data' | translate }}</td>
-      </tr>
+      @for (row of rows; track row) {
+        <tr>
+          @for (col of columns; track col) {
+            <td [attr.data-col]="col.key">
+              @switch (col.key) {
+                <!-- Booking deposit proof: show image preview instead of raw URL -->
+                @case ('depositProof') {
+                  @if (isImageUrl(row[col.key])) {
+                    <button
+                      type="button"
+                      class="report-img-btn"
+                      (click)="openPreview(row[col.key])"
+                      [attr.aria-label]="col.labelKey | translate"
+                      >
+                      <img class="report-img-thumb" [src]="row[col.key]" alt="" loading="lazy" />
+                    </button>
+                    <a
+                      class="report-img-download"
+                      [href]="row[col.key]"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      >
+                      {{ 'download' | translate }}
+                    </a>
+                  } @else {
+                    {{ row[col.key] }}
+                  }
+                }
+                @default {
+                  {{ row[col.key] }}
+                }
+              }
+            </td>
+          }
+        </tr>
+      }
+      @if (!rows || rows.length === 0) {
+        <tr>
+          <td [attr.colspan]="columns.length" class="text-center">{{ 'tr_report_no_data' | translate }}</td>
+        </tr>
+      }
     </tbody>
   </table>
 </div>
 
 <!-- Image preview modal -->
-<div class="report-img-modal" *ngIf="previewUrl" (click)="closePreview()">
-  <div class="report-img-modal__inner" (click)="$event.stopPropagation()">
-    <button type="button" class="report-img-modal__close" (click)="closePreview()">✖</button>
-    <img class="report-img-modal__img" [src]="previewUrl" alt="" />
-    <div class="report-img-modal__actions">
-      <a
-        class="s-btn btn-secondary"
-        [href]="previewUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        download
-      >
-        {{ 'download' | translate }}
-      </a>
+@if (previewUrl) {
+  <div class="report-img-modal" (click)="closePreview()">
+    <div class="report-img-modal__inner" (click)="$event.stopPropagation()">
+      <button type="button" class="report-img-modal__close" (click)="closePreview()">✖</button>
+      <img class="report-img-modal__img" [src]="previewUrl" alt="" />
+      <div class="report-img-modal__actions">
+        <a
+          class="s-btn btn-secondary"
+          [href]="previewUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          download
+          >
+          {{ 'download' | translate }}
+        </a>
+      </div>
     </div>
   </div>
-</div>
+}
 

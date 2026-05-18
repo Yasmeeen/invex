@@ -1,14 +1,15 @@
 <div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
-    <h2 class="size-body title-with-btn plr-4 ptb-4">
-      <span class="page-title">{{ 'tr_clients' | translate }}</span>
-      <div class="btn-group">
-        <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
-          <i class="fa fa-filter text-primary"></i>
-        </button>
-      </div>
-    </h2>
-  
-    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_clients' | translate }}</span>
+    <div class="btn-group">
+      <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary"></i>
+      </button>
+    </div>
+  </h2>
+
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
       <div class="row">
         <div class="col-md-3">
           <div class="form-group mb-0">
@@ -19,50 +20,57 @@
                 placeholder="{{ 'tr_search' | translate }}"
                 [(ngModel)]="nameSearchTerm"
                 (keyup)="filterClients($event, 'search')"
-              />
+                />
             </div>
           </div>
         </div>
       </div>
     </div>
-  
-    <div class="plr-4 mt-4" *ngIf="!clientsLoading">
-      <div class="table-container" *ngIf="clientsList.length > 0">
-        <table class="s-table table clients-list layout-fixed">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>{{ 'tr_phone_number' | translate }}</th>
-              <th>{{ 'tr_name' | translate }}</th>
-              <th>{{ 'tr_address' | translate }}</th>
-              <th>{{ 'tr_branch' | translate }}</th>
-              <th>{{ 'tr_number_of_orders' | translate }}</th>
-              <th>{{ 'tr_total_orders_price' | translate }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let client of clientsList; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>{{ client.phoneNumber }}</td>
-              <td>{{ client.name }}</td>
-              <td>{{ client.address }}</td>
-              <td><div *ngFor="let branch of  client.branches ">
-                {{branch}}
-              </div></td>
-              <td>{{ client.numberOfOrders }}</td>
-              <td>{{ client.totalOrdersPrice }}</td>
-          
-            </tr>
-          </tbody>
-        </table>
-      </div>
-  
-      <div class="empty-state-here text-center ptb-8" *ngIf="clientsList.length === 0">
-        <i class="fas fa-client-slash empty-icon"></i>
-        <p>{{ 'tr_no_items_found' | translate }}</p>
-      </div>
-  
+  }
+
+  @if (!clientsLoading) {
+    <div class="plr-4 mt-4">
+      @if (clientsList.length > 0) {
+        <div class="table-container">
+          <table class="s-table table clients-list layout-fixed">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>{{ 'tr_phone_number' | translate }}</th>
+                <th>{{ 'tr_name' | translate }}</th>
+                <th>{{ 'tr_address' | translate }}</th>
+                <th>{{ 'tr_branch' | translate }}</th>
+                <th>{{ 'tr_number_of_orders' | translate }}</th>
+                <th>{{ 'tr_total_orders_price' | translate }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (client of clientsList; track client; let i = $index) {
+                <tr>
+                  <td>{{ i + 1 }}</td>
+                  <td>{{ client.phoneNumber }}</td>
+                  <td>{{ client.name }}</td>
+                  <td>{{ client.address }}</td>
+                  <td>@for (branch of  client.branches ; track branch) {
+                    <div>
+                      {{branch}}
+                    </div>
+                  }</td>
+                  <td>{{ client.numberOfOrders }}</td>
+                  <td>{{ client.totalOrdersPrice }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @if (clientsList.length === 0) {
+        <div class="empty-state-here text-center ptb-8">
+          <i class="fas fa-client-slash empty-icon"></i>
+          <p>{{ 'tr_no_items_found' | translate }}</p>
+        </div>
+      }
       <div class="plr-4 ptb-4">
         <pagination
           [paginationData]="paginationData"
@@ -71,9 +79,11 @@
         </pagination>
       </div>
     </div>
-  
-    <div *ngIf="clientsLoading">
+  }
+
+  @if (clientsLoading) {
+    <div>
       <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
     </div>
-  </div>
-  
+  }
+</div>

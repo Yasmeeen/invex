@@ -1,5 +1,5 @@
 import { Component, HostListener, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialog as MatDialog, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Product, ProductActiveBooking } from '@core/models/products.model';
@@ -10,9 +10,10 @@ import { canPickBranchRole, isBranchManager, isModerator } from '@core/utils/rol
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 
 @Component({
-  selector: 'app-view-product-booking-dialog',
-  templateUrl: './view-product-booking-dialog.component.html',
-  styleUrls: ['./view-product-booking-dialog.component.scss'],
+    selector: 'app-view-product-booking-dialog',
+    templateUrl: './view-product-booking-dialog.component.html',
+    styleUrls: ['./view-product-booking-dialog.component.scss'],
+    standalone: false
 })
 export class ViewProductBookingDialogComponent implements OnInit {
   product: Product;
@@ -102,9 +103,9 @@ export class ViewProductBookingDialogComponent implements OnInit {
   }
 
   @HostListener('document:keydown.escape', ['$event'])
-  onEscape(event?: KeyboardEvent): void {
+  onEscape(event: Event): void {
     if (this.depositPreviewUrl) {
-      event?.preventDefault?.();
+      event.preventDefault();
       this.closeDepositPreview();
     }
   }

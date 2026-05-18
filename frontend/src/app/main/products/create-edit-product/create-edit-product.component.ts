@@ -4,7 +4,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { Component, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialog as MatDialog, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import {
   ViewChild,
   ElementRef,
@@ -34,9 +34,10 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 
 @Component({
-  selector: 'app-create-edit-product',
-  templateUrl: './create-edit-product.component.html',
-  styleUrls: ['./create-edit-product.component.scss']
+    selector: 'app-create-edit-product',
+    templateUrl: './create-edit-product.component.html',
+    styleUrls: ['./create-edit-product.component.scss'],
+    standalone: false
 })
 export class CreateEditProductComponent implements OnInit {
   branches: Branch [];

@@ -5,7 +5,7 @@
       id="create-edit-product-modal-root"
       class="modal-content"
       #modalContent
-    >
+      >
       <div class="modal-header border-bottom">
         <h3 class="steel weight-medium size-default m-0">
           {{ modalHeadingKey | translate }}
@@ -16,19 +16,21 @@
         <div class="add-student-modal-container">
           <div>
             <div class="content-container plr-4 ptb-3">
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="basicInfoForm.invalid && basicInfoForm.submitted"
-              >
-                {{ 'tr_fill_required_fields' | translate }}
-              </div>
+              @if (basicInfoForm.invalid && basicInfoForm.submitted) {
+                <div
+                  class="alert alert-error mb-3"
+                  >
+                  {{ 'tr_fill_required_fields' | translate }}
+                </div>
+              }
 
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="basicInfoForm.valid && basicInfoForm.submitted"
-              >
-                {{ 'tr_leaving_before_admission' | translate }}
-              </div>
+              @if (basicInfoForm.valid && basicInfoForm.submitted) {
+                <div
+                  class="alert alert-error mb-3"
+                  >
+                  {{ 'tr_leaving_before_admission' | translate }}
+                </div>
+              }
 
               <form #basicInfoForm="ngForm">
                 <div class="row">
@@ -37,7 +39,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="username_en.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ 'tr_name' | translate }}</label>
                       <input
                         #username_en="ngModel"
@@ -46,13 +48,14 @@
                         name="name"
                         ngModel
                         required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="username_en.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_name_required' | translate }}
-                      </span>
+                        />
+                      @if (username_en.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_name_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -61,7 +64,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="category.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ 'tr_category' | translate }}</label>
                       <div class="input-with-icon bg-white">
                         <ng-select
@@ -77,34 +80,41 @@
                           name="category"
                           [items]="categoryDropdownItems"
                           required
-                        >
+                          >
                           <ng-template ng-option-tmp let-item="item">
                             <span>{{ item.name }}</span>
-                            <span class="text-muted" *ngIf="item.code"> — {{ item.code }}</span>
-                            <span class="text-warning size-small" *ngIf="!item.code">
+                            @if (item.code) {
+                              <span class="text-muted"> — {{ item.code }}</span>
+                            }
+                            @if (!item.code) {
+                              <span class="text-warning size-small">
                               ({{ 'tr_category_no_code_tag' | translate }})</span>
+                            }
                           </ng-template>
                         </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="category.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_category_required' | translate }}
-                      </span>
-                      <p
-                        class="text-muted size-small m-0 mt-1"
-                        *ngIf="!isEdit && categories?.length && !hasAnyCategoryWithCode"
-                      >
-                        {{ 'tr_no_categories_with_code' | translate }}
-                      </p>
-                      <p
-                        class="text-warning size-small m-0 mt-1"
-                        *ngIf="!isEdit && selectedCategory && !hasCategoryCode(selectedCategory)"
-                      >
-                        {{ 'tr_category_needs_code_for_products' | translate }}
-                      </p>
+                      @if (category.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_category_required' | translate }}
+                        </span>
+                      }
+                      @if (!isEdit && categories?.length && !hasAnyCategoryWithCode) {
+                        <p
+                          class="text-muted size-small m-0 mt-1"
+                          >
+                          {{ 'tr_no_categories_with_code' | translate }}
+                        </p>
+                      }
+                      @if (!isEdit && selectedCategory && !hasCategoryCode(selectedCategory)) {
+                        <p
+                          class="text-warning size-small m-0 mt-1"
+                          >
+                          {{ 'tr_category_needs_code_for_products' | translate }}
+                        </p>
+                      }
                     </div>
                   </div>
 
@@ -113,7 +123,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="stock.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
                       <input
                         type="number"
@@ -124,19 +134,20 @@
                         required
                         min="1"
                         (ngModelChange)="onStockQuantityChanged()"
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="stock.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_stock_required' | translate }}
-                      </span>
+                        />
+                      @if (stock.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_stock_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
                   <!-- Product code (multi-code category + qty > 1 ⇒ one code per unit) -->
                   <div class="col-md-12">
-                    <ng-container *ngIf="isMultiUnitMode">
+                    @if (isMultiUnitMode) {
                       <input type="hidden" name="code" [(ngModel)]="codeValue" />
                       <div class="form-group">
                         <label>{{ 'tr_product_unit_codes_title' | translate }}</label>
@@ -147,100 +158,103 @@
                           {{ 'tr_product_unit_codes_editable_hint' | translate }}
                         </p>
                         <div class="multi-unit-codes__list">
-                          <div
-                            class="form-group multi-unit-codes__row"
-                            *ngFor="let _u of multiUnitCodes; let i = index; trackBy: trackByUnitIndex"
-                          >
-                            <label class="size-small steel m-0 mb-1">{{
-                              'tr_product_unit_code_piece' | translate: { n: i + 1 }
-                            }}</label>
-                            <input
-                              type="text"
-                              class="s-control"
-                              [(ngModel)]="multiUnitCodes[i]"
-                              [ngModelOptions]="{ standalone: true }"
-                              [readonly]="!isProductCodeEnabled"
-                              [attr.placeholder]="'tr_product_code_placeholder' | translate"
-                              (blur)="onMultiUnitCodeBlur(i)"
-                            />
-                          </div>
+                          @for (_u of multiUnitCodes; track trackByUnitIndex(i); let i = $index) {
+                            <div
+                              class="form-group multi-unit-codes__row"
+                              >
+                              <label class="size-small steel m-0 mb-1">{{
+                                'tr_product_unit_code_piece' | translate: { n: i + 1 }
+                              }}</label>
+                              <input
+                                type="text"
+                                class="s-control"
+                                [(ngModel)]="multiUnitCodes[i]"
+                                [ngModelOptions]="{ standalone: true }"
+                                [readonly]="!isProductCodeEnabled"
+                                [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                                (blur)="onMultiUnitCodeBlur(i)"
+                                />
+                            </div>
+                          }
                         </div>
                         <button
                           type="button"
                           class="s-btn btn-secondary mt-2"
                           [disabled]="!isProductCodeEnabled"
                           (click)="refreshMultiUnitCodes(true)"
-                        >
+                          >
                           {{ 'tr_product_regenerate_unit_codes' | translate }}
                         </button>
                       </div>
-                    </ng-container>
+                    }
 
-                    <div
-                      *ngIf="!isMultiUnitMode"
-                      class="form-group"
-                      [class.has-error]="code.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_code' | translate }}</label>
-                      <p
-                        class="text-muted size-small m-0 mb-2"
-                        *ngIf="!isEdit && !isProductCodeEnabled"
-                      >
-                        {{ 'tr_select_category_first_code' | translate }}
-                      </p>
-                      <div class="code-scan-container">
-                        <input
-                          type="text"
-                          name="code"
-                          [(ngModel)]="codeValue"
-                          [readonly]="!isProductCodeEnabled"
-                          [attr.placeholder]="'tr_product_code_placeholder' | translate"
-                          (blur)="enforceProductCodePrefix()"
-                          #code="ngModel"
-                          required
-                          class="s-control"
-                          [class.code-field-readonly]="!isProductCodeEnabled"
-                        />
-                        <button
-                          type="button"
-                          class="scan-btn"
-                          [disabled]="!isProductCodeEnabled"
-                          (click)="toggleCamera()"
+                    @if (!isMultiUnitMode) {
+                      <div
+                        class="form-group"
+                        [class.has-error]="code.invalid && basicInfoForm.submitted"
                         >
-                          <i class="fa fa-camera" aria-hidden="true"></i>
-                          {{ 'tr_product_scan_qr' | translate }}
-                        </button>
-
-                        <button
-                          type="button"
-                          class="s-btn btn-secondary ml-2"
-                          [disabled]="!isProductCodeEnabled"
-                          (click)="generateBarcode()"
-                        >
-                          {{ 'tr_product_generate_barcode' | translate }}
-                        </button>
+                        <label>{{ 'tr_code' | translate }}</label>
+                        @if (!isEdit && !isProductCodeEnabled) {
+                          <p
+                            class="text-muted size-small m-0 mb-2"
+                            >
+                            {{ 'tr_select_category_first_code' | translate }}
+                          </p>
+                        }
+                        <div class="code-scan-container">
+                          <input
+                            type="text"
+                            name="code"
+                            [(ngModel)]="codeValue"
+                            [readonly]="!isProductCodeEnabled"
+                            [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                            (blur)="enforceProductCodePrefix()"
+                            #code="ngModel"
+                            required
+                            class="s-control"
+                            [class.code-field-readonly]="!isProductCodeEnabled"
+                            />
+                          <button
+                            type="button"
+                            class="scan-btn"
+                            [disabled]="!isProductCodeEnabled"
+                            (click)="toggleCamera()"
+                            >
+                            <i class="fa fa-camera" aria-hidden="true"></i>
+                            {{ 'tr_product_scan_qr' | translate }}
+                          </button>
+                          <button
+                            type="button"
+                            class="s-btn btn-secondary ml-2"
+                            [disabled]="!isProductCodeEnabled"
+                            (click)="generateBarcode()"
+                            >
+                            {{ 'tr_product_generate_barcode' | translate }}
+                          </button>
+                        </div>
+                        @if (isCameraActive) {
+                          <div class="camera-overlay">
+                            <video id="video" width="300" height="300"></video>
+                          </div>
+                        }
+                        @if (code.invalid && basicInfoForm.submitted) {
+                          <span
+                            class="text-error size-small validator"
+                            >
+                            {{ 'tr_code_required' | translate }}
+                          </span>
+                        }
                       </div>
-
-                      <div *ngIf="isCameraActive" class="camera-overlay">
-                        <video id="video" width="300" height="300"></video>
-                      </div>
-
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="code.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_code_required' | translate }}
-                      </span>
-                    </div>
+                    }
                   </div>
 
                   <!-- Price -->
                   <div class="col-md-6">
-        
+
                     <div
                       class="form-group"
                       [class.has-error]="price.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ 'tr_sell_price' | translate }}</label>
                       <input
                         type="number"
@@ -249,13 +263,14 @@
                         #price="ngModel"
                         ngModel
                         required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="price.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_price_required' | translate }}
-                      </span>
+                        />
+                      @if (price.invalid && basicInfoForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_price_required' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -263,7 +278,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ 'tr_net_price_optional' | translate }}</span></label>
                       <input
                         type="number"
@@ -272,13 +287,14 @@
                         #netPrice="ngModel"
                         ngModel
                         min="0"
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="netPrice.invalid && basicInfoForm.submitted && netPrice.errors?.min"
-                      >
-                        {{ 'tr_net_price_invalid' | translate }}
-                      </span>
+                        />
+                      @if (netPrice.invalid && basicInfoForm.submitted && netPrice.errors?.min) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ 'tr_net_price_invalid' | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -287,7 +303,7 @@
                     <div
                       class="form-group"
                       [class.has-error]="discount.invalid && basicInfoForm.submitted"
-                    >
+                      >
                       <label>{{ 'tr_discount' | translate }}</label>
                       <input
                         type="number"
@@ -296,7 +312,7 @@
                         placeholder="{{ 'tr_discount_percentage' | translate }}"
                         #discount="ngModel"
                         ngModel
-                      />
+                        />
                     </div>
                   </div>
 
@@ -304,23 +320,29 @@
                   <div class="col-md-12">
                     <div class="form-group product-image-field">
                       <label>{{ 'tr_product_image' | translate }}</label>
-                      <p class="text-muted size-small m-0 mb-2" *ngIf="!isCloudinaryConfigured()">
-                        {{ 'tr_cloudinary_not_configured' | translate }}
-                      </p>
+                      @if (!isCloudinaryConfigured()) {
+                        <p class="text-muted size-small m-0 mb-2">
+                          {{ 'tr_cloudinary_not_configured' | translate }}
+                        </p>
+                      }
                       <div class="product-image-row">
-                        <div class="product-image-preview" *ngIf="productImageUrl">
-                          <img [src]="productImageUrl" alt="" />
-                          <button
-                            type="button"
-                            class="s-btn btn-secondary size-small product-image-remove"
-                            (click)="clearProductImage()"
-                          >
-                            {{ 'tr_remove_logo' | translate }}
-                          </button>
-                        </div>
-                        <div class="product-image-placeholder" *ngIf="!productImageUrl">
-                          <i class="fa fa-picture-o" aria-hidden="true"></i>
-                        </div>
+                        @if (productImageUrl) {
+                          <div class="product-image-preview">
+                            <img [src]="productImageUrl" alt="" />
+                            <button
+                              type="button"
+                              class="s-btn btn-secondary size-small product-image-remove"
+                              (click)="clearProductImage()"
+                              >
+                              {{ 'tr_remove_logo' | translate }}
+                            </button>
+                          </div>
+                        }
+                        @if (!productImageUrl) {
+                          <div class="product-image-placeholder">
+                            <i class="fa fa-picture-o" aria-hidden="true"></i>
+                          </div>
+                        }
                         <div class="product-image-actions">
                           <input
                             id="product-image-file-input"
@@ -330,132 +352,151 @@
                             [disabled]="isUploadingImage || !isCloudinaryConfigured()"
                             (change)="onProductImageSelected($event)"
                             hidden
-                          />
+                            />
                           <label
                             for="product-image-file-input"
                             class="s-btn btn-secondary product-image-upload-label mb-0"
                             [class.disabled]="isUploadingImage || !isCloudinaryConfigured()"
-                          >
-                            <span *ngIf="!isUploadingImage">{{ 'tr_choose_image' | translate }}</span>
-                            <span *ngIf="isUploadingImage">{{ 'tr_image_uploading' | translate }}</span>
+                            >
+                            @if (!isUploadingImage) {
+                              <span>{{ 'tr_choose_image' | translate }}</span>
+                            }
+                            @if (isUploadingImage) {
+                              <span>{{ 'tr_image_uploading' | translate }}</span>
+                            }
                           </label>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div class="col-md-12" *ngIf="isBranchManagerNewProduct">
-                    <p class="text-muted size-small m-0">
-                      {{ 'tr_branch' | translate }}:
-                      <strong>{{ globals.currentUser?.branch?.name || '—' }}</strong>
-                    </p>
-                  </div>
-
-                  <div class="col-md-12" *ngIf="cashDeskPurchase && deskPurchaseBranchLabel && !isBranchManagerNewProduct">
-                    <p class="text-muted size-small m-0">
-                      {{ 'tr_branch' | translate }}:
-                      <strong>{{ deskPurchaseBranchLabel }}</strong>
-                    </p>
-                  </div>
-
-                  <div class="col-md-8 mt-4" *ngIf="cashDeskPurchase">
-                    <div class="form-group">
-                      <label>{{ 'tr_purchase_treasury_method' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          [(ngModel)]="deskPurchaseTreasuryKey"
-                          name="deskPurchaseTreasuryKey"
-                          [items]="purchaseTreasuryMethodOptions"
-                          bindLabel="label"
-                          bindValue="key"
-                          [clearable]="false"
-                          appendTo="#create-edit-product-modal-root"
-                        >
-                        </ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-                      <p class="text-muted size-small m-0 mt-1">{{ 'tr_purchase_treasury_method_hint' | translate }}</p>
+                  @if (isBranchManagerNewProduct) {
+                    <div class="col-md-12">
+                      <p class="text-muted size-small m-0">
+                        {{ 'tr_branch' | translate }}:
+                        <strong>{{ globals.currentUser?.branch?.name || '—' }}</strong>
+                      </p>
                     </div>
-                  </div>
+                  }
 
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
-                    <div class="form-group">
-                      <label>{{ 'tr_product_storage' | translate }}</label>
-                      <div class="storage-choice">
-                        <label class="storage-option">
-                          <input
-                            type="radio"
-                            name="storageMode"
-                            [checked]="!storeInWarehouse"
-                            (change)="setStorageMode(false)"
-                          />
-                          <span>{{ 'tr_storage_branch' | translate }}</span>
-                        </label>
-                        <label class="storage-option">
-                          <input
-                            type="radio"
-                            name="storageMode"
-                            [checked]="storeInWarehouse"
-                            (change)="setStorageMode(true)"
-                          />
-                          <span>{{ 'tr_warehouse' | translate }}</span>
-                        </label>
+                  @if (cashDeskPurchase && deskPurchaseBranchLabel && !isBranchManagerNewProduct) {
+                    <div class="col-md-12">
+                      <p class="text-muted size-small m-0">
+                        {{ 'tr_branch' | translate }}:
+                        <strong>{{ deskPurchaseBranchLabel }}</strong>
+                      </p>
+                    </div>
+                  }
+
+                  @if (cashDeskPurchase) {
+                    <div class="col-md-8 mt-4">
+                      <div class="form-group">
+                        <label>{{ 'tr_purchase_treasury_method' | translate }}</label>
+                        <div class="input-with-icon bg-white">
+                          <ng-select
+                            class="s-control s-select"
+                            [(ngModel)]="deskPurchaseTreasuryKey"
+                            name="deskPurchaseTreasuryKey"
+                            [items]="purchaseTreasuryMethodOptions"
+                            bindLabel="label"
+                            bindValue="key"
+                            [clearable]="false"
+                            appendTo="#create-edit-product-modal-root"
+                            >
+                          </ng-select>
+                          <i class="fa fa-caret-down input-icon"></i>
+                        </div>
+                        <p class="text-muted size-small m-0 mt-1">{{ 'tr_purchase_treasury_method_hint' | translate }}</p>
                       </div>
                     </div>
-                  </div>
+                  }
 
-                  <!-- Branch -->
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse && !cashDeskPurchase">
-                    <div
-                      class="form-group"
-                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_branch' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          [clearable]="false"
-                          appendTo="#create-edit-product-modal-root"
-                          ngModel
-                          #branch="ngModel"
-                          name="branch"
-                          [items]="branches"
-                          [required]="!storeInWarehouse"
-                        ></ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="branch.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_branch_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- Dynamic category attributes (last; two fields per row) -->
-                  <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
-                    <div class="border-top pt-3 mt-3">
-                      <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
-                      <div class="row">
-                        <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
-                          <div class="form-group">
-                            <label>{{ d.label }}</label>
+                  @if (!isBranchManagerNewProduct && !cashDeskPurchase) {
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label>{{ 'tr_product_storage' | translate }}</label>
+                        <div class="storage-choice">
+                          <label class="storage-option">
                             <input
-                              type="text"
-                              class="s-control"
-                              [(ngModel)]="attributeValues[d.key]"
-                              [ngModelOptions]="{ standalone: true }"
-                              autocomplete="off"
-                            />
-                          </div>
+                              type="radio"
+                              name="storageMode"
+                              [checked]="!storeInWarehouse"
+                              (change)="setStorageMode(false)"
+                              />
+                            <span>{{ 'tr_storage_branch' | translate }}</span>
+                          </label>
+                          <label class="storage-option">
+                            <input
+                              type="radio"
+                              name="storageMode"
+                              [checked]="storeInWarehouse"
+                              (change)="setStorageMode(true)"
+                              />
+                            <span>{{ 'tr_warehouse' | translate }}</span>
+                          </label>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  }
+
+                  <!-- Branch -->
+                  @if (!isBranchManagerNewProduct && !storeInWarehouse && !cashDeskPurchase) {
+                    <div class="col-md-6">
+                      <div
+                        class="form-group"
+                        [class.has-error]="branch.invalid && basicInfoForm.submitted"
+                        >
+                        <label>{{ 'tr_branch' | translate }}</label>
+                        <div class="input-with-icon bg-white">
+                          <ng-select
+                            class="s-control s-select"
+                            placeholder="{{ 'tr_select' | translate }}"
+                            bindLabel="name"
+                            [clearable]="false"
+                            appendTo="#create-edit-product-modal-root"
+                            ngModel
+                            #branch="ngModel"
+                            name="branch"
+                            [items]="branches"
+                            [required]="!storeInWarehouse"
+                          ></ng-select>
+                          <i class="fa fa-caret-down input-icon"></i>
+                        </div>
+                        @if (branch.invalid && basicInfoForm.submitted) {
+                          <span
+                            class="text-error size-small validator"
+                            >
+                            {{ 'tr_branch_required' | translate }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Dynamic category attributes (last; two fields per row) -->
+                  @if (categoryAttributeDefs?.length) {
+                    <div class="col-md-12">
+                      <div class="border-top pt-3 mt-3">
+                        <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
+                        <div class="row">
+                          @for (d of categoryAttributeDefs; track d) {
+                            <div class="col-md-6">
+                              <div class="form-group">
+                                <label>{{ d.label }}</label>
+                                <input
+                                  type="text"
+                                  class="s-control"
+                                  [(ngModel)]="attributeValues[d.key]"
+                                  [ngModelOptions]="{ standalone: true }"
+                                  autocomplete="off"
+                                  />
+                              </div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
 
                 </div>
               </form>
@@ -473,7 +514,7 @@
           class="s-btn btn-primary"
           type="submit"
           [disabled]="isUploadingImage || isSubmitting"
-        >
+          >
           {{ cashDeskPurchase ? ('tr_product_purchase_submit' | translate) : ('tr_save' | translate) }}
         </button>
       </div>

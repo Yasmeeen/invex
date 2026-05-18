@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CategoriesServce } from './../../../shared/services/categories.service';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 // import { ordersSerivce } from '@shared/services/orders.services';
 import { PaginationData, User } from '@core/models/users-interfaces.model'
 // import { category, order } from '@core/models/orders-interface.model'
@@ -32,9 +32,10 @@ import {
 import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
 
 @Component({
-  selector: 'app-orders-list',
-  templateUrl: './orders-list.component.html',
-  styleUrls: ['./orders-list.component.scss']
+    selector: 'app-orders-list',
+    templateUrl: './orders-list.component.html',
+    styleUrls: ['./orders-list.component.scss'],
+    standalone: false
 })
 export class OrdersListComponent implements OnInit {
   ordersLoading: boolean = true;

@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild, Inject, Output, EventEmitter } from '@angular/core';
 import { NgForm } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -11,9 +11,10 @@ import { Vendor } from '@core/models/products.model';
 export type InstallmentSchedulePeriod = 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
 
 @Component({
-  selector: 'app-create-edit-purchasing-request',
-  templateUrl: './create-edit-purchasing-request.component.html',
-  styleUrls: ['./create-edit-purchasing-request.component.scss']
+    selector: 'app-create-edit-purchasing-request',
+    templateUrl: './create-edit-purchasing-request.component.html',
+    styleUrls: ['./create-edit-purchasing-request.component.scss'],
+    standalone: false
 })
 export class CreateEditPurchasingRequestComponent implements OnInit {
   @ViewChild('purchasingForm') purchasingForm: NgForm;

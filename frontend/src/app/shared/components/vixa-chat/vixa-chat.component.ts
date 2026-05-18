@@ -13,9 +13,10 @@ type VixaMessage = {
 };
 
 @Component({
-  selector: 'app-vixa-chat',
-  templateUrl: './vixa-chat.component.html',
-  styleUrls: ['./vixa-chat.component.scss'],
+    selector: 'app-vixa-chat',
+    templateUrl: './vixa-chat.component.html',
+    styleUrls: ['./vixa-chat.component.scss'],
+    standalone: false
 })
 export class VixaChatComponent implements OnInit, OnDestroy {
   /** floating = global widget; page = full-page layout (no FAB) */

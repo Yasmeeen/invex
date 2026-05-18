@@ -2,173 +2,193 @@
   <h2 mat-dialog-title class="drawer-close-dialog__title">{{ 'tr_drawer_close_title' | translate }}</h2>
 
   <div mat-dialog-content class="drawer-close-dialog__body">
-    <div *ngIf="step === 1">
-      <form [formGroup]="countForm">
-        <div class="form-group" *ngIf="showBranchPicker">
-          <label>{{ 'tr_branches' | translate }}</label>
-          <div class="input-with-icon">
-            <ng-select
-              class="s-control s-select"
-              formControlName="branchId"
-              [items]="branches"
-              bindLabel="name"
-              bindValue="_id"
-              [clearable]="false"
-              placeholder="{{ 'tr_branches' | translate }}"
-              (change)="loadPreview()"
-            >
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
+    @if (step === 1) {
+      <div>
+        <form [formGroup]="countForm">
+          @if (showBranchPicker) {
+            <div class="form-group">
+              <label>{{ 'tr_branches' | translate }}</label>
+              <div class="input-with-icon">
+                <ng-select
+                  class="s-control s-select"
+                  formControlName="branchId"
+                  [items]="branches"
+                  bindLabel="name"
+                  bindValue="_id"
+                  [clearable]="false"
+                  placeholder="{{ 'tr_branches' | translate }}"
+                  (change)="loadPreview()"
+                  >
+                </ng-select>
+                <i class="fa fa-caret-down input-icon"></i>
+              </div>
+            </div>
+          }
+          <div class="form-group">
+            <label>{{ 'tr_drawer_close_business_date' | translate }}</label>
+            <input
+              class="s-control width-100"
+              type="date"
+              formControlName="businessDate"
+              (change)="onBusinessDateChange()"
+              />
           </div>
-        </div>
+        </form>
+        @if (previewLoading) {
+          <div class="drawer-close-dialog__loading">
+            <app-ghost-line [length]="8" [type]="'table'"></app-ghost-line>
+          </div>
+        }
+        @if (!previewLoading && preview) {
+          <div class="drawer-close-dialog__summary">
+            <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
+              <span>{{ 'tr_drawer_close_invoice_count' | translate }}</span>
+              <strong>{{ preview.invoiceCount }}</strong>
+            </div>
+            <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
+              <span>{{ 'tr_drawer_close_expected_cash' | translate }}</span>
+              <strong>{{ preview.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+            </div>
+            <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_payments_in' | translate }}</h4>
+            @for (row of methodEntries(preview.paymentsReceivedByMethod); track row) {
+              <div class="drawer-close-dialog__row">
+                <span>{{ payMethodLabel(row[0]) }}</span>
+                <span>{{ row[1] | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+              </div>
+            }
+            @if (methodEntries(preview.paymentsReceivedByMethod).length === 0) {
+              <div class="drawer-close-dialog__muted">
+                {{ 'tr_drawer_close_none' | translate }}
+              </div>
+            }
+            <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_refunds_title' | translate }}</h4>
+            <div class="drawer-close-dialog__muted">
+              {{ 'tr_drawer_close_restored_count' | translate : { count: preview.restoredInvoiceCount } }}
+            </div>
+            @for (row of methodEntries(preview.refundsByMethod); track row) {
+              <div class="drawer-close-dialog__row">
+                <span>{{ payMethodLabel(row[0]) }}</span>
+                <span>−{{ row[1] | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+              </div>
+            }
+            @if (methodEntries(preview.refundsByMethod).length === 0) {
+              <div class="drawer-close-dialog__muted">
+                {{ 'tr_drawer_close_none' | translate }}
+              </div>
+            }
+            <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_cash_out_title' | translate }}</h4>
+            <div class="drawer-close-dialog__row">
+              <span>{{ 'tr_drawer_close_daily_expenses' | translate }}</span>
+              <span>−{{ preview.dailyExpenseTotal | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+            </div>
+            <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
+              <span>{{ 'tr_drawer_close_desk_purchase_cash_drawer' | translate }}</span>
+              <span
+                >−{{ deskCashDrawerAmount(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                <span class="drawer-close-dialog__hint"
+                  >({{ 'tr_drawer_close_desk_purchase_count' | translate : { count: preview.deskPurchaseIntakeCount } }})</span
+                  ></span
+                  >
+                </div>
+                @if (deskGrandTotal(preview) != null && deskGrandTotal(preview) !== deskCashDrawerAmount(preview)) {
+                  <div
+                    class="drawer-close-dialog__muted mb-1"
+                    >
+                    {{ 'tr_drawer_close_desk_purchase_grand_total' | translate }}:
+                    {{ deskGrandTotal(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                  </div>
+                }
+                @if (preview.deskPurchaseByTreasuryMethod?.length) {
+                  <div class="drawer-close-dialog__muted size-small mb-1">{{ 'tr_drawer_close_desk_purchase_by_treasury' | translate }}</div>
+                  @for (row of preview.deskPurchaseByTreasuryMethod; track row) {
+                    <div class="drawer-close-dialog__row drawer-close-dialog__row--sub">
+                      <span>{{ row.label }} <span class="drawer-close-dialog__hint">({{ row.key }}) · {{ row.count }}</span></span>
+                      <span>{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+                    </div>
+                  }
+                }
+                <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_refunds' | translate }}</p>
+                <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_desk_treasury' | translate }}</p>
+              </div>
+            }
+            @if (!previewLoading && previewError && !preview) {
+              <div class="drawer-close-dialog__muted">
+                {{ 'tr_drawer_close_preview_failed' | translate }}
+              </div>
+            }
+          </div>
+        }
 
-        <div class="form-group">
-          <label>{{ 'tr_drawer_close_business_date' | translate }}</label>
-          <input
-            class="s-control width-100"
-            type="date"
-            formControlName="businessDate"
-            (change)="onBusinessDateChange()"
-          />
-        </div>
-      </form>
-
-      <div *ngIf="previewLoading" class="drawer-close-dialog__loading">
-        <app-ghost-line [length]="8" [type]="'table'"></app-ghost-line>
+        @if (step === 2) {
+          <div>
+            <form [formGroup]="shortageReasonForm">
+              <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight mb-3">
+                <span>{{ 'tr_drawer_close_expected_cash' | translate }}</span>
+                <strong>{{ preview?.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+              </div>
+              <div class="form-group">
+                <label>{{ 'tr_drawer_close_actual_cash' | translate }}</label>
+                <input
+                  class="s-control width-100"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  formControlName="actualCashCounted"
+                  />
+              </div>
+              <div
+                class="drawer-close-dialog__status"
+                [class.drawer-close-dialog__status--ok]="isBalanced()"
+                [class.drawer-close-dialog__status--warn]="isShortage()"
+                [class.drawer-close-dialog__status--info]="!isBalanced() && !isShortage()"
+                >
+                @if (isBalanced()) {
+                  <span>{{ 'tr_drawer_close_status_balanced' | translate }}</span>
+                }
+                @if (isShortage()) {
+                  <span>{{ 'tr_drawer_close_status_shortage' | translate }}</span>
+                }
+                @if (!isBalanced() && !isShortage()) {
+                  <span>{{ 'tr_drawer_close_status_surplus' | translate }}</span>
+                }
+                @if (!isBalanced()) {
+                  <span class="drawer-close-dialog__var">
+                    {{ variance() | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                  </span>
+                }
+              </div>
+              @if (isShortage()) {
+                <div class="form-group mb-0">
+                  <label>{{ 'tr_drawer_close_shortage_reason' | translate }}</label>
+                  <textarea
+                    class="s-control width-100"
+                    rows="3"
+                    formControlName="shortageReason"
+                    maxlength="2000"
+                  ></textarea>
+                </div>
+              }
+            </form>
+          </div>
+        }
       </div>
 
-      <div *ngIf="!previewLoading && preview" class="drawer-close-dialog__summary">
-        <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
-          <span>{{ 'tr_drawer_close_invoice_count' | translate }}</span>
-          <strong>{{ preview.invoiceCount }}</strong>
-        </div>
-        <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
-          <span>{{ 'tr_drawer_close_expected_cash' | translate }}</span>
-          <strong>{{ preview.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
-        </div>
-
-        <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_payments_in' | translate }}</h4>
-        <div class="drawer-close-dialog__row" *ngFor="let row of methodEntries(preview.paymentsReceivedByMethod)">
-          <span>{{ payMethodLabel(row[0]) }}</span>
-          <span>{{ row[1] | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
-        </div>
-        <div class="drawer-close-dialog__muted" *ngIf="methodEntries(preview.paymentsReceivedByMethod).length === 0">
-          {{ 'tr_drawer_close_none' | translate }}
-        </div>
-
-        <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_refunds_title' | translate }}</h4>
-        <div class="drawer-close-dialog__muted">
-          {{ 'tr_drawer_close_restored_count' | translate : { count: preview.restoredInvoiceCount } }}
-        </div>
-        <div class="drawer-close-dialog__row" *ngFor="let row of methodEntries(preview.refundsByMethod)">
-          <span>{{ payMethodLabel(row[0]) }}</span>
-          <span>−{{ row[1] | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
-        </div>
-        <div class="drawer-close-dialog__muted" *ngIf="methodEntries(preview.refundsByMethod).length === 0">
-          {{ 'tr_drawer_close_none' | translate }}
-        </div>
-
-        <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_cash_out_title' | translate }}</h4>
-        <div class="drawer-close-dialog__row">
-          <span>{{ 'tr_drawer_close_daily_expenses' | translate }}</span>
-          <span>−{{ preview.dailyExpenseTotal | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
-        </div>
-        <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
-          <span>{{ 'tr_drawer_close_desk_purchase_cash_drawer' | translate }}</span>
-          <span
-            >−{{ deskCashDrawerAmount(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
-            <span class="drawer-close-dialog__hint"
-              >({{ 'tr_drawer_close_desk_purchase_count' | translate : { count: preview.deskPurchaseIntakeCount } }})</span
-            ></span
-          >
-        </div>
-
-        <div
-          class="drawer-close-dialog__muted mb-1"
-          *ngIf="deskGrandTotal(preview) != null && deskGrandTotal(preview) !== deskCashDrawerAmount(preview)"
-        >
-          {{ 'tr_drawer_close_desk_purchase_grand_total' | translate }}:
-          {{ deskGrandTotal(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
-        </div>
-
-        <ng-container *ngIf="preview.deskPurchaseByTreasuryMethod?.length">
-          <div class="drawer-close-dialog__muted size-small mb-1">{{ 'tr_drawer_close_desk_purchase_by_treasury' | translate }}</div>
-          <div class="drawer-close-dialog__row drawer-close-dialog__row--sub" *ngFor="let row of preview.deskPurchaseByTreasuryMethod">
-            <span>{{ row.label }} <span class="drawer-close-dialog__hint">({{ row.key }}) · {{ row.count }}</span></span>
-            <span>{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
-          </div>
-        </ng-container>
-
-        <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_refunds' | translate }}</p>
-        <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_desk_treasury' | translate }}</p>
-      </div>
-
-      <div *ngIf="!previewLoading && previewError && !preview" class="drawer-close-dialog__muted">
-        {{ 'tr_drawer_close_preview_failed' | translate }}
+      <div mat-dialog-actions align="end" class="drawer-close-dialog__actions">
+        <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+          {{ 'tr_action.cancel' | translate }}
+        </button>
+        @if (step === 1) {
+          <button type="button" class="s-btn btn-primary" (click)="goToConfirm()" [disabled]="previewLoading || !preview">
+            {{ 'tr_drawer_close_next' | translate }}
+          </button>
+        }
+        @if (step === 2) {
+          <button type="button" class="s-btn btn-secondary" (click)="goBack()" [disabled]="saving">
+            {{ 'tr_drawer_close_back' | translate }}
+          </button>
+          <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
+            {{ 'tr_drawer_close_submit' | translate }}
+          </button>
+        }
       </div>
     </div>
-
-    <div *ngIf="step === 2">
-      <form [formGroup]="shortageReasonForm">
-        <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight mb-3">
-          <span>{{ 'tr_drawer_close_expected_cash' | translate }}</span>
-          <strong>{{ preview?.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
-        </div>
-
-        <div class="form-group">
-          <label>{{ 'tr_drawer_close_actual_cash' | translate }}</label>
-          <input
-            class="s-control width-100"
-            type="number"
-            step="0.01"
-            min="0"
-            formControlName="actualCashCounted"
-          />
-        </div>
-
-        <div
-          class="drawer-close-dialog__status"
-          [class.drawer-close-dialog__status--ok]="isBalanced()"
-          [class.drawer-close-dialog__status--warn]="isShortage()"
-          [class.drawer-close-dialog__status--info]="!isBalanced() && !isShortage()"
-        >
-          <span *ngIf="isBalanced()">{{ 'tr_drawer_close_status_balanced' | translate }}</span>
-          <span *ngIf="isShortage()">{{ 'tr_drawer_close_status_shortage' | translate }}</span>
-          <span *ngIf="!isBalanced() && !isShortage()">{{ 'tr_drawer_close_status_surplus' | translate }}</span>
-          <span class="drawer-close-dialog__var" *ngIf="!isBalanced()">
-            {{ variance() | currency : 'EGP ' : 'symbol' : '1.2-2' }}
-          </span>
-        </div>
-
-        <div class="form-group mb-0" *ngIf="isShortage()">
-          <label>{{ 'tr_drawer_close_shortage_reason' | translate }}</label>
-          <textarea
-            class="s-control width-100"
-            rows="3"
-            formControlName="shortageReason"
-            maxlength="2000"
-          ></textarea>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div mat-dialog-actions align="end" class="drawer-close-dialog__actions">
-    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
-      {{ 'tr_action.cancel' | translate }}
-    </button>
-    <ng-container *ngIf="step === 1">
-      <button type="button" class="s-btn btn-primary" (click)="goToConfirm()" [disabled]="previewLoading || !preview">
-        {{ 'tr_drawer_close_next' | translate }}
-      </button>
-    </ng-container>
-    <ng-container *ngIf="step === 2">
-      <button type="button" class="s-btn btn-secondary" (click)="goBack()" [disabled]="saving">
-        {{ 'tr_drawer_close_back' | translate }}
-      </button>
-      <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
-        {{ 'tr_drawer_close_submit' | translate }}
-      </button>
-    </ng-container>
-  </div>
-</div>

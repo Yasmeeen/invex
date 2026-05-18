@@ -12,9 +12,11 @@
           <span class="system-name">INVEX</span>
         </div>
 
-        <p *ngIf="loginError" class="text-center text-error mt-3 mb-3">
-          {{errorMessage}}
-        </p>
+        @if (loginError) {
+          <p class="text-center text-error mt-3 mb-3">
+            {{errorMessage}}
+          </p>
+        }
         <form (ngSubmit)="onSubmit()" #loginForm="ngForm">
           <div class="form-group mb-6" [class.has-error]="(email.invalid && email.dirty) ||(loginForm.submitted && email.invalid)">
             <label class="login-label">Email</label>
@@ -29,8 +31,12 @@
             <label class="login-label">Password</label>
             <div class="flex flex-middle">
               <input class="login-input" [type]="show ? 'text' : 'password'" name="password" placeholder="Password" [(ngModel)]="user.password" (keyup.enter)="onSubmit()" autocomplete="password" #password="ngModel" required>
-              <i class="fa fa-eye eye-icon text-primary" *ngIf="!show" (click)="show = true"></i>
-              <i class="fa fa-eye-slash eye-icon text-primary" *ngIf="show" (click)="show = false"> </i>
+              @if (!show) {
+                <i class="fa fa-eye eye-icon text-primary" (click)="show = true"></i>
+              }
+              @if (show) {
+                <i class="fa fa-eye-slash eye-icon text-primary" (click)="show = false"> </i>
+              }
             </div>
 
             <span class="text-error size-small mt-2 validator">

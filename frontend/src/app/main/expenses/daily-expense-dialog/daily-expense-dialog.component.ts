@@ -1,6 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Branch } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -16,12 +16,13 @@ export interface DailyExpenseDialogData {
 }
 
 @Component({
-  selector: 'app-daily-expense-dialog',
-  templateUrl: './daily-expense-dialog.component.html',
-  styleUrls: ['./daily-expense-dialog.component.scss'],
+    selector: 'app-daily-expense-dialog',
+    templateUrl: './daily-expense-dialog.component.html',
+    styleUrls: ['./daily-expense-dialog.component.scss'],
+    standalone: false
 })
 export class DailyExpenseDialogComponent implements OnInit {
-  form: FormGroup;
+  form: UntypedFormGroup;
   saving = false;
   branches: Branch[] = [];
   /** Super Admin / Co Admin without forced branch: choose branch in dialog. */
@@ -29,7 +30,7 @@ export class DailyExpenseDialogComponent implements OnInit {
   private fixedBranchId: string | null = null;
 
   constructor(
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private dialogRef: MatDialogRef<DailyExpenseDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA) public data: DailyExpenseDialogData,
     private auth: AuthenticationService,

@@ -1,5 +1,5 @@
 import { CategoriesServce } from './../../../shared/services/categories.service';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Component, OnInit } from '@angular/core';
 // import { productsSerivce } from '@shared/services/products.services';
 import { PaginationData } from '@core/models/users-interfaces.model'
@@ -30,9 +30,10 @@ import { TransferProductBranchDialogComponent } from '../transfer-product-branch
 import { PendingBranchTransfersDialogComponent } from '../pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 
 @Component({
-  selector: 'app-products-list',
-  templateUrl: './products-list.component.html',
-  styleUrls: ['./products-list.component.scss']
+    selector: 'app-products-list',
+    templateUrl: './products-list.component.html',
+    styleUrls: ['./products-list.component.scss'],
+    standalone: false
 })
 export class ProductsListComponent implements OnInit {
   productsLoading: boolean = true;

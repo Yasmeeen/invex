@@ -5,7 +5,7 @@ import {
   ElementRef,
   ViewChild,
 } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
@@ -26,7 +26,7 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
@@ -34,9 +34,10 @@ import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
 
 @Component({
-  selector: 'app-cashier-order',
-  templateUrl: './cashier.component.html',
-  styleUrls: ['./cashier.component.scss']
+    selector: 'app-cashier-order',
+    templateUrl: './cashier.component.html',
+    styleUrls: ['./cashier.component.scss'],
+    standalone: false
 })
 export class CashierComponent implements AfterViewInit {
   @ViewChild('barcodeInput') barcodeInput!: ElementRef;
@@ -75,7 +76,7 @@ export class CashierComponent implements AfterViewInit {
 
   // Client information section
   isClientInfoOpen = false;
-  clientForm: FormGroup;
+  clientForm: UntypedFormGroup;
   isExistingClient = false;
   /** Avoid repeating the same “registered” toast for the same client lookup. */
   private lastNotifiedClientId: string | null = null;
@@ -114,7 +115,7 @@ export class CashierComponent implements AfterViewInit {
     private branchesServce: BranchesServce,
     private globals: Globals,
     private appNotificationService: AppNotificationService,
-    private fb: FormBuilder,
+    private fb: UntypedFormBuilder,
     private translate: TranslateService,
     public storeSettings: StoreSettingsService,
     private cdr: ChangeDetectorRef

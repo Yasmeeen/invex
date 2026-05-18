@@ -3,7 +3,8 @@ import { Component, Input, Output, EventEmitter, AfterContentInit } from '@angul
 @Component({
     selector: 'multi-checkbox',
     templateUrl: './multi-checkbox.component.html',
-    styleUrls: ['./multi-checkbox.component.scss']
+    styleUrls: ['./multi-checkbox.component.scss'],
+    standalone: false
 })
 export class MultiCheckboxComponent implements AfterContentInit {
 

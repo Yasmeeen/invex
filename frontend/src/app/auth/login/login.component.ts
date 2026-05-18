@@ -2,7 +2,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { IUserLogin, User, UserDetailsLogin } from '@core/models/users-interfaces.model';
 import { Component, OnInit, NgZone, ElementRef, ViewChild } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { FormGroup, FormBuilder, FormControl, Validators, NgForm } from '@angular/forms';
+import { UntypedFormGroup, FormBuilder, FormControl, Validators, NgForm } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from 'src/app/core/services/authentication.service';
 import { Globals } from 'src/app/core/globals';
@@ -12,13 +12,14 @@ import { RealtimeNotificationsService } from '@shared/services/realtime-notifica
 @Component({
     selector: 'login-components',
     templateUrl: './login.component.html',
-    styleUrls: ['./login.component.scss']
+    styleUrls: ['./login.component.scss'],
+    standalone: false
 })
 export class LoginComponent implements OnInit {
     triedToLogin: boolean = false;
     returnUrl: string;
-    protected aFormGroup?: FormGroup;
-    loginValidationForm?:  FormGroup;
+    protected aFormGroup?: UntypedFormGroup;
+    loginValidationForm?:  UntypedFormGroup;
     formSubmitted: boolean = false;
     user:IUserLogin = new UserDetailsLogin()
     isLoading: boolean = true;

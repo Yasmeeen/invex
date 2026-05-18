@@ -1,104 +1,119 @@
-<ng-container *ngIf="loading">
+@if (loading) {
   <div class="product-purchase-approval-dialog__heading m-0 mb-3">{{ 'tr_loading' | translate }}…</div>
-</ng-container>
+}
 
-<ng-container *ngIf="!loading && loadError">
+@if (!loading && loadError) {
   <h2 class="m-0 mb-3 product-purchase-approval-dialog__heading">{{ 'tr_notifications' | translate }}</h2>
   <div class="product-purchase-approval-dialog__banner product-purchase-approval-dialog__banner--warn mb-3">
     <div>{{ loadError }}</div>
-    <div class="size-small text-muted mt-2" *ngIf="loadErrorHint">{{ loadErrorHint }}</div>
+    @if (loadErrorHint) {
+      <div class="size-small text-muted mt-2">{{ loadErrorHint }}</div>
+    }
   </div>
   <button type="button" class="s-btn btn-secondary" (click)="close()">{{ 'tr_close' | translate }}</button>
-</ng-container>
+}
 
-<ng-container *ngIf="!loading && !loadError && purchase">
+@if (!loading && !loadError && purchase) {
   <h2 class="m-0 mb-3 product-purchase-approval-dialog__heading">{{ headingKey | translate }}</h2>
-
-  <div
-    *ngIf="!isPending"
-    class="product-purchase-approval-dialog__banner mb-3"
-    [class.product-purchase-approval-dialog__banner--ok]="status === 'approved'"
-    [class.product-purchase-approval-dialog__banner--muted]="status === 'rejected'"
-  >
-    <div class="weight-medium mb-1">
-      {{
+  @if (!isPending) {
+    <div
+      class="product-purchase-approval-dialog__banner mb-3"
+      [class.product-purchase-approval-dialog__banner--ok]="status === 'approved'"
+      [class.product-purchase-approval-dialog__banner--muted]="status === 'rejected'"
+      >
+      <div class="weight-medium mb-1">
+        {{
         status === 'approved'
-          ? ('tr_product_purchase_readonly_approved' | translate)
-          : ('tr_product_purchase_readonly_rejected' | translate)
-      }}
+        ? ('tr_product_purchase_readonly_approved' | translate)
+        : ('tr_product_purchase_readonly_rejected' | translate)
+        }}
+      </div>
+      @if (purchase?.resolvedAt) {
+        <div class="size-small">
+          {{ 'tr_product_purchase_resolved_on' | translate }} {{ purchase.resolvedAt | date : 'short' }}
+          @if (purchase?.resolvedBy?.name) {
+            · {{ 'tr_product_purchase_resolved_by' | translate }} {{ purchase.resolvedBy.name }}
+          }
+        </div>
+      }
     </div>
-    <div class="size-small" *ngIf="purchase?.resolvedAt">
-      {{ 'tr_product_purchase_resolved_on' | translate }} {{ purchase.resolvedAt | date : 'short' }}
-      <ng-container *ngIf="purchase?.resolvedBy?.name">
-        · {{ 'tr_product_purchase_resolved_by' | translate }} {{ purchase.resolvedBy.name }}
-      </ng-container>
-    </div>
-  </div>
-
-  <div class="size-small text-muted mb-3" *ngIf="dialogData?.body && isPending">{{ dialogData.body }}</div>
-
-  <div class="card mb-3" *ngIf="displayBlock as d">
-    <div class="card-body">
-      <div class="row">
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_name' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.name || d?.productName || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
-        </div>
-        <div class="col-12 mb-2" *ngIf="(d?.product?.unitCodes?.length ?? 0) > 1">
-          <div class="size-small text-muted">{{ 'tr_product_unit_codes_title' | translate }}</div>
-          <div class="weight-bold text-break">{{ d?.product?.unitCodes?.join(', ') }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>
-          <div class="weight-bold">{{ d?.branchName || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_quantity' | translate }}</div>
-          <div class="weight-bold">{{ d?.quantity || 1 }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_purchase_price' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.netPrice || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_sale_price' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.price || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2" *ngIf="d?.treasuryKey || d?.treasuryLabel">
-          <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
-          <div class="weight-bold">
-            {{ d?.treasuryLabel || d?.treasuryKey || '—' }}
-            <span class="text-muted size-small" *ngIf="d?.treasuryLabel && d?.treasuryKey">({{ d?.treasuryKey }})</span>
+  }
+  @if (dialogData?.body && isPending) {
+    <div class="size-small text-muted mb-3">{{ dialogData.body }}</div>
+  }
+  @if (displayBlock; as d) {
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_name' | translate }}</div>
+            <div class="weight-bold">{{ d?.product?.name || d?.productName || '-' }}</div>
           </div>
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
+            <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
+          </div>
+          @if ((d?.product?.unitCodes?.length ?? 0) > 1) {
+            <div class="col-12 mb-2">
+              <div class="size-small text-muted">{{ 'tr_product_unit_codes_title' | translate }}</div>
+              <div class="weight-bold text-break">{{ d?.product?.unitCodes?.join(', ') }}</div>
+            </div>
+          }
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>
+            <div class="weight-bold">{{ d?.branchName || '-' }}</div>
+          </div>
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_quantity' | translate }}</div>
+            <div class="weight-bold">{{ d?.quantity || 1 }}</div>
+          </div>
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_purchase_price' | translate }}</div>
+            <div class="weight-bold">{{ d?.product?.netPrice || '-' }}</div>
+          </div>
+          <div class="col-md-6 mb-2">
+            <div class="size-small text-muted">{{ 'tr_sale_price' | translate }}</div>
+            <div class="weight-bold">{{ d?.product?.price || '-' }}</div>
+          </div>
+          @if (d?.treasuryKey || d?.treasuryLabel) {
+            <div class="col-md-6 mb-2">
+              <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
+              <div class="weight-bold">
+                {{ d?.treasuryLabel || d?.treasuryKey || '—' }}
+                @if (d?.treasuryLabel && d?.treasuryKey) {
+                  <span class="text-muted size-small">({{ d?.treasuryKey }})</span>
+                }
+              </div>
+            </div>
+          }
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="form-group mb-3" *ngIf="isPending">
-    <label class="size-small">{{ 'tr_notes' | translate }}</label>
-    <input class="s-control width-100" [(ngModel)]="note" [disabled]="saving" />
-  </div>
-
-  <div class="flex flex-space-between" *ngIf="isPending">
-    <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
-      {{ 'tr_close' | translate }}
-    </button>
-    <div class="flex">
-      <button type="button" class="s-btn btn-secondary mr-2" (click)="reject()" [disabled]="saving">
-        {{ 'tr_action.reject' | translate }}
-      </button>
-      <button type="button" class="s-btn btn-primary" (click)="approve()" [disabled]="saving">
-        {{ 'tr_action.approve' | translate }}
-      </button>
+  }
+  @if (isPending) {
+    <div class="form-group mb-3">
+      <label class="size-small">{{ 'tr_notes' | translate }}</label>
+      <input class="s-control width-100" [(ngModel)]="note" [disabled]="saving" />
     </div>
-  </div>
-
-  <div *ngIf="!isPending">
-    <button type="button" class="s-btn btn-secondary" (click)="close()">{{ 'tr_close' | translate }}</button>
-  </div>
-</ng-container>
+  }
+  @if (isPending) {
+    <div class="flex flex-space-between">
+      <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+        {{ 'tr_close' | translate }}
+      </button>
+      <div class="flex">
+        <button type="button" class="s-btn btn-secondary mr-2" (click)="reject()" [disabled]="saving">
+          {{ 'tr_action.reject' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" (click)="approve()" [disabled]="saving">
+          {{ 'tr_action.approve' | translate }}
+        </button>
+      </div>
+    </div>
+  }
+  @if (!isPending) {
+    <div>
+      <button type="button" class="s-btn btn-secondary" (click)="close()">{{ 'tr_close' | translate }}</button>
+    </div>
+  }
+}

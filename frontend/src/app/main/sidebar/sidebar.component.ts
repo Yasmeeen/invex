@@ -13,9 +13,10 @@ import { Globals } from 'src/app/core/globals';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
-  selector: 'app-sidebar',
-  templateUrl: './sidebar.component.html',
-  styleUrls: ['./sidebar.component.scss']
+    selector: 'app-sidebar',
+    templateUrl: './sidebar.component.html',
+    styleUrls: ['./sidebar.component.scss'],
+    standalone: false
 })
 export class SidebarComponent implements OnInit {
   appSidebar: SidebarItem [];

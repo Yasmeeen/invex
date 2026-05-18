@@ -4,7 +4,8 @@ import { UpdateService } from '@shared/services/update.service';
 @Component({
     selector: '[order-by]',
     templateUrl: './order-by.component.html',
-    styleUrls: ['./order-by.component.scss']
+    styleUrls: ['./order-by.component.scss'],
+    standalone: false
 })
 export class OrderByComponent implements OnInit, OnDestroy {
 

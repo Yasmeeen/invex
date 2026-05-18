@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { NgForm } from '@angular/forms';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { Branch, Product } from '@core/models/products.model';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -9,9 +9,10 @@ import { Subscription } from 'rxjs';
 import { TranslateService } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-inventory-transfer-product',
-  templateUrl: './create-edit-product.component.html',
-  styleUrls: ['./create-edit-product.component.scss']
+    selector: 'app-inventory-transfer-product',
+    templateUrl: './create-edit-product.component.html',
+    styleUrls: ['./create-edit-product.component.scss'],
+    standalone: false
 })
 export class CreateEditProductComponent implements OnInit {
   @ViewChild('warehouseForm') warehouseForm: NgForm;

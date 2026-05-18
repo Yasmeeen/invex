@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -10,9 +10,10 @@ import {
 import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
 
 @Component({
-  selector: 'app-pending-branch-transfers-dialog',
-  templateUrl: './pending-branch-transfers-dialog.component.html',
-  styleUrls: ['./pending-branch-transfers-dialog.component.scss'],
+    selector: 'app-pending-branch-transfers-dialog',
+    templateUrl: './pending-branch-transfers-dialog.component.html',
+    styleUrls: ['./pending-branch-transfers-dialog.component.scss'],
+    standalone: false
 })
 export class PendingBranchTransfersDialogComponent implements OnInit {
   loading = true;

@@ -11,94 +11,108 @@
   <app-report-filters [reportType]="reportType" (apply)="onApplyFilters($event)"></app-report-filters>
 
   <div class="reports-page__cards">
-    <app-report-card
-      *ngFor="let card of cards; let i = index"
-      [variantIndex]="i"
-      [titleKey]="card.titleKey"
-      [titleParams]="card.titleParams || {}"
-      [value]="card.value"
-      [hintKey]="card.hintKey || ''"
-      [hintParams]="card.hintParams || {}"
-      [trendLabel]="card.trendLabel || ''"
-      [trendPositive]="card.trendPositive !== false"
-    ></app-report-card>
+    @for (card of cards; track card; let i = $index) {
+      <app-report-card
+        [variantIndex]="i"
+        [titleKey]="card.titleKey"
+        [titleParams]="card.titleParams || {}"
+        [value]="card.value"
+        [hintKey]="card.hintKey || ''"
+        [hintParams]="card.hintParams || {}"
+        [trendLabel]="card.trendLabel || ''"
+        [trendPositive]="card.trendPositive !== false"
+      ></app-report-card>
+    }
   </div>
 
-  <app-chart-wrapper
-    *ngIf="chartOptions"
-    [renderKey]="chartRedrawKey"
-    [title]="(reportTitleKey | translate) + ' — ' + ('tr_report_chart_suffix' | translate)"
-    [options]="chartOptions"
-  ></app-chart-wrapper>
+  @if (chartOptions) {
+    <app-chart-wrapper
+      [renderKey]="chartRedrawKey"
+      [title]="(reportTitleKey | translate) + ' — ' + ('tr_report_chart_suffix' | translate)"
+      [options]="chartOptions"
+    ></app-chart-wrapper>
+  }
 
-  <app-chart-wrapper
-    *ngIf="secondaryChartOptions && reportType === 'bookings'"
-    [renderKey]="chartBranchRedrawKey"
-    [title]="('tr_bookings_chart_by_branch' | translate)"
-    [options]="secondaryChartOptions"
-  ></app-chart-wrapper>
+  @if (secondaryChartOptions && reportType === 'bookings') {
+    <app-chart-wrapper
+      [renderKey]="chartBranchRedrawKey"
+      [title]="('tr_bookings_chart_by_branch' | translate)"
+      [options]="secondaryChartOptions"
+    ></app-chart-wrapper>
+  }
 
-  <app-chart-wrapper
-    *ngIf="secondaryChartOptions && reportType === 'sales'"
-    [renderKey]="chartBranchRedrawKey"
-    [title]="('tr_report_chart_sales_by_payment' | translate)"
-    [options]="secondaryChartOptions"
-  ></app-chart-wrapper>
+  @if (secondaryChartOptions && reportType === 'sales') {
+    <app-chart-wrapper
+      [renderKey]="chartBranchRedrawKey"
+      [title]="('tr_report_chart_sales_by_payment' | translate)"
+      [options]="secondaryChartOptions"
+    ></app-chart-wrapper>
+  }
 
-  <app-chart-wrapper
-    *ngIf="secondaryChartOptions && reportType === 'deskPurchases'"
-    [renderKey]="chartBranchRedrawKey"
-    [title]="('tr_report_desk_purchases_by_treasury' | translate)"
-    [options]="secondaryChartOptions"
-  ></app-chart-wrapper>
+  @if (secondaryChartOptions && reportType === 'deskPurchases') {
+    <app-chart-wrapper
+      [renderKey]="chartBranchRedrawKey"
+      [title]="('tr_report_desk_purchases_by_treasury' | translate)"
+      [options]="secondaryChartOptions"
+    ></app-chart-wrapper>
+  }
 
-  <div class="mt-3" *ngIf="reportType === 'sales' && salesPaymentRows.length > 0">
-    <h3 class="reports-page__subtitle">{{ 'tr_report_sales_by_payment' | translate }}</h3>
-    <app-report-table [columns]="salesPaymentColumns" [rows]="salesPaymentRows"></app-report-table>
-  </div>
+  @if (reportType === 'sales' && salesPaymentRows.length > 0) {
+    <div class="mt-3">
+      <h3 class="reports-page__subtitle">{{ 'tr_report_sales_by_payment' | translate }}</h3>
+      <app-report-table [columns]="salesPaymentColumns" [rows]="salesPaymentRows"></app-report-table>
+    </div>
+  }
 
   <div class="mt-3">
     <app-report-table [columns]="tableColumns" [rows]="tableRows" [roomy]="reportType === 'bookings'"></app-report-table>
   </div>
 
-  <div class="mt-4" *ngIf="reportType === 'deskPurchases' && deskPurchasesDetailRows.length > 0">
-    <h3 class="reports-page__subtitle">{{ 'tr_report_desk_purchases_lines_title' | translate }}</h3>
-    <app-report-table [columns]="deskPurchasesDetailColumns" [rows]="deskPurchasesDetailRows"></app-report-table>
-  </div>
+  @if (reportType === 'deskPurchases' && deskPurchasesDetailRows.length > 0) {
+    <div class="mt-4">
+      <h3 class="reports-page__subtitle">{{ 'tr_report_desk_purchases_lines_title' | translate }}</h3>
+      <app-report-table [columns]="deskPurchasesDetailColumns" [rows]="deskPurchasesDetailRows"></app-report-table>
+    </div>
+  }
 
-  <div
-    class="reports-page__pagination mt-2"
-    *ngIf="reportType === 'bookings' && bookingsMeta && bookingsMeta.totalCount > 0"
-  >
-    <button
-      type="button"
-      class="s-btn btn-secondary btn-sm"
-      [disabled]="bookingsMeta.page <= 1"
-      (click)="setBookingsPage(bookingsMeta.page - 1)"
-    >
-      {{ 'tr_bookings_report_prev' | translate }}
-    </button>
-    <span class="size-small text-muted">
-      {{ 'tr_bookings_report_page' | translate : { page: bookingsMeta.page, total: bookingsTotalPages } }}
-    </span>
-    <button
-      type="button"
-      class="s-btn btn-secondary btn-sm"
-      [disabled]="bookingsMeta.page >= bookingsTotalPages"
-      (click)="setBookingsPage(bookingsMeta.page + 1)"
-    >
-      {{ 'tr_bookings_report_next' | translate }}
-    </button>
-  </div>
+  @if (reportType === 'bookings' && bookingsMeta && bookingsMeta.totalCount > 0) {
+    <div
+      class="reports-page__pagination mt-2"
+      >
+      <button
+        type="button"
+        class="s-btn btn-secondary btn-sm"
+        [disabled]="bookingsMeta.page <= 1"
+        (click)="setBookingsPage(bookingsMeta.page - 1)"
+        >
+        {{ 'tr_bookings_report_prev' | translate }}
+      </button>
+      <span class="size-small text-muted">
+        {{ 'tr_bookings_report_page' | translate : { page: bookingsMeta.page, total: bookingsTotalPages } }}
+      </span>
+      <button
+        type="button"
+        class="s-btn btn-secondary btn-sm"
+        [disabled]="bookingsMeta.page >= bookingsTotalPages"
+        (click)="setBookingsPage(bookingsMeta.page + 1)"
+        >
+        {{ 'tr_bookings_report_next' | translate }}
+      </button>
+    </div>
+  }
 
-  <div class="mt-4" *ngIf="reportType === 'bookings' && topProductsRows.length > 0">
-    <h3 class="reports-page__subtitle">{{ 'tr_bookings_top_products' | translate }}</h3>
-    <app-report-table [columns]="topProductsColumns" [rows]="topProductsRows"></app-report-table>
-  </div>
+  @if (reportType === 'bookings' && topProductsRows.length > 0) {
+    <div class="mt-4">
+      <h3 class="reports-page__subtitle">{{ 'tr_bookings_top_products' | translate }}</h3>
+      <app-report-table [columns]="topProductsColumns" [rows]="topProductsRows"></app-report-table>
+    </div>
+  }
 
-  <div class="mt-4" *ngIf="reportType === 'bookings' && upcomingRows.length > 0">
-    <h3 class="reports-page__subtitle">{{ 'tr_bookings_upcoming' | translate }}</h3>
-    <app-report-table [columns]="upcomingColumns" [rows]="upcomingRows"></app-report-table>
-  </div>
+  @if (reportType === 'bookings' && upcomingRows.length > 0) {
+    <div class="mt-4">
+      <h3 class="reports-page__subtitle">{{ 'tr_bookings_upcoming' | translate }}</h3>
+      <app-report-table [columns]="upcomingColumns" [rows]="upcomingRows"></app-report-table>
+    </div>
+  }
 </div>
 

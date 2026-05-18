@@ -1,6 +1,6 @@
 import { VendorsSerivce } from './../../../shared/services/vendors.service';
 import { Component, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { PaginationData, User } from '@core/models/users-interfaces.model'
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -12,9 +12,10 @@ import { ConfirmationDialogComponent } from '@shared/components/confirmation-dia
 
 
 @Component({
-  selector: 'app-vendors-list',
-  templateUrl: './vendors-list.component.html',
-  styleUrls: ['./vendors-list.component.scss']
+    selector: 'app-vendors-list',
+    templateUrl: './vendors-list.component.html',
+    styleUrls: ['./vendors-list.component.scss'],
+    standalone: false
 })
 export class VendorsListComponent implements OnInit {
   vendorsLoading: boolean = true;

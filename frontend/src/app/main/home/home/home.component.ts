@@ -27,9 +27,10 @@ const DONUT_ORDER_DONE = '#1b4332';
 const DONUT_ORDER_RESTORED = '#74c69d';
 
 @Component({
-  selector: 'app-home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss'],
+    selector: 'app-home',
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.scss'],
+    standalone: false
 })
 export class HomeComponent implements OnInit, OnDestroy {
   fromDate: Date = new Date();

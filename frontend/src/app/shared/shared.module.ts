@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { CoreModule } from '@core/core.module';
 import { TranslateModule } from '@ngx-translate/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -24,50 +24,43 @@ import { PurchaseReceiptPrintComponent } from './components/purchase-receipt-pri
 
 
 
-@NgModule({
-  declarations: [
-    GhostLineComponent,
-    Pagination,
-    ConfirmationDialogComponent,
-    MultiCheckboxComponent,
-    OrderByComponent,
-    ImagePreloadDirective,
-    NotAuthorizedComponent,
-    ReceiptTranslatePipe,
-    VixaChatComponent,
-    ProductPurchaseApprovalDialogComponent,
-    PurchaseReceiptPrintComponent,
-  ],
-  imports: [
-    CommonModule,
-    HttpClientModule,
-    FormsModule,
-    ReactiveFormsModule,
-    CoreModule.forRoot(),
-    NgSelectModule,
-    TranslateModule
-  ],
-  exports: [
-    GhostLineComponent,
-    NgSelectModule,
-    Pagination,
-    TranslateModule,
-    CommonModule,
-    FormsModule,
-    ReactiveFormsModule,
-    LoadingBarHttpClientModule,
-    ConfirmationDialogComponent,
-    MultiCheckboxComponent,
-    OrderByComponent,
-    ImagePreloadDirective,
-    MatDatepickerModule,
-    MatNativeDateModule,
-    NotAuthorizedComponent,
-    ReceiptTranslatePipe,
-    VixaChatComponent,
-    ProductPurchaseApprovalDialogComponent,
-    PurchaseReceiptPrintComponent,
-  ],
-  providers: [VersionCheckService,UpdateService]
-})
+@NgModule({ declarations: [
+        GhostLineComponent,
+        Pagination,
+        ConfirmationDialogComponent,
+        MultiCheckboxComponent,
+        OrderByComponent,
+        ImagePreloadDirective,
+        NotAuthorizedComponent,
+        ReceiptTranslatePipe,
+        VixaChatComponent,
+        ProductPurchaseApprovalDialogComponent,
+        PurchaseReceiptPrintComponent,
+    ],
+    exports: [
+        GhostLineComponent,
+        NgSelectModule,
+        Pagination,
+        TranslateModule,
+        CommonModule,
+        FormsModule,
+        ReactiveFormsModule,
+        LoadingBarHttpClientModule,
+        ConfirmationDialogComponent,
+        MultiCheckboxComponent,
+        OrderByComponent,
+        ImagePreloadDirective,
+        MatDatepickerModule,
+        MatNativeDateModule,
+        NotAuthorizedComponent,
+        ReceiptTranslatePipe,
+        VixaChatComponent,
+        ProductPurchaseApprovalDialogComponent,
+        PurchaseReceiptPrintComponent,
+    ], imports: [CommonModule,
+        FormsModule,
+        ReactiveFormsModule,
+        CoreModule.forRoot(),
+        NgSelectModule,
+        TranslateModule], providers: [VersionCheckService, UpdateService, provideHttpClient(withInterceptorsFromDi())] })
 export class SharedModule { }

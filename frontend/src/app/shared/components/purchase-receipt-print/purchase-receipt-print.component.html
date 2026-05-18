@@ -1,40 +1,41 @@
-<div class="invoice-container" *ngIf="purchase">
-  <ng-container *ngIf="storeSettings.settings$ | async as st">
-    <div class="center mb-2" *ngIf="st.logoUrl">
-      <img class="invoice-logo" [src]="st.logoUrl" alt="" />
-    </div>
-
-    <div class="store-name center mtb-4 bold">{{ st.storeName }}</div>
-
-    <div class="center mtb-4 bold">
-      {{ 'tr_product_purchase_receipt_title' | receiptTranslate: st.receiptLanguage }}
-    </div>
-
-    <table class="invoice-table meta-table">
-      <tr>
-        <td>{{ 'tr_purchase_document_ref' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ purchaseReferenceDisplay }}</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ lineQuantity }}</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ printDate | date: 'dd MMM y' }}</td>
-      </tr>
-      <tr>
-        <td>{{ 'tr_status' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ purchase?.status || '-' }}</td>
-      </tr>
-      <tr *ngIf="purchaseTreasuryDisplay">
-        <td>{{ 'tr_receipt_purchase_treasury' | receiptTranslate: st.receiptLanguage }}</td>
-        <td>{{ purchaseTreasuryDisplay }}</td>
-      </tr>
-    </table>
-
-    <table class="invoice-table products-table">
-      <colgroup>
+@if (purchase) {
+  <div class="invoice-container">
+    @if (storeSettings.settings$ | async; as st) {
+      @if (st.logoUrl) {
+        <div class="center mb-2">
+          <img class="invoice-logo" [src]="st.logoUrl" alt="" />
+        </div>
+      }
+      <div class="store-name center mtb-4 bold">{{ st.storeName }}</div>
+      <div class="center mtb-4 bold">
+        {{ 'tr_product_purchase_receipt_title' | receiptTranslate: st.receiptLanguage }}
+      </div>
+      <table class="invoice-table meta-table">
+        <tr>
+          <td>{{ 'tr_purchase_document_ref' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ purchaseReferenceDisplay }}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ lineQuantity }}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ printDate | date: 'dd MMM y' }}</td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_status' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ purchase?.status || '-' }}</td>
+        </tr>
+        @if (purchaseTreasuryDisplay) {
+          <tr>
+            <td>{{ 'tr_receipt_purchase_treasury' | receiptTranslate: st.receiptLanguage }}</td>
+            <td>{{ purchaseTreasuryDisplay }}</td>
+          </tr>
+        }
+      </table>
+      <table class="invoice-table products-table">
+        <colgroup>
         <col class="products-table__col-name" />
         <col class="products-table__col-qty" />
         <col class="products-table__col-price" />
@@ -49,9 +50,13 @@
       <tr>
         <td class="item-name">
           {{ purchase?.productPayload?.name }}
-          <div class="invoice-item-attrs" *ngIf="attrLines.length">
-            <span class="invoice-item-attr" *ngFor="let ia of attrLines">{{ ia.label }}: {{ ia.value }}</span>
-          </div>
+          @if (attrLines.length) {
+            <div class="invoice-item-attrs">
+              @for (ia of attrLines; track ia) {
+                <span class="invoice-item-attr">{{ ia.label }}: {{ ia.value }}</span>
+              }
+            </div>
+          }
         </td>
         <td>{{ lineQuantity }}</td>
         <td class="money">
@@ -62,7 +67,6 @@
         </td>
       </tr>
     </table>
-
     <table class="invoice-table totals-table">
       <tr class="bold">
         <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
@@ -77,26 +81,24 @@
         </td>
       </tr>
     </table>
-
     <div class="separator double-border"></div>
-
     <div class="final-total center bold">
       {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
       <span class="money">
         {{ formatReceiptAmount(lineTotal) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
       </span>
     </div>
-
     <div class="separator double-border"></div>
-
     <div class="footer center">
       <div class="bold">{{ st.storeName }}</div>
       <div>{{ st.storePhoneNumber }}</div>
     </div>
-
-    <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
-      <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
-      <div class="invoice-qr__caption">innovation-tec.com</div>
-    </div>
-  </ng-container>
+    @if (invoiceQrDataUrl) {
+      <div class="invoice-qr center">
+        <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
+        <div class="invoice-qr__caption">innovation-tec.com</div>
+      </div>
+    }
+  }
 </div>
+}

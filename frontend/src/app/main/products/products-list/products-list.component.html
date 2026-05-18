@@ -2,12 +2,12 @@
   class="content-shadow bg-white mb-5"
   not-authorized
   [notAuthorized]="isNotAuthorized"
->
-        
+  >
+
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">
       <span class="text-primary">{{totalNumberOfProducts}}-</span>
-      {{ "tr_products" | translate }}</span>
+    {{ "tr_products" | translate }}</span>
     <div class="btn-group">
       <button
         type="button"
@@ -15,7 +15,7 @@
         [class.btn-primary]="viewMode === 'table'"
         [class.btn-secondary]="viewMode !== 'table'"
         (click)="setViewMode('table')"
-      >
+        >
         <i class="fa fa-table" aria-hidden="true"></i>
       </button>
       <button
@@ -24,459 +24,506 @@
         [class.btn-secondary]="viewMode !== 'cards'"
         [class.btn-primary]="viewMode === 'cards'"
         (click)="setViewMode('cards')"
-      >
+        >
         <i class="fa fa-th-large" aria-hidden="true"></i>
       </button>
-      <button
-        *ngIf="canAddProduct"
-        class="s-btn btn-secondary"
-        (click)="openImportDialog()"
-      >
-        {{ 'tr_upload_excel_sheet' | translate }}
-      </button>
-      <button
-        *ngIf="canAddProduct"
-        class="s-btn btn-primary"
-        (click)="createOrEditproduct(false)"
-      >
-        {{ "tr_add_product" | translate }}
-      </button>
+      @if (canAddProduct) {
+        <button
+          class="s-btn btn-secondary"
+          (click)="openImportDialog()"
+          >
+          {{ 'tr_upload_excel_sheet' | translate }}
+        </button>
+      }
+      @if (canAddProduct) {
+        <button
+          class="s-btn btn-primary"
+          (click)="createOrEditproduct(false)"
+          >
+          {{ "tr_add_product" | translate }}
+        </button>
+      }
       <button
         class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
-      >
+        >
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
-      <button
-        *ngIf="shouldShowPendingTransfersToolbar"
-        type="button"
-        class="s-btn btn-secondary size-body pending-transfers-btn"
-        (click)="openPendingTransfers()"
-      >
-        {{ 'tr_branch_transfers_pending' | translate }}
-        <span class="pending-transfers-badge" *ngIf="pendingTransferCount > 0">{{ pendingTransferCount }}</span>
-      </button>
+      @if (shouldShowPendingTransfersToolbar) {
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body pending-transfers-btn"
+          (click)="openPendingTransfers()"
+          >
+          {{ 'tr_branch_transfers_pending' | translate }}
+          @if (pendingTransferCount > 0) {
+            <span class="pending-transfers-badge">{{ pendingTransferCount }}</span>
+          }
+        </button>
+      }
     </div>
   </h2>
 
-  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
-    <div class="row">
-      <div class="col-md-3">
-        <div class="form-group mb-0">
-          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <input
-              class="s-control"
-              (keyup)="filterproducts($event, 'searchTerm')"
-              placeholder="{{ 'tr_search' | translate }}"
-              [(ngModel)]="nameSearchTerm"
-            />
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="form-group mb-0">
-          <label>{{ 'tr_category' | translate }}</label>
-          <div class="input-with-icon bg-white">
-            <ng-select
-              class="s-control s-select products-filter-ng-select"
-              placeholder="{{ 'tr_select' | translate }}"
-              bindLabel="name"
-              bindValue="_id"
-              [multiple]="true"
-              [closeOnSelect]="false"
-              [searchable]="true"
-              appendTo="body"
-              [(ngModel)]="selectedCategories"
-              name="categoryIds"
-              [items]="categorys"
-              [clearable]="true"
-              (ngModelChange)="onCategoryFilterChange()"
-            >
-              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                <div class="ng-value" *ngFor="let item of items">
-                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
-                  <span class="ng-value-label">{{ item.name }}</span>
-                </div>
-              </ng-template>
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 mb-4" *ngIf="selectedCategories?.length === 1 && attributeKeyOptions?.length">
-        <div class="form-group mb-0">
-          <label>{{ 'tr_category_attributes' | translate }}</label>
-          <div class="row">
-            <div class="col-md-5">
-              <ng-select
-                class="s-control s-select width-100"
-                placeholder="{{ 'tr_select' | translate }}"
-                [items]="attributeKeyOptions"
-                [(ngModel)]="selectedAttributeKey"
-                name="attrKey"
-                [clearable]="true"
-                appendTo="body"
-                (change)="applyAttributeSearch()"
-              >
-              </ng-select>
-            </div>
-            <div class="col-md-7">
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
               <input
-                class="s-control width-100"
-                type="text"
-                [(ngModel)]="selectedAttributeValue"
-                name="attrValue"
+                class="s-control"
+                (keyup)="filterproducts($event, 'searchTerm')"
                 placeholder="{{ 'tr_search' | translate }}"
-                (keyup)="applyAttributeSearchDebounced()"
-              />
+                [(ngModel)]="nameSearchTerm"
+                />
             </div>
           </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="form-group">
-          <label>{{ 'tr_location_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="locationFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="locationFilter"
-            name="locationFilter"
-            (ngModelChange)="getproducts()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="form-group mb-0">
-          <label>{{ 'tr_products_booking_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="bookingFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="bookingFilter"
-            name="bookingFilter"
-            (ngModelChange)="getproducts()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
-        </div>
-      </div>
-      <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
-        <div class="form-group">
-          <label>{{ 'tr_branches' | translate }}</label>
-          <div class="input-with-icon bg-white">
-            <ng-select
-              class="s-control s-select products-filter-ng-select"
-              placeholder="{{ 'tr_select' | translate }}"
-              bindLabel="name"
-              bindValue="_id"
-              [multiple]="true"
-              [closeOnSelect]="false"
-              [searchable]="true"
-              appendTo="body"
-              [(ngModel)]="selectedBranches"
-              name="branchIds"
-              [items]="branches"
-              [clearable]="true"
-              (ngModelChange)="getproducts()"
-            >
-              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                <div class="ng-value" *ngFor="let item of items">
-                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
-                  <span class="ng-value-label">{{ item.name }}</span>
-                </div>
-              </ng-template>
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
+        <div class="col-md-4">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_category' | translate }}</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select products-filter-ng-select"
+                placeholder="{{ 'tr_select' | translate }}"
+                bindLabel="name"
+                bindValue="_id"
+                [multiple]="true"
+                [closeOnSelect]="false"
+                [searchable]="true"
+                appendTo="body"
+                [(ngModel)]="selectedCategories"
+                name="categoryIds"
+                [items]="categorys"
+                [clearable]="true"
+                (ngModelChange)="onCategoryFilterChange()"
+                >
+                <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                  @for (item of items; track item) {
+                    <div class="ng-value">
+                      <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                      <span class="ng-value-label">{{ item.name }}</span>
+                    </div>
+                  }
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
           </div>
         </div>
+        @if (selectedCategories?.length === 1 && attributeKeyOptions?.length) {
+          <div class="col-md-4 mb-4">
+            <div class="form-group mb-0">
+              <label>{{ 'tr_category_attributes' | translate }}</label>
+              <div class="row">
+                <div class="col-md-5">
+                  <ng-select
+                    class="s-control s-select width-100"
+                    placeholder="{{ 'tr_select' | translate }}"
+                    [items]="attributeKeyOptions"
+                    [(ngModel)]="selectedAttributeKey"
+                    name="attrKey"
+                    [clearable]="true"
+                    appendTo="body"
+                    (change)="applyAttributeSearch()"
+                    >
+                  </ng-select>
+                </div>
+                <div class="col-md-7">
+                  <input
+                    class="s-control width-100"
+                    type="text"
+                    [(ngModel)]="selectedAttributeValue"
+                    name="attrValue"
+                    placeholder="{{ 'tr_search' | translate }}"
+                    (keyup)="applyAttributeSearchDebounced()"
+                    />
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+        <div class="col-md-4">
+          <div class="form-group">
+            <label>{{ 'tr_location_filter' | translate }}</label>
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="locationFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              appendTo="body"
+              [(ngModel)]="locationFilter"
+              name="locationFilter"
+              (ngModelChange)="getproducts()"
+              >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_products_booking_filter' | translate }}</label>
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="bookingFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              appendTo="body"
+              [(ngModel)]="bookingFilter"
+              name="bookingFilter"
+              (ngModelChange)="getproducts()"
+              >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+          </div>
+        </div>
+        @if (locationFilter !== 'warehouse') {
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>{{ 'tr_branches' | translate }}</label>
+              <div class="input-with-icon bg-white">
+                <ng-select
+                  class="s-control s-select products-filter-ng-select"
+                  placeholder="{{ 'tr_select' | translate }}"
+                  bindLabel="name"
+                  bindValue="_id"
+                  [multiple]="true"
+                  [closeOnSelect]="false"
+                  [searchable]="true"
+                  appendTo="body"
+                  [(ngModel)]="selectedBranches"
+                  name="branchIds"
+                  [items]="branches"
+                  [clearable]="true"
+                  (ngModelChange)="getproducts()"
+                  >
+                  <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                    @for (item of items; track item) {
+                      <div class="ng-value">
+                        <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                        <span class="ng-value-label">{{ item.name }}</span>
+                      </div>
+                    }
+                  </ng-template>
+                </ng-select>
+                <i class="fa fa-caret-down input-icon"></i>
+              </div>
+            </div>
+          </div>
+        }
       </div>
     </div>
-  </div>
+  }
 
   <div>
-    <div class="plr-4 mt-4" *ngIf="!productsLoading">
-      <div
-        class="table-container products-list"
-        id="table-container"
-        *ngIf="productsList.length > 0 && viewMode === 'table'"
-      >
-        <table class="s-table table layout-fixed products-list">
-          <thead>
-            <tr>
-              <th></th>
-              <th>{{ "tr_product_name" | translate }}</th>
-              <th>{{ "tr_location" | translate }}</th>
-              <th>{{ "tr_code" | translate }}</th>
-              <th>{{ "tr_category" | translate }}</th>
-              <th>{{ "tr_stock" | translate }}</th>
-              <th>{{ "tr_booked" | translate }}</th>
-              <th>{{ "tr_available" | translate }}</th>
-              <th>{{ "tr_sell_price" | translate }}</th>
-              <th>{{ "tr_net_price" | translate }}</th>
-              <th>{{ "tr_discount" | translate }}</th>
-              <th>{{ "tr_category_attributes" | translate }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let product of productsList; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>
-                <span class="products-list__name-cell">
-                  <img
-                    *ngIf="product.imageUrl"
-                    class="products-list__thumb"
-                    [src]="product.imageUrl"
-                    alt=""
-                  />
-                  <span class="products-list__name-column">
-                    <span
-                      *ngIf="bookedQty(product) > 0"
-                      class="booking-badge"
+    @if (!productsLoading) {
+      <div class="plr-4 mt-4">
+        @if (productsList.length > 0 && viewMode === 'table') {
+          <div
+            class="table-container products-list"
+            id="table-container"
+            >
+            <table class="s-table table layout-fixed products-list">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>{{ "tr_product_name" | translate }}</th>
+                  <th>{{ "tr_location" | translate }}</th>
+                  <th>{{ "tr_code" | translate }}</th>
+                  <th>{{ "tr_category" | translate }}</th>
+                  <th>{{ "tr_stock" | translate }}</th>
+                  <th>{{ "tr_booked" | translate }}</th>
+                  <th>{{ "tr_available" | translate }}</th>
+                  <th>{{ "tr_sell_price" | translate }}</th>
+                  <th>{{ "tr_net_price" | translate }}</th>
+                  <th>{{ "tr_discount" | translate }}</th>
+                  <th>{{ "tr_category_attributes" | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (product of productsList; track product; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>
+                      <span class="products-list__name-cell">
+                        @if (product.imageUrl) {
+                          <img
+                            class="products-list__thumb"
+                            [src]="product.imageUrl"
+                            alt=""
+                            />
+                        }
+                        <span class="products-list__name-column">
+                          @if (bookedQty(product) > 0) {
+                            <span
+                              class="booking-badge"
                       [attr.title]="
                         'tr_booking_stock_badge'
                           | translate
                             : { booked: bookedQty(product), stock: product.stock }
                       "
-                    >
-                      <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
-                      <span class="booking-badge__text">{{
-                        'tr_booking_stock_badge'
-                          | translate
-                            : { booked: bookedQty(product), stock: product.stock }
-                      }}</span>
-                    </span>
-                    <span
-                      *ngIf="transferReservedQty(product) > 0"
-                      class="transfer-badge"
+                              >
+                              <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
+                              <span class="booking-badge__text">{{
+                                'tr_booking_stock_badge'
+                                | translate
+                                : { booked: bookedQty(product), stock: product.stock }
+                              }}</span>
+                            </span>
+                          }
+                          @if (transferReservedQty(product) > 0) {
+                            <span
+                              class="transfer-badge"
                       [attr.title]="
                         'tr_product_transfer_reserved_hint'
                           | translate : { n: transferReservedQty(product) }
                       "
-                    >
-                      <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
-                      {{
-                        'tr_product_transfer_reserved_short'
-                          | translate : { n: transferReservedQty(product) }
-                      }}
-                    </span>
-                    <span class="products-list__name-text">{{ product.name }}</span>
-                  </span>
-                </span>
-              </td>
-              <td>
-                <span *ngIf="product.inWarehouse" class="location-badge location-badge--warehouse">{{
-                  "tr_warehouse" | translate
-                }}</span>
-                <span *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
-              </td>
-              <td>{{ product.code }}</td>
-              <td>{{ product.category?.name }}</td>
-              <td>{{ product.stock }}</td>
-              <td>{{ bookedQty(product) }}</td>
-              <td>{{ availableToBook(product) }}</td>
-              <td>{{ product.price }}</td>
-              <td>{{ product.netPrice }}</td>
-              <td>{{ product.discount }}</td>
-              <td class="products-list__attrs">{{ productAttributesSummary(product) }}</td>
-              <td>
-                <span class="options-menu" *ngIf="showProductActionsMenu(product)">
-                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                  <div class="options-menu-container p-0">
-                    <div class="border-bottom"></div>
-                    <ng-container *ngIf="canBookProduct(product)">
-                      <div
-                        class="single-option"
-                        *ngIf="availableToBook(product) > 0"
-                        (click)="openBookProduct(product)"
-                      >
-                        {{ "tr_product_book" | translate }}
-                      </div>
-                      <div
-                        class="single-option"
-                        *ngIf="bookedQty(product) > 0"
-                        (click)="openBookingDetails(product)"
-                      >
-                        {{ "tr_product_booking_details" | translate }}
-                      </div>
-                    </ng-container>
-                    <ng-container *ngIf="canBranchManagerModifyProduct(product)">
-                      <div class="single-option" (click)="deleteProduct(product)">
-                        <div class="text-error">
-                          {{ "tr_action.delete" | translate }}
-                        </div>
-                      </div>
-                      <div class="single-option" (click)="createOrEditproduct(true, product)">
-                        {{ "tr_action.edit" | translate }}
-                      </div>
-                      <div class="single-option" (click)="printbarCode(product)">
-                        {{ "tr_print_code" | translate }}
-                      </div>
-                    </ng-container>
-                    <ng-container *ngIf="canTransferProduct(product)">
-                      <div
-                        class="single-option"
-                        *ngIf="availableUnitsForBranchTransfer(product) > 0"
-                        (click)="openTransferProduct(product)"
-                      >
-                        {{ "tr_product_transfer_branch" | translate }}
-                      </div>
-                    </ng-container>
-                  </div>
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="products-cards" *ngIf="productsList.length > 0 && viewMode === 'cards'">
-        <div class="product-card" *ngFor="let product of productsList">
-          <div class="product-card__top">
-            <img
-              *ngIf="product.imageUrl"
-              class="product-card__img"
-              [src]="product.imageUrl"
-              alt=""
-            />
-            <div *ngIf="!product.imageUrl" class="product-card__img product-card__img--placeholder">
-              <i class="fa fa-cube" aria-hidden="true"></i>
-            </div>
-
-            <div class="product-card__title">
-              <div class="product-card__name">
-                <span
-                  *ngIf="transferReservedQty(product) > 0"
-                  class="transfer-badge"
+                              >
+                              <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
+                              {{
+                              'tr_product_transfer_reserved_short'
+                              | translate : { n: transferReservedQty(product) }
+                              }}
+                            </span>
+                          }
+                          <span class="products-list__name-text">{{ product.name }}</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td>
+                      @if (product.inWarehouse) {
+                        <span class="location-badge location-badge--warehouse">{{
+                          "tr_warehouse" | translate
+                        }}</span>
+                      }
+                      @if (!product.inWarehouse) {
+                        <span>{{ product.branch?.name }}</span>
+                      }
+                    </td>
+                    <td>{{ product.code }}</td>
+                    <td>{{ product.category?.name }}</td>
+                    <td>{{ product.stock }}</td>
+                    <td>{{ bookedQty(product) }}</td>
+                    <td>{{ availableToBook(product) }}</td>
+                    <td>{{ product.price }}</td>
+                    <td>{{ product.netPrice }}</td>
+                    <td>{{ product.discount }}</td>
+                    <td class="products-list__attrs">{{ productAttributesSummary(product) }}</td>
+                    <td>
+                      @if (showProductActionsMenu(product)) {
+                        <span class="options-menu">
+                          <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                          <div class="options-menu-container p-0">
+                            <div class="border-bottom"></div>
+                            @if (canBookProduct(product)) {
+                              @if (availableToBook(product) > 0) {
+                                <div
+                                  class="single-option"
+                                  (click)="openBookProduct(product)"
+                                  >
+                                  {{ "tr_product_book" | translate }}
+                                </div>
+                              }
+                              @if (bookedQty(product) > 0) {
+                                <div
+                                  class="single-option"
+                                  (click)="openBookingDetails(product)"
+                                  >
+                                  {{ "tr_product_booking_details" | translate }}
+                                </div>
+                              }
+                            }
+                            @if (canBranchManagerModifyProduct(product)) {
+                              <div class="single-option" (click)="deleteProduct(product)">
+                                <div class="text-error">
+                                  {{ "tr_action.delete" | translate }}
+                                </div>
+                              </div>
+                              <div class="single-option" (click)="createOrEditproduct(true, product)">
+                                {{ "tr_action.edit" | translate }}
+                              </div>
+                              <div class="single-option" (click)="printbarCode(product)">
+                                {{ "tr_print_code" | translate }}
+                              </div>
+                            }
+                            @if (canTransferProduct(product)) {
+                              @if (availableUnitsForBranchTransfer(product) > 0) {
+                                <div
+                                  class="single-option"
+                                  (click)="openTransferProduct(product)"
+                                  >
+                                  {{ "tr_product_transfer_branch" | translate }}
+                                </div>
+                              }
+                            }
+                          </div>
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (productsList.length > 0 && viewMode === 'cards') {
+          <div class="products-cards">
+            @for (product of productsList; track product) {
+              <div class="product-card">
+                <div class="product-card__top">
+                  @if (product.imageUrl) {
+                    <img
+                      class="product-card__img"
+                      [src]="product.imageUrl"
+                      alt=""
+                      />
+                  }
+                  @if (!product.imageUrl) {
+                    <div class="product-card__img product-card__img--placeholder">
+                      <i class="fa fa-cube" aria-hidden="true"></i>
+                    </div>
+                  }
+                  <div class="product-card__title">
+                    <div class="product-card__name">
+                      @if (transferReservedQty(product) > 0) {
+                        <span
+                          class="transfer-badge"
                   [attr.title]="
                     'tr_product_transfer_reserved_hint'
                       | translate : { n: transferReservedQty(product) }
                   "
-                >
-                  <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
-                  {{
-                    'tr_product_transfer_reserved_short'
-                      | translate : { n: transferReservedQty(product) }
-                  }}
-                </span>
-                {{ product.name }}
+                          >
+                          <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
+                          {{
+                          'tr_product_transfer_reserved_short'
+                          | translate : { n: transferReservedQty(product) }
+                          }}
+                        </span>
+                      }
+                      {{ product.name }}
+                    </div>
+                    <div class="product-card__meta">
+                      <span class="muted">{{ product.code }}</span>
+                      <span class="dot">•</span>
+                      <span class="muted">{{ product.category?.name }}</span>
+                    </div>
+                  </div>
+                  @if (showProductActionsMenu(product)) {
+                    <span class="options-menu">
+                      <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                      <div class="options-menu-container p-0">
+                        <div class="border-bottom"></div>
+                        @if (canBookProduct(product)) {
+                          @if (availableToBook(product) > 0) {
+                            <div
+                              class="single-option"
+                              (click)="openBookProduct(product)"
+                              >
+                              {{ "tr_product_book" | translate }}
+                            </div>
+                          }
+                          @if (bookedQty(product) > 0) {
+                            <div
+                              class="single-option"
+                              (click)="openBookingDetails(product)"
+                              >
+                              {{ "tr_product_booking_details" | translate }}
+                            </div>
+                          }
+                        }
+                        @if (canBranchManagerModifyProduct(product)) {
+                          <div class="single-option" (click)="createOrEditproduct(true, product)">
+                            {{ "tr_action.edit" | translate }}
+                          </div>
+                          <div class="single-option" (click)="printbarCode(product)">
+                            {{ "tr_print_code" | translate }}
+                          </div>
+                          <div class="single-option" (click)="deleteProduct(product)">
+                            <div class="text-error">{{ "tr_action.delete" | translate }}</div>
+                          </div>
+                        }
+                        @if (canTransferProduct(product)) {
+                          @if (availableUnitsForBranchTransfer(product) > 0) {
+                            <div
+                              class="single-option"
+                              (click)="openTransferProduct(product)"
+                              >
+                              {{ "tr_product_transfer_branch" | translate }}
+                            </div>
+                          }
+                        }
+                      </div>
+                    </span>
+                  }
+                </div>
+                <div class="product-card__stats">
+                  <div class="stat">
+                    <div class="stat__label">{{ 'tr_stock' | translate }}</div>
+                    <div class="stat__value">{{ product.stock }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">{{ 'tr_booked' | translate }}</div>
+                    <div class="stat__value">{{ bookedQty(product) }}</div>
+                  </div>
+                  <div class="stat">
+                    <div class="stat__label">{{ 'tr_available' | translate }}</div>
+                    <div class="stat__value">{{ availableToBook(product) }}</div>
+                  </div>
+                </div>
+                <div class="product-card__row">
+                  @if (product.inWarehouse) {
+                    <span class="badge">{{ "tr_warehouse" | translate }}</span>
+                  }
+                  @if (!product.inWarehouse) {
+                    <span class="muted">{{ product.branch?.name }}</span>
+                  }
+                </div>
+                <div class="product-card__prices">
+                  <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
+                  <div><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
+                  <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
+                </div>
+                @if (productAttributesPairs(product).length) {
+                  <div class="product-card__attrs">
+                    @for (a of productAttributesPairs(product); track a) {
+                      <span class="chip">{{ a.key }}: {{ a.value }}</span>
+                    }
+                  </div>
+                }
               </div>
-              <div class="product-card__meta">
-                <span class="muted">{{ product.code }}</span>
-                <span class="dot">•</span>
-                <span class="muted">{{ product.category?.name }}</span>
-              </div>
-            </div>
-
-            <span class="options-menu" *ngIf="showProductActionsMenu(product)">
-              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-              <div class="options-menu-container p-0">
-                <div class="border-bottom"></div>
-                <ng-container *ngIf="canBookProduct(product)">
-                  <div
-                    class="single-option"
-                    *ngIf="availableToBook(product) > 0"
-                    (click)="openBookProduct(product)"
-                  >
-                    {{ "tr_product_book" | translate }}
-                  </div>
-                  <div
-                    class="single-option"
-                    *ngIf="bookedQty(product) > 0"
-                    (click)="openBookingDetails(product)"
-                  >
-                    {{ "tr_product_booking_details" | translate }}
-                  </div>
-                </ng-container>
-                <ng-container *ngIf="canBranchManagerModifyProduct(product)">
-                  <div class="single-option" (click)="createOrEditproduct(true, product)">
-                    {{ "tr_action.edit" | translate }}
-                  </div>
-                  <div class="single-option" (click)="printbarCode(product)">
-                    {{ "tr_print_code" | translate }}
-                  </div>
-                  <div class="single-option" (click)="deleteProduct(product)">
-                    <div class="text-error">{{ "tr_action.delete" | translate }}</div>
-                  </div>
-                </ng-container>
-                <ng-container *ngIf="canTransferProduct(product)">
-                  <div
-                    class="single-option"
-                    *ngIf="availableUnitsForBranchTransfer(product) > 0"
-                    (click)="openTransferProduct(product)"
-                  >
-                    {{ "tr_product_transfer_branch" | translate }}
-                  </div>
-                </ng-container>
-              </div>
-            </span>
+            }
           </div>
-
-          <div class="product-card__stats">
-            <div class="stat">
-              <div class="stat__label">{{ 'tr_stock' | translate }}</div>
-              <div class="stat__value">{{ product.stock }}</div>
-            </div>
-            <div class="stat">
-              <div class="stat__label">{{ 'tr_booked' | translate }}</div>
-              <div class="stat__value">{{ bookedQty(product) }}</div>
-            </div>
-            <div class="stat">
-              <div class="stat__label">{{ 'tr_available' | translate }}</div>
-              <div class="stat__value">{{ availableToBook(product) }}</div>
-            </div>
+        }
+        @if (productsList.length == 0) {
+          <div
+            class="empty-state-here text-center ptb-8"
+            >
+            <i class="fa fa-folder-open empty-icon text-primary"></i>
+            <p>{{ "tr_empty_state" | translate }}</p>
           </div>
-
-          <div class="product-card__row">
-            <span class="badge" *ngIf="product.inWarehouse">{{ "tr_warehouse" | translate }}</span>
-            <span class="muted" *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
-          </div>
-
-          <div class="product-card__prices">
-            <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
-            <div><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
-            <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
-          </div>
-
-          <div class="product-card__attrs" *ngIf="productAttributesPairs(product).length">
-            <span class="chip" *ngFor="let a of productAttributesPairs(product)">{{ a.key }}: {{ a.value }}</span>
-          </div>
+        }
+        <div class="plr-4 ptb-4">
+          <pagination
+            [paginationData]="paginationData"
+            [perPage]="paginationPerPage"
+            (paginationUpdate)="paginationUpdate($event)"
+          ></pagination>
         </div>
       </div>
+    }
 
-      <div
-        class="empty-state-here text-center ptb-8"
-        *ngIf="productsList.length == 0"
-      >
-        <i class="fa fa-folder-open empty-icon text-primary"></i>
-        <p>{{ "tr_empty_state" | translate }}</p>
+    @if (productsLoading) {
+      <div>
+        <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
       </div>
-
-      <div class="plr-4 ptb-4">
-        <pagination
-          [paginationData]="paginationData"
-          [perPage]="paginationPerPage"
-          (paginationUpdate)="paginationUpdate($event)"
-        ></pagination>
-      </div>
-    </div>
-
-    <div *ngIf="productsLoading">
-      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
-    </div>
+    }
   </div>
 </div>

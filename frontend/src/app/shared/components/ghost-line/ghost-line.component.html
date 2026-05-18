@@ -1,28 +1,42 @@
 <!-- [style.height]="height? height+'px': ''" -->
 <div class="container">
-  <div class="table-container"  *ngIf="type == 'table'">
-    <table class="s-table table layout-fixed">
-      <thead>
-        <tr>
-          <th *ngFor="let i of ' '.repeat(length/2).split('')">
-            <div class="line"></div>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let i of ' '.repeat(length).split('')">
-          <td *ngFor="let i of ' '.repeat(length/2).split('')">
-            <div class="line"></div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
- 
-  <div *ngIf="type == 'line'">
-    <div class="line" [style.height]="height? height+'px': ''" [style.width]="width? width+'px': ''" ></div>
-  </div>
-  <div  *ngIf="type == 'list'">
-    <div class="line" [style.width]="width? width+'px': ''"  [style.height]="height? height+'px': ''" *ngFor="let i of ' '.repeat(length).split('')"></div>
-  </div>
+  @if (type == 'table') {
+    <div class="table-container" >
+      <table class="s-table table layout-fixed">
+        <thead>
+          <tr>
+            @for (i of ' '.repeat(length/2).split(''); track i) {
+              <th>
+                <div class="line"></div>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (i of ' '.repeat(length).split(''); track i) {
+            <tr>
+              @for (i of ' '.repeat(length/2).split(''); track i) {
+                <td>
+                  <div class="line"></div>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (type == 'line') {
+    <div>
+      <div class="line" [style.height]="height? height+'px': ''" [style.width]="width? width+'px': ''" ></div>
+    </div>
+  }
+  @if (type == 'list') {
+    <div >
+      @for (i of ' '.repeat(length).split(''); track i) {
+        <div class="line" [style.width]="width? width+'px': ''"  [style.height]="height? height+'px': ''"></div>
+      }
+    </div>
+  }
 </div>

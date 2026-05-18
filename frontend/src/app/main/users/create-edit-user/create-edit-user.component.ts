@@ -5,16 +5,17 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { Component, ElementRef, Inject, OnInit, Output, ViewChild, EventEmitter } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MAT_LEGACY_DIALOG_DATA as MAT_DIALOG_DATA, MatLegacyDialog as MatDialog, MatLegacyDialogRef as MatDialogRef } from '@angular/material/legacy-dialog';
 import { NgForm } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { User } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
 
 @Component({
-  selector: 'app-create-edit-user',
-  templateUrl: './create-edit-user.component.html',
-  styleUrls: ['./create-edit-user.component.scss']
+    selector: 'app-create-edit-user',
+    templateUrl: './create-edit-user.component.html',
+    styleUrls: ['./create-edit-user.component.scss'],
+    standalone: false
 })
 export class CreateEditUserComponent implements OnInit {
 

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Globals } from '@core/globals';
 import { Branch } from '@core/models/products.model';
 import { PaginationData } from '@core/models/users-interfaces.model';
@@ -11,9 +11,10 @@ import { CreateEditBranchComponent } from '../create-edit-branch/create-edit-bra
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
-  selector: 'app-branches-list',
-  templateUrl: './branches-list.component.html',
-  styleUrls: ['./branches-list.component.scss']
+    selector: 'app-branches-list',
+    templateUrl: './branches-list.component.html',
+    styleUrls: ['./branches-list.component.scss'],
+    standalone: false
 })
 export class BranchesListComponent implements OnInit {
 

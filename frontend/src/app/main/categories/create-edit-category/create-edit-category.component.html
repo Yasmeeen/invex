@@ -11,12 +11,13 @@
         <div class="add-student-modal-container">
           <div>
             <div class="content-container plr-4 ptb-3">
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="categoryForm.invalid && categoryForm.submitted"
-              >
-                {{ "tr_fill_required_fields" | translate }}
-              </div>
+              @if (categoryForm.invalid && categoryForm.submitted) {
+                <div
+                  class="alert alert-error mb-3"
+                  >
+                  {{ "tr_fill_required_fields" | translate }}
+                </div>
+              }
 
               <form #categoryForm="ngForm">
                 <div class="row">
@@ -26,7 +27,7 @@
                       [class.has-error]="
                         categoryName.invalid && categoryForm.submitted
                       "
-                    >
+                      >
                       <label for="">
                         {{ "tr_category_name" | translate }}
                       </label>
@@ -37,13 +38,14 @@
                         name="name"
                         ngModel
                         required
-                      />
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="categoryName.invalid && categoryForm.submitted"
-                      >
-                        {{ "tr_category_name_required" | translate }}
-                      </span>
+                        />
+                      @if (categoryName.invalid && categoryForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ "tr_category_name_required" | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
                   <div class="col-md-6">
@@ -52,7 +54,7 @@
                       [class.has-error]="
                         categoryCode.invalid && categoryForm.submitted
                       "
-                    >
+                      >
                       <label>{{ "tr_category_short_code" | translate }}</label>
                       <input
                         #categoryCode="ngModel"
@@ -63,16 +65,17 @@
                         required
                         autocomplete="off"
                         placeholder="ELEC"
-                      />
+                        />
                       <p class="text-muted size-small m-0 mt-1">
                         {{ "tr_category_code_hint" | translate }}
                       </p>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="categoryCode.invalid && categoryForm.submitted"
-                      >
-                        {{ "tr_category_code_required" | translate }}
-                      </span>
+                      @if (categoryCode.invalid && categoryForm.submitted) {
+                        <span
+                          class="text-error size-small validator"
+                          >
+                          {{ "tr_category_code_required" | translate }}
+                        </span>
+                      }
                     </div>
                   </div>
                 </div>
@@ -84,11 +87,11 @@
                       name="multiCodePerPiece"
                       [attr.id]="'category-multi-code-' + (categoryId || 'new')"
                       ngModel
-                    />
+                      />
                     <label
                       class="category-multi-code-checkbox__label"
                       [attr.for]="'category-multi-code-' + (categoryId || 'new')"
-                    >
+                      >
                       {{ "tr_category_multi_code_per_piece" | translate }}
                     </label>
                   </span>
@@ -112,54 +115,55 @@
                       <span></span>
                     </div>
 
-                    <div
-                      class="category-attr-row"
-                      *ngFor="let row of attributeRows; let i = index; trackBy: trackByIndex"
-                    >
-                      <div class="category-attr-row__key">
-                        <label class="category-attr-row__label-inline">{{ 'tr_attribute_key' | translate }}</label>
-                        <div class="form-group">
-                          <input
-                            type="text"
-                            class="s-control"
-                            [(ngModel)]="attributeRows[i].key"
-                            [ngModelOptions]="{ standalone: true }"
-                            [attr.placeholder]="'tr_category_attr_placeholder' | translate"
-                          />
+                    @for (row of attributeRows; track trackByIndex(i); let i = $index) {
+                      <div
+                        class="category-attr-row"
+                        >
+                        <div class="category-attr-row__key">
+                          <label class="category-attr-row__label-inline">{{ 'tr_attribute_key' | translate }}</label>
+                          <div class="form-group">
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="attributeRows[i].key"
+                              [ngModelOptions]="{ standalone: true }"
+                              [attr.placeholder]="'tr_category_attr_placeholder' | translate"
+                              />
+                          </div>
+                        </div>
+                        <div class="category-attr-row__checks">
+                          <span
+                            class="s-checkbox size-tiny flex"
+                            [attr.title]="'tr_show_attribute_on_invoice' | translate"
+                            >
+                            <input
+                              type="checkbox"
+                              [id]="'category-attr-' + i + '-invoice'"
+                              [(ngModel)]="attributeRows[i].showOnInvoice"
+                              [ngModelOptions]="{ standalone: true }"
+                              />
+                            <label [attr.for]="'category-attr-' + i + '-invoice'">{{ 'tr_attr_invoice_short' | translate }}</label>
+                          </span>
+                          <span
+                            class="s-checkbox size-tiny flex"
+                            [attr.title]="'tr_show_attribute_value_on_barcode' | translate"
+                            >
+                            <input
+                              type="checkbox"
+                              [id]="'category-attr-' + i + '-barcode'"
+                              [(ngModel)]="attributeRows[i].showInBarcode"
+                              [ngModelOptions]="{ standalone: true }"
+                              />
+                            <label [attr.for]="'category-attr-' + i + '-barcode'">{{ 'tr_attr_barcode_short' | translate }}</label>
+                          </span>
+                        </div>
+                        <div class="category-attr-row__remove">
+                          <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">
+                            {{ 'tr_remove' | translate }}
+                          </button>
                         </div>
                       </div>
-                      <div class="category-attr-row__checks">
-                        <span
-                          class="s-checkbox size-tiny flex"
-                          [attr.title]="'tr_show_attribute_on_invoice' | translate"
-                        >
-                          <input
-                            type="checkbox"
-                            [id]="'category-attr-' + i + '-invoice'"
-                            [(ngModel)]="attributeRows[i].showOnInvoice"
-                            [ngModelOptions]="{ standalone: true }"
-                          />
-                          <label [attr.for]="'category-attr-' + i + '-invoice'">{{ 'tr_attr_invoice_short' | translate }}</label>
-                        </span>
-                        <span
-                          class="s-checkbox size-tiny flex"
-                          [attr.title]="'tr_show_attribute_value_on_barcode' | translate"
-                        >
-                          <input
-                            type="checkbox"
-                            [id]="'category-attr-' + i + '-barcode'"
-                            [(ngModel)]="attributeRows[i].showInBarcode"
-                            [ngModelOptions]="{ standalone: true }"
-                          />
-                          <label [attr.for]="'category-attr-' + i + '-barcode'">{{ 'tr_attr_barcode_short' | translate }}</label>
-                        </span>
-                      </div>
-                      <div class="category-attr-row__remove">
-                        <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">
-                          {{ 'tr_remove' | translate }}
-                        </button>
-                      </div>
-                    </div>
+                    }
                   </div>
                 </div>
               </form>
@@ -175,7 +179,7 @@
           (click)="submitForm()"
           class="s-btn btn-primary"
           type="submit"
-        >
+          >
           {{ "tr_save" | translate }}
         </button>
       </div>

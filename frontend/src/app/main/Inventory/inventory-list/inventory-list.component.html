@@ -2,122 +2,136 @@
   class="content-shadow bg-white mb-5"
   not-authorized
   [notAuthorized]="isNotAuthorized"
->
+  >
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ "tr_inventory" | translate }}</span>
     <div class="btn-group">
-      <button
-        *ngIf="canWarehouseTransfer"
-        class="s-btn btn-primary"
-        (click)="openTransferProductForm()"
-      >
-        {{ "tr_transfer_product" | translate }}
-      </button>
+      @if (canWarehouseTransfer) {
+        <button
+          class="s-btn btn-primary"
+          (click)="openTransferProductForm()"
+          >
+          {{ "tr_transfer_product" | translate }}
+        </button>
+      }
       <button
         class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
-      >
+        >
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
     </div>
   </h2>
 
-  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
-    <div class="row">
-      <div class="col-md-3">
-        <div class="form-group mb-0">
-          <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
-          <div class="input-with-icon bg-white width-100">
-            <input
-              class="s-control"
-              (keyup)="filterproducts($event, 'searchTerm')"
-              placeholder="{{ 'tr_search' | translate }}"
-              [(ngModel)]="nameSearchTerm"
-            />
+  @if (isFilterOpen) {
+    <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                (keyup)="filterproducts($event, 'searchTerm')"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="nameSearchTerm"
+                />
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 
   <div>
-    <div class="plr-4 mt-4" *ngIf="!productsLoading">
-      <div
-        class="table-container products-list"
-        id="table-container"
-        *ngIf="productsList.length > 0"
-      >
-        <table class="s-table table layout-fixed products-list">
-          <thead>
-            <tr>
-              <th></th>
-              <th>{{ "tr_product_name" | translate }}</th>
-              <th>{{ "tr_location" | translate }}</th>
-              <th>{{ "tr_code" | translate }}</th>
-              <th>{{ "tr_stock" | translate }}</th>
-              <th>{{ "tr_price" | translate }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let product of productsList; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>{{ product.name }}</td>
-              <td>
-                <span class="location-badge location-badge--warehouse">{{ "tr_warehouse" | translate }}</span>
-              </td>
-              <td>{{ product.code }}</td>
-              <td>{{ product.stock }}</td>
-              <td>{{ product.price }}</td>
-              <td>
-                <span class="options-menu" *ngIf="canInventoryRowActions">
-                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                  <div class="options-menu-container p-0">
-                    <div
-                      *ngIf="canWarehouseTransfer"
-                      class="single-option"
-                      (click)="openTransferProductForm()"
-                    >
-                      {{ "tr_transfer" | translate }}
-                    </div>
-
-                    <div class="border-bottom" *ngIf="canWarehouseTransfer && canDeleteFromWarehouse"></div>
-                    <div
-                      *ngIf="canDeleteFromWarehouse"
-                      class="single-option"
-                      (click)="deleteProduct(product._id)"
-                    >
-                      <div class="text-error">
-                        {{ "tr_action.delete" | translate }}
-                      </div>
-                    </div>
-                  </div>
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    @if (!productsLoading) {
+      <div class="plr-4 mt-4">
+        @if (productsList.length > 0) {
+          <div
+            class="table-container products-list"
+            id="table-container"
+            >
+            <table class="s-table table layout-fixed products-list">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>{{ "tr_product_name" | translate }}</th>
+                  <th>{{ "tr_location" | translate }}</th>
+                  <th>{{ "tr_code" | translate }}</th>
+                  <th>{{ "tr_stock" | translate }}</th>
+                  <th>{{ "tr_price" | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (product of productsList; track product; let i = $index) {
+                  <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>
+                      <span class="location-badge location-badge--warehouse">{{ "tr_warehouse" | translate }}</span>
+                    </td>
+                    <td>{{ product.code }}</td>
+                    <td>{{ product.stock }}</td>
+                    <td>{{ product.price }}</td>
+                    <td>
+                      @if (canInventoryRowActions) {
+                        <span class="options-menu">
+                          <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                          <div class="options-menu-container p-0">
+                            @if (canWarehouseTransfer) {
+                              <div
+                                class="single-option"
+                                (click)="openTransferProductForm()"
+                                >
+                                {{ "tr_transfer" | translate }}
+                              </div>
+                            }
+                            @if (canWarehouseTransfer && canDeleteFromWarehouse) {
+                              <div class="border-bottom"></div>
+                            }
+                            @if (canDeleteFromWarehouse) {
+                              <div
+                                class="single-option"
+                                (click)="deleteProduct(product._id)"
+                                >
+                                <div class="text-error">
+                                  {{ "tr_action.delete" | translate }}
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (productsList.length == 0) {
+          <div
+            class="empty-state-here text-center ptb-8"
+            >
+            <i class="fa fa-folder-open empty-icon text-primary"></i>
+            <p>{{ "tr_empty_state" | translate }}</p>
+          </div>
+        }
+        <div class="plr-4 ptb-4">
+          <pagination
+            [paginationData]="paginationData"
+            [perPage]="paginationPerPage"
+            (paginationUpdate)="paginationUpdate($event)"
+          ></pagination>
+        </div>
       </div>
+    }
 
-      <div
-        class="empty-state-here text-center ptb-8"
-        *ngIf="productsList.length == 0"
-      >
-        <i class="fa fa-folder-open empty-icon text-primary"></i>
-        <p>{{ "tr_empty_state" | translate }}</p>
+    @if (productsLoading) {
+      <div>
+        <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
       </div>
-
-      <div class="plr-4 ptb-4">
-        <pagination
-          [paginationData]="paginationData"
-          [perPage]="paginationPerPage"
-          (paginationUpdate)="paginationUpdate($event)"
-        ></pagination>
-      </div>
-    </div>
-
-    <div *ngIf="productsLoading">
-      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
-    </div>
+    }
   </div>
 </div>

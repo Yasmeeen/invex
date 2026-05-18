@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
+import { MatLegacyDialog as MatDialog } from '@angular/material/legacy-dialog';
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -11,9 +11,10 @@ import { PurchasingRequestsService } from '@shared/services/purchasing.service';
 
 
 @Component({
-  selector: 'app-purchasing-requests-list',
-  templateUrl: './purchasing-requests-list.component.html',
-  styleUrls: ['./purchasing-requests-list.component.scss']
+    selector: 'app-purchasing-requests-list',
+    templateUrl: './purchasing-requests-list.component.html',
+    styleUrls: ['./purchasing-requests-list.component.scss'],
+    standalone: false
 })
 export class PurchasingRequestsListComponent implements OnInit, OnDestroy {
   purchasingRequestsList: PurchasingRequest[] = [];

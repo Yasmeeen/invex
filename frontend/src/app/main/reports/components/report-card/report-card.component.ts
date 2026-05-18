@@ -1,9 +1,10 @@
 import { Component, Input } from '@angular/core';
 
 @Component({
-  selector: 'app-report-card',
-  templateUrl: './report-card.component.html',
-  styleUrls: ['./report-card.component.scss'],
+    selector: 'app-report-card',
+    templateUrl: './report-card.component.html',
+    styleUrls: ['./report-card.component.scss'],
+    standalone: false
 })
 export class ReportCardComponent {
   @Input() titleKey = '';

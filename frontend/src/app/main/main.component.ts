@@ -9,9 +9,10 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { isWarehouse } from '@core/utils/role-utils';
 
 @Component({
-  selector: 'app-main',
-  templateUrl: './main.component.html',
-  styleUrls: ['./main.component.scss']
+    selector: 'app-main',
+    templateUrl: './main.component.html',
+    styleUrls: ['./main.component.scss'],
+    standalone: false
 })
 export class MainComponent implements OnInit {
 

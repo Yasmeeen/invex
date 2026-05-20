@@ -95,6 +95,21 @@
         {{ 'tr_bookings_report_warehouse_only' | translate }}
       </label>
     </div>
+    <div class="col-md-3">
+      <label>{{ 'tr_requested_by' | translate }}</label>
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_report_all_users' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="users"
+        [(ngModel)]="filters.booking_created_by"
+        name="bookingCreatedBy"
+        [clearable]="true"
+        [searchable]="true"
+      >
+      </ng-select>
+    </div>
     <div class="col-md-4">
       <label>{{ 'tr_bookings_report_search' | translate }}</label>
       <input

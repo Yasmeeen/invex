@@ -3,7 +3,8 @@ import { BranchesServce } from '@shared/services/branches.service';
 
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import {
   ViewChild,
@@ -12,12 +13,13 @@ import {
   EventEmitter,
 } from '@angular/core';
 import { NgForm } from '@angular/forms';
-import { Branch, Category, Product } from '@core/models/products.model';
+import { Branch, Category, OrderPartyType, Product, ProductAcquiredFrom } from '@core/models/products.model';
 import {
   productBarcodeAttributeValues,
   ProductsSerivce,
 } from '@shared/services/products.service';
-import { forkJoin, Observable, Subscription } from 'rxjs';
+import { forkJoin, Observable, of, Subscription } from 'rxjs';
+import { catchError, debounceTime, switchMap } from 'rxjs/operators';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
@@ -30,6 +32,8 @@ import {
   ProductPurchaseRequestsService,
 } from '@shared/services/product-purchase-requests.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
+import { VendorsSerivce } from '@shared/services/vendors.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
 
 
@@ -38,7 +42,15 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
   templateUrl: './create-edit-product.component.html',
   styleUrls: ['./create-edit-product.component.scss']
 })
-export class CreateEditProductComponent implements OnInit {
+export class CreateEditProductComponent implements OnInit, OnDestroy {
+  activeTab: 'basic' | 'extra' = 'basic';
+  sourcePartyForm: FormGroup;
+  sourcePartyType: OrderPartyType = 'client';
+  isExistingSourceClient = false;
+  isExistingSourceVendor = false;
+  selectedSourceVendorId: string | null = null;
+  sourceSupplierCompanyName = '';
+  private lastNotifiedSourcePartyId: string | null = null;
   branches: Branch [];
   codeReader = new BrowserMultiFormatReader();
   isCameraActive = false;
@@ -89,8 +101,17 @@ export class CreateEditProductComponent implements OnInit {
     private cloudinaryUpload: CloudinaryUploadService,
     public globals: Globals,
     private productPurchaseRequests: ProductPurchaseRequestsService,
-    private storeSettings: StoreSettingsService
-  ) {}
+    private storeSettings: StoreSettingsService,
+    private fb: FormBuilder,
+    private ordersSerivce: OrdersSerivce,
+    private vendorsSerivce: VendorsSerivce
+  ) {
+    this.sourcePartyForm = this.fb.group({
+      phone: [''],
+      name: [''],
+      address: [''],
+    });
+  }
 
   private syncDeskPurchaseTreasuryKey(): void {
     const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
@@ -410,6 +431,7 @@ export class CreateEditProductComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.initSourcePartyPhoneLookup();
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
     if (this.cashDeskPurchase) {
@@ -546,7 +568,223 @@ export class CreateEditProductComponent implements OnInit {
       });
       this.productImageUrl = response.imageUrl || '';
       this.refreshCategoryDropdownItems();
+      this.patchSourcePartyFromProduct(response);
     });
+  }
+
+  private patchSourcePartyFromProduct(response: any): void {
+    const af: ProductAcquiredFrom | null = response?.acquiredFrom || null;
+    if (!af?.displayName && !af?.phone && !af?.partyType) {
+      return;
+    }
+    this.sourcePartyType = af.partyType === 'supplier' ? 'supplier' : 'client';
+    this.selectedSourceVendorId = af.vendorId ? String(af.vendorId) : null;
+    this.isExistingSourceVendor = !!this.selectedSourceVendorId;
+    this.isExistingSourceClient = !!af.clientId;
+    if (this.isExistingSourceVendor) {
+      this.vendorsSerivce.getVendor(this.selectedSourceVendorId!).subscribe({
+        next: (v: any) => {
+          this.sourceSupplierCompanyName = v?.nameOfcompany || '';
+        },
+        error: () => {},
+      });
+    }
+    this.sourcePartyForm.patchValue(
+      {
+        phone: af.phone || '',
+        name: af.displayName || '',
+        address: '',
+      },
+      { emitEvent: false }
+    );
+    if (this.isExistingSourceClient || this.isExistingSourceVendor) {
+      this.sourcePartyForm.get('name')?.disable({ emitEvent: false });
+    }
+  }
+
+  private initSourcePartyPhoneLookup(): void {
+    const phoneControl = this.sourcePartyForm.get('phone');
+    const nameControl = this.sourcePartyForm.get('name');
+    const addressControl = this.sourcePartyForm.get('address');
+
+    this.subscriptions.push(
+      phoneControl!.valueChanges
+        .pipe(
+          debounceTime(400),
+          switchMap((phone: string) => {
+            const trimmed = String(phone || '').trim();
+            if (!trimmed) {
+              this.clearSourcePartyLookupState(nameControl, addressControl, false);
+              return of(null);
+            }
+            const lookup$ =
+              this.sourcePartyType === 'supplier'
+                ? this.vendorsSerivce.getVendorByPhone(trimmed)
+                : this.ordersSerivce.getClientByPhone(trimmed);
+            return lookup$.pipe(
+              catchError((err) => {
+                if (err.status === 404) {
+                  this.clearSourcePartyLookupState(nameControl, addressControl, true);
+                }
+                return of(null);
+              })
+            );
+          })
+        )
+        .subscribe((party: any) => {
+          if (!party) {
+            this.lastNotifiedSourcePartyId = null;
+            return;
+          }
+          if (this.sourcePartyType === 'supplier') {
+            const dedupeKey = party._id != null ? String(party._id) : String(party.phone || '');
+            if (dedupeKey && dedupeKey !== this.lastNotifiedSourcePartyId) {
+              this.lastNotifiedSourcePartyId = dedupeKey;
+              this.translateService
+                .get('tr_cashier_supplier_registered')
+                .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+            }
+            this.isExistingSourceVendor = true;
+            this.isExistingSourceClient = false;
+            this.selectedSourceVendorId = party._id ? String(party._id) : null;
+            this.sourceSupplierCompanyName = party.nameOfcompany || '';
+            nameControl?.setValue(party.name, { emitEvent: false });
+            addressControl?.setValue(party.address || '', { emitEvent: false });
+            nameControl?.disable({ emitEvent: false });
+            addressControl?.disable({ emitEvent: false });
+          } else {
+            const dedupeKey =
+              party._id != null ? String(party._id) : String(party.phoneNumber || '');
+            if (dedupeKey && dedupeKey !== this.lastNotifiedSourcePartyId) {
+              this.lastNotifiedSourcePartyId = dedupeKey;
+              this.translateService
+                .get('tr_cashier_client_registered')
+                .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+            }
+            this.isExistingSourceClient = true;
+            this.isExistingSourceVendor = false;
+            this.selectedSourceVendorId = null;
+            this.sourceSupplierCompanyName = '';
+            nameControl?.setValue(party.name, { emitEvent: false });
+            addressControl?.setValue(party.address || '', { emitEvent: false });
+            nameControl?.disable({ emitEvent: false });
+            addressControl?.disable({ emitEvent: false });
+          }
+        })
+    );
+  }
+
+  private clearSourcePartyLookupState(
+    nameControl: AbstractControl | null,
+    addressControl: AbstractControl | null,
+    requireNameForNew: boolean
+  ): void {
+    this.isExistingSourceClient = false;
+    this.isExistingSourceVendor = false;
+    this.selectedSourceVendorId = null;
+    this.sourceSupplierCompanyName = '';
+    nameControl?.enable({ emitEvent: false });
+    addressControl?.enable({ emitEvent: false });
+    if (requireNameForNew) {
+      nameControl?.setValidators([Validators.required]);
+    } else {
+      nameControl?.clearValidators();
+    }
+    nameControl?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  onSourcePartyTypeChange(type: OrderPartyType): void {
+    if (this.sourcePartyType === type) return;
+    this.sourcePartyType = type;
+    this.lastNotifiedSourcePartyId = null;
+    const phone = String(this.sourcePartyForm.get('phone')?.value || '').trim();
+    const nameControl = this.sourcePartyForm.get('name');
+    const addressControl = this.sourcePartyForm.get('address');
+    this.clearSourcePartyLookupState(nameControl, addressControl, !!phone);
+    if (phone) {
+      this.sourcePartyForm.get('phone')?.setValue(phone);
+    }
+  }
+
+  sourcePartyInfoTitleKey(): string {
+    return this.sourcePartyType === 'supplier' ? 'tr_supplier_info' : 'tr_client_info';
+  }
+
+  sourcePartyNameLabelKey(): string {
+    return this.sourcePartyType === 'supplier' ? 'tr_supplier_contact_name' : 'tr_client_name';
+  }
+
+  private phoneFormatValidator(control: AbstractControl): ValidationErrors | null {
+    const raw = String(control.value ?? '').trim();
+    if (!raw) return null;
+    const normalized = raw.replace(/[\s\-()]/g, '');
+    const ok = /^\+?\d{7,15}$/.test(normalized);
+    return ok ? null : { phoneFormat: true };
+  }
+
+  private hasSourcePartyInput(): boolean {
+    const raw = this.sourcePartyForm.getRawValue();
+    return !!(String(raw.phone || '').trim() || String(raw.name || '').trim());
+  }
+
+  private validateSourcePartyOptional(): boolean {
+    if (!this.hasSourcePartyInput()) {
+      return true;
+    }
+    const phone = String(this.sourcePartyForm.get('phone')?.value || '').trim();
+    const name = String(this.sourcePartyForm.get('name')?.value || '').trim();
+    if (phone) {
+      const phoneErr = this.phoneFormatValidator(this.sourcePartyForm.get('phone')!);
+      if (phoneErr) {
+        this.sourcePartyForm.get('phone')?.markAsTouched();
+        this.appNotificationService.push(
+          this.translateService.instant('tr_client_phone_invalid'),
+          'error'
+        );
+        this.activeTab = 'extra';
+        return false;
+      }
+      if (!this.isExistingSourceClient && !this.isExistingSourceVendor && !name) {
+        this.sourcePartyForm.get('name')?.markAsTouched();
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_source_name_required'),
+          'error'
+        );
+        this.activeTab = 'extra';
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private buildAcquiredFromPayload(): ProductAcquiredFrom | null {
+    if (!this.hasSourcePartyInput()) {
+      return null;
+    }
+    const raw = this.sourcePartyForm.getRawValue();
+    const phone = String(raw.phone || '').trim();
+    const name = String(raw.name || '').trim();
+    const address = String(raw.address || '').trim();
+    const payload: ProductAcquiredFrom = {
+      partyType: this.sourcePartyType,
+      phone,
+      displayName: name,
+      name,
+      address,
+    };
+    if (this.sourcePartyType === 'supplier' && this.selectedSourceVendorId) {
+      payload.vendorId = this.selectedSourceVendorId;
+    }
+    return payload;
+  }
+
+  private attachAcquiredFromToPayload(target: Record<string, unknown>): void {
+    const acquiredFrom = this.buildAcquiredFromPayload();
+    if (acquiredFrom) {
+      target.acquiredFrom = acquiredFrom;
+    } else if (this.isEdit) {
+      target.acquiredFrom = null;
+    }
   }
 
   onProductCategoryChange(cat: Category | null): void {
@@ -800,6 +1038,10 @@ private submitDeskPurchaseRequest(): void {
   if (deskMultiUnits?.length) {
     deskProduct.unitCodes = [...deskMultiUnits];
   }
+  const acquiredFrom = this.buildAcquiredFromPayload();
+  if (acquiredFrom) {
+    deskProduct.acquiredFrom = acquiredFrom;
+  }
 
   this.isSubmitting = true;
   this.productPurchaseRequests
@@ -905,6 +1147,7 @@ createProduct() {
   if (createMultiUnits?.length) {
     payload.unitCodes = [...createMultiUnits];
   }
+  this.attachAcquiredFromToPayload(payload);
   // Let backend compute netPrice when left empty.
   if (payload.netPrice === '' || payload.netPrice == null) {
     delete payload.netPrice;
@@ -1029,6 +1272,7 @@ updateProduct() {
   if (this.storeInWarehouse) {
     delete payload.branch;
   }
+  this.attachAcquiredFromToPayload(payload);
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {
@@ -1080,6 +1324,9 @@ updateProduct() {
   // }
 
   submitForm(){
+    if (!this.validateSourcePartyOptional()) {
+      return;
+    }
     if(this.isEdit){
       this.updateProduct();
     }

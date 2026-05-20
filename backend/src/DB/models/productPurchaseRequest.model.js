@@ -43,6 +43,15 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       attributes: { type: Object, default: {} },
       imageUrl: { type: String, trim: true, default: '' },
       notes: { type: String, trim: true, default: '' },
+      acquiredFrom: {
+        partyType: { type: String, enum: ['client', 'supplier'], required: false },
+        clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: false },
+        vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: false },
+        displayName: { type: String, trim: true, default: '' },
+        phone: { type: String, trim: true, default: '' },
+        name: { type: String, trim: true, default: '' },
+        address: { type: String, trim: true, default: '' },
+      },
     },
 
     quantity: { type: Number, required: true, min: 1, default: 1 },

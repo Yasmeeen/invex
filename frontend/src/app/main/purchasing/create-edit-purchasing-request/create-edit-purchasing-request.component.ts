@@ -23,9 +23,10 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
   isEdit = false;
   vendorsList: any[] = [];
   installments: any[] = [];
-  selectedPaymentTerm: string;
+  selectedPaymentTerm: string | null = null;
+  supplierPaymentOptions: { label: string; value: string }[] = [];
   private subscriptions: Subscription[] = [];
-  selectedVendor: Vendor;
+  selectedVendor: Vendor | null = null;
 
   /** Auto-schedule: cadence, count, first due date (manual rows still allowed after generate). */
   installmentSchedulePeriod: InstallmentSchedulePeriod = 'monthly';
@@ -104,6 +105,7 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
         }
         this.selectedPaymentTerm = response.paymentStatus;
         this.selectedVendor = response.supplier;
+        this.refreshVendorPaymentTerms();
         this.formReadyForInstallmentSuggestions = true;
       },
       error: () =>
@@ -125,6 +127,13 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
       status: formValue.status,
       notes: formValue.notes || '',
     };
+
+    if (this.selectedPaymentTerm !== 'Installments') {
+      payload.installments = [];
+    }
+    if (this.selectedPaymentTerm === 'Deferred' && !this.isEdit) {
+      payload.amountPaid = 0;
+    }
 
     if (this.selectedPaymentTerm === 'Installments') {
       payload.installments = this.installments.map((inst) => ({
@@ -315,8 +324,71 @@ export class CreateEditPurchasingRequestComponent implements OnInit {
     this.generateInstallmentSchedule({ silentNoTotal: true });
   }
 
+  paymentTermLabel(term: string): string {
+    switch (term) {
+      case 'cash':
+        return this.translateService.instant('tr_payment_cash');
+      case 'Installments':
+        return this.translateService.instant('tr_payment_installments');
+      case 'Deferred':
+        return this.translateService.instant('tr_payment_deferred');
+      default:
+        return term;
+    }
+  }
+
+  onVendorSelected(): void {
+    if (!this.selectedVendor?._id) {
+      this.supplierPaymentOptions = [];
+      this.selectedPaymentTerm = null;
+      return;
+    }
+    this.refreshVendorPaymentTerms();
+  }
+
+  /** Reload vendor payment terms from API (after vendor edit) and rebuild dropdown items. */
+  private refreshVendorPaymentTerms(): void {
+    const id = this.selectedVendor?._id;
+    if (!id) {
+      this.supplierPaymentOptions = [];
+      return;
+    }
+
+    this.vendorsService.getVendor(String(id)).subscribe({
+      next: (full: Vendor) => {
+        this.selectedVendor = full;
+        this.rebuildSupplierPaymentOptions();
+        const allowed = new Set(this.supplierPaymentOptions.map((o) => o.value));
+        if (!this.selectedPaymentTerm || !allowed.has(this.selectedPaymentTerm)) {
+          this.selectedPaymentTerm = this.supplierPaymentOptions[0]?.value ?? null;
+        }
+      },
+      error: () => {
+        this.rebuildSupplierPaymentOptions();
+      },
+    });
+  }
+
+  private rebuildSupplierPaymentOptions(): void {
+    const raw = this.selectedVendor?.paymentTerms;
+    const terms: string[] =
+      Array.isArray(raw) && raw.length > 0
+        ? raw.map((t) => (typeof t === 'object' && (t as { value?: string })?.value
+            ? String((t as { value: string }).value)
+            : String(t)))
+        : ['cash', 'Installments', 'Deferred'];
+
+    this.supplierPaymentOptions = terms.map((v) => ({
+      label: this.paymentTermLabel(v),
+      value: v,
+    }));
+  }
+
   onPaymentTermChange(): void {
     const t = this.selectedPaymentTerm;
+    if (t !== 'Installments') {
+      this.installments = [];
+    }
     if (!this.formReadyForInstallmentSuggestions) {
       this.lastPaymentTerm = t;
       return;

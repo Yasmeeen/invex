@@ -34,10 +34,12 @@ const purchasingRequestSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['cash', 'Installments'],
+      enum: ['cash', 'Installments', 'Deferred'],
       required: true,
     },
     installments: [installmentSchema],
+    /** For Deferred: amount we have paid the supplier so far. */
+    amountPaid: { type: Number, default: 0, min: 0 },
     totalAmount: {
       type: Number,
       required: true,
@@ -59,6 +61,13 @@ const purchasingRequestSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+purchasingRequestSchema.pre('save', function (next) {
+  if (this.paymentStatus !== 'Installments') {
+    this.installments = [];
+  }
+  next();
+});
 
 const PurchasingRequest = mongoose.model('PurchasingRequest', purchasingRequestSchema);
 export default PurchasingRequest;

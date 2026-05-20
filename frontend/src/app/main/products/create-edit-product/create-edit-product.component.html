@@ -30,8 +30,32 @@
                 {{ 'tr_leaving_before_admission' | translate }}
               </div>
 
+              <ul class="product-form-tabs mb-3">
+                <li>
+                  <button
+                    type="button"
+                    class="product-form-tabs__btn"
+                    [class.product-form-tabs__btn--active]="activeTab === 'basic'"
+                    (click)="activeTab = 'basic'"
+                  >
+                    {{ 'tr_product_tab_basic' | translate }}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="product-form-tabs__btn"
+                    [class.product-form-tabs__btn--active]="activeTab === 'extra'"
+                    (click)="activeTab = 'extra'"
+                  >
+                    {{ 'tr_product_tab_extra' | translate }}
+                    <span class="text-muted size-small">({{ 'tr_optional' | translate }})</span>
+                  </button>
+                </li>
+              </ul>
+
               <form #basicInfoForm="ngForm">
-                <div class="row">
+                <div class="row" *ngIf="activeTab === 'basic'">
                   <!-- Name -->
                   <div class="col-md-6">
                     <div
@@ -457,6 +481,80 @@
                     </div>
                   </div>
 
+                </div>
+
+                <div class="row" *ngIf="activeTab === 'extra'">
+                  <div class="col-md-12">
+                    <p class="text-muted size-small mb-3">{{ 'tr_product_source_optional_hint' | translate }}</p>
+                    <div class="party-type-toggle mb-3">
+                      <label class="mr-3">
+                        <input
+                          type="radio"
+                          name="sourcePartyType"
+                          [checked]="sourcePartyType === 'client'"
+                          (change)="onSourcePartyTypeChange('client')"
+                        />
+                        {{ 'tr_party_client' | translate }}
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="sourcePartyType"
+                          [checked]="sourcePartyType === 'supplier'"
+                          (change)="onSourcePartyTypeChange('supplier')"
+                        />
+                        {{ 'tr_party_supplier' | translate }}
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="col-md-12" [formGroup]="sourcePartyForm">
+                    <h4 class="m-0 mb-3">{{ sourcePartyInfoTitleKey() | translate }}</h4>
+                    <div class="row">
+                      <div
+                        class="col-md-4"
+                        [class.has-error]="sourcePartyForm.get('phone')?.invalid && sourcePartyForm.get('phone')?.touched"
+                      >
+                        <div class="form-group">
+                          <label>{{ 'tr_client_phone' | translate }}</label>
+                          <input type="text" class="s-control" formControlName="phone" />
+                          <span
+                            class="text-error size-small validator"
+                            *ngIf="sourcePartyForm.get('phone')?.errors?.phoneFormat && sourcePartyForm.get('phone')?.touched"
+                          >
+                            {{ 'tr_client_phone_invalid' | translate }}
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        class="col-md-4"
+                        [class.has-error]="sourcePartyForm.get('name')?.invalid && sourcePartyForm.get('name')?.touched"
+                      >
+                        <div class="form-group">
+                          <label>{{ sourcePartyNameLabelKey() | translate }}</label>
+                          <input type="text" class="s-control" formControlName="name" />
+                          <span
+                            class="text-error size-small validator"
+                            *ngIf="sourcePartyForm.get('name')?.errors?.required && sourcePartyForm.get('name')?.touched"
+                          >
+                            {{ 'tr_product_source_name_required' | translate }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="form-group">
+                          <label>{{ 'tr_client_address' | translate }}</label>
+                          <input type="text" class="s-control" formControlName="address" />
+                        </div>
+                      </div>
+                      <div class="col-md-4" *ngIf="sourcePartyType === 'supplier' && sourceSupplierCompanyName">
+                        <div class="form-group">
+                          <label>{{ 'tr_legal_name' | translate }}</label>
+                          <div class="s-control bg-light plr-2">{{ sourceSupplierCompanyName }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>

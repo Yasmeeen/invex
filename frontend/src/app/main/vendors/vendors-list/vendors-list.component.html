@@ -88,6 +88,18 @@
                     </div>
                     <div
                       class="single-option"
+                      (click)="openVendorHistory(vendor)"
+                    >
+                      {{ "tr_supplier_history" | translate }}
+                    </div>
+                    <div
+                      class="single-option"
+                      (click)="openVendorDeposit(vendor)"
+                    >
+                      {{ "tr_vendor_add_deposit" | translate }}
+                    </div>
+                    <div
+                      class="single-option"
                       (click)="createOrEditvendor(true, vendor)"
                     >
                       {{ "tr_action.edit" | translate }}

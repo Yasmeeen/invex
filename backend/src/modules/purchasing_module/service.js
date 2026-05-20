@@ -2,6 +2,10 @@
 
 import PurchasingRequest from "../../DB/models/purchasingRequest.model.js";
 import StockMovement from "../../DB/models/stockMovement.model.js";
+import {
+  removeVendorPurchaseLedger,
+  syncVendorPurchaseLedger,
+} from "../../utils/vendor-purchase-ledger.js";
 
 // ✅ Get all Purchasing Requests (with pagination & optional search)
 export const getPurchasingRequests = async (req, res) => {
@@ -67,6 +71,14 @@ export const createPurchasingRequest = async (req, res) => {
     const newPurchasingRequest = new PurchasingRequest(req.body);
     await newPurchasingRequest.save();
 
+    try {
+      await syncVendorPurchaseLedger(newPurchasingRequest, {
+        userId: req.body?.userId || req.body?.createdByUserId,
+      });
+    } catch (ledgerErr) {
+      console.error('⚠️ Failed to sync vendor purchase ledger:', ledgerErr.message);
+    }
+
     // Purchase movement log (request-level; current model has no per-product quantities).
     try {
       await StockMovement.create({
@@ -99,6 +111,15 @@ export const updatePurchasingRequest = async (req, res) => {
     if (!updatedPurchasingRequest) {
       return res.status(404).json({ message: 'Purchasing request not found' });
     }
+
+    try {
+      await syncVendorPurchaseLedger(updatedPurchasingRequest, {
+        userId: req.body?.userId || req.body?.createdByUserId,
+      });
+    } catch (ledgerErr) {
+      console.error('⚠️ Failed to sync vendor purchase ledger:', ledgerErr.message);
+    }
+
     res.status(200).json({ message: 'Purchasing request updated successfully', data: updatedPurchasingRequest });
   } catch (error) {
     res.status(400).json({ message: 'Error updating purchasing request', error: error.message });
@@ -112,6 +133,16 @@ export const deletePurchasingRequest = async (req, res) => {
     if (!deletedPurchasingRequest) {
       return res.status(404).json({ message: 'Purchasing request not found' });
     }
+
+    try {
+      await removeVendorPurchaseLedger(
+        deletedPurchasingRequest._id,
+        deletedPurchasingRequest.supplier
+      );
+    } catch (ledgerErr) {
+      console.error('⚠️ Failed to remove vendor purchase ledger:', ledgerErr.message);
+    }
+
     res.status(200).json({ message: 'Purchasing request deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting purchasing request', error: error.message });

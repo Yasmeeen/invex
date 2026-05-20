@@ -7,6 +7,8 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { TranslateService } from '@ngx-translate/core';
 
 import { CreateEditVendorComponent } from '../create-edit-vendor/create-edit-vendor.component';
+import { VendorHistoryDialogComponent } from '../vendor-history-dialog/vendor-history-dialog.component';
+import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { Vendor } from '@core/models/products.model';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
@@ -136,6 +138,24 @@ export class VendorsListComponent implements OnInit {
 
 
   }
+  openVendorHistory(vendor: Vendor): void {
+    this.dialog.open(VendorHistoryDialogComponent, {
+      width: '920px',
+      maxWidth: '96vw',
+      data: { vendor },
+      disableClose: false,
+    });
+  }
+
+  openVendorDeposit(vendor: Vendor): void {
+    this.dialog.open(VendorDepositDialogComponent, {
+      width: '480px',
+      maxWidth: '96vw',
+      data: { vendor },
+      disableClose: true,
+    });
+  }
+
   createOrEditvendor(isEdit: boolean, vendor?: Vendor){
     let dialogRef = this.dialog.open(CreateEditVendorComponent, {
       width: '850px',

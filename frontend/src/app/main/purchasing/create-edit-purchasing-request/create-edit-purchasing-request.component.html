@@ -1,7 +1,7 @@
-<div class="complex-modal">
+<div class="complex-modal purchasing-request-modal">
     <div class="modal-wrapper">
       <div class="close-modal-icon" (click)="closeModal()"></div>
-      <div class="modal-content" #modalContent>
+      <div id="purchasing-request-modal-root" class="modal-content" #modalContent>
         <div class="modal-header border-bottom">
           <h3 class="steel weight-medium size-default m-0">
             {{ isEdit ? ('tr_edit_purchasing_request' | translate) : ('tr_new_purchasing_request' | translate) }}
@@ -28,7 +28,12 @@
                         #vendor="ngModel"
                         [items]="vendorsList"
                         [(ngModel)]="selectedVendor"
+                        (ngModelChange)="onVendorSelected()"
                         bindLabel="nameOfcompany"
+                        appendTo="#purchasing-request-modal-root"
+                        [placeholder]="'tr_select' | translate"
+                        [clearable]="true"
+                        [searchable]="true"
                         required
                       ></ng-select>
                       <i class="fa fa-caret-down input-icon"></i>
@@ -42,18 +47,38 @@
                 <div class="col-md-6">
                   <div class="form-group" [class.has-error]="paymentStatus.invalid && purchasingForm.submitted">
                     <label>{{ 'tr_payment_terms' | translate }}</label>
-                    <ng-select
-                      name="paymentStatus"
-                      class="s-control s-select"
-                      [(ngModel)]="selectedPaymentTerm"
-                      (ngModelChange)="onPaymentTermChange()"
-                      #paymentStatus="ngModel"
-                      [items]="selectedVendor?.paymentTerms!"
-                      bindLabel="label"
-                      bindValue="value"
-                      required
-                    ></ng-select>
+                    <div class="input-with-icon bg-white">
+                      <ng-select
+                        name="paymentStatus"
+                        class="s-control s-select"
+                        [(ngModel)]="selectedPaymentTerm"
+                        (ngModelChange)="onPaymentTermChange()"
+                        #paymentStatus="ngModel"
+                        [items]="supplierPaymentOptions"
+                        bindLabel="label"
+                        bindValue="value"
+                        appendTo="#purchasing-request-modal-root"
+                        [placeholder]="'tr_select' | translate"
+                        [disabled]="!selectedVendor || supplierPaymentOptions.length === 0"
+                        [clearable]="true"
+                        [searchable]="false"
+                        required
+                      ></ng-select>
+                      <i class="fa fa-caret-down input-icon"></i>
+                    </div>
+                    <p
+                      class="size-small text-muted m-0 mt-1"
+                      *ngIf="selectedVendor && supplierPaymentOptions.length === 0"
+                    >
+                      {{ 'tr_purchasing_no_payment_terms' | translate }}
+                    </p>
                   </div>
+                  <p
+                    class="size-small text-muted m-0 mt-1"
+                    *ngIf="selectedPaymentTerm === 'Deferred'"
+                  >
+                    {{ 'tr_purchasing_deferred_hint' | translate }}
+                  </p>
                 </div>
   
                 <!-- Request Date -->

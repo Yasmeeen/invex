@@ -9,6 +9,10 @@ import User from '../../DB/models/user.model.js';
 import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
 import { auditLog } from '../audit_module/audit.service.js';
+import {
+  resolveProductAcquiredFrom,
+  shouldClearAcquiredFrom,
+} from '../../utils/product-source-party.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -1016,6 +1020,26 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: 'attributes must be an object' });
     }
 
+    let acquiredFromFields = {};
+    try {
+      const branchOidForSource =
+        isWarehouse || !branch?._id
+          ? null
+          : mongoose.Types.ObjectId.isValid(String(branch._id))
+            ? branch._id
+            : null;
+      const resolved = await resolveProductAcquiredFrom(req.body, {
+        categoryId,
+        branchOid: branchOidForSource,
+      });
+      if (resolved?.acquiredFrom) {
+        acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+      }
+    } catch (e) {
+      const msg = e?.message || 'Invalid source party';
+      return res.status(400).json({ error: msg, code: e?.code });
+    }
+
     const catRow = await Category.findById(categoryId).select('multiCodePerPiece').lean();
     const categoryMultiCode = !!catRow?.multiCodePerPiece;
     const unitCount = Math.max(1, Math.floor(stockNum));
@@ -1064,6 +1088,7 @@ export const createProduct = async (req, res) => {
             inWarehouse: true,
             imageUrl: imageUrlNorm,
             attributes: attrs,
+            ...acquiredFromFields,
           });
           createdProducts.push(p);
         }
@@ -1111,6 +1136,7 @@ export const createProduct = async (req, res) => {
           inWarehouse: false,
           imageUrl: imageUrlNorm,
           attributes: attrs,
+          ...acquiredFromFields,
         });
         createdProducts.push(p);
       }
@@ -1158,6 +1184,7 @@ export const createProduct = async (req, res) => {
         inWarehouse: true,
         imageUrl: imageUrlNorm,
         attributes: attrs,
+        ...acquiredFromFields,
       });
 
       await auditLog(req, {
@@ -1203,6 +1230,7 @@ export const createProduct = async (req, res) => {
       inWarehouse: false,
       imageUrl: imageUrlNorm,
       attributes: attrs,
+      ...acquiredFromFields,
     });
 
     await auditLog(req, {
@@ -1287,6 +1315,33 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: codeCheck.error });
     }
 
+    let acquiredFromSet = null;
+    let acquiredFromUnset = false;
+    if (shouldClearAcquiredFrom(req.body)) {
+      acquiredFromUnset = true;
+    } else if (Object.prototype.hasOwnProperty.call(req.body, 'acquiredFrom')) {
+      try {
+        const branchOidForSource =
+          isWarehouse || !branch?._id
+            ? null
+            : mongoose.Types.ObjectId.isValid(String(branch._id))
+              ? branch._id
+              : null;
+        const resolved = await resolveProductAcquiredFrom(req.body, {
+          categoryId,
+          branchOid: branchOidForSource,
+        });
+        if (resolved?.acquiredFrom) {
+          acquiredFromSet = resolved.acquiredFrom;
+        } else {
+          acquiredFromUnset = true;
+        }
+      } catch (e) {
+        const msg = e?.message || 'Invalid source party';
+        return res.status(400).json({ error: msg, code: e?.code });
+      }
+    }
+
     if (isWarehouse) {
       const existingWh = await Product.findOne({
         code,
@@ -1331,8 +1386,14 @@ export const updateProduct = async (req, res) => {
       if (imageUrlNorm !== undefined) {
         updateDoc.imageUrl = imageUrlNorm;
       }
+      if (acquiredFromSet) {
+        updateDoc.acquiredFrom = acquiredFromSet;
+      }
 
-      const product = await Product.findByIdAndUpdate(req.params.id, updateDoc, { new: true });
+      const updateOp = acquiredFromUnset
+        ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
+        : updateDoc;
+      const product = await Product.findByIdAndUpdate(req.params.id, updateOp, { new: true });
 
       if (!product) {
         return res.status(404).json({ error: 'Product not found' });
@@ -1386,9 +1447,15 @@ export const updateProduct = async (req, res) => {
     if (imageUrlNorm !== undefined) {
       updateDocBranch.imageUrl = imageUrlNorm;
     }
+    if (acquiredFromSet) {
+      updateDocBranch.acquiredFrom = acquiredFromSet;
+    }
 
+    const updateOpBranch = acquiredFromUnset
+      ? { $set: updateDocBranch, $unset: { acquiredFrom: 1 } }
+      : updateDocBranch;
     const before = await Product.findById(req.params.id).lean();
-    const product = await Product.findByIdAndUpdate(req.params.id, updateDocBranch, { new: true });
+    const product = await Product.findByIdAndUpdate(req.params.id, updateOpBranch, { new: true });
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });

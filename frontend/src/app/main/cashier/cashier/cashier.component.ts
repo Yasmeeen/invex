@@ -23,6 +23,8 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
+import { VendorsSerivce } from '@shared/services/vendors.service';
+import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
@@ -73,12 +75,16 @@ export class CashierComponent implements AfterViewInit {
   /** After sale receipt print, optionally print trade-in purchase receipt. */
   private pendingExchangePurchaseReceipt: any = null;
 
-  // Client information section
+  // Client / supplier information section
   isClientInfoOpen = false;
   clientForm: FormGroup;
+  partyType: OrderPartyType = 'client';
   isExistingClient = false;
-  /** Avoid repeating the same “registered” toast for the same client lookup. */
-  private lastNotifiedClientId: string | null = null;
+  isExistingVendor = false;
+  selectedVendorId: string | null = null;
+  supplierCompanyName = '';
+  /** Avoid repeating the same “registered” toast for the same lookup. */
+  private lastNotifiedPartyId: string | null = null;
 
   readonly paymentMethods: CashierPaymentMethod[] = [
     { id: 'cash', labelKey: 'tr_pay_cash', logo: 'assets/images/payment/cash.svg' },
@@ -98,17 +104,13 @@ export class CashierComponent implements AfterViewInit {
     { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
   ];
 
-  /**
-   * Same as paymentMethods minus «credit». Must stay a stable array reference — a getter that
-   * returns `.filter()` breaks ng-select: items change every CD cycle so clicks never stick.
-   */
-  readonly paymentMethodsForSplit: CashierPaymentMethod[] = this.paymentMethods.filter(
-    (m) => m.id !== 'credit'
-  );
+  /** Stable array reference for ng-select (do not use a getter — breaks multi-select). */
+  readonly paymentMethodsForSplit: CashierPaymentMethod[] = this.paymentMethods;
 
   constructor(
     private productsSerivce: ProductsSerivce, 
     private ordersSerivce: OrdersSerivce,
+    private vendorsSerivce: VendorsSerivce,
     private dialog: MatDialog,
     private authenticationService: AuthenticationService,
     private branchesServce: BranchesServce,
@@ -322,61 +324,123 @@ export class CashierComponent implements AfterViewInit {
         debounceTime(400),
         switchMap((phone: string) => {
           if (!phone) {
-            this.isExistingClient = false;
+            this.clearPartyLookupState(nameControl, addressControl, false);
             nameControl?.reset();
             addressControl?.reset();
-            nameControl?.clearValidators();
-            addressControl?.clearValidators();
-            nameControl?.updateValueAndValidity({ emitEvent: false });
-            addressControl?.updateValueAndValidity({ emitEvent: false });
-            nameControl?.enable({ emitEvent: false });
-            addressControl?.enable({ emitEvent: false });
             return of(null);
           }
-          return this.ordersSerivce.getClientByPhone(phone).pipe(
+          const lookup$ =
+            this.partyType === 'supplier'
+              ? this.vendorsSerivce.getVendorByPhone(phone)
+              : this.ordersSerivce.getClientByPhone(phone);
+
+          return lookup$.pipe(
             catchError((err) => {
               if (err.status === 404) {
-                this.isExistingClient = false;
-                nameControl?.enable({ emitEvent: false });
-                addressControl?.enable({ emitEvent: false });
-                nameControl?.setValidators([Validators.required]);
-                addressControl?.setValidators([Validators.required]);
-                nameControl?.updateValueAndValidity({ emitEvent: false });
-                addressControl?.updateValueAndValidity({ emitEvent: false });
-                nameControl?.reset();
-                addressControl?.reset();
+                this.clearPartyLookupState(nameControl, addressControl, true);
               }
               return of(null);
             })
           );
         })
       )
-      .subscribe((client: any) => {
-        if (client) {
-          const dedupeKey =
-            client._id != null
-              ? String(client._id)
-              : String(client.phoneNumber || '');
-          if (dedupeKey && dedupeKey !== this.lastNotifiedClientId) {
-            this.lastNotifiedClientId = dedupeKey;
+      .subscribe((party: any) => {
+        if (!party) {
+          this.lastNotifiedPartyId = null;
+          return;
+        }
+
+        const nameControl = this.clientForm.get('name');
+        const addressControl = this.clientForm.get('address');
+
+        if (this.partyType === 'supplier') {
+          const dedupeKey = party._id != null ? String(party._id) : String(party.phone || '');
+          if (dedupeKey && dedupeKey !== this.lastNotifiedPartyId) {
+            this.lastNotifiedPartyId = dedupeKey;
             this.translate
-              .get('tr_cashier_client_registered')
+              .get('tr_cashier_supplier_registered')
               .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
           }
-
-          this.isExistingClient = true;
-          nameControl?.setValue(client.name, { emitEvent: false });
-          addressControl?.setValue(client.address, { emitEvent: false });
+          this.isExistingVendor = true;
+          this.isExistingClient = false;
+          this.selectedVendorId = party._id ? String(party._id) : null;
+          this.supplierCompanyName = party.nameOfcompany || '';
+          nameControl?.setValue(party.name, { emitEvent: false });
+          addressControl?.setValue(party.address || '', { emitEvent: false });
           nameControl?.disable({ emitEvent: false });
           addressControl?.disable({ emitEvent: false });
           nameControl?.clearValidators();
           addressControl?.clearValidators();
-          nameControl?.updateValueAndValidity({ emitEvent: false });
-          addressControl?.updateValueAndValidity({ emitEvent: false });
         } else {
-          this.lastNotifiedClientId = null;
+          const dedupeKey =
+            party._id != null ? String(party._id) : String(party.phoneNumber || '');
+          if (dedupeKey && dedupeKey !== this.lastNotifiedPartyId) {
+            this.lastNotifiedPartyId = dedupeKey;
+            this.translate
+              .get('tr_cashier_client_registered')
+              .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+          }
+          this.isExistingClient = true;
+          this.isExistingVendor = false;
+          this.selectedVendorId = null;
+          this.supplierCompanyName = '';
+          nameControl?.setValue(party.name, { emitEvent: false });
+          addressControl?.setValue(party.address, { emitEvent: false });
+          nameControl?.disable({ emitEvent: false });
+          addressControl?.disable({ emitEvent: false });
+          nameControl?.clearValidators();
+          addressControl?.clearValidators();
         }
+        nameControl?.updateValueAndValidity({ emitEvent: false });
+        addressControl?.updateValueAndValidity({ emitEvent: false });
       });
+  }
+
+  private clearPartyLookupState(
+    nameControl: AbstractControl | null,
+    addressControl: AbstractControl | null,
+    requireFields: boolean
+  ): void {
+    this.isExistingClient = false;
+    this.isExistingVendor = false;
+    this.selectedVendorId = null;
+    this.supplierCompanyName = '';
+    nameControl?.enable({ emitEvent: false });
+    addressControl?.enable({ emitEvent: false });
+    if (requireFields) {
+      nameControl?.setValidators([Validators.required]);
+      addressControl?.setValidators([Validators.required]);
+    } else {
+      nameControl?.clearValidators();
+      addressControl?.clearValidators();
+    }
+    nameControl?.updateValueAndValidity({ emitEvent: false });
+    addressControl?.updateValueAndValidity({ emitEvent: false });
+    if (requireFields) {
+      nameControl?.reset();
+      addressControl?.reset();
+    }
+  }
+
+  onPartyTypeChange(type: OrderPartyType): void {
+    if (this.partyType === type) return;
+    this.partyType = type;
+    this.lastNotifiedPartyId = null;
+    const phone = String(this.clientForm.get('phone')?.value || '').trim();
+    const nameControl = this.clientForm.get('name');
+    const addressControl = this.clientForm.get('address');
+    this.clearPartyLookupState(nameControl, addressControl, !!phone);
+    if (phone) {
+      this.clientForm.get('phone')?.setValue(phone);
+    }
+  }
+
+  partyInfoTitleKey(): string {
+    return this.partyType === 'supplier' ? 'tr_supplier_info' : 'tr_client_info';
+  }
+
+  partyNameLabelKey(): string {
+    return this.partyType === 'supplier' ? 'tr_supplier_contact_name' : 'tr_client_name';
   }
 
   /**
@@ -400,7 +464,7 @@ export class CashierComponent implements AfterViewInit {
 
   /** Reset phone, name, address, payment to defaults and re-enable disabled controls. */
   private resetClientFormFields(): void {
-    this.lastNotifiedClientId = null;
+    this.lastNotifiedPartyId = null;
     this.clientForm.reset({
       phone: '',
       name: '',
@@ -409,6 +473,9 @@ export class CashierComponent implements AfterViewInit {
     this.clientForm.get('name')?.enable({ emitEvent: false });
     this.clientForm.get('address')?.enable({ emitEvent: false });
     this.isExistingClient = false;
+    this.isExistingVendor = false;
+    this.selectedVendorId = null;
+    this.supplierCompanyName = '';
   }
 
   /** After successful pay + print: collapse client section and clear form. */
@@ -495,11 +562,30 @@ export class CashierComponent implements AfterViewInit {
     const netDue = Math.round(this.effectiveCheckoutTotal() * 100) / 100;
     const cur = Number(this.payAmounts[id]);
     if (!Number.isFinite(cur) || cur <= 0) {
+      if (id === 'credit') {
+        this.payAmounts = { ...this.payAmounts, credit: 0 };
+        return;
+      }
       const pct = this.paymentAppFeePercent(id);
       const gross =
         pct > 0 ? Math.round(netDue * (1 + pct / 100) * 100) / 100 : netDue;
       this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, gross) };
     }
+  }
+
+  isCreditPayMethod(id: string | undefined | null): boolean {
+    return String(id || '').trim().toLowerCase() === 'credit';
+  }
+
+  hasCreditPayMethodSelected(): boolean {
+    return this.selectedPayMethods.some((id) => this.isCreditPayMethod(id));
+  }
+
+  /** `max` on number inputs must be string | number (not null). */
+  payAmountInputMax(methodId: string): number | undefined {
+    return this.isCreditPayMethod(methodId)
+      ? this.effectiveCheckoutTotal()
+      : undefined;
   }
 
   onSelectedPayMethodsChange(ids: string[] | null): void {
@@ -515,7 +601,11 @@ export class CashierComponent implements AfterViewInit {
   private reconcilePayAmountsKeys(ids: string[]): void {
     const next: Record<string, number> = {};
     for (const id of ids) {
-      next[id] = Number(this.payAmounts[id]) || 0;
+      if (this.isCreditPayMethod(id) && !Number.isFinite(Number(this.payAmounts[id]))) {
+        next[id] = 0;
+      } else {
+        next[id] = Number(this.payAmounts[id]) || 0;
+      }
     }
     this.payAmounts = next;
   }
@@ -540,7 +630,7 @@ export class CashierComponent implements AfterViewInit {
   }
 
   getPayMethodDef(id: string): CashierPaymentMethod | undefined {
-    return this.paymentMethodsForSplit.find((m) => m.id === id);
+    return this.paymentMethods.find((m) => m.id === id);
   }
 
   /** BNPL / wallet surcharge from store settings (0 if unset). */
@@ -857,6 +947,7 @@ export class CashierComponent implements AfterViewInit {
 
     const orderData: Record<string, unknown> = {
       products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
+      partyType: this.isClientInfoOpen ? this.partyType : 'client',
       clientName,
       clientPhoneNumber,
       clientAddress,
@@ -866,6 +957,10 @@ export class CashierComponent implements AfterViewInit {
       userId: this.curentUser._id,
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
     };
+
+    if (this.isClientInfoOpen && this.partyType === 'supplier' && this.selectedVendorId) {
+      orderData.vendorId = this.selectedVendorId;
+    }
 
     if (exchangeCredit > 0) {
       orderData.exchangeTradeInCreditAmount = exchangeCredit;
@@ -887,6 +982,7 @@ export class CashierComponent implements AfterViewInit {
       // Receipt must show invoice-level discount even if API omits fields or CD lags.
       this.createdOrder = {
         ...base,
+        partyType: this.isClientInfoOpen ? this.partyType : 'client',
         subtotalPrice: receiptSubtotal,
         invoiceDiscountAmount: receiptInvoiceDisc,
         totalPrice: receiptFinal,
@@ -1024,6 +1120,17 @@ export class CashierComponent implements AfterViewInit {
    * Receipt: show client block only when order has real client data (not cashier defaults:
    * phone "00", name "Walk-in", address "-").
    */
+  receiptPartyType(): OrderPartyType {
+    const t = this.createdOrder?.partyType;
+    return t === 'supplier' ? 'supplier' : 'client';
+  }
+
+  receiptPartyTypeLabelKey(): string {
+    return this.receiptPartyType() === 'supplier'
+      ? 'tr_invoice_party_supplier'
+      : 'tr_invoice_party_client';
+  }
+
   get showReceiptClientSection(): boolean {
     const o = this.createdOrder;
     if (!o) {

@@ -1,5 +1,31 @@
-.pr-installment-generator {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+/* ng-select inside dialog: append target must be .modal-content (not outer .complex-modal). */
+#purchasing-request-modal-root {
+  position: relative;
+  overflow: visible;
+}
+
+.purchasing-request-modal {
+  .modal-body {
+    overflow: visible;
+  }
+
+  .input-with-icon {
+    ng-select.ng-select {
+      position: relative;
+      z-index: 3;
+    }
+
+    ng-select.ng-select .ng-select-container {
+      position: relative !important;
+    }
+
+    .input-icon {
+      pointer-events: none;
+    }
+  }
+}
+
+/* Panel appended to #purchasing-request-modal-root */
+::ng-deep #purchasing-request-modal-root .ng-dropdown-panel {
+  z-index: 10050 !important;
 }

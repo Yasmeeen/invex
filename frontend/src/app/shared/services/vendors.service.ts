@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { VENDORS_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import {Vendor } from '@core/models/products.model';
+import { Vendor, VendorHistoryResponse } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -19,8 +19,8 @@ constructor(
 getVendors(params: any) {
   return this.http.get(VENDORS_URL, { params: params });
 }
-getVendor(vendorId: any) {
-  return this.http.get(VENDORS_URL+ `/${vendorId}`);
+getVendor(vendorId: string): Observable<Vendor> {
+  return this.http.get<Vendor>(`${VENDORS_URL}/${vendorId}`);
 }
 
 createVendor(params: any) {
@@ -44,6 +44,36 @@ deleteVendor(vendorId: string) {
       },
     })
   );
+}
+
+getVendorByPhone(phone: string): Observable<Vendor> {
+  const encoded = encodeURIComponent(String(phone).trim());
+  return this.http.get<Vendor>(`${VENDORS_URL}/by-phone/${encoded}`);
+}
+
+getVendorHistory(vendorId: string): Observable<VendorHistoryResponse> {
+  return this.http.get<VendorHistoryResponse>(`${VENDORS_URL}/${vendorId}/history`);
+}
+
+settleVendorBalances(
+  vendorId: string,
+  payload: { userId?: string; note?: string }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/settle`, payload);
+}
+
+addVendorDeposit(
+  vendorId: string,
+  payload: { amount: number; userId?: string; note?: string }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/deposit`, payload);
+}
+
+recordDeferredPurchasePayment(
+  vendorId: string,
+  payload: { purchasingRequestId: string; amount: number; userId?: string; note?: string }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/deferred-payment`, payload);
 }
 
 }

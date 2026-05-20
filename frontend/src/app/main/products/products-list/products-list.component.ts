@@ -214,6 +214,11 @@ export class ProductsListComponent implements OnInit {
     return Math.max(0, Math.floor(Number(product.bookedQuantity) || 0));
   }
 
+  /** Client or supplier name when device was acquired from someone (optional field). */
+  productSourceName(product: Product): string {
+    return String(product.acquiredFrom?.displayName || '').trim();
+  }
+
   availableToBook(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const reserved = this.transferReservedQty(product);

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { PRODUCT_PURCHASE_REQUESTS_URL } from '@core/base/urls';
+import { ProductAcquiredFrom } from '@core/models/products.model';
 
 export interface DeskPurchaseProductPayload {
   name: string;
@@ -15,6 +16,7 @@ export interface DeskPurchaseProductPayload {
   notes?: string;
   /** When category uses multi-code per piece and quantity > 1 */
   unitCodes?: string[];
+  acquiredFrom?: ProductAcquiredFrom | null;
 }
 
 @Injectable({ providedIn: 'root' })

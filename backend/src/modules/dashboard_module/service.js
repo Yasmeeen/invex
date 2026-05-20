@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
 import Installment from '../../DB/models/purchasingRequest.model.js';
+import { recordVendorInstallmentPayment } from '../../utils/vendor-purchase-ledger.js';
 import moment from 'moment-timezone';
 
 export const getOrdersStatstics = async (req, res) => {
@@ -340,6 +341,14 @@ export const markInstallmentPaid = async (req, res) => {
 
     installment.paid = true;
     await request.save();
+
+    try {
+      await recordVendorInstallmentPayment(request, installment, {
+        userId: req.body?.userId,
+      });
+    } catch (ledgerErr) {
+      console.error('⚠️ Failed to log vendor installment payment:', ledgerErr.message);
+    }
 
     res.status(200).json({ message: 'Installment marked as paid', installment });
 

@@ -8,6 +8,7 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
 import { auditLog } from '../audit_module/audit.service.js';
+import { resolveProductAcquiredFrom } from '../../utils/product-source-party.js';
 import {
   allocateSequentialProductCodes,
   assertCodesNotUsedInStorage,
@@ -265,6 +266,24 @@ export const createProductPurchaseRequest = async (req, res) => {
     if (categoryIsMulti && q > 1) {
       payload.unitCodes = unitCodesNorm;
     }
+    if (product?.acquiredFrom && typeof product.acquiredFrom === 'object') {
+      payload.acquiredFrom = product.acquiredFrom;
+    }
+
+    let acquiredFromFields = {};
+    try {
+      const resolved = await resolveProductAcquiredFrom(
+        { acquiredFrom: payload.acquiredFrom },
+        { categoryId: String(categoryId), branchOid: branchId }
+      );
+      if (resolved?.acquiredFrom) {
+        acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+      }
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+    }
 
     const autoApprove = isAutoApproverRole(actor.role);
 
@@ -327,6 +346,7 @@ export const createProductPurchaseRequest = async (req, res) => {
                 inWarehouse: false,
                 imageUrl: payload.imageUrl,
                 attributes: payload.attributes,
+                ...acquiredFromFields,
               },
             ],
             { session }
@@ -406,6 +426,7 @@ export const createProductPurchaseRequest = async (req, res) => {
             inWarehouse: false,
             imageUrl: payload.imageUrl,
             attributes: payload.attributes,
+            ...acquiredFromFields,
           },
         ],
         { session }
@@ -567,6 +588,21 @@ export const approveProductPurchaseRequest = async (req, res) => {
     const catMultiRow = await Category.findById(categoryIdStr).select('multiCodePerPiece').session(session).lean();
     const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
 
+    let acquiredFromFields = {};
+    try {
+      const resolved = await resolveProductAcquiredFrom(
+        { acquiredFrom: pp.acquiredFrom },
+        { categoryId: categoryIdStr, branchOid: purchase.branch }
+      );
+      if (resolved?.acquiredFrom) {
+        acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+      }
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+    }
+
     let prod;
     let createdList = [];
 
@@ -613,6 +649,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
               inWarehouse: false,
               imageUrl: normalizeImageUrl(pp.imageUrl),
               attributes: attrsNorm,
+              ...acquiredFromFields,
             },
           ],
           { session }
@@ -642,6 +679,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
             inWarehouse: false,
             imageUrl: normalizeImageUrl(pp.imageUrl),
             attributes: attrsNorm,
+            ...acquiredFromFields,
           },
         ],
         { session }

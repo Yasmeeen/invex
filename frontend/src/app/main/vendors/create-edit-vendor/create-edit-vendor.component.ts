@@ -26,10 +26,7 @@ export class CreateEditVendorComponent implements OnInit {
   installments: { date: string; paid: boolean }[] = [];
   categoriesList: any[] = [];
 
-  paymentOptions = [
-    { label: 'Cash', value: 'cash' },
-    { label: 'Installments', value: 'Installments' }
-  ];
+  paymentOptions: { label: string; value: string }[] = [];
 
   private subscriptions: Subscription[] = [];
 
@@ -43,6 +40,11 @@ export class CreateEditVendorComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.paymentOptions = [
+      { label: this.translateService.instant('tr_payment_cash'), value: 'cash' },
+      { label: this.translateService.instant('tr_payment_installments'), value: 'Installments' },
+      { label: this.translateService.instant('tr_payment_deferred'), value: 'Deferred' },
+    ];
     this.vendorId = this.data?.vendorId;
     this.isEdit = this.data?.isEdit || false;
     this.getCategories();

@@ -28,6 +28,20 @@ export interface Product {
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
   imageUrl?: string;
+  /** Optional source: client or supplier the device was acquired from */
+  acquiredFrom?: ProductAcquiredFrom | null;
+}
+
+/** Payload / API shape for optional device source (client or supplier). */
+export interface ProductAcquiredFrom {
+  partyType?: 'client' | 'supplier';
+  clientId?: string;
+  vendorId?: string;
+  displayName?: string;
+  phone?: string;
+  /** Sent on create/update; server maps to displayName */
+  name?: string;
+  address?: string;
 }
 
 export interface ProductActiveBooking {
@@ -100,8 +114,12 @@ export interface OrderProductLine {
   invoiceAttributes?: Array<{ label: string; value: string }>;
 }
 
+export type OrderPartyType = 'client' | 'supplier';
+
 export interface Order {
   _id?: string;
+  partyType?: OrderPartyType;
+  vendorId?: string;
   clientName: string;
   clientPhoneNumber: string;
   sellerName: string;
@@ -141,6 +159,24 @@ export interface Installment {
   paid: boolean;      // true if paid, false if not
 }
 
+export interface VendorLedgerEntry {
+  type:
+    | 'deposit'
+    | 'settlement'
+    | 'order_payment'
+    | 'purchase'
+    | 'purchase_installment_paid'
+    | 'purchase_deferred'
+    | 'purchase_deferred_paid';
+  amount: number;
+  orderId?: string;
+  orderNumber?: number;
+  purchasingRequestId?: string;
+  note?: string;
+  createdAt?: string;
+  createdByUserId?: string;
+}
+
 export interface Vendor {
   _id?: string;
   nameOfcompany: string;
@@ -151,8 +187,51 @@ export interface Vendor {
   transactionCurrency?: string;
   paymentTerms: string[] ;
   categories: Category[];         // Array of Category IDs
+  creditBalance?: number;
+  ledgerEntries?: VendorLedgerEntry[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface VendorPurchasingRequestRow {
+  _id?: string;
+  requestDate?: string;
+  requestedBy?: string;
+  status?: string;
+  totalAmount?: number;
+  amountPaid?: number;
+  remaining?: number;
+  paymentStatus?: 'Installments' | 'Deferred' | string;
+}
+
+export interface VendorSettlementPreview {
+  debitTotal: number;
+  creditTotal: number;
+  settleAmount: number;
+  afterDebit: number;
+  afterCredit: number;
+  netAfter?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
+  canSettle: boolean;
+}
+
+export interface VendorHistoryResponse {
+  vendor: Vendor;
+  supplierOwesUs: number;
+  owesFromSales?: number;
+  /** Total credit = prepaid + purchase payables (for display and netting). */
+  weOweSupplier: number;
+  /** Prepaid deposit held for supplier (subset of weOweSupplier). */
+  prepaidBalance?: number;
+  /** Unpaid installment + deferred amounts (subset of weOweSupplier). */
+  purchasePayable?: number;
+  purchasePayableInstallments?: number;
+  purchasePayableDeferred?: number;
+  canSettle: boolean;
+  settlementPreview?: VendorSettlementPreview;
+  netBalanceMessage?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
+  orders: Array<Order & { remaining?: number }>;
+  purchasingRequests?: VendorPurchasingRequestRow[];
+  ledgerEntries: VendorLedgerEntry[];
 }
 
 

@@ -46,7 +46,7 @@ const vendorSchema = new mongoose.Schema(
     paymentTerms: [
         {
             type: String,
-            enum: ['cash', 'Installments'], // ✅ Adjusted to lowercase "cash"
+            enum: ['cash', 'Installments', 'Deferred'],
             required: true,
           }
     ] ,
@@ -57,6 +57,43 @@ const vendorSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
         required: true,
+      },
+    ],
+
+    /** Prepaid balance / deposit the supplier holds with us (we owe them). */
+    creditBalance: { type: Number, default: 0, min: 0 },
+
+    /** Audit trail: deposits, settlements, order payments. */
+    ledgerEntries: [
+      {
+        type: {
+          type: String,
+          enum: [
+            'deposit',
+            'settlement',
+            'order_payment',
+            'purchase',
+            'purchase_installment_paid',
+            'purchase_deferred',
+            'purchase_deferred_paid',
+          ],
+          required: true,
+        },
+        amount: { type: Number, required: true, min: 0 },
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: false },
+        orderNumber: { type: Number, required: false },
+        purchasingRequestId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'PurchasingRequest',
+          required: false,
+        },
+        note: { type: String, default: '', trim: true },
+        createdAt: { type: Date, default: Date.now },
+        createdByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: false,
+        },
       },
     ],
   },

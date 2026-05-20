@@ -1,16 +1,17 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { UserSerivce } from '@shared/services/user.service';
 
 @Component({
   selector: 'app-report-filters',
   templateUrl: './report-filters.component.html',
   styleUrls: ['./report-filters.component.scss'],
 })
-export class ReportFiltersComponent implements OnInit {
+export class ReportFiltersComponent implements OnInit, OnChanges {
   /** When `bookings`, show booking-specific filters and hide group-by. */
   @Input() reportType = '';
 
@@ -18,6 +19,7 @@ export class ReportFiltersComponent implements OnInit {
 
   branches: any[] = [];
   products: any[] = [];
+  users: { _id: string; name: string }[] = [];
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
   branchFilterLocked = false;
 
@@ -32,11 +34,13 @@ export class ReportFiltersComponent implements OnInit {
     booking_confirmed: 'all',
     warehouse_only: false,
     booking_search: '',
+    booking_created_by: null as string | null,
   };
 
   constructor(
     private branchesServce: BranchesServce,
     private productsSerivce: ProductsSerivce,
+    private userSerivce: UserSerivce,
     private authenticationService: AuthenticationService,
     public globals: Globals
   ) {}
@@ -49,7 +53,20 @@ export class ReportFiltersComponent implements OnInit {
     }
     this.loadBranches();
     this.loadProducts();
+    this.ensureBookingUsersLoaded();
     queueMicrotask(() => this.applyFilters());
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['reportType']) {
+      this.ensureBookingUsersLoaded();
+    }
+  }
+
+  private ensureBookingUsersLoaded(): void {
+    if (this.reportType === 'bookings' && this.users.length === 0) {
+      this.loadUsers();
+    }
   }
 
   get lockedBranchLabel(): string {
@@ -65,6 +82,18 @@ export class ReportFiltersComponent implements OnInit {
     this.branchesServce.getBranchs({ page: 1, limit: 1000 }).subscribe({
       next: (res: any) => (this.branches = res.branches || []),
       error: () => (this.branches = []),
+    });
+  }
+
+  loadUsers(): void {
+    this.userSerivce.getUsers({ page: 1, limit: 1000 }).subscribe({
+      next: (res: { users?: { _id: string; name: string }[] }) => {
+        this.users = (res.users || []).map((u) => ({
+          _id: String(u._id),
+          name: u.name || '',
+        }));
+      },
+      error: () => (this.users = []),
     });
   }
 
@@ -103,6 +132,9 @@ export class ReportFiltersComponent implements OnInit {
       if (bs) {
         base.search = bs;
       }
+      if (this.filters.booking_created_by) {
+        base.created_by = String(this.filters.booking_created_by);
+      }
     }
     return base;
   }
@@ -127,6 +159,7 @@ export class ReportFiltersComponent implements OnInit {
     this.filters.booking_confirmed = 'all';
     this.filters.warehouse_only = false;
     this.filters.booking_search = '';
+    this.filters.booking_created_by = null;
     this.loadProducts();
     this.applyFilters();
   }

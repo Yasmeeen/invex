@@ -1,0 +1,203 @@
+<div class="vendor-history-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">{{ 'tr_supplier_history' | translate }} — {{ data.vendor.name }}</h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
+
+  <ng-container *ngIf="!loading && history">
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <div class="balance-card balance-card--owe">
+          <div class="balance-card__label">{{ 'tr_vendor_debit_balance' | translate }}</div>
+          <div class="balance-card__value">
+            {{ history.supplierOwesUs | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromSales || 0) > 0">
+            {{ 'tr_vendor_debit_from_sales' | translate }}:
+            {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="balance-card balance-card--credit">
+          <div class="balance-card__label">{{ 'tr_vendor_credit_balance' | translate }}</div>
+          <div class="balance-card__value">
+            {{ history.weOweSupplier | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.prepaidBalance || 0) > 0">
+            {{ 'tr_vendor_credit_prepaid' | translate }}:
+            {{ history.prepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.purchasePayable || 0) > 0">
+            {{ 'tr_vendor_purchase_payable' | translate }}:
+            {{ history.purchasePayable | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.purchasePayableInstallments || 0) > 0">
+            {{ 'tr_vendor_payable_from_installments' | translate }}:
+            {{ history.purchasePayableInstallments | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.purchasePayableDeferred || 0) > 0">
+            {{ 'tr_vendor_payable_from_deferred' | translate }}:
+            {{ history.purchasePayableDeferred | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="balance-card balance-card--net" *ngIf="history.netBalanceMessage">
+          <div class="balance-card__label">{{ 'tr_vendor_net_balance' | translate }}</div>
+          <div class="balance-card__value balance-card__value--net">
+            {{ netBalanceText() }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settlement row -->
+    <div class="vendor-settlement-row card mb-3 plr-3 ptb-3" *ngIf="settlementPreview">
+      <h5 class="mt-0 mb-2">{{ 'tr_vendor_settlement_section' | translate }}</h5>
+      <p class="size-small text-muted mb-2">{{ 'tr_vendor_settlement_section_hint' | translate }}</p>
+      <div class="row">
+        <div class="col-md-3 col-6 mb-2">
+          <span class="size-small text-muted d-block">{{ 'tr_vendor_settlement_debit' | translate }}</span>
+          <strong>{{ settlementPreview.debitTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+          <span class="size-small text-muted d-block">{{ 'tr_vendor_settlement_credit' | translate }}</span>
+          <strong>{{ settlementPreview.creditTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="settlementPreview.canSettle">
+          <span class="size-small text-muted d-block">{{ 'tr_vendor_settlement_will_offset' | translate }}</span>
+          <strong class="text-primary">{{ settlementPreview.settleAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-12 flex flex-end flex-bottom">
+          <button
+            type="button"
+            class="s-btn btn-primary"
+            *ngIf="settlementPreview.canSettle"
+            [disabled]="settling"
+            (click)="confirmSettle()"
+          >
+            {{ 'tr_vendor_settle_balances' | translate }}
+          </button>
+        </div>
+      </div>
+      <p class="size-small m-0 mt-2 text-muted" *ngIf="settlementPreview.canSettle">
+        {{ settlementNetAfterText(settlementPreview) }}
+      </p>
+    </div>
+
+    <div class="flex flex-end mb-3">
+      <button type="button" class="s-btn btn-secondary" (click)="openDepositDialog()">
+        {{ 'tr_vendor_add_deposit' | translate }}
+      </button>
+    </div>
+
+    <h5>{{ 'tr_supplier_orders' | translate }}</h5>
+    <div class="table-container mb-3" *ngIf="history.orders?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_order_number' | translate }}</th>
+            <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
+            <th>{{ 'tr_paid' | translate }}</th>
+            <th>{{ 'tr_remaining' | translate }}</th>
+            <th>{{ 'tr_payment_method' | translate }}</th>
+            <th>{{ 'tr_created_at' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of history.orders">
+            <td>{{ o.orderNumber }}</td>
+            <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ o.amountPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ o.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ o.paymentMethod }}</td>
+            <td>{{ o.createdAt | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.orders?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+
+    <h5>{{ 'tr_vendor_purchasing_requests' | translate }}</h5>
+    <p class="size-small text-muted mb-2">{{ 'tr_vendor_purchasing_requests_hint' | translate }}</p>
+    <div class="table-container mb-3" *ngIf="history.purchasingRequests?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_request_date' | translate }}</th>
+            <th>{{ 'tr_payment_terms' | translate }}</th>
+            <th>{{ 'tr_total_amount' | translate }}</th>
+            <th>{{ 'tr_paid' | translate }}</th>
+            <th>{{ 'tr_remaining' | translate }}</th>
+            <th>{{ 'tr_purchasing_status' | translate }}</th>
+            <th>{{ 'tr_record_payment' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pr of history.purchasingRequests">
+            <td>{{ pr.requestDate | date:'shortDate' }}</td>
+            <td>{{ paymentStatusLabel(pr.paymentStatus) }}</td>
+            <td>{{ pr.totalAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ (pr.amountPaid || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ pr.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ pr.status }}</td>
+            <td>
+              <ng-container *ngIf="pr.paymentStatus === 'Deferred' && (pr.remaining || 0) > 0">
+                <div class="vendor-history-deferred-pay flex gap-1 flex-middle">
+                  <input
+                    class="s-control"
+                    type="number"
+                    min="0.01"
+                    [max]="pr.remaining ?? 0"
+                    step="0.01"
+                    [placeholder]="'tr_payment_amount' | translate"
+                    [(ngModel)]="deferredPaymentDraft[pr._id!]"
+                    [ngModelOptions]="{ standalone: true }"
+                  />
+                  <button
+                    type="button"
+                    class="s-btn btn-primary btn-sm"
+                    [disabled]="recordingDeferredId === pr._id"
+                    (click)="recordDeferredPayment(pr)"
+                  >
+                    {{ 'tr_record_payment' | translate }}
+                  </button>
+                </div>
+              </ng-container>
+              <span *ngIf="pr.paymentStatus !== 'Deferred' || !(pr.remaining || 0)">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.purchasingRequests?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+
+    <h5>{{ 'tr_vendor_ledger' | translate }}</h5>
+    <div class="table-container" *ngIf="history.ledgerEntries?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_type' | translate }}</th>
+            <th>{{ 'tr_payment_amount' | translate }}</th>
+            <th>{{ 'tr_payment_note' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let e of history.ledgerEntries">
+            <td>{{ e.createdAt | date:'short' }}</td>
+            <td>{{ ledgerTypeLabel(e.type) }}</td>
+            <td>{{ e.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>
+              <span *ngIf="e.orderNumber">#{{ e.orderNumber }} — </span>{{ e.note }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.ledgerEntries?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+  </ng-container>
+</div>

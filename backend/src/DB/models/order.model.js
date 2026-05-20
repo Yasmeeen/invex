@@ -2,9 +2,23 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema(
   {
+    /** Sale counterparty: retail client (default) or supplier buying from the store. */
+    partyType: {
+      type: String,
+      enum: ["client", "supplier"],
+      default: "client",
+      trim: true,
+    },
+
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Client",
+    },
+
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vendor",
+      required: false,
     },
 
     clientName: { type: String, required: false, trim: true },

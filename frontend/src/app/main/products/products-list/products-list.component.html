@@ -219,6 +219,7 @@
             <tr>
               <th></th>
               <th>{{ "tr_product_name" | translate }}</th>
+              <th>{{ "tr_product_source_party" | translate }}</th>
               <th>{{ "tr_location" | translate }}</th>
               <th>{{ "tr_code" | translate }}</th>
               <th>{{ "tr_category" | translate }}</th>
@@ -277,6 +278,10 @@
                     <span class="products-list__name-text">{{ product.name }}</span>
                   </span>
                 </span>
+              </td>
+              <td>
+                <span *ngIf="productSourceName(product) as src">{{ src }}</span>
+                <span *ngIf="!productSourceName(product)" class="text-muted">—</span>
               </td>
               <td>
                 <span *ngIf="product.inWarehouse" class="location-badge location-badge--warehouse">{{
@@ -379,6 +384,9 @@
                 <span class="muted">{{ product.code }}</span>
                 <span class="dot">•</span>
                 <span class="muted">{{ product.category?.name }}</span>
+              </div>
+              <div class="product-card__source text-muted size-small" *ngIf="productSourceName(product)">
+                {{ 'tr_product_source_party' | translate }}: {{ productSourceName(product) }}
               </div>
             </div>
 

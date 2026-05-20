@@ -3,6 +3,16 @@
 @import 'color_scheme';
 /* Do NOT @import global _print.scss here: it hides .s-btn etc. at all times when scoped into this component. Print rules are below under @media print. */
 
+.party-type-toggle {
+  label {
+    margin-inline-end: 1rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  input {
+    margin-inline-end: 0.35rem;
+  }
+}
 
 #print-container,
 #print-purchase-receipt {

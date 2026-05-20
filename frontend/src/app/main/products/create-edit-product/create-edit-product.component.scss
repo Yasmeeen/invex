@@ -20,6 +20,36 @@
   }
 }
 
+.product-form-tabs {
+  display: flex;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.product-form-tabs__btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: -1px;
+}
+
+.product-form-tabs__btn--active {
+  color: var(--primary, #1976d2);
+  border-bottom-color: var(--primary, #1976d2);
+}
+
+.party-type-toggle label {
+  font-weight: normal;
+  cursor: pointer;
+}
+
 .storage-choice {
   display: flex;
   gap: 1rem;

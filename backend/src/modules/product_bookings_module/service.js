@@ -677,6 +677,7 @@ function buildBookingsReportMatch(query) {
     branch_id: branchId,
     product_id: productId,
     customer_phone: customerPhone,
+    created_by: createdBy,
     status,
     confirmed,
     search,
@@ -699,6 +700,9 @@ function buildBookingsReportMatch(query) {
   }
   if (productId && mongoose.Types.ObjectId.isValid(String(productId))) {
     match.product = new mongoose.Types.ObjectId(String(productId));
+  }
+  if (createdBy && mongoose.Types.ObjectId.isValid(String(createdBy))) {
+    match.createdBy = new mongoose.Types.ObjectId(String(createdBy));
   }
   if (status === 'active' || status === 'cancelled') {
     match.status = status;
@@ -873,6 +877,7 @@ export const getBookingsReport = async (req, res) => {
     if (match.branch) upcomingMatch.branch = match.branch;
     if (match.product) upcomingMatch.product = match.product;
     if (match.customerPhone) upcomingMatch.customerPhone = match.customerPhone;
+    if (match.createdBy) upcomingMatch.createdBy = match.createdBy;
     if (match.confirmed === true || match.confirmed === false) {
       upcomingMatch.confirmed = match.confirmed;
     }

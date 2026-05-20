@@ -230,6 +230,7 @@
           <thead>
             <tr>
               <th>{{ "tr_number" | translate }}</th>
+              <th>{{ "tr_party_type" | translate }}</th>
               <th>{{ "tr_client_name" | translate }}</th>
               <th> {{"tr_phone_number" | translate}}</th>
               <th>{{ "tr_branch" | translate }}</th>
@@ -248,6 +249,14 @@
           <tbody>
             <tr *ngFor="let order of ordersList">
               <td>{{ order.orderNumber }}</td>
+              <td>
+                <span
+                  class="party-badge"
+                  [class.party-badge--supplier]="orderPartyType(order) === 'supplier'"
+                >
+                  {{ orderPartyTypeLabel(order) }}
+                </span>
+              </td>
               <td>{{ order.clientName }}</td>
               <td>{{ order.clientPhoneNumber}}</td>
               <td>{{ order.branch?.name }}</td>

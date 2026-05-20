@@ -71,16 +71,37 @@
            <!-- Client Information (collapsible): payment + client fields -->
            <div class="card mb-3">
             <div class="card-header flex flex-space-between pointer" (click)="toggleClientInfo()">
-              <h5 class="m-0">{{ 'tr_client_info' | translate }}</h5>
+              <h5 class="m-0">{{ partyInfoTitleKey() | translate }}</h5>
               <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
             </div>
             <div class="card-body" *ngIf="isClientInfoOpen">
+              <div class="party-type-toggle mb-3">
+                <label class="mr-3">
+                  <input
+                    type="radio"
+                    name="partyType"
+                    [checked]="partyType === 'client'"
+                    (change)="onPartyTypeChange('client')"
+                  />
+                  {{ 'tr_party_client' | translate }}
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="partyType"
+                    [checked]="partyType === 'supplier'"
+                    (change)="onPartyTypeChange('supplier')"
+                  />
+                  {{ 'tr_party_supplier' | translate }}
+                </label>
+              </div>
+            
               <div [formGroup]="clientForm">
     
               <div class="row">
                 
                 <div
-                  class="col-md-4"
+                  class="col-md-3"
                   [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
                 >
                   <div class="form-group">
@@ -103,11 +124,11 @@
                   </div>
                 </div>
                 <div
-                  class="col-md-4"
+                  class="col-md-3"
                   [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
                 >
                   <div class="form-group">
-                    <label>{{ 'tr_client_name' | translate }}</label>
+                    <label>{{ partyNameLabelKey() | translate }}</label>
                     <div class="input-with-icon bg-white width-100">
                       <input type="text" class="s-control width-100" formControlName="name" />
                     </div>
@@ -120,7 +141,7 @@
                   </div>
                 </div>
                 <div
-                class="col-md-4"
+                class="col-md-3"
                 [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
               >
                 <div class="form-group mb-0">
@@ -134,6 +155,12 @@
                   >
                     {{ 'tr_client_address_required' | translate }}
                   </span>
+                </div>
+              </div>
+              <div class="col-md-3" *ngIf="partyType === 'supplier' && supplierCompanyName">
+                <div class="form-group mb-0">
+                  <label>{{ 'tr_legal_name' | translate }}</label>
+                  <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
                 </div>
               </div>
               </div>
@@ -189,7 +216,7 @@
                   {{ 'tr_cashier_payment_amounts_hint' | translate }}
                 </div>
                 <div
-                  class="cashier-payment-amount-heading size-small text-muted mb-2"
+                  class="cashier-payment-amount-heading size-small text-muted mt-4"
                   *ngIf="selectedPayMethods?.length && cashierPaymentHasAnyFee()"
                 >
                   {{ 'tr_cashier_payment_gross_fee_hint' | translate }}
@@ -205,7 +232,14 @@
                       class="payment-logo"
                       alt=""
                     />
-                    <span class="cashier-payment-split-row__label">{{ payMethodLabelKey(mid) | translate }}</span>
+                    <span class="cashier-payment-split-row__label">
+                      <ng-container *ngIf="isCreditPayMethod(mid); else payMethodRowLabel">
+                        {{ 'tr_paid_now_amount' | translate }}
+                      </ng-container>
+                      <ng-template #payMethodRowLabel>
+                        {{ payMethodLabelKey(mid) | translate }}
+                      </ng-template>
+                    </span>
                     <span *ngIf="paymentAppFeePercent(mid) > 0" class="cashier-payment-split-row__fee-pct text-muted size-small">
                       (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
                     </span>
@@ -214,11 +248,19 @@
                     type="number"
                     class="s-control cashier-payment-split-row__amount"
                     min="0"
+                    [attr.max]="payAmountInputMax(mid)"
                     step="0.01"
                     [(ngModel)]="payAmounts[mid]"
                     [ngModelOptions]="{ standalone: true }"
                     [name]="'payAmt_' + mid"
                   />
+                </div>
+                <div
+                  class="size-small text-muted mt-1"
+                  *ngIf="hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+                >
+                  {{ 'tr_cashier_credit_balance_due' | translate }}:
+                  <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
                 </div>
                 <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
                   {{ 'tr_cashier_payment_allocated' | translate }}:
@@ -226,7 +268,10 @@
                   /
                   {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
                 </div>
-                <div class="size-small text-muted mt-1" *ngIf="paymentRemaining() > 0.005">
+                <div
+                  class="size-small text-muted mt-1"
+                  *ngIf="!hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+                >
                   {{ 'tr_cashier_payment_remaining_credit' | translate }}:
                   <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
                 </div>
@@ -463,7 +508,7 @@
     <ng-container *ngIf="showReceiptClientSection">
       <div class="invoice-client-block">
         <div class="invoice-client-block__title">
-          {{ 'tr_client_info' | receiptTranslate: st.receiptLanguage }}
+          {{ receiptPartyTypeLabelKey() | receiptTranslate: st.receiptLanguage }}
         </div>
         <table class="invoice-table invoice-client-block__table">
           <tr *ngIf="createdOrder?.clientPhoneNumber && createdOrder.clientPhoneNumber !== '00'">

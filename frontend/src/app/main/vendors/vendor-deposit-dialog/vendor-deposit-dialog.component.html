@@ -1,0 +1,42 @@
+<div class="vendor-deposit-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">{{ 'tr_vendor_add_deposit' | translate }}</h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <div class="mb-3 size-small text-muted">
+    <div>
+      {{ 'tr_name' | translate }}: <b>{{ vendor?.name }}</b>
+    </div>
+    <div *ngIf="vendor?.phone">
+      {{ 'tr_phone' | translate }}: <b>{{ vendor.phone }}</b>
+    </div>
+  </div>
+
+  <div [formGroup]="form">
+    <div class="form-group mb-3">
+      <label>{{ 'tr_payment_amount' | translate }}</label>
+      <input
+        class="s-control width-100"
+        type="number"
+        min="0"
+        step="0.01"
+        formControlName="amount"
+      />
+    </div>
+
+    <div class="form-group mb-3">
+      <label>{{ 'tr_payment_note' | translate }}</label>
+      <input class="s-control width-100" type="text" formControlName="note" />
+    </div>
+  </div>
+
+  <div class="flex flex-end gap-2">
+    <button type="button" class="s-btn btn-secondary" [disabled]="saving" (click)="close()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" [disabled]="saving" (click)="submit()">
+      {{ 'tr_action.save' | translate }}
+    </button>
+  </div>
+</div>

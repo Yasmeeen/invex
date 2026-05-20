@@ -3,6 +3,7 @@ import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Client from "../../DB/models/client.model.js";
+import Vendor from '../../DB/models/vendor.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
@@ -106,7 +107,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt branch products'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt branch products'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -174,7 +175,14 @@ export const createOrder = async (req, res) => {
       paymentSplits: paymentSplitsRaw,
       exchangeTradeInCreditAmount: exchangeCreditRaw,
       exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
+      partyType: partyTypeRaw,
+      vendorId: vendorIdRaw,
     } = req.body;
+
+    const partyType =
+      String(partyTypeRaw || 'client').trim().toLowerCase() === 'supplier'
+        ? 'supplier'
+        : 'client';
 
     // validation
     if ( !clientPhoneNumber ) {
@@ -188,45 +196,58 @@ export const createOrder = async (req, res) => {
     }
 
     // ======================
-    // 1️⃣ GET OR CREATE CLIENT (+ link order branch for clients list / Branch Manager filter)
+    // 1️⃣ CLIENT or SUPPLIER linkage
     // ======================
     let finalClientId = clientId;
+    let finalVendorId = null;
     const orderBranchOid =
       branch && mongoose.Types.ObjectId.isValid(String(branch))
         ? new mongoose.Types.ObjectId(String(branch))
         : null;
 
-    if (!finalClientId) {
-      let client = await Client.findOne({ phoneNumber: clientPhoneNumber }).session(session);
+    if (partyType === 'supplier') {
+      if (vendorIdRaw && mongoose.Types.ObjectId.isValid(String(vendorIdRaw))) {
+        const vendorDoc = await Vendor.findById(vendorIdRaw).session(session);
+        if (!vendorDoc) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: 'Supplier not found' });
+        }
+        finalVendorId = vendorDoc._id;
+      }
+    } else {
+      if (!finalClientId) {
+        let client = await Client.findOne({ phoneNumber: clientPhoneNumber }).session(session);
 
-      if (!client) {
-        const [newClient] = await Client.create(
-          [
-            {
-              name: clientName,
-              phoneNumber: clientPhoneNumber,
-              address: clientAddress,
-              branches: orderBranchOid ? [orderBranchOid] : [],
-            },
-          ],
-          { session }
-        );
-        client = newClient;
+        if (!client) {
+          const [newClient] = await Client.create(
+            [
+              {
+                name: clientName,
+                phoneNumber: clientPhoneNumber,
+                address: clientAddress,
+                branches: orderBranchOid ? [orderBranchOid] : [],
+              },
+            ],
+            { session }
+          );
+          client = newClient;
+        } else if (orderBranchOid) {
+          await Client.updateOne(
+            { _id: client._id },
+            { $addToSet: { branches: orderBranchOid } },
+            { session }
+          );
+        }
+
+        finalClientId = client._id;
       } else if (orderBranchOid) {
         await Client.updateOne(
-          { _id: client._id },
+          { _id: finalClientId },
           { $addToSet: { branches: orderBranchOid } },
           { session }
         );
       }
-
-      finalClientId = client._id;
-    } else if (orderBranchOid) {
-      await Client.updateOne(
-        { _id: finalClientId },
-        { $addToSet: { branches: orderBranchOid } },
-        { session }
-      );
     }
 
     // ======================
@@ -346,22 +367,26 @@ export const createOrder = async (req, res) => {
         ? new mongoose.Types.ObjectId(String(userId))
         : undefined;
 
+      const hasCreditSplit = splits.some((s) => s.method === 'credit');
+
       for (const s of splits) {
         if (s.amount > 0) {
+          const isCreditLine = s.method === 'credit';
           payments.push({
             amount: s.amount,
             paidAt: new Date(),
             paidByUserId: uid,
-            method: s.method,
-            note: `Checkout · ${s.method}`,
+            method: isCreditLine ? undefined : s.method,
+            note: isCreditLine ? 'Initial payment (cashier)' : `Checkout · ${s.method}`,
           });
         }
       }
 
-      const withMoney = splits.filter((s) => s.amount > 0);
+      const withMoney = splits.filter((s) => s.amount > 0 && s.method !== 'credit');
       if (paidAmount >= amountDueForPayment - 0.001) {
-        resolvedPaymentMethod =
-          withMoney.length === 0
+        resolvedPaymentMethod = hasCreditSplit
+          ? 'credit'
+          : withMoney.length === 0
             ? 'cash'
             : withMoney.length === 1
               ? withMoney[0].method
@@ -419,7 +444,9 @@ export const createOrder = async (req, res) => {
       [
         {
           orderNumber: nextOrderNumber,
-          clientId: finalClientId,
+          partyType,
+          ...(finalVendorId ? { vendorId: finalVendorId } : {}),
+          ...(finalClientId ? { clientId: finalClientId } : {}),
           clientName,
           clientPhoneNumber,
           clientAddress,
@@ -549,6 +576,33 @@ export const addOrderPayment = async (req, res) => {
     }
 
     await order.save();
+
+    if (
+      order.partyType === 'supplier' &&
+      order.vendorId &&
+      mongoose.Types.ObjectId.isValid(String(order.vendorId))
+    ) {
+      try {
+        const vendor = await Vendor.findById(order.vendorId);
+        if (vendor) {
+          vendor.ledgerEntries = vendor.ledgerEntries || [];
+          vendor.ledgerEntries.push({
+            type: 'order_payment',
+            amount: applied,
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            note: String(note || '').trim() || `Payment on order #${order.orderNumber}`,
+            createdAt: dt,
+            createdByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
+              ? new mongoose.Types.ObjectId(String(userId))
+              : undefined,
+          });
+          await vendor.save();
+        }
+      } catch (ledgerErr) {
+        console.error('⚠️ Failed to log supplier payment:', ledgerErr.message);
+      }
+    }
 
     await auditLog(req, {
       action: 'payment',

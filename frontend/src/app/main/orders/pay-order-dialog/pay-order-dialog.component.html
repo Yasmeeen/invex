@@ -8,6 +8,10 @@
     <div>
       {{ 'tr_order_number' | translate }}: <b>{{ order?.orderNumber }}</b>
     </div>
+    <div *ngIf="order?.partyType === 'supplier'">
+      {{ 'tr_party_type' | translate }}:
+      <b>{{ 'tr_party_supplier' | translate }}</b>
+    </div>
     <div>
       {{ 'tr_final_after_extra_discount' | translate }}:
       <b>{{ order?.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</b>

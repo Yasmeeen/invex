@@ -1,4 +1,15 @@
 @import 'blocks';
+
+.confirmation-dialog__message {
+  line-height: 1.5;
+  color: #374151;
+}
+
+.confirmation-dialog__details {
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
 .lightbox-container {
     .lightbox-wrapper {
         position: relative;

@@ -11,7 +11,7 @@ import { Globals } from '@core/globals';
 import { UserSerivce } from '@shared/services/user.service';
 // import { Category, Order } from '@core/models/orders.model';
 import { OrdersSerivce } from '@shared/services/orders.service';
-import { Branch, Order } from '@core/models/products.model';
+import { Branch, Order, OrderPartyType } from '@core/models/products.model';
 import { AddOrderComponent } from '../add-order/add-order.component';
 import { PayOrderDialogComponent } from '../pay-order-dialog/pay-order-dialog.component';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -100,6 +100,16 @@ export class OrdersListComponent implements OnInit {
 
   orderRemaining(order: Order): number {
     return orderDisplayRemaining(order);
+  }
+
+  orderPartyType(order: Order): OrderPartyType {
+    return order?.partyType === 'supplier' ? 'supplier' : 'client';
+  }
+
+  orderPartyTypeLabel(order: Order): string {
+    return this.orderPartyType(order) === 'supplier'
+      ? this.translateService.instant('tr_party_supplier')
+      : this.translateService.instant('tr_party_client');
   }
 
   canPayOrder(order: Order): boolean {

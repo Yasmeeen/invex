@@ -1,19 +1,27 @@
 import express from 'express';
 const router = express.Router();
 import {
-    getVendors,
-    getVendorById,
-    createVendor,
-    updateVendor,
-    deleteVendor
-  } from './service.js';
-  
+  getVendors,
+  getVendorById,
+  getVendorByPhone,
+  getVendorHistory,
+  settleVendorBalances,
+  addVendorDeposit,
+  recordVendorDeferredPurchasePayment,
+  createVendor,
+  updateVendor,
+  deleteVendor,
+} from './service.js';
 
-router.get('/', getVendors);   
-router.get('/:id', getVendorById);        // GET one by ID
-router.post('/createVendor', createVendor);           // POST create
-router.put('/updateVendor/:id', updateVendor);         // PUT update
-router.delete('/deleteVendor/:id', deleteVendor);      // DELETE product
+router.get('/', getVendors);
+router.get('/by-phone/:phone', getVendorByPhone);
+router.get('/:id/history', getVendorHistory);
+router.post('/:id/settle', settleVendorBalances);
+router.post('/:id/deposit', addVendorDeposit);
+router.post('/:id/deferred-payment', recordVendorDeferredPurchasePayment);
+router.get('/:id', getVendorById);
+router.post('/createVendor', createVendor);
+router.put('/updateVendor/:id', updateVendor);
+router.delete('/deleteVendor/:id', deleteVendor);
 
-
-export default router; 
+export default router;

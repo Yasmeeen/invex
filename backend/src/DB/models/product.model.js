@@ -90,6 +90,26 @@ const productSchema = new mongoose.Schema(
       of: String,
       default: {},
     },
+    /** Optional: client or supplier the device was acquired from (trade-in / purchase source). */
+    acquiredFrom: {
+      partyType: {
+        type: String,
+        enum: ['client', 'supplier'],
+        required: false,
+      },
+      clientId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Client',
+        default: null,
+      },
+      vendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        default: null,
+      },
+      displayName: { type: String, default: '', trim: true },
+      phone: { type: String, default: '', trim: true },
+    },
   },
   {
     timestamps: true,

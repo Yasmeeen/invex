@@ -1,6 +1,27 @@
 
-
 import Vendor from "../../DB/models/vendor.model.js";
+import Order from "../../DB/models/order.model.js";
+import PurchasingRequest from "../../DB/models/purchasingRequest.model.js";
+import mongoose from "mongoose";
+import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
+import {
+  computeSupplierOwesFromOrders,
+  computeSupplierOwesUs,
+  orderAmountRemaining,
+} from "../../utils/vendor-balance-utils.js";
+import {
+  buildNetBalanceMessage,
+  buildSettlementPreview,
+  computeTotalCreditOwed,
+} from "../../utils/vendor-balance-summary.js";
+import {
+  applyPurchasePayableSettlement,
+  computePurchasePayableBreakdown,
+  deferredPurchaseRemaining,
+  recordVendorDeferredPayment,
+  syncVendorPurchaseLedger,
+  unpaidInstallmentsTotal,
+} from "../../utils/vendor-purchase-ledger.js";
 
 // 📌 Create Vendor
 export const createVendor = async (req, res) => {
@@ -143,6 +164,362 @@ export const updateVendor = async (req, res) => {
   } catch (error) {
     console.error('Error updating vendor:', error);
     res.status(500).json({ message: 'Server error while updating vendor' });
+  }
+};
+
+/** GET supplier by phone (cashier lookup). */
+export const getVendorByPhone = async (req, res) => {
+  try {
+    const param = req.params.phone;
+    if (!param) {
+      return res.status(400).json({ message: 'Phone is required' });
+    }
+
+    const candidates = buildPhoneSearchCandidates(param);
+    const last10 = digitsOnly(param).slice(-10);
+
+    let vendor = await Vendor.findOne({ phone: { $in: candidates } });
+
+    if (!vendor && last10 && last10.length === 10) {
+      vendor = await Vendor.findOne({
+        phone: { $regex: new RegExp(`${last10}$`) },
+      });
+    }
+
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    res.json({
+      _id: vendor._id,
+      name: vendor.name,
+      nameOfcompany: vendor.nameOfcompany,
+      address: vendor.address,
+      phone: vendor.phone,
+      email: vendor.email,
+    });
+  } catch (error) {
+    console.error('Error fetching vendor by phone:', error);
+    res.status(500).json({ message: 'Server error while fetching vendor' });
+  }
+};
+
+/** GET supplier account history: balances, orders, ledger. */
+export const getVendorHistory = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id).populate('categories', 'name');
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
+    const supplierOwesUs = owesFromSales;
+    const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+    const purchasePayable = purchasePayableBreakdown.total;
+    const weOweSupplier = computeTotalCreditOwed(prepaidBalance, purchasePayable);
+    const ledgerPurchases = await PurchasingRequest.find({
+      supplier: vendor._id,
+      paymentStatus: { $in: ['Installments', 'Deferred'] },
+    }).lean();
+
+    const linkedInstallmentIds = new Set(
+      (vendor.ledgerEntries || [])
+        .filter((e) => e.type === 'purchase' && e.purchasingRequestId)
+        .map((e) => String(e.purchasingRequestId))
+    );
+    const linkedDeferredIds = new Set(
+      (vendor.ledgerEntries || [])
+        .filter((e) => e.type === 'purchase_deferred' && e.purchasingRequestId)
+        .map((e) => String(e.purchasingRequestId))
+    );
+    for (const pr of ledgerPurchases) {
+      const needsInstallment =
+        pr.paymentStatus === 'Installments' && !linkedInstallmentIds.has(String(pr._id));
+      const needsDeferred =
+        pr.paymentStatus === 'Deferred' &&
+        (!linkedDeferredIds.has(String(pr._id)) ||
+          !(vendor.ledgerEntries || []).some(
+            (e) =>
+              e.type === 'purchase_deferred' &&
+              String(e.purchasingRequestId) === String(pr._id) &&
+              String(e.note || '').includes('مستحق علينا')
+          ));
+      if (needsInstallment || needsDeferred) {
+        try {
+          await syncVendorPurchaseLedger(pr);
+        } catch (backfillErr) {
+          console.error('⚠️ Vendor purchase ledger backfill:', backfillErr.message);
+        }
+      }
+    }
+
+    const vendorRefreshed = await Vendor.findById(vendor._id);
+    const ledgerSource = vendorRefreshed || vendor;
+
+    const purchasingRequests = await PurchasingRequest.find({
+      supplier: vendor._id,
+      paymentStatus: { $in: ['Installments', 'Deferred'] },
+    })
+      .select(
+        'requestDate requestedBy status totalAmount installments paymentStatus amountPaid createdAt'
+      )
+      .sort({ requestDate: -1 })
+      .limit(100)
+      .lean();
+
+    const purchasingRequestsWithRemaining = purchasingRequests.map((pr) => ({
+      ...pr,
+      remaining:
+        pr.paymentStatus === 'Deferred'
+          ? deferredPurchaseRemaining(pr)
+          : unpaidInstallmentsTotal(pr),
+      amountPaid: Number(pr.amountPaid) || 0,
+    }));
+
+    const orders = await Order.find({
+      partyType: 'supplier',
+      vendorId: vendor._id,
+    })
+      .select(
+        'orderNumber clientName clientPhoneNumber totalPrice amountPaid paymentStatus paymentMethod status createdAt'
+      )
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    const ordersWithRemaining = orders.map((o) => ({
+      ...o,
+      remaining: orderAmountRemaining(o),
+    }));
+
+    const netBalanceMessage = buildNetBalanceMessage(supplierOwesUs, weOweSupplier);
+    const settlementPreview = buildSettlementPreview(supplierOwesUs, weOweSupplier);
+
+    res.json({
+      vendor,
+      supplierOwesUs,
+      owesFromSales,
+      weOweSupplier,
+      prepaidBalance,
+      purchasePayable,
+      purchasePayableInstallments: purchasePayableBreakdown.installments,
+      purchasePayableDeferred: purchasePayableBreakdown.deferred,
+      canSettle: settlementPreview.canSettle,
+      settlementPreview,
+      netBalanceMessage,
+      orders: ordersWithRemaining,
+      purchasingRequests: purchasingRequestsWithRemaining,
+      ledgerEntries: (ledgerSource.ledgerEntries || []).slice().reverse(),
+    });
+  } catch (error) {
+    console.error('Error fetching vendor history:', error);
+    res.status(500).json({ message: 'Server error while fetching vendor history' });
+  }
+};
+
+/** POST net settlement between supplier debt and our prepaid balance. */
+export const settleVendorBalances = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+    const prepaidBefore = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const purchasePayableBefore = await computePurchasePayableBreakdown(vendor._id);
+    const totalCreditBefore = computeTotalCreditOwed(
+      prepaidBefore,
+      purchasePayableBefore.total
+    );
+    const settleAmount = Math.min(supplierOwesUs, totalCreditBefore);
+
+    if (settleAmount <= 0) {
+      return res.status(400).json({
+        message: 'No overlapping balances to settle',
+        supplierOwesUs,
+        weOweSupplier: totalCreditBefore,
+        prepaidBalance: prepaidBefore,
+        purchasePayable: purchasePayableBefore.total,
+      });
+    }
+
+    let remaining = settleAmount;
+    const unpaidOrders = await Order.find({
+      partyType: 'supplier',
+      vendorId: vendor._id,
+      status: { $ne: 'restored' },
+    }).sort({ createdAt: 1 });
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ''))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    for (const order of unpaidOrders) {
+      if (remaining <= 0) break;
+      const orderRem = orderAmountRemaining(order);
+      if (orderRem <= 0) continue;
+
+      const apply = Math.min(remaining, orderRem);
+      order.payments = order.payments || [];
+      order.payments.push({
+        amount: apply,
+        paidAt: new Date(),
+        paidByUserId: uid,
+        method: 'settlement',
+        note: 'Balance settlement (netting)',
+      });
+      const paid = Number(order.amountPaid) || 0;
+      order.amountPaid = Math.round((paid + apply) * 100) / 100;
+      const total = Number(order.totalPrice) || 0;
+      order.paymentStatus =
+        order.amountPaid >= total - 0.001
+          ? 'paid'
+          : order.amountPaid > 0
+            ? 'partial'
+            : 'unpaid';
+      await order.save();
+      remaining = Math.round((remaining - apply) * 100) / 100;
+    }
+
+    let creditToReduce = settleAmount;
+    const fromPrepaid = Math.min(creditToReduce, prepaidBefore);
+    vendor.creditBalance = Math.round((prepaidBefore - fromPrepaid) * 100) / 100;
+    creditToReduce = Math.round((creditToReduce - fromPrepaid) * 100) / 100;
+
+    if (creditToReduce > 0) {
+      await applyPurchasePayableSettlement(vendor._id, creditToReduce, {
+        userId: uid,
+        note: 'Balance settlement (netting)',
+      });
+    }
+
+    vendor.ledgerEntries = vendor.ledgerEntries || [];
+    vendor.ledgerEntries.push({
+      type: 'settlement',
+      amount: settleAmount,
+      note: String(req.body?.note || 'Balance settlement').trim(),
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await vendor.save();
+
+    const newOwesFromSales = await computeSupplierOwesFromOrders(vendor._id);
+    const newSupplierOwesUs = newOwesFromSales;
+    const newPrepaid = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const newPayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+    const newWeOwe = computeTotalCreditOwed(newPrepaid, newPayableBreakdown.total);
+    const netBalanceMessage = buildNetBalanceMessage(newSupplierOwesUs, newWeOwe);
+    const settlementPreview = buildSettlementPreview(newSupplierOwesUs, newWeOwe);
+
+    res.json({
+      message: 'Balances settled',
+      settled: settleAmount,
+      supplierOwesUs: newSupplierOwesUs,
+      owesFromSales: newOwesFromSales,
+      weOweSupplier: newWeOwe,
+      prepaidBalance: newPrepaid,
+      purchasePayable: newPayableBreakdown.total,
+      purchasePayableInstallments: newPayableBreakdown.installments,
+      purchasePayableDeferred: newPayableBreakdown.deferred,
+      netBalanceMessage,
+      settlementPreview,
+    });
+  } catch (error) {
+    console.error('Error settling vendor balances:', error);
+    res.status(500).json({ message: 'Server error while settling balances' });
+  }
+};
+
+/** POST record our payment to supplier on a deferred (آجل) purchase. */
+export const recordVendorDeferredPurchasePayment = async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    const { purchasingRequestId } = req.body || {};
+    if (!purchasingRequestId || !mongoose.Types.ObjectId.isValid(String(purchasingRequestId))) {
+      return res.status(400).json({ message: 'Valid purchasingRequestId is required' });
+    }
+
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const request = await PurchasingRequest.findOne({
+      _id: purchasingRequestId,
+      supplier: vendor._id,
+      paymentStatus: 'Deferred',
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: 'Deferred purchasing request not found' });
+    }
+
+    const result = await recordVendorDeferredPayment(request, amount, {
+      userId: req.body?.userId,
+      note: req.body?.note,
+    });
+
+    const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+
+    res.json({
+      message: 'Payment recorded',
+      ...result,
+      purchasePayable: purchasePayableBreakdown.total,
+      purchasePayableInstallments: purchasePayableBreakdown.installments,
+      purchasePayableDeferred: purchasePayableBreakdown.deferred,
+    });
+  } catch (error) {
+    const msg = error?.message || 'Failed to record payment';
+    const status = msg.includes('Nothing remaining') ? 400 : 500;
+    console.error('Error recording deferred purchase payment:', error);
+    res.status(status).json({ message: msg });
+  }
+};
+
+/** POST add prepaid deposit (supplier money held at store). */
+export const addVendorDeposit = async (req, res) => {
+  try {
+    const amount = Number(req.body?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const applied = Math.round(amount * 100) / 100;
+    vendor.creditBalance =
+      Math.round(((Number(vendor.creditBalance) || 0) + applied) * 100) / 100;
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ''))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    vendor.ledgerEntries = vendor.ledgerEntries || [];
+    vendor.ledgerEntries.push({
+      type: 'deposit',
+      amount: applied,
+      note: String(req.body?.note || 'Prepaid deposit').trim(),
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await vendor.save();
+
+    res.json({
+      message: 'Deposit recorded',
+      weOweSupplier: vendor.creditBalance,
+    });
+  } catch (error) {
+    console.error('Error adding vendor deposit:', error);
+    res.status(500).json({ message: 'Server error while recording deposit' });
   }
 };
 

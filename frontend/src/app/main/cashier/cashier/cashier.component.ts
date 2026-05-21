@@ -81,6 +81,7 @@ export class CashierComponent implements AfterViewInit {
   partyType: OrderPartyType = 'client';
   isExistingClient = false;
   isExistingVendor = false;
+  selectedClientId: string | null = null;
   selectedVendorId: string | null = null;
   supplierCompanyName = '';
   /** Avoid repeating the same “registered” toast for the same lookup. */
@@ -226,6 +227,7 @@ export class CashierComponent implements AfterViewInit {
 
       if (isExchange) {
         this.exchangeTradeInPurchase = purchase;
+        this.applyExchangeClientFromTradeIn(purchase);
         this.refreshExchangePaymentDefaults();
         const msgKey = body?.createdProduct ? 'tr_exchange_trade_in_ok_auto' : 'tr_exchange_trade_in_ok_pending';
         this.translate.get(msgKey).subscribe((msg) => this.appNotificationService.push(msg, 'success'));
@@ -363,6 +365,7 @@ export class CashierComponent implements AfterViewInit {
           }
           this.isExistingVendor = true;
           this.isExistingClient = false;
+          this.selectedClientId = null;
           this.selectedVendorId = party._id ? String(party._id) : null;
           this.supplierCompanyName = party.nameOfcompany || '';
           nameControl?.setValue(party.name, { emitEvent: false });
@@ -382,6 +385,7 @@ export class CashierComponent implements AfterViewInit {
           }
           this.isExistingClient = true;
           this.isExistingVendor = false;
+          this.selectedClientId = party._id ? String(party._id) : null;
           this.selectedVendorId = null;
           this.supplierCompanyName = '';
           nameControl?.setValue(party.name, { emitEvent: false });
@@ -403,6 +407,7 @@ export class CashierComponent implements AfterViewInit {
   ): void {
     this.isExistingClient = false;
     this.isExistingVendor = false;
+    this.selectedClientId = null;
     this.selectedVendorId = null;
     this.supplierCompanyName = '';
     nameControl?.enable({ emitEvent: false });
@@ -474,8 +479,114 @@ export class CashierComponent implements AfterViewInit {
     this.clientForm.get('address')?.enable({ emitEvent: false });
     this.isExistingClient = false;
     this.isExistingVendor = false;
+    this.selectedClientId = null;
     this.selectedVendorId = null;
     this.supplierCompanyName = '';
+  }
+
+  /**
+   * Exchange trade-in already captured the client on the purchase; mirror them on the sale
+   * so the order is linked in client history even if the cashier panel stays collapsed.
+   */
+  private applyExchangeClientFromTradeIn(purchase: any): void {
+    const af = purchase?.productPayload?.acquiredFrom;
+    if (!af || String(af.partyType || 'client').toLowerCase() === 'supplier') {
+      return;
+    }
+
+    const phone = String(af.phone || '').trim();
+    const name = String(af.displayName || af.name || '').trim();
+    const address = String(af.address || '').trim();
+    const clientId = af.clientId ? String(af.clientId) : null;
+
+    if (!phone && !clientId) {
+      return;
+    }
+
+    this.partyType = 'client';
+    this.isClientInfoOpen = true;
+    this.isExistingVendor = false;
+    this.selectedVendorId = null;
+    this.supplierCompanyName = '';
+
+    if (clientId) {
+      this.selectedClientId = clientId;
+      this.isExistingClient = true;
+    } else {
+      this.selectedClientId = null;
+      this.isExistingClient = false;
+    }
+
+    const nameControl = this.clientForm.get('name');
+    const addressControl = this.clientForm.get('address');
+    this.clientForm.patchValue(
+      { phone: phone || '', name, address: address || '' },
+      { emitEvent: false }
+    );
+
+    if (this.isExistingClient) {
+      nameControl?.disable({ emitEvent: false });
+      addressControl?.disable({ emitEvent: false });
+      nameControl?.clearValidators();
+      addressControl?.clearValidators();
+    } else {
+      nameControl?.enable({ emitEvent: false });
+      addressControl?.enable({ emitEvent: false });
+      if (phone) {
+        nameControl?.setValidators([Validators.required]);
+        addressControl?.setValidators([Validators.required]);
+      }
+    }
+    nameControl?.updateValueAndValidity({ emitEvent: false });
+    addressControl?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  /** Client fields for checkout: open panel, or exchange trade-in source when panel is closed. */
+  private resolveCheckoutClientDetails(): {
+    clientName: string;
+    clientPhoneNumber: string;
+    clientAddress: string;
+    clientId?: string;
+    partyType: OrderPartyType;
+    linkParty: boolean;
+  } {
+    if (this.isClientInfoOpen) {
+      const raw = this.clientForm.getRawValue();
+      return {
+        clientName: (raw.name || '').trim() || 'Walk-in',
+        clientPhoneNumber: (raw.phone || '').trim() || '00',
+        clientAddress: (raw.address || '').trim() || '-',
+        clientId: this.selectedClientId || undefined,
+        partyType: this.partyType,
+        linkParty: true,
+      };
+    }
+
+    const af = this.exchangeTradeInPurchase?.productPayload?.acquiredFrom;
+    if (af && String(af.partyType || 'client').toLowerCase() !== 'supplier') {
+      const phone = String(af.phone || '').trim();
+      const name = String(af.displayName || af.name || '').trim();
+      const address = String(af.address || '').trim();
+      const clientId = af.clientId ? String(af.clientId) : undefined;
+      if (phone || clientId) {
+        return {
+          clientName: name || 'Walk-in',
+          clientPhoneNumber: phone || '00',
+          clientAddress: address || '-',
+          clientId,
+          partyType: 'client',
+          linkParty: true,
+        };
+      }
+    }
+
+    return {
+      clientName: 'Walk-in',
+      clientPhoneNumber: '00',
+      clientAddress: '-',
+      partyType: 'client',
+      linkParty: false,
+    };
   }
 
   /** After successful pay + print: collapse client section and clear form. */
@@ -924,16 +1035,7 @@ export class CashierComponent implements AfterViewInit {
       ? this.adminSelectedBranchId
       : this.globals.currentUser.branch._id;
 
-    let clientName = 'Walk-in';
-    let clientPhoneNumber = '00';
-    let clientAddress = '-';
-
-    if (this.isClientInfoOpen) {
-      const raw = this.clientForm.getRawValue();
-      clientName = (raw.name || '').trim() || 'Walk-in';
-      clientPhoneNumber = (raw.phone || '').trim() || '00';
-      clientAddress = (raw.address || '').trim() || '-';
-    }
+    const clientDetails = this.resolveCheckoutClientDetails();
 
     const paymentSplits = this.selectedPayMethods
       .filter((id) => String(id || '').trim())
@@ -947,10 +1049,10 @@ export class CashierComponent implements AfterViewInit {
 
     const orderData: Record<string, unknown> = {
       products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
-      partyType: this.isClientInfoOpen ? this.partyType : 'client',
-      clientName,
-      clientPhoneNumber,
-      clientAddress,
+      partyType: clientDetails.linkParty ? clientDetails.partyType : 'client',
+      clientName: clientDetails.clientName,
+      clientPhoneNumber: clientDetails.clientPhoneNumber,
+      clientAddress: clientDetails.clientAddress,
       paymentSplits,
       branch: selectedBranchId,
       status: 'completed',
@@ -958,7 +1060,11 @@ export class CashierComponent implements AfterViewInit {
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
     };
 
-    if (this.isClientInfoOpen && this.partyType === 'supplier' && this.selectedVendorId) {
+    if (clientDetails.clientId) {
+      orderData.clientId = clientDetails.clientId;
+    }
+
+    if (clientDetails.linkParty && clientDetails.partyType === 'supplier' && this.selectedVendorId) {
       orderData.vendorId = this.selectedVendorId;
     }
 
@@ -982,7 +1088,7 @@ export class CashierComponent implements AfterViewInit {
       // Receipt must show invoice-level discount even if API omits fields or CD lags.
       this.createdOrder = {
         ...base,
-        partyType: this.isClientInfoOpen ? this.partyType : 'client',
+        partyType: clientDetails.linkParty ? clientDetails.partyType : 'client',
         subtotalPrice: receiptSubtotal,
         invoiceDiscountAmount: receiptInvoiceDisc,
         totalPrice: receiptFinal,

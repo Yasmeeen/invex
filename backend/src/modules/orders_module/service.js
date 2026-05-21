@@ -4,6 +4,7 @@ import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Client from "../../DB/models/client.model.js";
 import Vendor from '../../DB/models/vendor.model.js';
+import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
@@ -200,6 +201,9 @@ export const createOrder = async (req, res) => {
     // ======================
     let finalClientId = clientId;
     let finalVendorId = null;
+    let saleClientName = clientName;
+    let saleClientPhone = clientPhoneNumber;
+    let saleClientAddress = clientAddress;
     const orderBranchOid =
       branch && mongoose.Types.ObjectId.isValid(String(branch))
         ? new mongoose.Types.ObjectId(String(branch))
@@ -216,16 +220,42 @@ export const createOrder = async (req, res) => {
         finalVendorId = vendorDoc._id;
       }
     } else {
+      // Exchange: sale must use the same client as the trade-in purchase (cashier may omit client panel).
+      if (
+        !finalClientId &&
+        exchangePurchaseIdRaw &&
+        mongoose.Types.ObjectId.isValid(String(exchangePurchaseIdRaw))
+      ) {
+        const exchangePurchase = await ProductPurchaseRequest.findById(exchangePurchaseIdRaw)
+          .select('productPayload.acquiredFrom')
+          .session(session)
+          .lean();
+        const af = exchangePurchase?.productPayload?.acquiredFrom;
+        if (af && String(af.partyType || 'client').toLowerCase() !== 'supplier') {
+          if (af.clientId && mongoose.Types.ObjectId.isValid(String(af.clientId))) {
+            finalClientId = new mongoose.Types.ObjectId(String(af.clientId));
+          }
+          const tradePhone = String(af.phone || '').trim();
+          if (tradePhone) {
+            saleClientPhone = tradePhone;
+            saleClientName = String(af.displayName || af.name || saleClientName || '').trim() || saleClientName;
+            if (af.address) {
+              saleClientAddress = String(af.address).trim() || saleClientAddress;
+            }
+          }
+        }
+      }
+
       if (!finalClientId) {
-        let client = await Client.findOne({ phoneNumber: clientPhoneNumber }).session(session);
+        let client = await Client.findOne({ phoneNumber: saleClientPhone }).session(session);
 
         if (!client) {
           const [newClient] = await Client.create(
             [
               {
-                name: clientName,
-                phoneNumber: clientPhoneNumber,
-                address: clientAddress,
+                name: saleClientName,
+                phoneNumber: saleClientPhone,
+                address: saleClientAddress,
                 branches: orderBranchOid ? [orderBranchOid] : [],
               },
             ],
@@ -447,9 +477,9 @@ export const createOrder = async (req, res) => {
           partyType,
           ...(finalVendorId ? { vendorId: finalVendorId } : {}),
           ...(finalClientId ? { clientId: finalClientId } : {}),
-          clientName,
-          clientPhoneNumber,
-          clientAddress,
+          clientName: saleClientName,
+          clientPhoneNumber: saleClientPhone,
+          clientAddress: saleClientAddress,
           sellerName,
           paymentMethod: resolvedPaymentMethod,
           branch,

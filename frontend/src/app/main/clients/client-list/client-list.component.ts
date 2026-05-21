@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Globals } from '@core/globals';
 import { Client, PaginationData } from '@core/models/users-interfaces.model';
+import { ClientHistoryDialogComponent } from '../client-history-dialog/client-history-dialog.component';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
@@ -23,6 +24,7 @@ export class ClientListComponent implements OnInit {
   nameSearchTerm: string = '';
   paginationData: PaginationData;
   paginationPerPage = 10;
+  viewMode: 'table' | 'cards' = 'table';
   params: any = { page: 1, perPage: this.paginationPerPage };
   private searchTimeout: any;
   private subscriptions: Subscription[] = [];
@@ -36,10 +38,17 @@ export class ClientListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    const saved = localStorage.getItem('clients.viewMode');
+    this.viewMode = saved === 'cards' ? 'cards' : 'table';
     if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
       this.params.branch_id = this.globals.currentUser.branch._id;
     }
     this.getClients();
+  }
+
+  setViewMode(mode: 'table' | 'cards'): void {
+    this.viewMode = mode;
+    localStorage.setItem('clients.viewMode', mode);
   }
 
   getClients(): void {
@@ -76,7 +85,14 @@ export class ClientListComponent implements OnInit {
     this.getClients();
   }
 
- 
+  openClientHistory(client: Client): void {
+    this.dialog.open(ClientHistoryDialogComponent, {
+      width: '960px',
+      maxWidth: '96vw',
+      data: { client },
+      disableClose: false,
+    });
+  }
 
   ngOnDestroy(): void {
     this.subscriptions.forEach(s => s && s.unsubscribe());

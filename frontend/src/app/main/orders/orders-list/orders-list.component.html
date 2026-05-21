@@ -129,7 +129,24 @@
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ "tr_orders" | translate }}</span>
     <div class="btn-group">
-
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-primary]="viewMode === 'table'"
+        [class.btn-secondary]="viewMode !== 'table'"
+        (click)="setViewMode('table')"
+      >
+        <i class="fa fa-table" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-secondary]="viewMode !== 'cards'"
+        [class.btn-primary]="viewMode === 'cards'"
+        (click)="setViewMode('cards')"
+      >
+        <i class="fa fa-th-large" aria-hidden="true"></i>
+      </button>
       <button
         class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
@@ -224,7 +241,7 @@
       <div
         class="table-container orders-list"
         id="table-container"
-        *ngIf="ordersList.length > 0"
+        *ngIf="ordersList.length > 0 && viewMode === 'table'"
       >
         <table class="s-table table orders-table layout-fixed orders-list">
           <thead>
@@ -315,6 +332,122 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="orders-cards" *ngIf="ordersList.length > 0 && viewMode === 'cards'">
+        <div class="order-card" *ngFor="let order of ordersList">
+          <div class="order-card__top">
+            <div class="order-card__icon">
+              <i class="fa fa-file-text-o" aria-hidden="true"></i>
+            </div>
+            <div class="order-card__title">
+              <div class="order-card__number">
+                #{{ order.orderNumber }}
+                <span
+                  class="party-badge"
+                  [class.party-badge--supplier]="orderPartyType(order) === 'supplier'"
+                >
+                  {{ orderPartyTypeLabel(order) }}
+                </span>
+              </div>
+              <div class="order-card__client">{{ order.clientName }}</div>
+              <div class="order-card__meta muted">
+                <span *ngIf="order.clientPhoneNumber">{{ order.clientPhoneNumber }}</span>
+                <span class="dot" *ngIf="order.clientPhoneNumber && order.branch?.name">•</span>
+                <span *ngIf="order.branch?.name">{{ order.branch?.name }}</span>
+              </div>
+            </div>
+            <span class="options-menu" *ngIf="order.status != 'restored'">
+              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+              <div class="options-menu-container p-0">
+                <div
+                  class="single-option"
+                  *ngIf="canPayOrder(order)"
+                  (click)="openPayDialog(order)"
+                >
+                  {{ "tr_add_payment" | translate }}
+                </div>
+                <div class="single-option" (click)="restoreOrder(order._id!)">
+                  {{ "tr_action.restore" | translate }}
+                </div>
+              </div>
+            </span>
+          </div>
+
+          <div class="order-card__stats">
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_order_subtotal' | translate }}</div>
+              <div class="stat__value">
+                {{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_final_after_extra_discount' | translate }}</div>
+              <div class="stat__value">
+                {{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_paid' | translate }}</div>
+              <div class="stat__value">
+                {{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_remaining' | translate }}</div>
+              <div class="stat__value">
+                {{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="order-card__row" *ngIf="orderInvoiceExtraDiscount(order) > 0 || orderInvoiceSurcharge(order) > 0">
+            <span class="muted">{{ 'tr_invoice_extra_discount' | translate }}:</span>
+            <span>
+              <ng-container *ngIf="orderInvoiceExtraDiscount(order) > 0">
+                −{{ orderInvoiceExtraDiscount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </ng-container>
+              <ng-container *ngIf="orderInvoiceSurcharge(order) > 0">
+                <span *ngIf="orderInvoiceExtraDiscount(order) > 0"> </span>
+                +{{ orderInvoiceSurcharge(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                ({{ "tr_invoice_extra_surcharge" | translate }})
+              </ng-container>
+            </span>
+          </div>
+
+          <div class="order-card__details">
+            <div>
+              <b>{{ 'tr_payment_method' | translate }}:</b>
+              {{ paymentMethodLabel(order.paymentMethod) }}
+            </div>
+            <div>
+              <b>{{ 'tr_created_at' | translate }}:</b>
+              {{ createdAtCairo(order) }}
+            </div>
+            <div>
+              <b>{{ 'tr_status' | translate }}:</b>
+              {{ order.status }}
+            </div>
+            <div *ngIf="order.numberOfProducts != null">
+              <b>{{ 'tr_number_of_products' | translate }}:</b>
+              <span class="text-primary weight-bold">{{ order.numberOfProducts }}</span>
+            </div>
+          </div>
+
+          <div class="order-card__products" *ngIf="order.products?.length">
+            <div class="order-card__products-title">{{ 'tr_products' | translate }}</div>
+            <div class="order-card__product-line" *ngFor="let product of order.products">
+              <span>
+                {{ product.quantity }} {{ 'tr_items' | translate }}
+                {{ 'tr_from' | translate }} {{ product.code }}
+                <span class="muted" *ngIf="product.name"> — {{ product.name }}</span>
+              </span>
+              <div class="order-line-invoice-attrs" *ngIf="product.invoiceAttributes?.length">
+                <span *ngFor="let ia of product.invoiceAttributes">{{ ia.label }}: {{ ia.value }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div

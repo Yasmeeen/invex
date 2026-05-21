@@ -29,6 +29,31 @@ export class Client{
   created_at: string;
   branches?: Branch[];
 }
+
+export interface ClientHistoryOrderRow {
+  _id?: string;
+  orderNumber?: number;
+  totalPrice?: number;
+  amountPaid?: number;
+  paymentMethod?: string;
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  status?: string;
+  createdAt?: string;
+  sellerName?: string;
+  branch?: { _id?: string; name?: string };
+  remaining?: number;
+  pointsEarned?: number;
+  isPayLater?: boolean;
+}
+
+export interface ClientHistoryResponse {
+  client: Pick<Client, '_id' | 'name' | 'phoneNumber' | 'address'>;
+  totalPointsEarned: number;
+  creditBalanceDue: number;
+  creditOrdersCount: number;
+  orders: ClientHistoryOrderRow[];
+  creditOrders: ClientHistoryOrderRow[];
+}
 export class Employee extends User {
 
 

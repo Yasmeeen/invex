@@ -1,0 +1,43 @@
+.client-history-dialog {
+  max-width: 960px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.balance-card {
+  border-radius: 8px;
+  padding: 1rem;
+  height: 100%;
+  border: 1px solid var(--border-color, #e0e0e0);
+
+  &__label {
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.35rem;
+  }
+
+  &__value {
+    font-size: 1.35rem;
+    font-weight: 600;
+
+    &--sm {
+      font-size: 1.1rem;
+    }
+  }
+
+  &--points {
+    background: #f3f8ff;
+  }
+
+  &--credit {
+    background: #fff5f5;
+  }
+
+  &--info {
+    background: #f8f9fa;
+  }
+}
+
+.row-restored {
+  opacity: 0.65;
+}

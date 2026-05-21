@@ -3,6 +3,12 @@ import Order from "../../DB/models/order.model.js";
 import Branch from "../../DB/models/branch.model.js";
 import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
+import { orderAmountRemaining } from "../../utils/vendor-balance-utils.js";
+import {
+  computeClientCreditDue,
+  isClientCreditOrder,
+  pointsEarnedForOrder,
+} from "../../utils/client-order-utils.js";
 
 /**
  * GET client by phone (cashier / lookup). Must match stored phoneNumber flexibly.
@@ -248,6 +254,70 @@ export const updateClient = async (req, res) => {
   } catch (error) {
     console.error("❌ Error updating client:", error.message);
     res.status(500).json({ error: "Failed to update client" });
+  }
+};
+
+/**
+ * GET client account history: orders, loyalty points, pay-later balance.
+ */
+export const getClientHistory = async (req, res) => {
+  try {
+    const clientId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(String(clientId))) {
+      return res.status(400).json({ error: "Invalid client id" });
+    }
+
+    const client = await Client.findById(clientId).lean();
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const orders = await Order.find({
+      clientId: client._id,
+      partyType: { $ne: "supplier" },
+    })
+      .select(
+        "orderNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName"
+      )
+      .populate("branch", "name")
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    let totalPointsEarned = 0;
+    const ordersWithMeta = orders.map((o) => {
+      const remaining = isClientCreditOrder(o) ? orderAmountRemaining(o) : 0;
+      const pointsEarned = pointsEarnedForOrder(o);
+      totalPointsEarned += pointsEarned;
+      return {
+        ...o,
+        remaining,
+        pointsEarned,
+        isPayLater: isClientCreditOrder(o),
+      };
+    });
+
+    const creditBalanceDue = await computeClientCreditDue(client._id);
+    const creditOrders = ordersWithMeta.filter(
+      (o) => o.isPayLater && o.remaining > 0 && o.status !== "restored"
+    );
+
+    res.json({
+      client: {
+        _id: client._id,
+        name: client.name,
+        phoneNumber: client.phoneNumber,
+        address: client.address,
+      },
+      totalPointsEarned,
+      creditBalanceDue,
+      creditOrdersCount: creditOrders.length,
+      orders: ordersWithMeta,
+      creditOrders,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching client history:", error.message);
+    res.status(500).json({ error: "Failed to fetch client history" });
   }
 };
 

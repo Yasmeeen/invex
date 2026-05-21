@@ -8,6 +8,24 @@
       <span class="text-primary">{{totalNumberOfVendors}}-</span>
       {{ "tr_suppliers" | translate }}</span>
     <div class="btn-group">
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-primary]="viewMode === 'table'"
+        [class.btn-secondary]="viewMode !== 'table'"
+        (click)="setViewMode('table')"
+      >
+        <i class="fa fa-table" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-secondary]="viewMode !== 'cards'"
+        [class.btn-primary]="viewMode === 'cards'"
+        (click)="setViewMode('cards')"
+      >
+        <i class="fa fa-th-large" aria-hidden="true"></i>
+      </button>
       <button class="s-btn btn-primary" (click)="createOrEditvendor(false)">
         {{ "tr_add_supplier" | translate }}
       </button>
@@ -44,7 +62,7 @@
       <div
         class="table-container vendors-list"
         id="table-container"
-        *ngIf="vendorsList.length > 0"
+        *ngIf="vendorsList.length > 0 && viewMode === 'table'"
       >
         <table class="s-table table layout-fixed vendors-list">
           <thead>
@@ -110,6 +128,80 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="vendors-cards" *ngIf="vendorsList.length > 0 && viewMode === 'cards'">
+        <div class="vendor-card" *ngFor="let vendor of vendorsList">
+          <div class="vendor-card__top">
+            <div class="vendor-card__icon">
+              <i class="fa fa-truck" aria-hidden="true"></i>
+            </div>
+            <div class="vendor-card__title">
+              <div class="vendor-card__name">{{ vendor.name }}</div>
+              <div class="vendor-card__legal" *ngIf="vendor.nameOfcompany">
+                {{ vendor.nameOfcompany }}
+              </div>
+              <div class="vendor-card__meta muted">
+                <span *ngIf="vendor.phone">{{ vendor.phone }}</span>
+                <span class="dot" *ngIf="vendor.phone && vendor.email">•</span>
+                <span *ngIf="vendor.email">{{ vendor.email }}</span>
+              </div>
+            </div>
+            <span class="options-menu">
+              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+              <div class="options-menu-container p-0">
+                <div class="border-bottom"></div>
+                <div
+                  class="single-option"
+                  (click)="deleteVendor(vendor._id!)"
+                >
+                  <div class="text-error">
+                    {{ "tr_action.delete" | translate }}
+                  </div>
+                </div>
+                <div
+                  class="single-option"
+                  (click)="openVendorHistory(vendor)"
+                >
+                  {{ "tr_supplier_history" | translate }}
+                </div>
+                <div
+                  class="single-option"
+                  (click)="openVendorDeposit(vendor)"
+                >
+                  {{ "tr_vendor_add_deposit" | translate }}
+                </div>
+                <div
+                  class="single-option"
+                  (click)="createOrEditvendor(true, vendor)"
+                >
+                  {{ "tr_action.edit" | translate }}
+                </div>
+              </div>
+            </span>
+          </div>
+
+          <div class="vendor-card__details">
+            <div *ngIf="vendor.address">
+              <b>{{ "tr_address" | translate }}:</b>
+              {{ vendor.address }}
+            </div>
+            <div *ngIf="vendor.categories?.length">
+              <b>{{ "tr_category" | translate }}:</b>
+              <div class="vendor-card__categories">
+                <span *ngFor="let category of vendor.categories; let last = last">
+                  {{ category.name }}<span *ngIf="!last">, </span>
+                </span>
+              </div>
+            </div>
+            <div *ngIf="vendor.paymentTerms?.length">
+              <b>{{ "tr_payment_terms" | translate }}:</b>
+              <span *ngFor="let term of vendor.paymentTerms; let last = last">
+                {{ term }}<span *ngIf="!last">, </span>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div

@@ -79,6 +79,7 @@ export class OrdersListComponent implements OnInit {
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
   readonly paymentMethodOptions: PaymentMethodOption[] = PAYMENT_METHOD_OPTIONS;
+  viewMode: 'table' | 'cards' = 'table';
 
   private subscriptions: Subscription[] = [];
 
@@ -135,9 +136,16 @@ export class OrdersListComponent implements OnInit {
 
 
   ngOnInit(): void {
+    const saved = localStorage.getItem('orders.viewMode');
+    this.viewMode = saved === 'cards' ? 'cards' : 'table';
     this.getOrders();
     this.getOrderStatistics();
     this.getBranches();
+  }
+
+  setViewMode(mode: 'table' | 'cards'): void {
+    this.viewMode = mode;
+    localStorage.setItem('orders.viewMode', mode);
   }
   getBranches() {
     let params = {

@@ -8,7 +8,7 @@ import {
   CLIENTS_URL,
 } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import { Client, User } from '@core/models/users-interfaces.model';
+import { Client, ClientHistoryResponse, User } from '@core/models/users-interfaces.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -30,6 +30,10 @@ export class UserSerivce {
   }
   getClients(params: any): Observable<any> {
     return this.http.get(CLIENTS_URL, { params: params });
+  }
+
+  getClientHistory(clientId: string): Observable<ClientHistoryResponse> {
+    return this.http.get<ClientHistoryResponse>(`${CLIENTS_URL}/${clientId}/history`);
   }
 
   createUser(user: User): Observable<User> {

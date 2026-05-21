@@ -2,6 +2,24 @@
     <h2 class="size-body title-with-btn plr-4 ptb-4">
       <span class="page-title">{{ 'tr_clients' | translate }}</span>
       <div class="btn-group">
+        <button
+          type="button"
+          class="s-btn size-body"
+          [class.btn-primary]="viewMode === 'table'"
+          [class.btn-secondary]="viewMode !== 'table'"
+          (click)="setViewMode('table')"
+        >
+          <i class="fa fa-table" aria-hidden="true"></i>
+        </button>
+        <button
+          type="button"
+          class="s-btn size-body"
+          [class.btn-secondary]="viewMode !== 'cards'"
+          [class.btn-primary]="viewMode === 'cards'"
+          (click)="setViewMode('cards')"
+        >
+          <i class="fa fa-th-large" aria-hidden="true"></i>
+        </button>
         <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
           <i class="fa fa-filter text-primary"></i>
         </button>
@@ -27,7 +45,10 @@
     </div>
   
     <div class="plr-4 mt-4" *ngIf="!clientsLoading">
-      <div class="table-container" *ngIf="clientsList.length > 0">
+      <div
+        class="table-container"
+        *ngIf="clientsList.length > 0 && viewMode === 'table'"
+      >
         <table class="s-table table clients-list layout-fixed">
           <thead>
             <tr>
@@ -38,7 +59,7 @@
               <th>{{ 'tr_branch' | translate }}</th>
               <th>{{ 'tr_number_of_orders' | translate }}</th>
               <th>{{ 'tr_total_orders_price' | translate }}</th>
-              <th></th>
+              <th>{{ 'tr_actions' | translate }}</th>
             </tr>
           </thead>
           <tbody>
@@ -51,11 +72,71 @@
                 {{branch}}
               </div></td>
               <td>{{ client.numberOfOrders }}</td>
-              <td>{{ client.totalOrdersPrice }}</td>
-          
+              <td>{{ client.totalOrdersPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="s-btn btn-secondary size-small"
+                  (click)="openClientHistory(client)"
+                >
+                  {{ 'tr_client_history' | translate }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="clients-cards" *ngIf="clientsList.length > 0 && viewMode === 'cards'">
+        <div class="client-card" *ngFor="let client of clientsList">
+          <div class="client-card__top">
+            <div class="client-card__icon">
+              <i class="fa fa-user" aria-hidden="true"></i>
+            </div>
+            <div class="client-card__title">
+              <div class="client-card__name">{{ client.name || ('tr_phone_number' | translate) }}</div>
+              <div class="client-card__meta muted">
+                <span>{{ client.phoneNumber }}</span>
+                <span class="dot" *ngIf="client.address">•</span>
+                <span *ngIf="client.address">{{ client.address }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="client-card__stats">
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_number_of_orders' | translate }}</div>
+              <div class="stat__value">{{ client.numberOfOrders }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">{{ 'tr_total_orders_price' | translate }}</div>
+              <div class="stat__value">
+                {{ client.totalOrdersPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="client-card__details" *ngIf="client.branches?.length">
+            <div>
+              <b>{{ 'tr_branch' | translate }}:</b>
+              <div class="client-card__branches">
+                <span *ngFor="let branch of client.branches; let last = last">
+                  {{ branch }}<span *ngIf="!last">, </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="client-card__actions">
+            <button
+              type="button"
+              class="s-btn btn-secondary size-small width-100"
+              (click)="openClientHistory(client)"
+            >
+              {{ 'tr_client_history' | translate }}
+            </button>
+          </div>
+        </div>
       </div>
   
       <div class="empty-state-here text-center ptb-8" *ngIf="clientsList.length === 0">

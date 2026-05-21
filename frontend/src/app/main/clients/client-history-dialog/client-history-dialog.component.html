@@ -1,0 +1,105 @@
+<div class="client-history-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">
+      {{ 'tr_client_history' | translate }} — {{ data.client.name || data.client.phoneNumber }}
+    </h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
+
+  <ng-container *ngIf="!loading && history">
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <div class="balance-card balance-card--points">
+          <div class="balance-card__label">{{ 'tr_client_total_points' | translate }}</div>
+          <div class="balance-card__value">{{ history.totalPointsEarned }}</div>
+          <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_points_hint' | translate }}</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="balance-card balance-card--credit">
+          <div class="balance-card__label">{{ 'tr_client_credit_balance_due' | translate }}</div>
+          <div class="balance-card__value">
+            {{ history.creditBalanceDue | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="history.creditOrdersCount > 0">
+            {{ 'tr_client_credit_invoices_count' | translate:{ count: history.creditOrdersCount } }}
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="balance-card balance-card--info">
+          <div class="balance-card__label">{{ 'tr_phone_number' | translate }}</div>
+          <div class="balance-card__value balance-card__value--sm">{{ history.client.phoneNumber }}</div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="history.client.address">
+            {{ history.client.address }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <h5 *ngIf="history.creditOrders?.length">{{ 'tr_client_unpaid_credit_orders' | translate }}</h5>
+    <div class="table-container mb-3" *ngIf="history.creditOrders?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_order_number' | translate }}</th>
+            <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
+            <th>{{ 'tr_paid' | translate }}</th>
+            <th>{{ 'tr_remaining' | translate }}</th>
+            <th>{{ 'tr_payment_status' | translate }}</th>
+            <th>{{ 'tr_created_at' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of history.creditOrders">
+            <td>{{ o.orderNumber }}</td>
+            <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td class="text-error">{{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ paymentStatusLabel(o.paymentStatus) }}</td>
+            <td>{{ o.createdAt | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h5>{{ 'tr_client_operations' | translate }}</h5>
+    <p class="size-small text-muted mb-2">{{ 'tr_client_operations_hint' | translate }}</p>
+    <div class="table-container mb-3" *ngIf="history.orders?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_order_number' | translate }}</th>
+            <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
+            <th>{{ 'tr_paid' | translate }}</th>
+            <th>{{ 'tr_remaining' | translate }}</th>
+            <th>{{ 'tr_points_earned' | translate }}</th>
+            <th>{{ 'tr_payment_method' | translate }}</th>
+            <th>{{ 'tr_status' | translate }}</th>
+            <th>{{ 'tr_created_at' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let o of history.orders" [class.row-restored]="o.status === 'restored'">
+            <td>{{ o.orderNumber }}</td>
+            <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>
+              <span *ngIf="orderRemaining(o) > 0" class="text-error">
+                {{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </span>
+              <span *ngIf="orderRemaining(o) <= 0">—</span>
+            </td>
+            <td>{{ o.pointsEarned ?? 0 }}</td>
+            <td>{{ paymentMethodLabel(o.paymentMethod) }}</td>
+            <td>{{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus) }}</td>
+            <td>{{ o.createdAt | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.orders?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+  </ng-container>
+</div>

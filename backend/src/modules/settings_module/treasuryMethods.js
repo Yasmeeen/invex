@@ -60,3 +60,12 @@ export function treasuryMethodMap(methods) {
 export function treasuryKeyIsCashDrawer(key) {
   return String(key || '').trim().toLowerCase() === 'cash';
 }
+
+/** Pay later — no cash drawer outflow; supplier liability via PurchasingRequest. */
+export const PURCHASE_TREASURY_DEFERRED_KEY = 'deferred';
+
+export const PURCHASE_TREASURY_DEFERRED_LABEL = 'شراء بالآجل';
+
+export function isDeferredPurchaseTreasury(key) {
+  return String(key || '').trim().toLowerCase() === PURCHASE_TREASURY_DEFERRED_KEY;
+}

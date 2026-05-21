@@ -61,6 +61,16 @@ const productPurchaseRequestSchema = new mongoose.Schema(
     /** Snapshot label at creation time (for receipts/history if settings change). */
     purchaseTreasuryLabel: { type: String, trim: true, default: '' },
 
+    /** When purchaseTreasuryKey is `deferred` and source is supplier — links vendor payable. */
+    linkedPurchasingRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PurchasingRequest',
+      required: false,
+      index: true,
+    },
+    /** Amount paid to client on deferred desk purchase (supplier uses PurchasingRequest). */
+    amountPaid: { type: Number, default: 0, min: 0 },
+
     createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
     /** When multi-code purchase creates several products. */
     createdProductIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], default: undefined },

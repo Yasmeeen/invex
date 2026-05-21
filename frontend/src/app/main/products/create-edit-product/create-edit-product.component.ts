@@ -113,6 +113,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     });
   }
 
+  private static readonly DESK_PURCHASE_DEFERRED_KEY = 'deferred';
+
   private syncDeskPurchaseTreasuryKey(): void {
     const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
     if (Array.isArray(m) && m.length) {
@@ -126,12 +128,37 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       ];
     }
 
+    if (this.cashDeskPurchase) {
+      const deferredKey = CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY;
+      if (!this.purchaseTreasuryMethodOptions.some((o) => o.key === deferredKey)) {
+        this.purchaseTreasuryMethodOptions = [
+          ...this.purchaseTreasuryMethodOptions,
+          {
+            key: deferredKey,
+            label: this.translateService.instant('tr_payment_deferred'),
+          },
+        ];
+      }
+    }
+
     const opts = this.purchaseTreasuryMethodOptions;
     const keys = new Set(opts.map((o) => o.key));
     if (!keys.has(this.deskPurchaseTreasuryKey)) {
       const cash = opts.find((o) => o.key === 'cash');
       this.deskPurchaseTreasuryKey = cash ? cash.key : opts[0]?.key || 'cash';
     }
+  }
+
+  get isDeferredDeskPurchaseSelected(): boolean {
+    return (
+      this.deskPurchaseTreasuryKey === CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY
+    );
+  }
+
+  get deferredDeskPurchaseHintKey(): string {
+    return this.sourcePartyType === 'supplier'
+      ? 'tr_desk_purchase_deferred_supplier_hint'
+      : 'tr_desk_purchase_deferred_client_hint';
   }
 
   get cashDeskPurchase(): boolean {
@@ -652,6 +679,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
             addressControl?.setValue(party.address || '', { emitEvent: false });
             nameControl?.disable({ emitEvent: false });
             addressControl?.disable({ emitEvent: false });
+            this.syncDeskPurchaseTreasuryKey();
           } else {
             const dedupeKey =
               party._id != null ? String(party._id) : String(party.phoneNumber || '');
@@ -669,6 +697,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
             addressControl?.setValue(party.address || '', { emitEvent: false });
             nameControl?.disable({ emitEvent: false });
             addressControl?.disable({ emitEvent: false });
+            this.syncDeskPurchaseTreasuryKey();
           }
         })
     );
@@ -691,9 +720,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       nameControl?.clearValidators();
     }
     nameControl?.updateValueAndValidity({ emitEvent: false });
+    this.syncDeskPurchaseTreasuryKey();
   }
 
   onSourcePartyTypeChange(type: OrderPartyType): void {
+    this.syncDeskPurchaseTreasuryKey();
     if (this.sourcePartyType === type) return;
     this.sourcePartyType = type;
     this.lastNotifiedSourcePartyId = null;
@@ -725,6 +756,26 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   private hasSourcePartyInput(): boolean {
     const raw = this.sourcePartyForm.getRawValue();
     return !!(String(raw.phone || '').trim() || String(raw.name || '').trim());
+  }
+
+  /**
+   * Submit button sits in modal-footer outside `<form>`, so ngSubmit never runs
+   * and `basicInfoForm.submitted` stays false — field errors never show.
+   */
+  private markBasicInfoFormSubmitted(): void {
+    if (this.basicInfoForm) {
+      this.basicInfoForm.onSubmit(null as any);
+    }
+  }
+
+  private notifyRequiredFieldsMissing(): void {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_fill_required_fields'),
+      'error'
+    );
+    if (this.activeTab !== 'basic') {
+      this.activeTab = 'basic';
+    }
   }
 
   private validateSourcePartyOptional(): boolean {
@@ -958,7 +1009,11 @@ private submitDeskPurchaseRequest(): void {
   if (this.isUploadingImage) {
     return;
   }
-  if (!this.basicInfoForm.valid) return;
+  this.syncDeskPurchaseTreasuryKey();
+  if (!this.basicInfoForm.valid) {
+    this.notifyRequiredFieldsMissing();
+    return;
+  }
   if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
     this.appNotificationService.push(
       this.translateService.instant('tr_select_category_first_code'),
@@ -1090,7 +1145,10 @@ createProduct() {
   if (this.isUploadingImage) {
     return;
   }
-  if (!this.basicInfoForm.valid) return;
+  if (!this.basicInfoForm.valid) {
+    this.notifyRequiredFieldsMissing();
+    return;
+  }
   if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
     this.appNotificationService.push(
       this.translateService.instant('tr_select_category_first_code'),
@@ -1229,7 +1287,10 @@ updateProduct() {
     return;
   }
   this.product = this.basicInfoForm.value;
-  if (!this.basicInfoForm.valid) return;
+  if (!this.basicInfoForm.valid) {
+    this.notifyRequiredFieldsMissing();
+    return;
+  }
   if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
     this.appNotificationService.push(
       this.translateService.instant('tr_category_code_missing_on_category'),
@@ -1324,6 +1385,7 @@ updateProduct() {
   // }
 
   submitForm(){
+    this.markBasicInfoFormSubmitted();
     if (!this.validateSourcePartyOptional()) {
       return;
     }

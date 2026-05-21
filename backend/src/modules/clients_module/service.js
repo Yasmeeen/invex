@@ -1,5 +1,11 @@
 import Client from "../../DB/models/client.model.js";
 import Order from "../../DB/models/order.model.js";
+import ProductPurchaseRequest from "../../DB/models/productPurchaseRequest.model.js";
+import {
+  deferredDeskPurchaseRemaining,
+  deskPurchaseLineTotal,
+} from "../../utils/desk-purchase-deferred.js";
+import { isDeferredPurchaseTreasury } from "../settings_module/treasuryMethods.js";
 import Branch from "../../DB/models/branch.model.js";
 import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
@@ -258,7 +264,7 @@ export const updateClient = async (req, res) => {
 };
 
 /**
- * GET client account history: orders, loyalty points, pay-later balance.
+ * GET client account history: sales orders, purchases from client, loyalty points, pay-later balance.
  */
 export const getClientHistory = async (req, res) => {
   try {
@@ -302,6 +308,63 @@ export const getClientHistory = async (req, res) => {
       (o) => o.isPayLater && o.remaining > 0 && o.status !== "restored"
     );
 
+    const phoneCandidates = buildPhoneSearchCandidates(client.phoneNumber);
+    const purchaseMatchOr = [
+      { "productPayload.acquiredFrom.clientId": client._id },
+    ];
+    if (phoneCandidates.length) {
+      purchaseMatchOr.push({
+        "productPayload.acquiredFrom.phone": { $in: phoneCandidates },
+        $or: [
+          { "productPayload.acquiredFrom.partyType": "client" },
+          { "productPayload.acquiredFrom.partyType": { $exists: false } },
+          { "productPayload.acquiredFrom.partyType": null },
+        ],
+      });
+    }
+
+    const purchaseRows = await ProductPurchaseRequest.find({ $or: purchaseMatchOr })
+      .select(
+        "status quantity purchaseTreasuryKey purchaseTreasuryLabel productPayload createdAt branch createdBy"
+      )
+      .populate("branch", "name")
+      .populate("createdBy", "name")
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    const purchases = purchaseRows.map((p) => {
+      const pp = p.productPayload || {};
+      const qty = Math.max(1, Math.floor(Number(p.quantity) || 1));
+      const unitNet = Math.round((Number(pp.netPrice) || 0) * 100) / 100;
+      const lineTotal = deskPurchaseLineTotal(p);
+      const isDeferred = isDeferredPurchaseTreasury(p.purchaseTreasuryKey);
+      const remaining = isDeferred ? deferredDeskPurchaseRemaining(p) : 0;
+      const paid =
+        isDeferred && p.status === "approved"
+          ? Math.round((lineTotal - remaining) * 100) / 100
+          : isDeferred
+            ? 0
+            : lineTotal;
+      return {
+        _id: p._id,
+        status: p.status,
+        createdAt: p.createdAt,
+        branch: p.branch,
+        productName: pp.name || "",
+        productCode: pp.code || "",
+        quantity: qty,
+        unitNetPrice: unitNet,
+        lineTotal,
+        totalPaid: paid,
+        remaining,
+        isDeferredPurchase: isDeferred,
+        purchaseTreasuryKey: p.purchaseTreasuryKey,
+        purchaseTreasuryLabel: p.purchaseTreasuryLabel || "",
+        createdByName: p.createdBy?.name || "",
+      };
+    });
+
     res.json({
       client: {
         _id: client._id,
@@ -314,6 +377,8 @@ export const getClientHistory = async (req, res) => {
       creditOrdersCount: creditOrders.length,
       orders: ordersWithMeta,
       creditOrders,
+      purchases,
+      purchasesCount: purchases.length,
     });
   } catch (error) {
     console.error("❌ Error fetching client history:", error.message);

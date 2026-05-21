@@ -16,8 +16,14 @@ import {
 } from '../products_module/service.js';
 import {
   getEffectivePurchaseTreasuryMethodsFromDb,
+  isDeferredPurchaseTreasury,
+  PURCHASE_TREASURY_DEFERRED_KEY,
   treasuryMethodMap,
 } from '../settings_module/treasuryMethods.js';
+import {
+  deferredPurchaseTreasuryLabel,
+  syncDeferredSupplierDeskPurchase,
+} from '../../utils/desk-purchase-deferred.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -278,6 +284,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       );
       if (resolved?.acquiredFrom) {
         acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+        payload.acquiredFrom = resolved.acquiredFrom;
       }
     } catch (e) {
       await session.abortTransaction();
@@ -289,6 +296,7 @@ export const createProductPurchaseRequest = async (req, res) => {
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
     const treasuryKeysAllowed = new Set(treasuryMethods.map((m) => m.key));
+    treasuryKeysAllowed.add(PURCHASE_TREASURY_DEFERRED_KEY);
     const tMap = treasuryMethodMap(treasuryMethods);
     const treasuryKeyNorm =
       treasuryKeyRaw !== undefined && treasuryKeyRaw !== null && String(treasuryKeyRaw).trim() !== ''
@@ -299,7 +307,9 @@ export const createProductPurchaseRequest = async (req, res) => {
       session.endSession();
       return res.status(400).json({ error: 'Invalid purchase treasury method' });
     }
-    const purchaseTreasuryLabel = String(tMap.get(treasuryKeyNorm) || treasuryKeyNorm).trim();
+    const purchaseTreasuryLabel = isDeferredPurchaseTreasury(treasuryKeyNorm)
+      ? deferredPurchaseTreasuryLabel()
+      : String(tMap.get(treasuryKeyNorm) || treasuryKeyNorm).trim();
 
     const purchase = await ProductPurchaseRequest.create(
       [
@@ -311,6 +321,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           quantity: q,
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
+          ...(isDeferredPurchaseTreasury(treasuryKeyNorm) ? { amountPaid: 0 } : {}),
           ...(autoApprove
             ? { resolvedBy: actor._id, resolvedAt: new Date(), resolutionNote: 'Auto-approved' }
             : {}),
@@ -360,6 +371,17 @@ export const createProductPurchaseRequest = async (req, res) => {
 
         await session.commitTransaction();
         session.endSession();
+
+        if (isDeferredPurchaseTreasury(treasuryKeyNorm)) {
+          try {
+            await syncDeferredSupplierDeskPurchase(created, {
+              userId: actor._id,
+              actorName: actor?.name,
+            });
+          } catch (e) {
+            console.error('⚠️ deferred desk purchase vendor sync:', e?.message || e);
+          }
+        }
 
         for (const prodRow of createdList) {
           try {
@@ -438,6 +460,17 @@ export const createProductPurchaseRequest = async (req, res) => {
 
       await session.commitTransaction();
       session.endSession();
+
+      if (isDeferredPurchaseTreasury(treasuryKeyNorm)) {
+        try {
+          await syncDeferredSupplierDeskPurchase(created, {
+            userId: actor._id,
+            actorName: actor?.name,
+          });
+        } catch (e) {
+          console.error('⚠️ deferred desk purchase vendor sync:', e?.message || e);
+        }
+      }
 
       try {
         await StockMovement.create({
@@ -700,6 +733,21 @@ export const approveProductPurchaseRequest = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    if (isDeferredPurchaseTreasury(purchase.purchaseTreasuryKey)) {
+      try {
+        if (acquiredFromFields.acquiredFrom) {
+          purchase.productPayload = purchase.productPayload || {};
+          purchase.productPayload.acquiredFrom = acquiredFromFields.acquiredFrom;
+        }
+        await syncDeferredSupplierDeskPurchase(purchase, {
+          userId: actor._id,
+          actorName: actor?.name,
+        });
+      } catch (e) {
+        console.error('⚠️ deferred desk purchase approve vendor sync:', e?.message || e);
+      }
+    }
 
     try {
       if (createdList.length > 1) {

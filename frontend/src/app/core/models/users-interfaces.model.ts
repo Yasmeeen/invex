@@ -46,6 +46,24 @@ export interface ClientHistoryOrderRow {
   isPayLater?: boolean;
 }
 
+export interface ClientHistoryPurchaseRow {
+  _id?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  createdAt?: string;
+  branch?: { _id?: string; name?: string };
+  productName?: string;
+  productCode?: string;
+  quantity?: number;
+  unitNetPrice?: number;
+  lineTotal?: number;
+  totalPaid?: number;
+  remaining?: number;
+  isDeferredPurchase?: boolean;
+  purchaseTreasuryKey?: string;
+  purchaseTreasuryLabel?: string;
+  createdByName?: string;
+}
+
 export interface ClientHistoryResponse {
   client: Pick<Client, '_id' | 'name' | 'phoneNumber' | 'address'>;
   totalPointsEarned: number;
@@ -53,6 +71,8 @@ export interface ClientHistoryResponse {
   creditOrdersCount: number;
   orders: ClientHistoryOrderRow[];
   creditOrders: ClientHistoryOrderRow[];
+  purchases?: ClientHistoryPurchaseRow[];
+  purchasesCount?: number;
 }
 export class Employee extends User {
 

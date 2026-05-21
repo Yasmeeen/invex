@@ -23,13 +23,6 @@
                 {{ 'tr_fill_required_fields' | translate }}
               </div>
 
-              <div
-                class="alert alert-error mb-3"
-                *ngIf="basicInfoForm.valid && basicInfoForm.submitted"
-              >
-                {{ 'tr_leaving_before_admission' | translate }}
-              </div>
-
               <ul class="product-form-tabs mb-3">
                 <li>
                   <button
@@ -55,7 +48,7 @@
               </ul>
 
               <form #basicInfoForm="ngForm">
-                <div class="row" *ngIf="activeTab === 'basic'">
+                <div class="row" [hidden]="activeTab !== 'basic'">
                   <!-- Name -->
                   <div class="col-md-6">
                     <div
@@ -400,6 +393,12 @@
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
                       <p class="text-muted size-small m-0 mt-1">{{ 'tr_purchase_treasury_method_hint' | translate }}</p>
+                      <p
+                        class="text-muted size-small m-0 mt-1"
+                        *ngIf="isDeferredDeskPurchaseSelected"
+                      >
+                        {{ deferredDeskPurchaseHintKey | translate }}
+                      </p>
                     </div>
                   </div>
 
@@ -483,7 +482,7 @@
 
                 </div>
 
-                <div class="row" *ngIf="activeTab === 'extra'">
+                <div class="row" [hidden]="activeTab !== 'extra'">
                   <div class="col-md-12">
                     <p class="text-muted size-small mb-3">{{ 'tr_product_source_optional_hint' | translate }}</p>
                     <div class="party-type-toggle mb-3">

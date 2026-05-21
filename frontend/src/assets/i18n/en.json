@@ -808,8 +808,14 @@
   "tr_client_credit_balance_due": "Balance due (pay later)",
   "tr_client_credit_invoices_count": "{{count}} unpaid invoice(s)",
   "tr_client_unpaid_credit_orders": "Pay-later invoices — outstanding",
-  "tr_client_operations": "Activity",
+  "tr_client_operations": "Sales to client",
   "tr_client_operations_hint": "Each sale with points earned and any amount still due",
+  "tr_client_purchases_from_client": "Purchases from client",
+  "tr_client_purchases_hint": "Devices bought from this client via cashier (product purchase) or exchange",
+  "tr_client_purchases_empty": "No purchases recorded for this client",
+  "tr_client_purchase_total_paid": "Amount paid",
+  "tr_purchase_status_approved": "Approved",
+  "tr_purchase_status_rejected": "Rejected",
   "tr_points_earned": "Points",
   "tr_payment_status": "Payment status",
   "tr_partial": "Partially paid",
@@ -1087,5 +1093,10 @@
   "tr_report_desk_purchases_col_intakes": "Intakes",
   "tr_report_desk_purchases_by_treasury": "Cost by treasury",
   "tr_report_desk_purchases_lines_title": "Intake lines",
-  "tr_receipt_purchase_treasury": "Purchase treasury"
+  "tr_receipt_purchase_treasury": "Purchase treasury",
+  "tr_desk_purchase_deferred_supplier_hint": "No treasury outflow now. Amount is recorded as payable to the supplier (like a deferred purchasing request) and appears in supplier history for later payment.",
+  "tr_desk_purchase_deferred_client_hint": "No treasury outflow now. The amount stays owed to the client until you record payment later.",
+  "tr_desk_purchase_deferred_requires_party": "To use pay later, select a client or supplier on the source tab.",
+  "tr_desk_purchase_deferred_party_required": "Pay later requires a client or supplier.",
+  "tr_desk_purchase_deferred_supplier_required": "Pay later from a supplier requires a registered supplier (not phone-only entry)."
 }

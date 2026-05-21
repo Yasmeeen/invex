@@ -63,7 +63,7 @@ export class ReportExportService {
 
     let logoAdded = false;
     try {
-      const blob = await this.http.get('assets/images/logo3.png', { responseType: 'blob' }).toPromise();
+      const blob = await this.http.get('assets/images/new logo.jpeg', { responseType: 'blob' }).toPromise();
       if (blob && blob.size > 0) {
         const dataUrl = await this.blobToDataUrl(blob);
         doc.addImage(dataUrl, 'PNG', margin, headerTop, logoSize, logoSize);
@@ -213,7 +213,7 @@ export class ReportExportService {
 
     let logoDataUrl = '';
     try {
-      const blob = await this.http.get('assets/images/logo3.png', { responseType: 'blob' }).toPromise();
+      const blob = await this.http.get('assets/images/new logo.jpeg', { responseType: 'blob' }).toPromise();
       if (blob && blob.size > 0) logoDataUrl = await this.blobToDataUrl(blob);
     } catch {
       // ignore

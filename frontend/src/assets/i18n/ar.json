@@ -717,8 +717,14 @@
   "tr_client_credit_balance_due": "المتبقي عليه (بيع بالآجل)",
   "tr_client_credit_invoices_count": "{{count}} فاتورة لم تُسدَّد بالكامل",
   "tr_client_unpaid_credit_orders": "فواتير بالآجل — غير مسددة",
-  "tr_client_operations": "العمليات",
+  "tr_client_operations": "مبيعات للعميل",
   "tr_client_operations_hint": "كل فاتورة بيع مع النقاط المكتسبة والمتبقي إن وُجد",
+  "tr_client_purchases_from_client": "مشتريات من العميل",
+  "tr_client_purchases_hint": "أجهزة اشتريتها من العميل عبر الكاشير (شراء منتج) أو الاستبدال",
+  "tr_client_purchases_empty": "لا توجد مشتريات مسجّلة لهذا العميل",
+  "tr_client_purchase_total_paid": "المبلغ المدفوع",
+  "tr_purchase_status_approved": "معتمد",
+  "tr_purchase_status_rejected": "مرفوض",
   "tr_points_earned": "النقاط",
   "tr_payment_status": "حالة الدفع",
   "tr_partial": "مدفوع جزئياً",
@@ -1085,5 +1091,10 @@
   "tr_report_desk_purchases_col_intakes": "العمليات",
   "tr_report_desk_purchases_by_treasury": "التكلفة حسب الخزنة",
   "tr_report_desk_purchases_lines_title": "تفاصيل العمليات",
-  "tr_receipt_purchase_treasury": "خزنة الشراء"
+  "tr_receipt_purchase_treasury": "خزنة الشراء",
+  "tr_desk_purchase_deferred_supplier_hint": "لن يُخصم من الخزنة الآن. يُسجَّل مستحق على المورد (مثل طلب الشراء بالآجل) ويظهر في سجل المورد للسداد لاحقاً.",
+  "tr_desk_purchase_deferred_client_hint": "لن يُخصم من الخزنة الآن. المبلغ يبقى مستحقاً للعميل حتى تسجّل السداد لاحقاً.",
+  "tr_desk_purchase_deferred_requires_party": "لتفعيل «شراء بالآجل» اختر عميلاً أو مورداً في تبويب المصدر.",
+  "tr_desk_purchase_deferred_party_required": "شراء بالآجل يتطلب تحديد عميل أو مورد.",
+  "tr_desk_purchase_deferred_supplier_required": "شراء بالآجل من مورد يتطلب اختيار مورد مسجّل (وليس رقم هاتف جديداً فقط)."
 }

@@ -3,6 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
   Client,
   ClientHistoryOrderRow,
+  ClientHistoryPurchaseRow,
   ClientHistoryResponse,
 } from '@core/models/users-interfaces.model';
 import { TranslateService } from '@ngx-translate/core';
@@ -75,6 +76,23 @@ export class ClientHistoryDialogComponent implements OnInit {
       return this.translate.instant('tr_pay_credit');
     }
     return method || '—';
+  }
+
+  purchaseStatusLabel(status?: string): string {
+    switch (status) {
+      case 'approved':
+        return this.translate.instant('tr_purchase_status_approved');
+      case 'rejected':
+        return this.translate.instant('tr_purchase_status_rejected');
+      case 'pending':
+        return this.translate.instant('tr_pending');
+      default:
+        return status || '—';
+    }
+  }
+
+  purchaseTreasuryLabel(row: ClientHistoryPurchaseRow): string {
+    return String(row.purchaseTreasuryLabel || row.purchaseTreasuryKey || '').trim() || '—';
   }
 
   close(): void {

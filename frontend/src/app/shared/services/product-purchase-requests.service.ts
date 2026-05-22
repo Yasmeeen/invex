@@ -4,6 +4,12 @@ import { Observable } from 'rxjs';
 import { PRODUCT_PURCHASE_REQUESTS_URL } from '@core/base/urls';
 import { ProductAcquiredFrom } from '@core/models/products.model';
 
+export interface PurchaseTreasurySplit {
+  key: string;
+  label?: string;
+  amount: number;
+}
+
 export interface DeskPurchaseProductPayload {
   name: string;
   code: string;
@@ -14,6 +20,8 @@ export interface DeskPurchaseProductPayload {
   attributes?: Record<string, string>;
   imageUrl?: string;
   notes?: string;
+  /** Employee who added the device */
+  addedBy?: string;
   /** When category uses multi-code per piece and quantity > 1 */
   unitCodes?: string[];
   acquiredFrom?: ProductAcquiredFrom | null;
@@ -28,8 +36,10 @@ export class ProductPurchaseRequestsService {
     branchId: string;
     quantity?: number;
     product: DeskPurchaseProductPayload;
-    /** Store Settings purchase treasury key (`cash` = from physical drawer). */
+    /** Legacy single treasury (used when splits omitted). */
     purchaseTreasuryKey?: string;
+    /** Split cost across treasuries; amounts must sum to netPrice × quantity. */
+    purchaseTreasurySplits?: PurchaseTreasurySplit[];
   }): Observable<any> {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }

@@ -96,6 +96,7 @@ export class ProductPurchaseApprovalDialogComponent implements OnInit {
         quantity: p.quantity ?? 1,
         treasuryLabel: String(p.purchaseTreasuryLabel || '').trim(),
         treasuryKey: String(p.purchaseTreasuryKey || 'cash').trim().toLowerCase(),
+        treasurySplits: Array.isArray(p.purchaseTreasurySplits) ? p.purchaseTreasurySplits : [],
       };
     }
     return this.dialogData?.data || {};

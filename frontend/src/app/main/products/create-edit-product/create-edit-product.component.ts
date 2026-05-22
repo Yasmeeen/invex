@@ -79,8 +79,10 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   isUploadingImage = false;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
   deskPurchaseBranchLabel = '';
-  /** Purchase treasury key from Store Settings (`cash` = paid from physical drawer). */
-  deskPurchaseTreasuryKey = 'cash';
+  /** Selected purchase treasury keys (multi, like cashier payment methods). */
+  selectedDeskTreasuryKeys: string[] = ['cash'];
+  /** Amount paid from each treasury key. */
+  deskTreasuryAmounts: Record<string, number> = {};
   /** Stable array for ng-select `[items]` (never a getter — new refs break selection). */
   purchaseTreasuryMethodOptions: { key: string; label: string }[] = [];
   readonly maxImageBytes = 5 * 1024 * 1024;
@@ -143,16 +145,144 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
     const opts = this.purchaseTreasuryMethodOptions;
     const keys = new Set(opts.map((o) => o.key));
-    if (!keys.has(this.deskPurchaseTreasuryKey)) {
+    const validSelected = this.selectedDeskTreasuryKeys.filter((k) => keys.has(k));
+    if (!validSelected.length) {
       const cash = opts.find((o) => o.key === 'cash');
-      this.deskPurchaseTreasuryKey = cash ? cash.key : opts[0]?.key || 'cash';
+      this.selectedDeskTreasuryKeys = [cash ? cash.key : opts[0]?.key || 'cash'];
+    } else {
+      this.selectedDeskTreasuryKeys = validSelected;
     }
+    this.reconcileDeskTreasuryAmountsKeys(this.selectedDeskTreasuryKeys);
+    this.ensureDefaultDeskTreasuryAmounts();
+  }
+
+  get deskPurchaseTotalCost(): number {
+    const net = Number(this.basicInfoForm?.value?.netPrice);
+    if (!Number.isFinite(net) || net < 0) {
+      return 0;
+    }
+    return Math.round(net * this.getStockQty() * 100) / 100;
   }
 
   get isDeferredDeskPurchaseSelected(): boolean {
-    return (
-      this.deskPurchaseTreasuryKey === CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY
+    return this.selectedDeskTreasuryKeys.includes(
+      CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY
     );
+  }
+
+  treasuryOptionLabel(key: string): string {
+    const opt = this.purchaseTreasuryMethodOptions.find((o) => o.key === key);
+    return opt?.label || key;
+  }
+
+  onDeskTreasuryCostInputsChanged(): void {
+    this.ensureDefaultDeskTreasuryAmounts();
+  }
+
+  onSelectedDeskTreasuryChange(ids: string[] | null): void {
+    const raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
+    if (!raw.length) {
+      this.selectedDeskTreasuryKeys = ['cash'];
+      this.reconcileDeskTreasuryAmountsKeys(['cash']);
+      this.ensureDefaultDeskTreasuryAmounts();
+      return;
+    }
+    this.reconcileDeskTreasuryAmountsKeys(raw);
+    this.ensureDefaultDeskTreasuryAmounts();
+  }
+
+  private reconcileDeskTreasuryAmountsKeys(ids: string[]): void {
+    const next: Record<string, number> = {};
+    for (const id of ids) {
+      next[id] = Number(this.deskTreasuryAmounts[id]) || 0;
+    }
+    this.deskTreasuryAmounts = next;
+    this.selectedDeskTreasuryKeys = ids;
+  }
+
+  trackDeskTreasuryKey(_index: number, key: string): string {
+    return key;
+  }
+
+  deskTreasuryOverflowTitle(items: readonly { key?: string; label?: string }[] | null | undefined): string {
+    if (!items?.length || items.length <= 2) {
+      return '';
+    }
+    return items
+      .slice(2)
+      .map((row) => String(row?.label || row?.key || '').trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  deskTreasurySplitsTotal(): number {
+    const sum = this.selectedDeskTreasuryKeys.reduce(
+      (acc, key) => acc + (Number(this.deskTreasuryAmounts[key]) || 0),
+      0
+    );
+    return Math.round(sum * 100) / 100;
+  }
+
+  deskTreasuryRemaining(): number {
+    return Math.round((this.deskPurchaseTotalCost - this.deskTreasurySplitsTotal()) * 100) / 100;
+  }
+
+  deskTreasuryOverAllocated(): boolean {
+    return this.deskTreasurySplitsTotal() > this.deskPurchaseTotalCost + 0.001;
+  }
+
+  private ensureDefaultDeskTreasuryAmounts(): void {
+    if (!this.cashDeskPurchase || this.selectedDeskTreasuryKeys.length !== 1) {
+      return;
+    }
+    const key = this.selectedDeskTreasuryKeys[0];
+    const total = this.deskPurchaseTotalCost;
+    const cur = Number(this.deskTreasuryAmounts[key]);
+    if (!Number.isFinite(cur) || cur <= 0) {
+      this.deskTreasuryAmounts = { ...this.deskTreasuryAmounts, [key]: Math.max(0, total) };
+    }
+  }
+
+  private buildPurchaseTreasurySplitsPayload():
+    | { key: string; label: string; amount: number }[]
+    | null {
+    const splits = this.selectedDeskTreasuryKeys
+      .map((key) => ({
+        key,
+        label: this.treasuryOptionLabel(key),
+        amount: Math.round((Number(this.deskTreasuryAmounts[key]) || 0) * 100) / 100,
+      }))
+      .filter((s) => s.amount > 0);
+    if (!splits.length) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_desk_purchase_treasury_required'),
+        'error'
+      );
+      return null;
+    }
+    const total = this.deskPurchaseTotalCost;
+    if (total <= 0) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_desk_purchase_net_required'),
+        'error'
+      );
+      return null;
+    }
+    if (this.deskTreasuryOverAllocated()) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_desk_purchase_treasury_over'),
+        'error'
+      );
+      return null;
+    }
+    if (Math.abs(this.deskTreasurySplitsTotal() - total) > 0.01) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_desk_purchase_treasury_mismatch'),
+        'error'
+      );
+      return null;
+    }
+    return splits;
   }
 
   get deferredDeskPurchaseHintKey(): string {
@@ -592,6 +722,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         discount: response.discount,
         category: response.category,
         branch: response.branch || null,
+        addedBy: response.addedBy || '',
       });
       this.productImageUrl = response.imageUrl || '';
       this.refreshCategoryDropdownItems();
@@ -1097,6 +1228,15 @@ private submitDeskPurchaseRequest(): void {
   if (acquiredFrom) {
     deskProduct.acquiredFrom = acquiredFrom;
   }
+  const addedByTrim = String(fv.addedBy || '').trim();
+  if (addedByTrim) {
+    deskProduct.addedBy = addedByTrim;
+  }
+
+  const treasurySplits = this.buildPurchaseTreasurySplitsPayload();
+  if (!treasurySplits) {
+    return;
+  }
 
   this.isSubmitting = true;
   this.productPurchaseRequests
@@ -1105,7 +1245,7 @@ private submitDeskPurchaseRequest(): void {
       branchId,
       quantity: qty,
       product: deskProduct,
-      purchaseTreasuryKey: this.deskPurchaseTreasuryKey || 'cash',
+      purchaseTreasurySplits: treasurySplits,
     })
     .subscribe({
       next: (res: any) => {

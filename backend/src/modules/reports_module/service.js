@@ -6,6 +6,10 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import {
+  aggregateTreasuryAmountsFromPurchases,
+  resolvePurchaseTreasurySplits,
+} from '../../utils/purchase-treasury-splits.js';
 
 /** Monthly branch fixed costs (rent + salaries + invoices + expenses) spread over this many days for daily rate. */
 const BRANCH_OVERHEAD_MONTHLY_DAYS = 30;
@@ -625,35 +629,37 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
     }
 
     const rows = await ProductPurchaseRequest.find(match)
-      .select('createdAt quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel branch')
+      .select(
+        'createdAt quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits branch'
+      )
       .populate('branch', 'name')
       .sort({ createdAt: -1 })
       .limit(500)
       .lean();
 
-    const byTreasury = {};
+    const byKey = aggregateTreasuryAmountsFromPurchases(rows);
     let totalAmount = 0;
     for (const r of rows) {
-      const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
-      const net = round2(Number(r.productPayload?.netPrice || 0));
-      const line = round2(net * q);
-      totalAmount = round2(totalAmount + line);
-      const key = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
-      const label = String(r.purchaseTreasuryLabel || '').trim() || key;
-      if (!byTreasury[key]) {
-        byTreasury[key] = { treasuryKey: key, treasuryLabel: label, totalAmount: 0, intakeCount: 0 };
+      const splits = resolvePurchaseTreasurySplits(r);
+      for (const s of splits) {
+        totalAmount = round2(totalAmount + s.amount);
       }
-      byTreasury[key].totalAmount = round2(byTreasury[key].totalAmount + line);
-      byTreasury[key].intakeCount += 1;
     }
 
-    const summaryByTreasury = Object.values(byTreasury).sort((a, b) =>
-      String(a.treasuryKey).localeCompare(String(b.treasuryKey))
-    );
+    const summaryByTreasury = Object.values(byKey)
+      .map((x) => ({
+        treasuryKey: x.key,
+        treasuryLabel: x.label,
+        totalAmount: x.total,
+        intakeCount: x.count,
+      }))
+      .sort((a, b) => String(a.treasuryKey).localeCompare(String(b.treasuryKey)));
 
     const lines = rows.map((r) => {
       const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
       const net = round2(Number(r.productPayload?.netPrice || 0));
+      const lineTotal = round2(net * q);
+      const splits = resolvePurchaseTreasurySplits(r);
       const k = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
       return {
         createdAt: r.createdAt,
@@ -661,9 +667,10 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
         productName: r.productPayload?.name || '',
         quantity: q,
         unitCost: net,
-        lineTotal: round2(net * q),
+        lineTotal,
         treasuryKey: k,
         treasuryLabel: String(r.purchaseTreasuryLabel || '').trim() || k,
+        treasurySplits: splits,
       };
     });
 

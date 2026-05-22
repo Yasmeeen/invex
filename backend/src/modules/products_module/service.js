@@ -226,6 +226,9 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
+/** Optional employee name who registered the device (trimmed, max 200 chars). */
+const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
+
 /** If netPrice omitted/empty, use price - (price * discount% / 100) (clamped to >= 0). */
 const resolveNetPrice = (priceNum, discountNum, netPriceRaw) => {
   const d = Number(discountNum);
@@ -976,9 +979,10 @@ export const getProductById = async (req, res) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes } =
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes, addedBy } =
       req.body;
     const imageUrlNorm = normalizeImageUrl(imageUrl);
+    const addedByNorm = normalizeAddedBy(addedBy);
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
 
@@ -1088,6 +1092,7 @@ export const createProduct = async (req, res) => {
             inWarehouse: true,
             imageUrl: imageUrlNorm,
             attributes: attrs,
+            addedBy: addedByNorm,
             ...acquiredFromFields,
           });
           createdProducts.push(p);
@@ -1136,6 +1141,7 @@ export const createProduct = async (req, res) => {
           inWarehouse: false,
           imageUrl: imageUrlNorm,
           attributes: attrs,
+          addedBy: addedByNorm,
           ...acquiredFromFields,
         });
         createdProducts.push(p);
@@ -1184,6 +1190,7 @@ export const createProduct = async (req, res) => {
         inWarehouse: true,
         imageUrl: imageUrlNorm,
         attributes: attrs,
+        addedBy: addedByNorm,
         ...acquiredFromFields,
       });
 
@@ -1230,6 +1237,7 @@ export const createProduct = async (req, res) => {
       inWarehouse: false,
       imageUrl: imageUrlNorm,
       attributes: attrs,
+      addedBy: addedByNorm,
       ...acquiredFromFields,
     });
 
@@ -1266,8 +1274,9 @@ export const createProduct = async (req, res) => {
 // Update product
 export const updateProduct = async (req, res) => {
   try {
-    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes } = req.body;
+    const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes, addedBy } = req.body;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
+    const hasAddedBy = Object.prototype.hasOwnProperty.call(req.body, 'addedBy');
     const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
@@ -1389,6 +1398,9 @@ export const updateProduct = async (req, res) => {
       if (acquiredFromSet) {
         updateDoc.acquiredFrom = acquiredFromSet;
       }
+      if (hasAddedBy) {
+        updateDoc.addedBy = normalizeAddedBy(addedBy);
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -1449,6 +1461,9 @@ export const updateProduct = async (req, res) => {
     }
     if (acquiredFromSet) {
       updateDocBranch.acquiredFrom = acquiredFromSet;
+    }
+    if (hasAddedBy) {
+      updateDocBranch.addedBy = normalizeAddedBy(addedBy);
     }
 
     const updateOpBranch = acquiredFromUnset
@@ -1745,6 +1760,7 @@ export const approveBranchTransfer = async (req, res) => {
             inWarehouse: false,
             imageUrl: imageUrlNorm,
             attributes: attrs,
+            addedBy: normalizeAddedBy(sourceProduct.addedBy),
           },
         ],
         { session }
@@ -2093,6 +2109,7 @@ export const transferProductStock = async (req, res) => {
             category: sourceProduct.category,
             branch: toBranchId,
             inWarehouse: false,
+            addedBy: normalizeAddedBy(sourceProduct.addedBy),
           },
         ],
         { session }

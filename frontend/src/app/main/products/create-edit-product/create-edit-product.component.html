@@ -140,7 +140,7 @@
                         ngModel
                         required
                         min="1"
-                        (ngModelChange)="onStockQuantityChanged()"
+                        (ngModelChange)="onStockQuantityChanged(); onDeskTreasuryCostInputsChanged()"
                       />
                       <span
                         class="text-error size-small validator"
@@ -289,6 +289,7 @@
                         #netPrice="ngModel"
                         ngModel
                         min="0"
+                        (ngModelChange)="onDeskTreasuryCostInputsChanged()"
                       />
                       <span
                         class="text-error size-small validator"
@@ -313,6 +314,19 @@
                         placeholder="{{ 'tr_discount_percentage' | translate }}"
                         #discount="ngModel"
                         ngModel
+                      />
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>{{ 'tr_product_added_by' | translate }}</label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="addedBy"
+                        ngModel
+                        autocomplete="off"
                       />
                     </div>
                   </div>
@@ -375,20 +389,39 @@
                     </p>
                   </div>
 
-                  <div class="col-md-8 mt-4" *ngIf="cashDeskPurchase">
+                  <div class="col-md-12 mt-4 desk-treasury-splits" *ngIf="cashDeskPurchase">
                     <div class="form-group">
-                      <label>{{ 'tr_purchase_treasury_method' | translate }}</label>
+                      <label>{{ 'tr_purchase_treasury_method_multi' | translate }}</label>
                       <div class="input-with-icon bg-white">
                         <ng-select
                           class="s-control s-select"
-                          [(ngModel)]="deskPurchaseTreasuryKey"
-                          name="deskPurchaseTreasuryKey"
                           [items]="purchaseTreasuryMethodOptions"
                           bindLabel="label"
                           bindValue="key"
-                          [clearable]="false"
+                          [multiple]="true"
+                          [closeOnSelect]="false"
+                          [clearable]="true"
+                          [searchable]="true"
+                          placeholder="{{ 'tr_purchase_treasury_select_placeholder' | translate }}"
+                          [(ngModel)]="selectedDeskTreasuryKeys"
+                          [ngModelOptions]="{ standalone: true }"
+                          name="deskTreasuryMulti"
                           appendTo="#create-edit-product-modal-root"
+                          (ngModelChange)="onSelectedDeskTreasuryChange($event)"
                         >
+                          <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                            <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                              <span class="ng-value-label">{{ $any(item).label }}</span>
+                              <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+                            </div>
+                            <div
+                              class="ng-value"
+                              *ngIf="items.length > 2"
+                              [attr.title]="deskTreasuryOverflowTitle(items)"
+                            >
+                              <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+                            </div>
+                          </ng-template>
                         </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
@@ -400,6 +433,44 @@
                         {{ deferredDeskPurchaseHintKey | translate }}
                       </p>
                     </div>
+
+                    <div class="size-small text-muted mb-1" *ngIf="selectedDeskTreasuryKeys?.length">
+                      {{ 'tr_desk_purchase_treasury_amounts_hint' | translate }}
+                    </div>
+                    <div
+                      class="desk-treasury-split-row"
+                      *ngFor="let tKey of selectedDeskTreasuryKeys; trackBy: trackDeskTreasuryKey"
+                    >
+                      <span class="desk-treasury-split-row__label">{{ treasuryOptionLabel(tKey) }}</span>
+                      <input
+                        type="number"
+                        class="s-control desk-treasury-split-row__amount"
+                        min="0"
+                        step="0.01"
+                        [(ngModel)]="deskTreasuryAmounts[tKey]"
+                        [ngModelOptions]="{ standalone: true }"
+                        [name]="'deskTreasuryAmt_' + tKey"
+                      />
+                    </div>
+                    <div class="size-small mt-2" [class.text-error]="deskTreasuryOverAllocated()">
+                      {{ 'tr_desk_purchase_treasury_allocated' | translate }}:
+                      <strong>{{ deskTreasurySplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                      /
+                      <strong>{{ deskPurchaseTotalCost | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                    </div>
+                    <div
+                      class="size-small text-muted mt-1"
+                      *ngIf="deskTreasuryRemaining() > 0.005 && !deskTreasuryOverAllocated()"
+                    >
+                      {{ 'tr_desk_purchase_treasury_remaining' | translate }}:
+                      <strong>{{ deskTreasuryRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                    </div>
+                    <p
+                      class="text-muted size-small m-0 mt-1"
+                      *ngIf="selectedDeskTreasuryKeys?.length === 1"
+                    >
+                      {{ 'tr_desk_purchase_treasury_single_hint' | translate }}
+                    </p>
                   </div>
 
                   <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
@@ -484,7 +555,6 @@
 
                 <div class="row" [hidden]="activeTab !== 'extra'">
                   <div class="col-md-12">
-                    <p class="text-muted size-small mb-3">{{ 'tr_product_source_optional_hint' | translate }}</p>
                     <div class="party-type-toggle mb-3">
                       <label class="mr-3">
                         <input

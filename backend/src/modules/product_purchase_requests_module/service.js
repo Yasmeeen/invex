@@ -16,14 +16,16 @@ import {
 } from '../products_module/service.js';
 import {
   getEffectivePurchaseTreasuryMethodsFromDb,
-  isDeferredPurchaseTreasury,
-  PURCHASE_TREASURY_DEFERRED_KEY,
   treasuryMethodMap,
 } from '../settings_module/treasuryMethods.js';
 import {
-  deferredPurchaseTreasuryLabel,
   syncDeferredSupplierDeskPurchase,
 } from '../../utils/desk-purchase-deferred.js';
+import {
+  deskPurchaseLineTotal,
+  normalizePurchaseTreasuryInput,
+  purchaseHasDeferredTreasury,
+} from '../../utils/purchase-treasury-splits.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -38,6 +40,13 @@ const normalizeImageUrl = (raw) => {
   if (!/^https:\/\//i.test(s)) return '';
   return s.slice(0, 2048);
 };
+
+const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
+
+async function leanPurchaseForResponse(purchaseId) {
+  if (!purchaseId) return null;
+  return ProductPurchaseRequest.findById(purchaseId).lean();
+}
 
 const normalizeAttributesForCategory = async (categoryId, raw) => {
   if (raw == null) return {};
@@ -157,7 +166,14 @@ export const createProductPurchaseRequest = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { userId, branchId, quantity: qtyRaw, product, purchaseTreasuryKey: treasuryKeyRaw } = req.body || {};
+    const {
+      userId,
+      branchId,
+      quantity: qtyRaw,
+      product,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      purchaseTreasurySplits: treasurySplitsRaw,
+    } = req.body || {};
 
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       await session.abortTransaction();
@@ -258,6 +274,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       }
     }
 
+    const addedByNorm = normalizeAddedBy(product?.addedBy);
     const payload = {
       name,
       code: categoryIsMulti && q > 1 ? unitCodesNorm[0] : code,
@@ -268,6 +285,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       attributes: attrsNorm,
       imageUrl: imageUrlNorm,
       notes,
+      ...(addedByNorm ? { addedBy: addedByNorm } : {}),
     };
     if (categoryIsMulti && q > 1) {
       payload.unitCodes = unitCodesNorm;
@@ -295,21 +313,27 @@ export const createProductPurchaseRequest = async (req, res) => {
     const autoApprove = isAutoApproverRole(actor.role);
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
-    const treasuryKeysAllowed = new Set(treasuryMethods.map((m) => m.key));
-    treasuryKeysAllowed.add(PURCHASE_TREASURY_DEFERRED_KEY);
     const tMap = treasuryMethodMap(treasuryMethods);
-    const treasuryKeyNorm =
-      treasuryKeyRaw !== undefined && treasuryKeyRaw !== null && String(treasuryKeyRaw).trim() !== ''
-        ? String(treasuryKeyRaw).trim().toLowerCase()
-        : 'cash';
-    if (!treasuryKeysAllowed.has(treasuryKeyNorm)) {
+    const lineTotal = Math.round(netNum * q * 100) / 100;
+    const treasuryNorm = normalizePurchaseTreasuryInput({
+      purchaseTreasurySplits: treasurySplitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      lineTotal,
+      treasuryMethods,
+      tMap,
+    });
+    if (treasuryNorm.error) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: 'Invalid purchase treasury method' });
+      return res.status(400).json({ error: treasuryNorm.error });
     }
-    const purchaseTreasuryLabel = isDeferredPurchaseTreasury(treasuryKeyNorm)
-      ? deferredPurchaseTreasuryLabel()
-      : String(tMap.get(treasuryKeyNorm) || treasuryKeyNorm).trim();
+    const {
+      splits: purchaseTreasurySplits,
+      treasuryKey: treasuryKeyNorm,
+      treasuryLabel: purchaseTreasuryLabel,
+      amountPaid: treasuryAmountPaid,
+      hasDeferred: treasuryHasDeferred,
+    } = treasuryNorm;
 
     const purchase = await ProductPurchaseRequest.create(
       [
@@ -321,7 +345,8 @@ export const createProductPurchaseRequest = async (req, res) => {
           quantity: q,
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
-          ...(isDeferredPurchaseTreasury(treasuryKeyNorm) ? { amountPaid: 0 } : {}),
+          purchaseTreasurySplits,
+          ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
           ...(autoApprove
             ? { resolvedBy: actor._id, resolvedAt: new Date(), resolutionNote: 'Auto-approved' }
             : {}),
@@ -330,6 +355,11 @@ export const createProductPurchaseRequest = async (req, res) => {
       { session }
     );
     const created = purchase[0];
+    if (purchaseTreasurySplits?.length) {
+      created.set('purchaseTreasurySplits', purchaseTreasurySplits);
+      created.markModified('purchaseTreasurySplits');
+      await created.save({ session });
+    }
 
     let createdProduct = null;
 
@@ -357,6 +387,7 @@ export const createProductPurchaseRequest = async (req, res) => {
                 inWarehouse: false,
                 imageUrl: payload.imageUrl,
                 attributes: payload.attributes,
+                ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
                 ...acquiredFromFields,
               },
             ],
@@ -372,7 +403,7 @@ export const createProductPurchaseRequest = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        if (isDeferredPurchaseTreasury(treasuryKeyNorm)) {
+        if (purchaseHasDeferredTreasury(created)) {
           try {
             await syncDeferredSupplierDeskPurchase(created, {
               userId: actor._id,
@@ -419,9 +450,10 @@ export const createProductPurchaseRequest = async (req, res) => {
           },
         });
 
+        const purchaseOut = await leanPurchaseForResponse(created._id);
         return res.status(201).json({
           message: '✅ Purchase created and approved',
-          purchase: created.toObject ? created.toObject() : created,
+          purchase: purchaseOut || (created.toObject ? created.toObject() : created),
           createdProduct,
           createdProducts: createdList,
         });
@@ -448,6 +480,7 @@ export const createProductPurchaseRequest = async (req, res) => {
             inWarehouse: false,
             imageUrl: payload.imageUrl,
             attributes: payload.attributes,
+            ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
             ...acquiredFromFields,
           },
         ],
@@ -461,7 +494,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       await session.commitTransaction();
       session.endSession();
 
-      if (isDeferredPurchaseTreasury(treasuryKeyNorm)) {
+      if (purchaseHasDeferredTreasury(created)) {
         try {
           await syncDeferredSupplierDeskPurchase(created, {
             userId: actor._id,
@@ -482,7 +515,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           toBranchId: branchId,
           quantity: q,
           unitPrice: payload.netPrice,
-          totalValue: Math.round(payload.netPrice * q * 100) / 100,
+          totalValue: deskPurchaseLineTotal(created),
           referenceType: 'productPurchaseRequest',
           referenceId: created._id,
           notes: `Product purchase (desk, auto-approved)`,
@@ -500,9 +533,10 @@ export const createProductPurchaseRequest = async (req, res) => {
         metadata: { branchId, productCode: code, quantity: q, createdProductId: prod._id },
       });
 
+      const purchaseOut = await leanPurchaseForResponse(created._id);
       return res.status(201).json({
         message: '✅ Purchase created and approved',
-        purchase: created.toObject ? created.toObject() : created,
+        purchase: purchaseOut || (created.toObject ? created.toObject() : created),
         createdProduct,
       });
     }
@@ -551,9 +585,10 @@ export const createProductPurchaseRequest = async (req, res) => {
       metadata: { branchId, productCode: code, quantity: q },
     });
 
+    const purchaseOut = await leanPurchaseForResponse(created._id);
     return res.status(201).json({
       message: '✅ Purchase created (pending approval)',
-      purchase: created.toObject ? created.toObject() : created,
+      purchase: purchaseOut || (created.toObject ? created.toObject() : created),
       createdProduct,
     });
   } catch (e) {
@@ -682,6 +717,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
               inWarehouse: false,
               imageUrl: normalizeImageUrl(pp.imageUrl),
               attributes: attrsNorm,
+              ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
               ...acquiredFromFields,
             },
           ],
@@ -712,6 +748,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
             inWarehouse: false,
             imageUrl: normalizeImageUrl(pp.imageUrl),
             attributes: attrsNorm,
+            ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
             ...acquiredFromFields,
           },
         ],
@@ -734,7 +771,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    if (isDeferredPurchaseTreasury(purchase.purchaseTreasuryKey)) {
+    if (purchaseHasDeferredTreasury(purchase)) {
       try {
         if (acquiredFromFields.acquiredFrom) {
           purchase.productPayload = purchase.productPayload || {};

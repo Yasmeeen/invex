@@ -1,5 +1,14 @@
 import mongoose from 'mongoose';
 
+const purchaseTreasurySplitSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, required: true },
+    label: { type: String, trim: true, default: '' },
+    amount: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
 const productPurchaseRequestSchema = new mongoose.Schema(
   {
     status: {
@@ -43,6 +52,7 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       attributes: { type: Object, default: {} },
       imageUrl: { type: String, trim: true, default: '' },
       notes: { type: String, trim: true, default: '' },
+      addedBy: { type: String, trim: true, default: '' },
       acquiredFrom: {
         partyType: { type: String, enum: ['client', 'supplier'], required: false },
         clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: false },
@@ -56,10 +66,12 @@ const productPurchaseRequestSchema = new mongoose.Schema(
 
     quantity: { type: Number, required: true, min: 1, default: 1 },
 
-    /** Store Settings purchase treasury key (`cash` = paid from physical drawer). */
+    /** Store Settings purchase treasury key (`cash` = paid from physical drawer). Legacy / summary. */
     purchaseTreasuryKey: { type: String, trim: true, default: 'cash', index: true },
     /** Snapshot label at creation time (for receipts/history if settings change). */
     purchaseTreasuryLabel: { type: String, trim: true, default: '' },
+    /** Split payment across treasuries: [{ key, label, amount }]. Sum equals netPrice × quantity. */
+    purchaseTreasurySplits: { type: [purchaseTreasurySplitSchema], default: undefined },
 
     /** When purchaseTreasuryKey is `deferred` and source is supplier — links vendor payable. */
     linkedPurchasingRequestId: {

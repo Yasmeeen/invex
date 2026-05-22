@@ -1,14 +1,21 @@
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import Order from '../../DB/models/order.model.js';
 import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import DrawerClose from '../../DB/models/drawerClose.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import User from '../../DB/models/user.model.js';
-import { treasuryKeyIsCashDrawer } from '../settings_module/treasuryMethods.js';
+import {
+  aggregateTreasuryAmountsFromPurchases,
+  resolvePurchaseTreasurySplits,
+  sumCashDrawerOutflowFromPurchases,
+} from '../../utils/purchase-treasury-splits.js';
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
+/** Business day boundaries for drawer close (store operations). */
+const DRAWER_BUSINESS_TZ = 'Africa/Cairo';
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -26,16 +33,12 @@ function isPhysicalCashMethod(m) {
 
 function parseBusinessDay(yyyyMmDd) {
   const raw = String(yyyyMmDd || '').trim();
-  const parts = raw.split('-');
-  if (parts.length !== 3) return null;
-  const y = Number(parts[0]);
-  const mo = Number(parts[1]);
-  const d = Number(parts[2]);
-  if (!y || !mo || !d) return null;
-  const start = new Date(y, mo - 1, d, 0, 0, 0, 0);
-  const end = new Date(y, mo - 1, d, 23, 59, 59, 999);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  return { start, end };
+  const m = moment.tz(raw, 'YYYY-MM-DD', DRAWER_BUSINESS_TZ);
+  if (!m.isValid()) return null;
+  return {
+    start: m.clone().startOf('day').utc().toDate(),
+    end: m.clone().endOf('day').utc().toDate(),
+  };
 }
 
 async function loadActor(userId) {
@@ -146,30 +149,21 @@ async function deskPurchaseTreasuryBreakdown(branchOid, start, end) {
   const rows = await ProductPurchaseRequest.find({
     branch: branchOid,
     createdAt: { $gte: start, $lte: end },
+    status: { $ne: 'rejected' },
   })
-    .select('quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel')
+    .select(
+      'quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits status'
+    )
     .lean();
 
-  const byKey = {};
-  let cashDrawerTotal = 0;
+  const byKey = aggregateTreasuryAmountsFromPurchases(rows);
   let grandTotal = 0;
-
   for (const r of rows) {
-    const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
-    const net = round2(Number(r.productPayload?.netPrice || 0));
-    const line = round2(net * q);
-    grandTotal = round2(grandTotal + line);
-    const key = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
-    const label = String(r.purchaseTreasuryLabel || '').trim() || key;
-    if (!byKey[key]) {
-      byKey[key] = { key, label, total: 0, count: 0 };
-    }
-    byKey[key].total = round2(byKey[key].total + line);
-    byKey[key].count += 1;
-    if (treasuryKeyIsCashDrawer(key)) {
-      cashDrawerTotal = round2(cashDrawerTotal + line);
+    for (const s of resolvePurchaseTreasurySplits(r)) {
+      grandTotal = round2(grandTotal + s.amount);
     }
   }
+  const cashDrawerTotal = sumCashDrawerOutflowFromPurchases(rows);
 
   const deskPurchaseByTreasuryMethod = Object.values(byKey).sort((a, b) =>
     String(a.key).localeCompare(String(b.key))

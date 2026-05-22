@@ -28,6 +28,8 @@ export interface Product {
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
   imageUrl?: string;
+  /** Optional: employee name who added / registered the device */
+  addedBy?: string;
   /** Optional source: client or supplier the device was acquired from */
   acquiredFrom?: ProductAcquiredFrom | null;
 }

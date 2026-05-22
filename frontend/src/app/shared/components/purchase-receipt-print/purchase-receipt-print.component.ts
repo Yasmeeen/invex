@@ -76,10 +76,23 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
   }
 
   get purchaseTreasuryDisplay(): string {
+    const splits = Array.isArray(this.purchase?.purchaseTreasurySplits)
+      ? this.purchase.purchaseTreasurySplits
+      : [];
+    if (splits.length > 1) {
+      return splits
+        .map((s: { label?: string; key?: string; amount?: number }) => {
+          const name = String(s?.label || s?.key || '').trim();
+          const amt = Number(s?.amount);
+          const amtStr = Number.isFinite(amt) ? this.formatReceiptAmount(amt) : '0';
+          return `${name}: ${amtStr}`;
+        })
+        .join(' · ');
+    }
     const label = String(this.purchase?.purchaseTreasuryLabel || '').trim();
     const key = String(this.purchase?.purchaseTreasuryKey || '').trim().toLowerCase();
     if (!label && !key) return '';
-    if (label && key) return `${label} (${key})`;
+    if (label && key && label !== key) return `${label} (${key})`;
     return label || key;
   }
 

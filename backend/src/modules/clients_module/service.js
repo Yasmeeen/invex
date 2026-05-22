@@ -5,7 +5,7 @@ import {
   deferredDeskPurchaseRemaining,
   deskPurchaseLineTotal,
 } from "../../utils/desk-purchase-deferred.js";
-import { isDeferredPurchaseTreasury } from "../settings_module/treasuryMethods.js";
+import { purchaseHasDeferredTreasury } from "../../utils/purchase-treasury-splits.js";
 import Branch from "../../DB/models/branch.model.js";
 import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
@@ -338,7 +338,7 @@ export const getClientHistory = async (req, res) => {
       const qty = Math.max(1, Math.floor(Number(p.quantity) || 1));
       const unitNet = Math.round((Number(pp.netPrice) || 0) * 100) / 100;
       const lineTotal = deskPurchaseLineTotal(p);
-      const isDeferred = isDeferredPurchaseTreasury(p.purchaseTreasuryKey);
+      const isDeferred = purchaseHasDeferredTreasury(p);
       const remaining = isDeferred ? deferredDeskPurchaseRemaining(p) : 0;
       const paid =
         isDeferred && p.status === "approved"
@@ -361,6 +361,7 @@ export const getClientHistory = async (req, res) => {
         isDeferredPurchase: isDeferred,
         purchaseTreasuryKey: p.purchaseTreasuryKey,
         purchaseTreasuryLabel: p.purchaseTreasuryLabel || "",
+        purchaseTreasurySplits: p.purchaseTreasurySplits || [],
         createdByName: p.createdBy?.name || "",
       };
     });

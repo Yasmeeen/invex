@@ -90,6 +90,12 @@ const productSchema = new mongoose.Schema(
       of: String,
       default: {},
     },
+    /** Optional: name of the employee who registered / added the device. */
+    addedBy: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     /** Optional: client or supplier the device was acquired from (trade-in / purchase source). */
     acquiredFrom: {
       partyType: {

@@ -68,7 +68,16 @@
           <div class="size-small text-muted">{{ 'tr_sale_price' | translate }}</div>
           <div class="weight-bold">{{ d?.product?.price || '-' }}</div>
         </div>
-        <div class="col-md-6 mb-2" *ngIf="d?.treasuryKey || d?.treasuryLabel">
+        <div class="col-md-12 mb-2" *ngIf="d?.treasurySplits?.length > 1">
+          <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
+          <ul class="m-0 pl-3 weight-bold">
+            <li *ngFor="let s of d.treasurySplits">
+              {{ s.label || s.key }}:
+              {{ s.amount | currency:'EGP ':'symbol':'1.2-2' }}
+            </li>
+          </ul>
+        </div>
+        <div class="col-md-6 mb-2" *ngIf="(d?.treasuryKey || d?.treasuryLabel) && !(d?.treasurySplits?.length > 1)">
           <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
           <div class="weight-bold">
             {{ d?.treasuryLabel || d?.treasuryKey || '—' }}

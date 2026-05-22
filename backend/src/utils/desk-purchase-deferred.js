@@ -4,21 +4,21 @@ import {
   PURCHASE_TREASURY_DEFERRED_LABEL,
 } from '../modules/settings_module/treasuryMethods.js';
 import {
+  deferredTreasuryAmount,
+  purchaseHasDeferredTreasury,
+} from './purchase-treasury-splits.js';
+import {
   removeVendorPurchaseLedger,
   syncVendorPurchaseLedger,
 } from './vendor-purchase-ledger.js';
 
-export function deskPurchaseLineTotal(purchase) {
-  const q = Math.max(1, Math.floor(Number(purchase?.quantity) || 1));
-  const net = Number(purchase?.productPayload?.netPrice) || 0;
-  return Math.round(net * q * 100) / 100;
-}
+export { deskPurchaseLineTotal } from './purchase-treasury-splits.js';
 
 export function deferredDeskPurchaseRemaining(purchase) {
-  if (!purchase || !isDeferredPurchaseTreasury(purchase.purchaseTreasuryKey)) return 0;
-  const total = deskPurchaseLineTotal(purchase);
+  if (!purchase || !purchaseHasDeferredTreasury(purchase)) return 0;
+  const deferredTotal = deferredTreasuryAmount(purchase) || deskPurchaseLineTotal(purchase);
   const paid = Number(purchase.amountPaid) || 0;
-  return Math.max(0, Math.round((total - paid) * 100) / 100);
+  return Math.max(0, Math.round((deferredTotal - paid) * 100) / 100);
 }
 
 function deskPurchasingRequestNote(purchase) {
@@ -35,7 +35,7 @@ function deskPurchasingRequestNote(purchase) {
  * Create or update PurchasingRequest + vendor ledger for approved deferred supplier desk purchase.
  */
 export async function syncDeferredSupplierDeskPurchase(purchase, { userId, actorName, session } = {}) {
-  if (!purchase || !isDeferredPurchaseTreasury(purchase.purchaseTreasuryKey)) {
+  if (!purchase || !purchaseHasDeferredTreasury(purchase)) {
     return null;
   }
 
@@ -44,7 +44,7 @@ export async function syncDeferredSupplierDeskPurchase(purchase, { userId, actor
     return null;
   }
 
-  const totalAmount = deskPurchaseLineTotal(purchase);
+  const totalAmount = deferredTreasuryAmount(purchase) || deskPurchaseLineTotal(purchase);
   const productIds = [];
   if (purchase.createdProductIds?.length) {
     for (const id of purchase.createdProductIds) {

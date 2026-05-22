@@ -13,7 +13,7 @@ import {
   getEffectivePurchaseTreasuryMethodsFromDb,
   isDeferredPurchaseTreasury,
   treasuryMethodMap,
-} from '../modules/settings_module/treasuryMethods.js';
+} from '../settings_module/treasuryMethods.js';
 import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
 
 const normalizeAttrKey = (raw) =>

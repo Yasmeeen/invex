@@ -1,10 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
-import { PAYMENT_APP_FEE_METHOD_IDS } from '@shared/constants/payment-app-fee-methods';
 import { PAYMENT_METHOD_OPTIONS } from '@shared/constants/payment-method-options';
 import { AppNotificationService } from '@shared/services/app-notification.service';
-import { PaymentAppFeePercent, StoreSettingsService } from '@shared/services/store-settings.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+import {
+  PaymentFeeUiRow,
+  normalizePaymentFeeRowsForSave,
+  paymentFeeRowsFromSaved,
+} from '../store-settings-dialog.util';
 
 @Component({
   selector: 'app-payment-app-fees-dialog',
@@ -12,12 +16,7 @@ import { PaymentAppFeePercent, StoreSettingsService } from '@shared/services/sto
   styleUrls: ['./payment-app-fees-dialog.component.scss'],
 })
 export class PaymentAppFeesDialogComponent implements OnInit {
-  readonly rows = PAYMENT_APP_FEE_METHOD_IDS.map((id) => ({
-    id,
-    labelKey: PAYMENT_METHOD_OPTIONS.find((p) => p.id === id)?.labelKey ?? `tr_pay_${id}`,
-  }));
-
-  percents: Record<string, number> = {};
+  feeRows: PaymentFeeUiRow[] = [];
   saving = false;
 
   constructor(
@@ -28,16 +27,27 @@ export class PaymentAppFeesDialogComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const map = new Map(
-      (this.storeSettingsService.snapshot.paymentAppFeePercents || []).map((x: PaymentAppFeePercent) => [
-        x.method,
-        x.percent,
-      ])
+    this.feeRows = paymentFeeRowsFromSaved(
+      this.storeSettingsService.snapshot.paymentAppFeePercents || [],
+      (method) => this.defaultLabelForPaymentMethod(method)
     );
-    for (const r of this.rows) {
-      const v = map.get(r.id);
-      this.percents[r.id] = Number.isFinite(Number(v)) ? Number(v) : 0;
+  }
+
+  private defaultLabelForPaymentMethod(method: string): string {
+    const id = String(method || '').trim().toLowerCase();
+    const opt = PAYMENT_METHOD_OPTIONS.find((p) => p.id === id);
+    if (opt?.labelKey) {
+      return this.translate.instant(opt.labelKey);
     }
+    return id.replace(/_/g, ' ');
+  }
+
+  addRow(): void {
+    this.feeRows.push({ key: '', label: '', percent: 0 });
+  }
+
+  removeRow(index: number): void {
+    this.feeRows.splice(index, 1);
   }
 
   cancel(): void {
@@ -45,13 +55,7 @@ export class PaymentAppFeesDialogComponent implements OnInit {
   }
 
   save(): void {
-    const paymentAppFeePercents = PAYMENT_APP_FEE_METHOD_IDS.map((method) => ({
-      method,
-      percent: Math.max(
-        0,
-        Math.min(100, Math.round((Number(this.percents[method]) || 0) * 100) / 100)
-      ),
-    }));
+    const paymentAppFeePercents = normalizePaymentFeeRowsForSave(this.feeRows);
     this.saving = true;
     this.storeSettingsService.update({ paymentAppFeePercents }).subscribe({
       next: () => {

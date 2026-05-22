@@ -4,9 +4,10 @@ import { BehaviorSubject, Observable, from, of } from 'rxjs';
 import { catchError, concatMap, map, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { STORE_SETTINGS_URL } from '@core/base/urls';
-import { PAYMENT_APP_FEE_METHOD_IDS } from '@shared/constants/payment-app-fee-methods';
-
 export type ReceiptLanguageCode = 'ar' | 'en' | 'de' | 'fr';
+
+const PAYMENT_FEE_BLOCKED = new Set(['cash', 'credit', 'mixed']);
+const PAYMENT_FEE_KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
 
 export const RECEIPT_LANGUAGE_CODES: ReceiptLanguageCode[] = ['ar', 'en', 'de', 'fr'];
 
@@ -17,6 +18,7 @@ export interface PurchaseTreasuryMethod {
 
 export interface PaymentAppFeePercent {
   method: string;
+  label?: string;
   percent: number;
 }
 
@@ -57,14 +59,13 @@ export class StoreSettingsService {
     if (!Array.isArray(raw)) {
       return [];
     }
-    const allowed = new Set<string>(PAYMENT_APP_FEE_METHOD_IDS as unknown as string[]);
     const seen = new Set<string>();
     const out: PaymentAppFeePercent[] = [];
     for (const row of raw) {
       const method = String((row as PaymentAppFeePercent)?.method ?? '')
         .trim()
         .toLowerCase();
-      if (!method || !allowed.has(method) || seen.has(method)) {
+      if (!method || PAYMENT_FEE_BLOCKED.has(method) || !PAYMENT_FEE_KEY_RE.test(method) || seen.has(method)) {
         continue;
       }
       let percent = Number((row as PaymentAppFeePercent)?.percent);
@@ -72,8 +73,9 @@ export class StoreSettingsService {
         percent = 0;
       }
       percent = Math.max(0, Math.min(100, Math.round(percent * 100) / 100));
+      const label = String((row as PaymentAppFeePercent)?.label ?? '').trim().slice(0, 120);
       seen.add(method);
-      out.push({ method, percent });
+      out.push({ method, label, percent });
     }
     out.sort((a, b) => a.method.localeCompare(b.method));
     return out;

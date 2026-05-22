@@ -10,6 +10,8 @@ import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
+import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 export type ClientHistoryDialogData = { client: Client };
 
@@ -27,6 +29,7 @@ export class ClientHistoryDialogComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private ref: MatDialogRef<ClientHistoryDialogComponent>,
+    private storeSettings: StoreSettingsService,
     @Inject(MAT_DIALOG_DATA) public data: ClientHistoryDialogData
   ) {}
 
@@ -72,10 +75,14 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   paymentMethodLabel(method?: string): string {
-    if (String(method || '').toLowerCase() === 'credit') {
-      return this.translate.instant('tr_pay_credit');
+    if (!method) {
+      return '—';
     }
-    return method || '—';
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
   }
 
   purchaseStatusLabel(status?: string): string {

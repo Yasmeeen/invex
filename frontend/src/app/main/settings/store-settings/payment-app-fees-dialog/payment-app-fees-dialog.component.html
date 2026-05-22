@@ -1,28 +1,57 @@
 <div class="payment-app-fees-dialog">
   <h2 mat-dialog-title class="payment-app-fees-dialog__title">
-    {{ 'tr_payment_app_fees_dialog_title' | translate }}
+    {{ 'tr_payment_methods_fees_title' | translate }}
   </h2>
 
-  <div mat-dialog-content class="payment-app-fees-dialog__body">
-    <p class="payment-app-fees-dialog__lead">{{ 'tr_payment_app_fees_dialog_lead' | translate }}</p>
+  <div mat-dialog-content class="payment-app-fees-dialog__content">
+    <div class="payment-app-fees-dialog__scroll">
+    <p class="payment-app-fees-dialog__lead">{{ 'tr_payment_methods_fees_hint' | translate }}</p>
 
-    <div class="payment-app-fees-table">
-      <div class="payment-app-fees-table__head">
-        <span>{{ 'tr_payment_app_fees_col_method' | translate }}</span>
-        <span>{{ 'tr_payment_app_fees_col_percent' | translate }}</span>
+    <div class="settings-dialog-table payment-methods-fees-table">
+      <div class="settings-dialog-table__head payment-methods-fees-table__head">
+        <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
+        <span>{{ 'tr_payment_methods_fees_col_percent' | translate }}</span>
+        <span></span>
       </div>
-      <div class="payment-app-fees-table__row" *ngFor="let row of rows">
-        <span class="payment-app-fees-table__method">{{ row.labelKey | translate }}</span>
-        <input
-          type="number"
-          class="s-control payment-app-fees-table__input"
-          min="0"
-          max="100"
-          step="0.01"
-          [(ngModel)]="percents[row.id]"
-          [name]="'feePct_' + row.id"
-        />
+      <div class="settings-dialog-table__row payment-methods-fees-table__row mb-2" *ngFor="let row of feeRows; let i = index">
+        <div class="payment-methods-fees-table__method">
+          <input
+            type="text"
+            class="s-control settings-dialog-table__label"
+            [(ngModel)]="row.label"
+            [name]="'payMethodLabel_' + i"
+            maxlength="120"
+            autocomplete="off"
+            [attr.placeholder]="'tr_payment_methods_fees_method_placeholder' | translate"
+          />
+        </div>
+        <div class="payment-methods-fees-table__percent-cell">
+          <input
+            type="number"
+            class="s-control payment-methods-fees-table__percent"
+            [(ngModel)]="row.percent"
+            [name]="'payMethodPct_' + i"
+            min="0"
+            max="100"
+            step="0.01"
+          />
+        </div>
+        <div class="payment-methods-fees-table__actions">
+          <button
+            type="button"
+            class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
+            (click)="removeRow(i)"
+            [attr.title]="'tr_remove' | translate"
+          >
+            <i class="fa fa-trash-o"></i>
+          </button>
+        </div>
       </div>
+    </div>
+
+    <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
+      <i class="fa fa-plus mr-1"></i>{{ 'tr_payment_methods_fees_add' | translate }}
+    </button>
     </div>
   </div>
 

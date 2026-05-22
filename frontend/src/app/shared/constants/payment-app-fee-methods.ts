@@ -1,6 +1,6 @@
 /**
- * Payment methods that may carry a BNPL / wallet provider surcharge.
- * Must stay in sync with backend `paymentAppFees.js` ALLOWED_METHODS.
+ * Default payment method ids (cashier). Settings may add custom methods;
+ * fee % is matched by `method` id — custom rows need the same id as in cashier splits.
  */
 export const PAYMENT_APP_FEE_METHOD_IDS = [
   'visa',

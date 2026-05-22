@@ -30,6 +30,8 @@ import {
   PaymentMethodOption,
 } from '@shared/constants/payment-method-options';
 import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
+import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-orders-list',
@@ -95,7 +97,8 @@ export class OrdersListComponent implements OnInit {
     private CategoriesServce: CategoriesServce,
     private authenticationService: AuthenticationService,
     private dashboardService: DashboardService,
-    private branchesServce: BranchesServce
+    private branchesServce: BranchesServce,
+    private storeSettings: StoreSettingsService
   ) { }
 
   orderPaid(order: Order): number {
@@ -256,15 +259,16 @@ export class OrdersListComponent implements OnInit {
     return Math.round(-Number(d) * 100) / 100;
   }
 
-  /** Translate stored order.paymentMethod id for display. */
+  /** Display stored order.paymentMethod (store settings label when configured). */
   paymentMethodLabel(method: string | undefined): string {
     if (!method) {
       return '—';
     }
-    const opt = this.paymentMethodOptions.find((o) => o.id === method);
-    return opt
-      ? this.translateService.instant(opt.labelKey)
-      : method;
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translateService
+    );
   }
 
   createdAtCairo(order: Order): string {

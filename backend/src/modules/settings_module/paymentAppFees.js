@@ -1,23 +1,11 @@
-/** Payment methods that may carry a BNPL / wallet provider surcharge (matches cashier split methods). */
-const ALLOWED_METHODS = new Set([
-  'visa',
-  'mastercard',
-  'meeza',
-  'valu',
-  'aman',
-  'halan',
-  'tru',
-  'sohoula',
-  'maylo_seven',
-  'fawry',
-  'vodafone_cash',
-  'instapay',
-  'forsa',
-]);
+/** Cashier methods that never carry an app surcharge row. */
+const BLOCKED_METHODS = new Set(['cash', 'credit', 'mixed']);
+
+const METHOD_KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
 
 /**
  * @param {unknown} rawList
- * @returns {{ method: string; percent: number }[]}
+ * @returns {{ method: string; label: string; percent: number }[]}
  */
 export function normalizePaymentAppFeePercents(rawList) {
   if (!Array.isArray(rawList)) {
@@ -29,7 +17,7 @@ export function normalizePaymentAppFeePercents(rawList) {
     const method = String(row?.method ?? '')
       .trim()
       .toLowerCase();
-    if (!method || !ALLOWED_METHODS.has(method) || seen.has(method)) {
+    if (!method || BLOCKED_METHODS.has(method) || !METHOD_KEY_RE.test(method) || seen.has(method)) {
       continue;
     }
     let percent = Number(row?.percent);
@@ -37,8 +25,13 @@ export function normalizePaymentAppFeePercents(rawList) {
       percent = 0;
     }
     percent = Math.max(0, Math.min(100, Math.round(percent * 100) / 100));
+    const label = String(row?.label ?? '').trim().slice(0, 120);
     seen.add(method);
-    out.push({ method, percent });
+    out.push({
+      method,
+      label,
+      percent,
+    });
   }
   out.sort((a, b) => a.method.localeCompare(b.method));
   return out;

@@ -3,20 +3,21 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  OnDestroy,
+  OnInit,
   ViewChild,
 } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { debounceTime, switchMap, catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
+import { of, Subscription } from 'rxjs';
 import { Globals } from '@core/globals';
-
-export interface CashierPaymentMethod {
-  id: string;
-  labelKey: string;
-  logo: string;
-}
+import {
+  buildCashierPaymentMethods,
+  CashierPaymentMethod,
+  paymentMethodDisplayLabel,
+} from '@shared/utils/cashier-payment-methods.util';
 import { Branch, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -40,7 +41,7 @@ import { environment } from 'src/environments/environment';
   templateUrl: './cashier.component.html',
   styleUrls: ['./cashier.component.scss']
 })
-export class CashierComponent implements AfterViewInit {
+export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('barcodeInput') barcodeInput!: ElementRef;
 
   products: Product[] = [];
@@ -87,26 +88,12 @@ export class CashierComponent implements AfterViewInit {
   /** Avoid repeating the same “registered” toast for the same lookup. */
   private lastNotifiedPartyId: string | null = null;
 
-  readonly paymentMethods: CashierPaymentMethod[] = [
-    { id: 'cash', labelKey: 'tr_pay_cash', logo: 'assets/images/payment/cash.svg' },
-    { id: 'credit', labelKey: 'tr_pay_credit', logo: 'assets/images/payment/cash.svg' },
-    { id: 'visa', labelKey: 'tr_pay_visa', logo: 'assets/images/payment/visa.svg' },
-    { id: 'mastercard', labelKey: 'tr_pay_mastercard', logo: 'assets/images/payment/mastercard.svg' },
-    { id: 'meeza', labelKey: 'tr_pay_meeza', logo: 'assets/images/payment/meeza.svg' },
-    { id: 'valu', labelKey: 'tr_pay_valu', logo: 'assets/images/payment/valu.svg' },
-    { id: 'aman', labelKey: 'tr_pay_aman', logo: 'assets/images/payment/aman.svg' },
-    { id: 'halan', labelKey: 'tr_pay_halan', logo: 'assets/images/payment/halan.svg' },
-    { id: 'tru', labelKey: 'tr_pay_tru', logo: 'assets/images/payment/tru.svg' },
-    { id: 'sohoula', labelKey: 'tr_pay_sohoula', logo: 'assets/images/payment/sohoula.svg' },
-    { id: 'maylo_seven', labelKey: 'tr_pay_maylo_seven', logo: 'assets/images/payment/maylo-seven.svg' },
-    { id: 'forsa', labelKey: 'tr_pay_forsa', logo: 'assets/images/payment/cash.svg' },
-    { id: 'fawry', labelKey: 'tr_pay_fawry', logo: 'assets/images/payment/fawry.svg' },
-    { id: 'vodafone_cash', labelKey: 'tr_pay_vodafone_cash', logo: 'assets/images/payment/vodafone-cash.svg' },
-    { id: 'instapay', labelKey: 'tr_pay_instapay', logo: 'assets/images/payment/instapay.svg' },
-  ];
-
+  /** Built from store settings + cash/credit; refreshed on settings$ updates. */
+  paymentMethods: CashierPaymentMethod[] = [];
   /** Stable array reference for ng-select (do not use a getter — breaks multi-select). */
-  readonly paymentMethodsForSplit: CashierPaymentMethod[] = this.paymentMethods;
+  paymentMethodsForSplit: CashierPaymentMethod[] = [];
+
+  private settingsSub?: Subscription;
 
   constructor(
     private productsSerivce: ProductsSerivce, 
@@ -129,6 +116,24 @@ export class CashierComponent implements AfterViewInit {
       this.loadProducts();
     }
     this.initClientForm();
+  }
+
+  ngOnInit(): void {
+    this.rebuildPaymentMethods();
+    this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
+  }
+
+  ngOnDestroy(): void {
+    this.settingsSub?.unsubscribe();
+  }
+
+  private rebuildPaymentMethods(): void {
+    this.paymentMethods = buildCashierPaymentMethods(
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
+    this.paymentMethodsForSplit = this.paymentMethods;
+    this.cdr.markForCheck();
   }
 
   startExchangeFlow(): void {
@@ -734,7 +739,7 @@ export class CashierComponent implements AfterViewInit {
       .slice(2)
       .map((row) => {
         const item = row as CashierPaymentMethod;
-        return item?.labelKey ? this.translate.instant(item.labelKey) : '';
+        return item?.label || '';
       })
       .filter(Boolean)
       .join(', ');
@@ -787,17 +792,23 @@ export class CashierComponent implements AfterViewInit {
     return this.paymentSplitsTotal() > this.effectiveCheckoutTotal() + 0.001;
   }
 
-  /** Receipt: translation key for payment method id (store receipt language). */
-  payMethodLabelKey(method: string | undefined | null): string {
-    const m = String(method || '').trim().toLowerCase();
-    const opt = this.paymentMethods.find((x) => x.id === m);
-    if (opt) {
-      return opt.labelKey;
-    }
-    if (m === 'mixed') {
-      return 'tr_pay_mixed';
-    }
-    return 'tr_pay_cash';
+  /** UI label for a payment method id (uses store settings names when set). */
+  payMethodDisplayLabel(method: string | undefined | null): string {
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
+  }
+
+  /** Receipt label in store receipt language. */
+  payMethodReceiptLabel(method: string | undefined | null): string {
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate,
+      this.storeSettings.snapshot.receiptLanguage
+    );
   }
 
   private maybePushBookingWarning(product: Product | any, newLineQuantity: number): void {

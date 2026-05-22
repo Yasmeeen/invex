@@ -16,6 +16,8 @@ const paymentAppFeePercentEntry = new mongoose.Schema(
   {
     /** Same ids as cashier payment splits (fawry, valu, aman, …). */
     method: { type: String, required: true, trim: true, maxlength: 40 },
+    /** Display name in settings (Arabic / custom label). */
+    label: { type: String, trim: true, maxlength: 120, default: '' },
     /** Provider surcharge paid by customer on top of invoice net (0–100). */
     percent: { type: Number, default: 0, min: 0, max: 100 },
   },

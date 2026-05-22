@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import {
+  getEffectivePurchaseTreasuryMethodsFromDb,
+  treasuryMethodMap,
+} from '../settings_module/treasuryMethods.js';
+import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -40,7 +45,15 @@ function canListExpenses(actor) {
 
 export const createDailyExpense = async (req, res) => {
   try {
-    const { branch, amount, expenseType, notes, userId } = req.body || {};
+    const {
+      branch,
+      amount: amountRaw,
+      expenseType,
+      notes,
+      userId,
+      expenseTreasurySplits: splitsRaw,
+      expenseTreasuryKey: treasuryKeyRaw,
+    } = req.body || {};
 
     const actor = await loadActor(userId);
     if (!canCreateExpense(actor)) {
@@ -60,10 +73,35 @@ export const createDailyExpense = async (req, res) => {
       return res.status(400).json({ error: 'Expense type is required' });
     }
 
-    const amt = round2(amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
+    const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+    const tMap = treasuryMethodMap(treasuryMethods);
+
+    let lineTotal = round2(amountRaw);
+    if (Array.isArray(splitsRaw) && splitsRaw.length) {
+      lineTotal = round2(
+        splitsRaw.reduce((acc, row) => acc + (Number(row?.amount) || 0), 0)
+      );
+    }
+    if (!Number.isFinite(lineTotal) || lineTotal <= 0) {
       return res.status(400).json({ error: 'Amount must be greater than zero' });
     }
+
+    const treasuryNorm = normalizeTreasurySplitsInput({
+      purchaseTreasurySplits: splitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      lineTotal,
+      treasuryMethods,
+      tMap,
+    });
+    if (treasuryNorm.error) {
+      return res.status(400).json({ error: treasuryNorm.error });
+    }
+
+    const {
+      splits: expenseTreasurySplits,
+      treasuryKey: expenseTreasuryKey,
+      treasuryLabel: expenseTreasuryLabel,
+    } = treasuryNorm;
 
     const branchDoc = await Branch.findById(branch).select('_id').lean();
     if (!branchDoc) {
@@ -72,10 +110,13 @@ export const createDailyExpense = async (req, res) => {
 
     const doc = await DailyExpense.create({
       branch,
-      amount: amt,
+      amount: lineTotal,
       expenseType: typeTrim,
       notes: String(notes || '').trim().slice(0, 2000),
       recordedBy: userId,
+      expenseTreasuryKey,
+      expenseTreasuryLabel,
+      expenseTreasurySplits,
     });
 
     const populated = await DailyExpense.findById(doc._id)

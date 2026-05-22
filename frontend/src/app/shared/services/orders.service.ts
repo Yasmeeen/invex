@@ -6,6 +6,11 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Order } from '@core/models/products.model';
 
+export interface TreasurySplitPayload {
+  key: string;
+  label?: string;
+  amount: number;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -27,7 +32,16 @@ createOrder(params: any) {
   return this.http.post(ORDER_CREATE_URL, params);
 }
 
-addPayment(orderId: string, payload: { amount: number; paidAt?: string; userId?: string; note?: string }) {
+addPayment(
+  orderId: string,
+  payload: {
+    amount: number;
+    paidAt?: string;
+    userId?: string;
+    note?: string;
+    paymentTreasurySplits?: TreasurySplitPayload[];
+  }
+) {
   return this.http.post(`${ORDERS_URL}/${orderId}/payments`, payload);
 }
 

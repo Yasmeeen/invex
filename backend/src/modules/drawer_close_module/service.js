@@ -9,6 +9,7 @@ import User from '../../DB/models/user.model.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
   resolvePurchaseTreasurySplits,
+  sumCashDrawerOutflowFromExpenses,
   sumCashDrawerOutflowFromPurchases,
 } from '../../utils/purchase-treasury-splits.js';
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
@@ -81,8 +82,16 @@ async function paymentsReceivedByMethod(branchOid, start, end) {
     for (const p of o.payments || []) {
       const t = p.paidAt ? new Date(p.paidAt).getTime() : NaN;
       if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
-      const m = normalizePayMethod(p.method);
-      byMethod[m] = round2((byMethod[m] || 0) + Number(p.amount || 0));
+      const splits = Array.isArray(p.paymentTreasurySplits) ? p.paymentTreasurySplits : [];
+      if (splits.length) {
+        for (const s of splits) {
+          const m = normalizePayMethod(s.key);
+          byMethod[m] = round2((byMethod[m] || 0) + Number(s.amount || 0));
+        }
+      } else {
+        const m = normalizePayMethod(p.method);
+        byMethod[m] = round2((byMethod[m] || 0) + Number(p.amount || 0));
+      }
     }
   }
   return byMethod;
@@ -128,17 +137,15 @@ async function invoiceCountForDay(branchOid, start, end) {
   });
 }
 
-async function sumDailyExpenses(branchOid, start, end) {
-  const [agg] = await DailyExpense.aggregate([
-    {
-      $match: {
-        branch: branchOid,
-        createdAt: { $gte: start, $lte: end },
-      },
-    },
-    { $group: { _id: null, total: { $sum: '$amount' } } },
-  ]);
-  return round2(agg?.total || 0);
+/** Daily expenses: only cash-treasury portions reduce expected drawer cash. */
+async function sumDailyExpensesCashDrawer(branchOid, start, end) {
+  const rows = await DailyExpense.find({
+    branch: branchOid,
+    createdAt: { $gte: start, $lte: end },
+  })
+    .select('amount expenseTreasuryKey expenseTreasuryLabel expenseTreasurySplits')
+    .lean();
+  return sumCashDrawerOutflowFromExpenses(rows);
 }
 
 /**
@@ -199,7 +206,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
-    sumDailyExpenses(branchOid, start, end),
+    sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
   ]);

@@ -264,7 +264,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let order of ordersList">
+            <tr *ngFor="let order of ordersList" [class.order-row--pay-later]="isPayLaterOrder(order)">
               <td>{{ order.orderNumber }}</td>
               <td>
                 <span
@@ -335,7 +335,11 @@
       </div>
 
       <div class="orders-cards" *ngIf="ordersList.length > 0 && viewMode === 'cards'">
-        <div class="order-card" *ngFor="let order of ordersList">
+        <div
+          class="order-card"
+          *ngFor="let order of ordersList"
+          [class.order-card--pay-later]="isPayLaterOrder(order)"
+        >
           <div class="order-card__top">
             <div class="order-card__icon">
               <i class="fa fa-file-text-o" aria-hidden="true"></i>

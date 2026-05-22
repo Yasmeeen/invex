@@ -7,6 +7,7 @@ import { AddOrderComponent } from './add-order/add-order.component';
 import { PayOrderDialogComponent } from './pay-order-dialog/pay-order-dialog.component';
 import { SharedModule } from '@shared/shared.module';
 import { OrdersSerivce } from '@shared/services/orders.service';
+import { MatDialogModule } from '@angular/material/dialog';
 
 
 @NgModule({
@@ -18,7 +19,8 @@ import { OrdersSerivce } from '@shared/services/orders.service';
   imports: [
     CommonModule,
     OrdersRoutingModule,
-    SharedModule
+    SharedModule,
+    MatDialogModule,
   ],
   providers: [OrdersSerivce]
 })

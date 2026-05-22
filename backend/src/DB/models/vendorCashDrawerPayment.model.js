@@ -1,5 +1,14 @@
 import mongoose from 'mongoose';
 
+const paymentTreasurySplitSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, required: true },
+    label: { type: String, trim: true, default: '' },
+    amount: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
 /**
  * Cash that left the physical drawer for supplier payments (deposit / deferred / installment).
  * Mirrors DailyExpense — branch + date are required for drawer-close reconciliation.
@@ -30,6 +39,8 @@ const vendorCashDrawerPaymentSchema = new mongoose.Schema(
       required: false,
     },
     note: { type: String, default: '', trim: true, maxlength: 500 },
+    /** Full payment breakdown when only cash portion hits drawer (audit). */
+    paymentTreasurySplits: { type: [paymentTreasurySplitSchema], default: undefined },
     recordedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

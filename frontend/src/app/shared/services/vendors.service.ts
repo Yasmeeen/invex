@@ -6,6 +6,11 @@ import { Vendor, VendorHistoryResponse } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+export interface TreasurySplitPayload {
+  key: string;
+  label?: string;
+  amount: number;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -77,6 +82,7 @@ recordDeferredPurchasePayment(
     userId?: string;
     branchId?: string;
     note?: string;
+    paymentTreasurySplits?: TreasurySplitPayload[];
   }
 ): Observable<any> {
   return this.http.post(`${VENDORS_URL}/${vendorId}/deferred-payment`, payload);

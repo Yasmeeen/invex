@@ -440,12 +440,18 @@ export const settleVendorBalances = async (req, res) => {
 /** POST record our payment to supplier on a deferred (آجل) purchase. */
 export const recordVendorDeferredPurchasePayment = async (req, res) => {
   try {
-    const amount = Number(req.body?.amount);
+    const { purchasingRequestId, paymentTreasurySplits: splitsRaw, amount: amountRaw } =
+      req.body || {};
+
+    let amount = Number(amountRaw);
+    if (Array.isArray(splitsRaw) && splitsRaw.length) {
+      amount = splitsRaw.reduce((acc, row) => acc + (Number(row?.amount) || 0), 0);
+    }
+    amount = Math.round(amount * 100) / 100;
+
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ message: 'Valid amount is required' });
     }
-
-    const { purchasingRequestId } = req.body || {};
     if (!purchasingRequestId || !mongoose.Types.ObjectId.isValid(String(purchasingRequestId))) {
       return res.status(400).json({ message: 'Valid purchasingRequestId is required' });
     }
@@ -469,6 +475,7 @@ export const recordVendorDeferredPurchasePayment = async (req, res) => {
       userId: req.body?.userId,
       branchId: req.body?.branchId,
       note: req.body?.note,
+      paymentTreasurySplits: splitsRaw,
     });
 
     const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);

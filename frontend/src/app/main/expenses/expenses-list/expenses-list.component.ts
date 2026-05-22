@@ -166,4 +166,25 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.subscriptions.forEach((s) => s && s.unsubscribe());
   }
+
+  expenseTreasuryDisplay(row: DailyExpenseDto): string {
+    const splits = Array.isArray(row.expenseTreasurySplits) ? row.expenseTreasurySplits : [];
+    if (splits.length > 1) {
+      return splits
+        .map((s) => {
+          const name = String(s.label || s.key || '').trim();
+          const amt = Number(s.amount);
+          const amtStr = Number.isFinite(amt)
+            ? new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amt)
+            : '0';
+          return `${name}: ${amtStr}`;
+        })
+        .join(' · ');
+    }
+    const label = String(row.expenseTreasuryLabel || '').trim();
+    const key = String(row.expenseTreasuryKey || '').trim();
+    if (label) return label;
+    if (key) return key;
+    return '—';
+  }
 }

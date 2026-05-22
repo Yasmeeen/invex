@@ -9,6 +9,12 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
 import { auditLog } from '../audit_module/audit.service.js';
+import {
+  getEffectivePurchaseTreasuryMethodsFromDb,
+  isDeferredPurchaseTreasury,
+  treasuryMethodMap,
+} from '../modules/settings_module/treasuryMethods.js';
+import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -568,11 +574,14 @@ export const createOrder = async (req, res) => {
 export const addOrderPayment = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { amount, paidAt, userId, note, method: methodRaw } = req.body || {};
-    const payAmount = Number(amount);
-    if (!Number.isFinite(payAmount) || payAmount <= 0) {
-      return res.status(400).json({ error: 'Valid amount is required' });
-    }
+    const {
+      amount,
+      paidAt,
+      userId,
+      note,
+      method: methodRaw,
+      paymentTreasurySplits: splitsRaw,
+    } = req.body || {};
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.status === 'restored') return res.status(400).json({ error: 'Order is restored' });
@@ -580,23 +589,76 @@ export const addOrderPayment = async (req, res) => {
     const total = Number(order.totalPrice) || 0;
     const alreadyPaid = Number(order.amountPaid) || 0;
     const remaining = Math.max(0, Math.round((total - alreadyPaid) * 100) / 100);
-    const applied = Math.min(Math.round(payAmount * 100) / 100, remaining);
+
+    let applied = 0;
+    let treasurySplits = [];
+    const hasSplits = Array.isArray(splitsRaw) && splitsRaw.length > 0;
+
+    if (hasSplits) {
+      applied = Math.round(
+        splitsRaw.reduce((acc, row) => acc + (Number(row?.amount) || 0), 0) * 100
+      ) / 100;
+    } else {
+      const payAmount = Number(amount);
+      if (!Number.isFinite(payAmount) || payAmount <= 0) {
+        return res.status(400).json({ error: 'Valid amount is required' });
+      }
+      applied = Math.round(payAmount * 100) / 100;
+    }
+
+    applied = Math.min(applied, remaining);
     if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
+
+    if (hasSplits) {
+      const filtered = splitsRaw.filter(
+        (row) => !isDeferredPurchaseTreasury(String(row?.key || '').trim().toLowerCase())
+      );
+      const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+      const tMap = treasuryMethodMap(treasuryMethods);
+      const treasuryNorm = normalizeTreasurySplitsInput({
+        purchaseTreasurySplits: filtered,
+        purchaseTreasuryKey: undefined,
+        lineTotal: applied,
+        treasuryMethods,
+        tMap,
+      });
+      if (treasuryNorm.error) {
+        return res.status(400).json({ error: treasuryNorm.error });
+      }
+      treasurySplits = treasuryNorm.splits;
+    }
 
     const dt = paidAt ? new Date(paidAt) : new Date();
     if (Number.isNaN(dt.getTime())) return res.status(400).json({ error: 'Invalid paidAt date' });
 
+    const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+      ? new mongoose.Types.ObjectId(String(userId))
+      : undefined;
+
     order.payments = order.payments || [];
-    const methodSlug = String(methodRaw || '').trim().toLowerCase();
-    order.payments.push({
-      amount: applied,
-      paidAt: dt,
-      paidByUserId: mongoose.Types.ObjectId.isValid(String(userId || ''))
-        ? new mongoose.Types.ObjectId(String(userId))
-        : undefined,
-      ...(methodSlug ? { method: methodSlug } : {}),
-      note: String(note || '').trim(),
-    });
+    const noteStr = String(note || '').trim();
+
+    if (treasurySplits.length) {
+      for (const s of treasurySplits) {
+        order.payments.push({
+          amount: s.amount,
+          paidAt: dt,
+          paidByUserId: uid,
+          method: s.key,
+          paymentTreasurySplits: treasurySplits,
+          note: noteStr,
+        });
+      }
+    } else {
+      const methodSlug = String(methodRaw || '').trim().toLowerCase();
+      order.payments.push({
+        amount: applied,
+        paidAt: dt,
+        paidByUserId: uid,
+        ...(methodSlug ? { method: methodSlug } : {}),
+        note: noteStr,
+      });
+    }
 
     order.amountPaid = Math.round((alreadyPaid + applied) * 100) / 100;
     if (order.amountPaid >= total) {

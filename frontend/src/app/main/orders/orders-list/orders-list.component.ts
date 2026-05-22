@@ -113,6 +113,11 @@ export class OrdersListComponent implements OnInit {
       : this.translateService.instant('tr_party_client');
   }
 
+  /** بيع بالآجل (paymentMethod = credit). */
+  isPayLaterOrder(order: Order): boolean {
+    return isPayLaterMethod(order?.paymentMethod);
+  }
+
   canPayOrder(order: Order): boolean {
     if (!order?._id) return false;
     if (order.status === 'restored') return false;
@@ -123,6 +128,9 @@ export class OrdersListComponent implements OnInit {
   openPayDialog(order: Order): void {
     const ref = this.dialog.open(PayOrderDialogComponent, {
       width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'pay-order-dialog-panel',
+      backdropClass: 'pay-order-dialog-backdrop',
       data: { order },
       disableClose: true,
     });

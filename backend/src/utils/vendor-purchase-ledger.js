@@ -6,6 +6,17 @@ import {
   recordVendorCashDrawerPayment,
   resolveBranchForCashDrawer,
 } from './vendor-cash-drawer.js';
+import {
+  cashAmountFromTreasurySplits,
+  derivePurchaseTreasuryKey,
+  derivePurchaseTreasuryLabel,
+  normalizeTreasurySplitsInput,
+} from './purchase-treasury-splits.js';
+import {
+  getEffectivePurchaseTreasuryMethodsFromDb,
+  treasuryKeyIsCashDrawer,
+  treasuryMethodMap,
+} from '../modules/settings_module/treasuryMethods.js';
 
 function unpaidInstallmentsTotal(request) {
   if (!request || request.paymentStatus !== 'Installments') return 0;
@@ -294,11 +305,17 @@ export async function applyPurchasePayableSettlement(vendorId, amount, { userId,
   return totalApplied;
 }
 
+function formatTreasurySplitsNote(splits) {
+  return (splits || [])
+    .map((s) => `${s.label || s.key}: ${s.amount}`)
+    .join(' · ');
+}
+
 /** Record our payment to supplier on a deferred purchase. */
 export async function recordVendorDeferredPayment(
   request,
   payAmount,
-  { userId, branchId, note } = {}
+  { userId, branchId, note, paymentTreasurySplits: splitsRaw } = {}
 ) {
   const supplierId = request?.supplier;
   if (!supplierId || !mongoose.Types.ObjectId.isValid(String(supplierId))) {
@@ -309,47 +326,110 @@ export async function recordVendorDeferredPayment(
   }
 
   const remaining = deferredPurchaseRemaining(request);
-  const applied = Math.min(Math.round(Number(payAmount) * 100) / 100, remaining);
-  if (applied <= 0) {
+  if (remaining <= 0) {
     throw new Error('Nothing remaining to pay');
   }
 
+  const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+  const tMap = treasuryMethodMap(treasuryMethods);
+
+  let splits = [];
+  let lineTotal = Math.round(Number(payAmount) * 100) / 100;
+  if (Array.isArray(splitsRaw) && splitsRaw.length) {
+    lineTotal = Math.round(
+      splitsRaw.reduce((acc, row) => acc + (Number(row?.amount) || 0), 0) * 100
+    ) / 100;
+  }
+
+  if (!Number.isFinite(lineTotal) || lineTotal <= 0) {
+    throw new Error('Valid payment amount is required');
+  }
+  if (lineTotal > remaining + 0.01) {
+    throw new Error('Payment exceeds remaining balance');
+  }
+
+  const treasuryNorm = normalizeTreasurySplitsInput({
+    purchaseTreasurySplits: splitsRaw,
+    purchaseTreasuryKey: undefined,
+    lineTotal,
+    treasuryMethods,
+    tMap,
+  });
+  if (treasuryNorm.error) {
+    throw new Error(treasuryNorm.error);
+  }
+
+  splits = treasuryNorm.splits;
+  const applied = lineTotal;
+  const cashDrawerAmount = cashAmountFromTreasurySplits(splits);
+  const treasuryKey = derivePurchaseTreasuryKey(splits);
+  const treasuryLabel = derivePurchaseTreasuryLabel(splits, tMap);
+
   request.amountPaid = Math.round(((Number(request.amountPaid) || 0) + applied) * 100) / 100;
+  const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+    ? new mongoose.Types.ObjectId(String(userId))
+    : undefined;
+
+  request.deferredPayments = request.deferredPayments || [];
+  request.deferredPayments.push({
+    amount: applied,
+    paidAt: new Date(),
+    recordedBy: uid,
+    paymentTreasuryKey: treasuryKey,
+    paymentTreasuryLabel: treasuryLabel,
+    paymentTreasurySplits: splits,
+    note: String(note || '').trim(),
+  });
+
   await request.save();
 
   const vendor = await Vendor.findById(supplierId);
   if (!vendor) throw new Error('Vendor not found');
 
-  const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
-    ? new mongoose.Types.ObjectId(String(userId))
-    : undefined;
-
   const resolvedBranch = await resolveBranchForCashDrawer({ userId, branchId });
-  const payNote = String(note || '').trim() || 'سداد للمورد — شراء بالآجل';
+  const splitsNote = formatTreasurySplitsNote(splits);
+  const payNote =
+    String(note || '').trim() ||
+    (splitsNote ? `سداد للمورد — شراء بالآجل (${splitsNote})` : 'سداد للمورد — شراء بالآجل');
 
   vendor.ledgerEntries = vendor.ledgerEntries || [];
-  vendor.ledgerEntries.push({
-    type: 'purchase_deferred_paid',
-    amount: applied,
-    purchasingRequestId: request._id,
-    note: payNote,
-    createdAt: new Date(),
-    createdByUserId: uid,
-    ...buildCashDrawerLedgerFields({ fromCashDrawer: true, branchId: resolvedBranch }),
-  });
+  for (const s of splits) {
+    const splitNote = `${payNote}${splits.length > 1 ? ` — ${s.label || s.key}` : ''}`;
+    vendor.ledgerEntries.push({
+      type: 'purchase_deferred_paid',
+      amount: s.amount,
+      purchasingRequestId: request._id,
+      note: splitNote,
+      createdAt: new Date(),
+      createdByUserId: uid,
+      ...buildCashDrawerLedgerFields({
+        fromCashDrawer: treasuryKeyIsCashDrawer(s.key),
+        branchId: treasuryKeyIsCashDrawer(s.key) ? resolvedBranch : undefined,
+      }),
+    });
+  }
   await vendor.save();
 
-  await recordVendorCashDrawerPayment({
-    branchId,
-    userId,
-    vendorId: vendor._id,
-    amount: applied,
-    paymentType: 'purchase_deferred_paid',
-    purchasingRequestId: request._id,
-    note: payNote,
-  });
+  if (cashDrawerAmount > 0) {
+    await recordVendorCashDrawerPayment({
+      branchId,
+      userId,
+      vendorId: vendor._id,
+      amount: cashDrawerAmount,
+      paymentType: 'purchase_deferred_paid',
+      purchasingRequestId: request._id,
+      note: payNote,
+      paymentTreasurySplits: splits,
+    });
+  }
 
-  return { applied, amountPaid: request.amountPaid, remaining: deferredPurchaseRemaining(request) };
+  return {
+    applied,
+    cashDrawerAmount,
+    amountPaid: request.amountPaid,
+    remaining: deferredPurchaseRemaining(request),
+    paymentTreasurySplits: splits,
+  };
 }
 
 /** Remove all ledger rows linked to a deleted purchasing request. */

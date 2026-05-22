@@ -92,6 +92,44 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
+/** فواتير بيع بالآجل (credit) — تمييز بصري عن باقي الكروت */
+.order-card--pay-later {
+  background: linear-gradient(145deg, #fffbeb 0%, #ffffff 52%);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 10px 28px rgba(245, 158, 11, 0.12);
+
+  .order-card__icon {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.28);
+    color: #b45309;
+  }
+
+  .stat {
+    background: rgba(245, 158, 11, 0.09);
+    border-color: rgba(245, 158, 11, 0.2);
+  }
+
+  .order-card__products {
+    border-top-color: rgba(245, 158, 11, 0.2);
+  }
+
+  .order-card__product-line + .order-card__product-line {
+    border-top-color: rgba(245, 158, 11, 0.15);
+  }
+}
+
+.orders-table tbody tr.order-row--pay-later {
+  background: rgba(255, 251, 235, 0.9);
+
+  td {
+    border-top-color: rgba(245, 158, 11, 0.15);
+  }
+}
+
+.orders-table tbody tr.order-row--pay-later:hover {
+  background: rgba(254, 243, 199, 0.95);
+}
+
 .order-card__top {
   display: grid;
   grid-template-columns: 48px 1fr auto;

@@ -191,3 +191,53 @@ export function sumCashDrawerOutflowFromPurchases(rows) {
   }
   return total;
 }
+
+/** Effective treasury lines for a daily expense (splits or legacy single amount as cash). */
+export function resolveExpenseTreasurySplits(expense) {
+  const doc = expense && typeof expense.toObject === 'function' ? expense.toObject() : expense;
+  const raw = coerceTreasurySplitsArray(doc?.expenseTreasurySplits);
+  if (raw.length) {
+    return raw
+      .map((row) => ({
+        key: String(row?.key ?? '')
+          .trim()
+          .toLowerCase(),
+        label: String(row?.label ?? '').trim(),
+        amount: round2(row?.amount),
+      }))
+      .filter((s) => s.key && s.amount > 0);
+  }
+
+  const total = round2(Number(doc?.amount) || 0);
+  if (total <= 0) return [];
+
+  const key = String(doc?.expenseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
+  const label = String(doc?.expenseTreasuryLabel || '').trim() || key;
+  return [{ key, label, amount: total }];
+}
+
+/** Sum of amounts paid from the physical cash drawer treasury. */
+export function cashAmountFromTreasurySplits(splits) {
+  return round2(
+    (splits || [])
+      .filter((s) => treasuryKeyIsCashDrawer(s.key))
+      .reduce((acc, s) => acc + (Number(s.amount) || 0), 0)
+  );
+}
+
+/** Cash-only portion of daily expenses (for drawer close). */
+export function sumCashDrawerOutflowFromExpenses(rows) {
+  let total = 0;
+  for (const r of rows || []) {
+    const splits = resolveExpenseTreasurySplits(r);
+    for (const s of splits) {
+      if (treasuryKeyIsCashDrawer(s.key)) {
+        total = round2(total + s.amount);
+      }
+    }
+  }
+  return total;
+}
+
+/** Shared normalizer (desk purchase + daily expense). */
+export const normalizeTreasurySplitsInput = normalizePurchaseTreasuryInput;

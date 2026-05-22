@@ -165,28 +165,14 @@
             <td>{{ pr.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ pr.status }}</td>
             <td>
-              <ng-container *ngIf="pr.paymentStatus === 'Deferred' && (pr.remaining || 0) > 0">
-                <div class="vendor-history-deferred-pay flex gap-1 flex-middle">
-                  <input
-                    class="s-control"
-                    type="number"
-                    min="0.01"
-                    [max]="pr.remaining ?? 0"
-                    step="0.01"
-                    [placeholder]="'tr_payment_amount' | translate"
-                    [(ngModel)]="deferredPaymentDraft[pr._id!]"
-                    [ngModelOptions]="{ standalone: true }"
-                  />
-                  <button
-                    type="button"
-                    class="s-btn btn-primary btn-sm"
-                    [disabled]="recordingDeferredId === pr._id"
-                    (click)="recordDeferredPayment(pr)"
-                  >
-                    {{ 'tr_record_payment' | translate }}
-                  </button>
-                </div>
-              </ng-container>
+              <button
+                type="button"
+                class="s-btn btn-primary btn-sm"
+                *ngIf="pr.paymentStatus === 'Deferred' && (pr.remaining || 0) > 0"
+                (click)="openDeferredPaymentDialog(pr)"
+              >
+                {{ 'tr_record_payment' | translate }}
+              </button>
               <span *ngIf="pr.paymentStatus !== 'Deferred' || !(pr.remaining || 0)">—</span>
             </td>
           </tr>

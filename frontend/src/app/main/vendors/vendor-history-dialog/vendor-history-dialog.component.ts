@@ -15,6 +15,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
+import { VendorDeferredPaymentDialogComponent } from '../vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.component';
 
 export type VendorHistoryDialogData = { vendor: Vendor; forcedBranchId?: string | null };
 
@@ -26,8 +27,6 @@ export type VendorHistoryDialogData = { vendor: Vendor; forcedBranchId?: string 
 export class VendorHistoryDialogComponent implements OnInit {
   loading = true;
   settling = false;
-  recordingDeferredId: string | null = null;
-  deferredPaymentDraft: Record<string, number> = {};
   history: VendorHistoryResponse | null = null;
   /** Branch for cash-drawer attribution (deposits / deferred payments). */
   paymentBranchId: string | null = null;
@@ -266,46 +265,25 @@ export class VendorHistoryDialogComponent implements OnInit {
     }
   }
 
-  recordDeferredPayment(pr: VendorPurchasingRequestRow): void {
-    const id = this.data.vendor._id;
-    const prId = pr._id;
-    if (!id || !prId || this.recordingDeferredId) return;
+  openDeferredPaymentDialog(pr: VendorPurchasingRequestRow): void {
+    const ref = this.dialog.open(VendorDeferredPaymentDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'vendor-deferred-payment-dialog-panel',
+      backdropClass: 'vendor-deferred-payment-dialog-backdrop',
+      data: {
+        vendor: this.data.vendor,
+        purchasingRequest: pr,
+        forcedBranchId: this.paymentBranchId || this.data.forcedBranchId,
+      },
+      disableClose: true,
+    });
 
-    const amount = Number(this.deferredPaymentDraft[prId]);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      this.notify.push(this.translate.instant('tr_vendor_deferred_amount_required'), 'error');
-      return;
-    }
-
-    if (!this.paymentBranchId) {
-      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
-      return;
-    }
-
-    this.recordingDeferredId = prId;
-    const u = this.auth.getUserFromLocalStorage();
-    this.vendors
-      .recordDeferredPurchasePayment(String(id), {
-        purchasingRequestId: String(prId),
-        amount,
-        userId: u?._id,
-        branchId: this.paymentBranchId,
-      })
-      .subscribe({
-        next: () => {
-          this.recordingDeferredId = null;
-          delete this.deferredPaymentDraft[prId];
-          this.notify.push(this.translate.instant('tr_vendor_deferred_payment_ok'), 'success');
-          this.loadHistory();
-        },
-        error: (err) => {
-          this.recordingDeferredId = null;
-          const msg =
-            err?.error?.message ||
-            this.translate.instant('tr_unexpected_error_message');
-          this.notify.push(msg, 'error');
-        },
-      });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.loadHistory();
+      }
+    });
   }
 
   close(): void {

@@ -62,6 +62,7 @@
             <th>{{ 'tr_daily_expenses_recorded_at' | translate }}</th>
             <th>{{ 'tr_branch' | translate }}</th>
             <th>{{ 'tr_daily_expense_amount' | translate }}</th>
+            <th>{{ 'tr_daily_expense_treasury' | translate }}</th>
             <th>{{ 'tr_daily_expense_type' | translate }}</th>
             <th>{{ 'tr_daily_expense_notes' | translate }}</th>
             <th>{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
@@ -72,6 +73,7 @@
             <td>{{ row.createdAt | date : 'short' }}</td>
             <td>{{ row.branch?.name || '—' }}</td>
             <td>{{ row.amount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td class="expenses-treasury">{{ expenseTreasuryDisplay(row) }}</td>
             <td>{{ row.expenseType }}</td>
             <td class="expenses-notes">{{ row.notes || '—' }}</td>
             <td>{{ row.recordedBy?.name || row.recordedBy?.email || '—' }}</td>

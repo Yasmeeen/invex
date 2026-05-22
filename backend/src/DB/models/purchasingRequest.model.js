@@ -10,6 +10,28 @@ const installmentSchema = new mongoose.Schema(
   }
 );
 
+const paymentTreasurySplitSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, required: true },
+    label: { type: String, trim: true, default: '' },
+    amount: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
+const deferredPaymentRecordSchema = new mongoose.Schema(
+  {
+    amount: { type: Number, required: true, min: 0 },
+    paidAt: { type: Date, default: Date.now },
+    recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
+    paymentTreasuryKey: { type: String, trim: true, default: 'cash' },
+    paymentTreasuryLabel: { type: String, trim: true, default: '' },
+    paymentTreasurySplits: { type: [paymentTreasurySplitSchema], default: undefined },
+    note: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
 const purchasingRequestSchema = new mongoose.Schema(
   {
     supplier: {
@@ -40,6 +62,8 @@ const purchasingRequestSchema = new mongoose.Schema(
     installments: [installmentSchema],
     /** For Deferred: amount we have paid the supplier so far. */
     amountPaid: { type: Number, default: 0, min: 0 },
+    /** Payment installments on deferred balance (treasury splits per payment). */
+    deferredPayments: { type: [deferredPaymentRecordSchema], default: undefined },
     totalAmount: {
       type: Number,
       required: true,

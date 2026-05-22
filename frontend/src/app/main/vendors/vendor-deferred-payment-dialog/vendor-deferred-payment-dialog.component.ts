@@ -1,26 +1,38 @@
 import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { Order } from '@core/models/products.model';
-import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
+import { Branch, Vendor, VendorPurchasingRequestRow } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
-import { OrdersSerivce, TreasurySplitPayload } from '@shared/services/orders.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import {
+  TreasurySplitPayload,
+  VendorsSerivce,
+} from '@shared/services/vendors.service';
 import { Subscription } from 'rxjs';
 
-export type PayOrderDialogData = { order: Order };
+export type VendorDeferredPaymentDialogData = {
+  vendor: Vendor;
+  purchasingRequest: VendorPurchasingRequestRow;
+  forcedBranchId?: string | null;
+};
 
 @Component({
-  selector: 'app-pay-order-dialog',
-  templateUrl: './pay-order-dialog.component.html',
-  styleUrls: ['./pay-order-dialog.component.scss'],
+  selector: 'app-vendor-deferred-payment-dialog',
+  templateUrl: './vendor-deferred-payment-dialog.component.html',
+  styleUrls: ['./vendor-deferred-payment-dialog.component.scss'],
 })
-export class PayOrderDialogComponent implements OnInit, OnDestroy {
+export class VendorDeferredPaymentDialogComponent implements OnInit, OnDestroy {
   form: FormGroup;
   saving = false;
-  readonly order: Order;
+  readonly vendor: Vendor;
+  readonly pr: VendorPurchasingRequestRow;
+  branches: Branch[] = [];
+  showBranchPicker = false;
+  private paymentBranchId: string | null = null;
   private subscriptions: Subscription[] = [];
 
   treasuryMethodOptions: { key: string; label: string }[] = [];
@@ -29,28 +41,31 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
 
   constructor(
     private fb: FormBuilder,
-    private orders: OrdersSerivce,
+    private vendors: VendorsSerivce,
     private auth: AuthenticationService,
+    private branchesService: BranchesServce,
     private storeSettings: StoreSettingsService,
     private translate: TranslateService,
     private notify: AppNotificationService,
-    private ref: MatDialogRef<PayOrderDialogComponent, boolean>,
-    @Inject(MAT_DIALOG_DATA) data: PayOrderDialogData
+    private ref: MatDialogRef<VendorDeferredPaymentDialogComponent, boolean>,
+    @Inject(MAT_DIALOG_DATA) data: VendorDeferredPaymentDialogData
   ) {
-    this.order = data.order;
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+    this.vendor = data.vendor;
+    this.pr = data.purchasingRequest;
+
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
+    this.paymentBranchId = ctx.branchId;
+    this.showBranchPicker = ctx.showBranchPicker;
 
     this.form = this.fb.group({
-      paidAt: [`${yyyy}-${mm}-${dd}`, [Validators.required]],
+      branchId: [ctx.branchId || '', this.showBranchPicker ? Validators.required : []],
       note: ['', Validators.maxLength(500)],
     });
   }
 
   get remaining(): number {
-    return orderDisplayRemaining(this.order);
+    return Math.max(0, Math.round((Number(this.pr.remaining) || 0) * 100) / 100);
   }
 
   ngOnInit(): void {
@@ -58,14 +73,29 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.storeSettings.settings$.subscribe(() => this.syncTreasuryOptions())
     );
+
+    if (this.showBranchPicker) {
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => {
+          this.branches = res?.branches || [];
+          const first = this.branches[0]?._id;
+          if (first && !this.form.get('branchId')?.value) {
+            this.form.patchValue({ branchId: first });
+            this.paymentBranchId = String(first);
+          }
+        },
+        error: () => {
+          this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+        },
+      });
+    } else if (this.paymentBranchId) {
+      this.form.patchValue({ branchId: this.paymentBranchId });
+      this.form.get('branchId')?.disable();
+    }
   }
 
   ngOnDestroy(): void {
     this.subscriptions.forEach((s) => s.unsubscribe());
-  }
-
-  displayPaid(): number {
-    return orderDisplayPaid(this.order);
   }
 
   private syncTreasuryOptions(): void {
@@ -170,41 +200,52 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
 
   submit(): void {
     if (this.saving) return;
+    if (this.showBranchPicker) {
+      this.form.get('branchId')?.enable();
+    }
     this.form.markAllAsTouched();
-    if (!this.form.valid) return;
+    if (!this.form.valid) {
+      return;
+    }
 
-    const orderId = this.order._id;
-    if (!orderId) return;
+    const vendorId = this.vendor._id;
+    const prId = this.pr._id;
+    if (!vendorId || !prId) {
+      return;
+    }
+
+    const branchId = String(this.form.getRawValue().branchId || this.paymentBranchId || '').trim();
+    if (!branchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
 
     const splits = this.buildTreasurySplitsPayload();
-    if (!splits) return;
+    if (!splits) {
+      return;
+    }
 
-    const v = this.form.getRawValue();
-    const paidAt = String(v.paidAt || '').trim();
-    const note = String(v.note || '').trim();
     const u = this.auth.getUserFromLocalStorage();
-
     this.saving = true;
-    this.orders
-      .addPayment(String(orderId), {
+    this.vendors
+      .recordDeferredPurchasePayment(String(vendorId), {
+        purchasingRequestId: String(prId),
         amount: this.treasurySplitsTotal(),
         paymentTreasurySplits: splits,
-        paidAt,
         userId: u?._id,
-        note,
+        branchId,
+        note: String(this.form.getRawValue().note || '').trim(),
       })
       .subscribe({
         next: () => {
           this.saving = false;
-          this.notify.push(this.translate.instant('tr_payment_added'), 'success');
+          this.notify.push(this.translate.instant('tr_vendor_deferred_payment_ok'), 'success');
           this.ref.close(true);
         },
         error: (err) => {
           this.saving = false;
           const msg =
-            err?.error?.error ||
-            err?.error?.message ||
-            this.translate.instant('tr_unexpected_error_message');
+            err?.error?.message || this.translate.instant('tr_unexpected_error_message');
           this.notify.push(msg, 'error');
         },
       });

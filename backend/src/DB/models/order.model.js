@@ -70,6 +70,17 @@ const orderSchema = new mongoose.Schema(
         paidByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
         /** cash, visa, aman, … (split checkout / follow-up payments). */
         method: { type: String, required: false, trim: true },
+        /** Purchase treasuries when recording pay-later settlement (same keys as desk purchase). */
+        paymentTreasurySplits: {
+          type: [
+            {
+              key: { type: String, trim: true, required: true },
+              label: { type: String, trim: true, default: '' },
+              amount: { type: Number, required: true, min: 0 },
+            },
+          ],
+          default: undefined,
+        },
         note: { type: String, default: '', trim: true },
       },
     ],

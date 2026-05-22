@@ -3,12 +3,21 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { DAILY_EXPENSES_URL } from '@core/base/urls';
 
+export interface ExpenseTreasurySplit {
+  key: string;
+  label?: string;
+  amount: number;
+}
+
 export interface DailyExpenseDto {
   _id: string;
   branch?: { _id: string; name?: string };
   amount: number;
   expenseType: string;
   notes?: string;
+  expenseTreasuryKey?: string;
+  expenseTreasuryLabel?: string;
+  expenseTreasurySplits?: ExpenseTreasurySplit[];
   recordedBy?: { _id: string; name?: string; email?: string; role?: string };
   createdAt?: string;
   updatedAt?: string;
@@ -29,10 +38,13 @@ export interface DailyExpenseListResponse {
 
 export interface CreateDailyExpensePayload {
   branch: string;
-  amount: number;
+  /** Total; optional when expenseTreasurySplits provided (server sums splits). */
+  amount?: number;
   expenseType: string;
   notes?: string;
   userId: string;
+  expenseTreasurySplits?: ExpenseTreasurySplit[];
+  expenseTreasuryKey?: string;
 }
 
 @Injectable({ providedIn: 'root' })

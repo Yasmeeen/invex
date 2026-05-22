@@ -73,6 +73,7 @@ export async function recordVendorCashDrawerPayment({
   paymentType,
   purchasingRequestId,
   note,
+  paymentTreasurySplits,
 }) {
   const resolvedBranch = await resolveBranchForCashDrawer({ userId, branchId });
   if (!resolvedBranch) {
@@ -102,6 +103,9 @@ export async function recordVendorCashDrawerPayment({
     paymentType,
     purchasingRequestId: prId,
     note: String(note || '').trim().slice(0, 500),
+    ...(Array.isArray(paymentTreasurySplits) && paymentTreasurySplits.length
+      ? { paymentTreasurySplits }
+      : {}),
     recordedBy: uid,
   });
 

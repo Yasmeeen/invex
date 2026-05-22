@@ -78,6 +78,11 @@
   }
 }
 
+.invoices-subsection__heading .page-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
 .orders-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

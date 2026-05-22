@@ -126,8 +126,8 @@
 >
 
 
-  <h2 class="size-body title-with-btn plr-4 ptb-4">
-    <span class="page-title">{{ "tr_orders" | translate }}</span>
+  <h2 class="size-body title-with-btn plr-4 ptb-4" [class.invoices-subsection__heading]="asSection">
+    <span class="page-title">{{ (asSection ? 'tr_sales_invoices' : 'tr_orders') | translate }}</span>
     <div class="btn-group">
       <button
         type="button"

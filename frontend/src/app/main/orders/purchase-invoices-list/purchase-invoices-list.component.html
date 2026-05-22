@@ -1,0 +1,241 @@
+<div class="content-shadow bg-white mb-5 purchase-invoices-list">
+  <h2 class="size-body title-with-btn plr-4 ptb-4 invoices-subsection__heading">
+    <span class="page-title">{{ 'tr_purchase_invoices' | translate }}</span>
+    <div class="btn-group">
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-primary]="viewMode === 'table'"
+        [class.btn-secondary]="viewMode !== 'table'"
+        (click)="setViewMode('table')"
+      >
+        <i class="fa fa-table" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        class="s-btn size-body"
+        [class.btn-secondary]="viewMode !== 'cards'"
+        [class.btn-primary]="viewMode === 'cards'"
+        (click)="setViewMode('cards')"
+      >
+        <i class="fa fa-th-large" aria-hidden="true"></i>
+      </button>
+      <button class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary" aria-hidden="false"></i>
+      </button>
+    </div>
+  </h2>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_search' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              (keyup)="filterPurchases($event)"
+              placeholder="{{ 'tr_search' | translate }}"
+              [(ngModel)]="searchTerm"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_status' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              [items]="statusOptions"
+              bindLabel="labelKey"
+              bindValue="value"
+              [clearable]="true"
+              [(ngModel)]="selectedStatus"
+              (change)="onStatusChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+              <ng-template ng-option-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div
+        class="col-md-3"
+        *ngIf="curentUser?.role === 'Super Admin' || curentUser?.role === 'Co Admin'"
+      >
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branches' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              [items]="branches"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="true"
+              placeholder="{{ 'tr_select' | translate }}"
+              [(ngModel)]="selectedBranchId"
+              (change)="onBranchChange()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4 mt-4" *ngIf="!loading">
+    <div class="table-container" *ngIf="purchasesList.length > 0 && viewMode === 'table'">
+      <table class="s-table table purchase-invoices-table layout-fixed">
+        <thead>
+          <tr>
+            <th>{{ 'tr_purchase_document_ref' | translate }}</th>
+            <th>{{ 'tr_party_type' | translate }}</th>
+            <th>{{ 'tr_purchase_invoice_party' | translate }}</th>
+            <th>{{ 'tr_name' | translate }}</th>
+            <th>{{ 'tr_code' | translate }}</th>
+            <th>{{ 'tr_branch' | translate }}</th>
+            <th>{{ 'tr_total_amount' | translate }}</th>
+            <th>{{ 'tr_paid' | translate }}</th>
+            <th>{{ 'tr_remaining' | translate }}</th>
+            <th>{{ 'tr_receipt_purchase_treasury' | translate }}</th>
+            <th>{{ 'tr_status' | translate }}</th>
+            <th>{{ 'tr_created_at' | translate }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let p of purchasesList"
+            [class.purchase-row--deferred]="isDeferredPurchase(p)"
+            class="pointer"
+            (click)="openPurchaseDetail(p)"
+          >
+            <td>{{ purchaseRef(p) }}</td>
+            <td>
+              <span
+                class="party-badge"
+                [class.party-badge--supplier]="
+                  (p?.productPayload?.acquiredFrom?.partyType || 'client') === 'supplier'
+                "
+              >
+                {{ partyTypeLabel(p) }}
+              </span>
+            </td>
+            <td>{{ partyName(p) }}</td>
+            <td>{{ p?.productPayload?.name || '—' }}</td>
+            <td>{{ p?.productPayload?.code || '—' }}</td>
+            <td>{{ p?.branch?.name || '—' }}</td>
+            <td>{{ lineTotal(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ totalPaid(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>
+              <span *ngIf="remaining(p) > 0">{{ remaining(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
+              <span *ngIf="remaining(p) <= 0">—</span>
+            </td>
+            <td>{{ treasuryDisplay(p) }}</td>
+            <td>{{ statusLabel(p?.status) }}</td>
+            <td>{{ createdAtDisplay(p) }}</td>
+            <td (click)="$event.stopPropagation()">
+              <button type="button" class="s-btn btn-secondary btn-sm" (click)="openPurchaseDetail(p)">
+                {{ 'tr_purchase_invoice_view' | translate }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="orders-cards" *ngIf="purchasesList.length > 0 && viewMode === 'cards'">
+      <div
+        class="order-card purchase-card"
+        *ngFor="let p of purchasesList"
+        [class.order-card--pay-later]="isDeferredPurchase(p)"
+        (click)="openPurchaseDetail(p)"
+      >
+        <div class="order-card__top">
+          <div class="order-card__icon">
+            <i class="fa fa-shopping-basket" aria-hidden="true"></i>
+          </div>
+          <div class="order-card__title">
+            <div class="order-card__number">
+              {{ purchaseRef(p) }}
+              <span
+                class="party-badge"
+                [class.party-badge--supplier]="
+                  (p?.productPayload?.acquiredFrom?.partyType || 'client') === 'supplier'
+                "
+              >
+                {{ partyTypeLabel(p) }}
+              </span>
+            </div>
+            <div class="order-card__client">{{ partyName(p) }}</div>
+            <div class="order-card__meta muted">
+              {{ p?.productPayload?.name }}
+              <span class="dot" *ngIf="p?.productPayload?.code">•</span>
+              <span *ngIf="p?.productPayload?.code">{{ p?.productPayload?.code }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-card__stats">
+          <div class="stat">
+            <div class="stat__label">{{ 'tr_total_amount' | translate }}</div>
+            <div class="stat__value">{{ lineTotal(p) | currency:'EGP ':'symbol':'1.2-2' }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">{{ 'tr_paid' | translate }}</div>
+            <div class="stat__value">{{ totalPaid(p) | currency:'EGP ':'symbol':'1.2-2' }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">{{ 'tr_remaining' | translate }}</div>
+            <div class="stat__value">
+              <ng-container *ngIf="remaining(p) > 0; else noRem">
+                {{ remaining(p) | currency:'EGP ':'symbol':'1.2-2' }}
+              </ng-container>
+              <ng-template #noRem>—</ng-template>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">{{ 'tr_status' | translate }}</div>
+            <div class="stat__value">{{ statusLabel(p?.status) }}</div>
+          </div>
+        </div>
+
+        <div class="order-card__details">
+          <div>
+            <b>{{ 'tr_branch' | translate }}:</b> {{ p?.branch?.name || '—' }}
+          </div>
+          <div>
+            <b>{{ 'tr_receipt_purchase_treasury' | translate }}:</b> {{ treasuryDisplay(p) }}
+          </div>
+          <div>
+            <b>{{ 'tr_created_at' | translate }}:</b> {{ createdAtDisplay(p) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty-state-here text-center ptb-8" *ngIf="purchasesList.length === 0">
+      <img class="placeholder-icon" src="assets/images/placeholders/announcments.svg" alt="" />
+      <p>{{ 'tr_purchase_invoices_empty' | translate }}</p>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData?.totalCount">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      ></pagination>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="plr-4">
+    <app-ghost-line [length]="8" [type]="'table'"></app-ghost-line>
+  </div>
+</div>

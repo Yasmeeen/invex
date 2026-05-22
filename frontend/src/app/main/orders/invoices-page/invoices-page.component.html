@@ -1,0 +1,43 @@
+<div class="invoices-page">
+  <header class="invoices-page__header plr-4 ptb-4">
+    <h1 class="invoices-page__title m-0">{{ 'tr_invoices' | translate }}</h1>
+    <p class="invoices-page__lead size-small text-muted m-0 mt-1">
+      {{ 'tr_invoices_page_lead' | translate }}
+    </p>
+  </header>
+
+  <nav class="invoices-page__tabs plr-4" role="tablist" [attr.aria-label]="'tr_invoices' | translate">
+    <button
+      type="button"
+      class="s-btn invoices-page__tab"
+      role="tab"
+      [attr.aria-selected]="activeSection === 'sales'"
+      [class.btn-primary]="activeSection === 'sales'"
+      [class.btn-secondary]="activeSection !== 'sales'"
+      (click)="setSection('sales')"
+    >
+      <i class="fa fa-file-text-o" aria-hidden="true"></i>
+      {{ 'tr_sales_invoices' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn invoices-page__tab"
+      role="tab"
+      [attr.aria-selected]="activeSection === 'purchases'"
+      [class.btn-primary]="activeSection === 'purchases'"
+      [class.btn-secondary]="activeSection !== 'purchases'"
+      (click)="setSection('purchases')"
+    >
+      <i class="fa fa-shopping-basket" aria-hidden="true"></i>
+      {{ 'tr_purchase_invoices' | translate }}
+    </button>
+  </nav>
+
+  <section class="invoices-page__section" *ngIf="activeSection === 'sales'" role="tabpanel">
+    <app-orders-list [asSection]="true"></app-orders-list>
+  </section>
+
+  <section class="invoices-page__section" *ngIf="activeSection === 'purchases'" role="tabpanel">
+    <app-purchase-invoices-list></app-purchase-invoices-list>
+  </section>
+</div>

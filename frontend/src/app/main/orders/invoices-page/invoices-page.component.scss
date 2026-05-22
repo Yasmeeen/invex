@@ -1,0 +1,47 @@
+.invoices-page {
+  padding-bottom: 2.5rem;
+}
+
+.invoices-page__header {
+  background: #fff;
+  border-bottom: 1px solid rgba(108, 92, 231, 0.1);
+}
+
+.invoices-page__title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.invoices-page__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  background: #fff;
+  border-bottom: 1px solid rgba(108, 92, 231, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.invoices-page__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+.invoices-page__section {
+  margin-top: 0.5rem;
+}
+
+/** Sales + purchase blocks: avoid 80vh min-height pushing purchase section off-screen */
+.invoices-page ::ng-deep .content-shadow {
+  min-height: auto;
+}
+
+.invoices-page ::ng-deep .filters-card.bg-white.mb-8 {
+  margin-bottom: 1rem;
+}

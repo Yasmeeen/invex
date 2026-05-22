@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CategoriesServce } from './../../../shared/services/categories.service';
 import { MatDialog } from '@angular/material/dialog';
 // import { ordersSerivce } from '@shared/services/orders.services';
@@ -37,6 +37,9 @@ import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
   styleUrls: ['./orders-list.component.scss']
 })
 export class OrdersListComponent implements OnInit {
+  /** When embedded under unified invoices page, show subsection title instead of main page title. */
+  @Input() asSection = false;
+
   ordersLoading: boolean = true;
   isFilterOpen: boolean = true;
   paginationPerPage:number = 10;

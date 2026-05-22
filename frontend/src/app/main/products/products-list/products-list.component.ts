@@ -115,6 +115,11 @@ export class ProductsListComponent implements OnInit {
     return !isModerator(this.globals.currentUser?.role);
   }
 
+  /** Moderator: net price must not be visible in the products list. */
+  get showNetPrice(): boolean {
+    return !isModerator(this.globals.currentUser?.role);
+  }
+
   get shouldShowPendingTransfersToolbar(): boolean {
     const role = this.globals.currentUser?.role as string | undefined;
     return canPickBranchRole(role) || isBranchManager(role);

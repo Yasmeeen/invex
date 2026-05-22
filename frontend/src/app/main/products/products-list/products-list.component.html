@@ -227,7 +227,7 @@
               <th>{{ "tr_booked" | translate }}</th>
               <th>{{ "tr_available" | translate }}</th>
               <th>{{ "tr_sell_price" | translate }}</th>
-              <th>{{ "tr_net_price" | translate }}</th>
+              <th *ngIf="showNetPrice">{{ "tr_net_price" | translate }}</th>
               <th>{{ "tr_discount" | translate }}</th>
               <th>{{ "tr_category_attributes" | translate }}</th>
               <th></th>
@@ -295,7 +295,7 @@
               <td>{{ bookedQty(product) }}</td>
               <td>{{ availableToBook(product) }}</td>
               <td>{{ product.price }}</td>
-              <td>{{ product.netPrice }}</td>
+              <td *ngIf="showNetPrice">{{ product.netPrice }}</td>
               <td>{{ product.discount }}</td>
               <td class="products-list__attrs">{{ productAttributesSummary(product) }}</td>
               <td>
@@ -456,7 +456,7 @@
 
           <div class="product-card__prices">
             <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
-            <div><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
+            <div *ngIf="showNetPrice"><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
             <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
           </div>
 

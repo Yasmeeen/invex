@@ -3,6 +3,9 @@
 }
 
 .drawer-close-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 720px);
   padding: 1rem 1.15rem 1.1rem;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
@@ -14,6 +17,7 @@
   -webkit-backdrop-filter: saturate(140%) blur(10px);
 
   &__title {
+    flex-shrink: 0;
     margin: 0;
     padding: 0 0 10px;
     font-size: 1.125rem;
@@ -23,9 +27,28 @@
   }
 
   &__body {
-    min-width: 280px;
-    max-width: 520px;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-height: min(60vh, 480px);
     padding-top: 12px;
+    padding-bottom: 4px;
+    padding-inline-start: 2px;
+    padding-inline-end: 14px;
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
   }
 
   &__loading {
@@ -118,6 +141,7 @@
   }
 
   &__actions {
+    flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;

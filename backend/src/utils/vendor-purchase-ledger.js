@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 import Vendor from '../DB/models/vendor.model.js';
 import PurchasingRequest from '../DB/models/purchasingRequest.model.js';
+import {
+  buildCashDrawerLedgerFields,
+  recordVendorCashDrawerPayment,
+  resolveBranchForCashDrawer,
+} from './vendor-cash-drawer.js';
 
 function unpaidInstallmentsTotal(request) {
   if (!request || request.paymentStatus !== 'Installments') return 0;
@@ -129,7 +134,11 @@ export async function syncVendorPurchaseLedger(request, { userId } = {}) {
 }
 
 /** Log installment payment in vendor ledger (we paid supplier). */
-export async function recordVendorInstallmentPayment(request, installment, { userId } = {}) {
+export async function recordVendorInstallmentPayment(
+  request,
+  installment,
+  { userId, branchId, fromCashDrawer = false } = {}
+) {
   const supplierId = request?.supplier;
   if (!supplierId || !mongoose.Types.ObjectId.isValid(String(supplierId))) {
     return;
@@ -145,20 +154,38 @@ export async function recordVendorInstallmentPayment(request, installment, { use
     ? new mongoose.Types.ObjectId(String(userId))
     : undefined;
 
+  const resolvedBranch = fromCashDrawer
+    ? await resolveBranchForCashDrawer({ userId, branchId })
+    : null;
+
   const due = installment.dueDate
     ? new Date(installment.dueDate).toLocaleDateString('ar-EG')
     : '';
+  const note = due ? `سداد قسط — استحقاق ${due}` : 'سداد قسط';
 
   vendor.ledgerEntries = vendor.ledgerEntries || [];
   vendor.ledgerEntries.push({
     type: 'purchase_installment_paid',
     amount,
     purchasingRequestId: request._id,
-    note: due ? `سداد قسط — استحقاق ${due}` : 'سداد قسط',
+    note,
     createdAt: new Date(),
     createdByUserId: uid,
+    ...buildCashDrawerLedgerFields({ fromCashDrawer, branchId: resolvedBranch }),
   });
   await vendor.save();
+
+  if (fromCashDrawer) {
+    await recordVendorCashDrawerPayment({
+      branchId,
+      userId,
+      vendorId: vendor._id,
+      amount,
+      paymentType: 'purchase_installment_paid',
+      purchasingRequestId: request._id,
+      note,
+    });
+  }
 }
 
 /** Apply settlement credit against deferred purchase (netting — no cash). */
@@ -190,6 +217,7 @@ export async function applyDeferredSettlementCredit(request, payAmount, { userId
     note: String(note || '').trim() || 'مقاصة — شراء بالآجل',
     createdAt: new Date(),
     createdByUserId: uid,
+    ...buildCashDrawerLedgerFields({ fromCashDrawer: false }),
   });
   await vendor.save();
 
@@ -217,6 +245,7 @@ export async function applyInstallmentSettlementCredit(request, payAmount, { use
     applied = Math.round((applied + instAmount) * 100) / 100;
     await recordVendorInstallmentPayment(request, inst, {
       userId,
+      fromCashDrawer: false,
       note: String(note || '').trim() || 'مقاصة — سداد قسط',
     });
   }
@@ -269,7 +298,7 @@ export async function applyPurchasePayableSettlement(vendorId, amount, { userId,
 export async function recordVendorDeferredPayment(
   request,
   payAmount,
-  { userId, note } = {}
+  { userId, branchId, note } = {}
 ) {
   const supplierId = request?.supplier;
   if (!supplierId || !mongoose.Types.ObjectId.isValid(String(supplierId))) {
@@ -295,16 +324,30 @@ export async function recordVendorDeferredPayment(
     ? new mongoose.Types.ObjectId(String(userId))
     : undefined;
 
+  const resolvedBranch = await resolveBranchForCashDrawer({ userId, branchId });
+  const payNote = String(note || '').trim() || 'سداد للمورد — شراء بالآجل';
+
   vendor.ledgerEntries = vendor.ledgerEntries || [];
   vendor.ledgerEntries.push({
     type: 'purchase_deferred_paid',
     amount: applied,
     purchasingRequestId: request._id,
-    note: String(note || '').trim() || 'سداد للمورد — شراء بالآجل',
+    note: payNote,
     createdAt: new Date(),
     createdByUserId: uid,
+    ...buildCashDrawerLedgerFields({ fromCashDrawer: true, branchId: resolvedBranch }),
   });
   await vendor.save();
+
+  await recordVendorCashDrawerPayment({
+    branchId,
+    userId,
+    vendorId: vendor._id,
+    amount: applied,
+    paymentType: 'purchase_deferred_paid',
+    purchasingRequestId: request._id,
+    note: payNote,
+  });
 
   return { applied, amountPaid: request.amountPaid, remaining: deferredPurchaseRemaining(request) };
 }

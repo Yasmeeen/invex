@@ -6,6 +6,7 @@ import DrawerClose from '../../DB/models/drawerClose.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import User from '../../DB/models/user.model.js';
 import { treasuryKeyIsCashDrawer } from '../settings_module/treasuryMethods.js';
+import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -199,19 +200,24 @@ export async function computeDrawerPreview(branchOid, bounds) {
     invoices,
     expenseTotal,
     deskInfo,
+    vendorCashInfo,
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
     sumDailyExpenses(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
+    sumVendorCashDrawerOutflows(branchOid, start, end),
   ]);
 
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
   const cashRefunded = sumMethods(refundInfo.merged, isPhysicalCashMethod);
 
   const deskCashFromDrawer = deskInfo.deskPurchaseCashDrawerTotal;
-  const expectedCashInDrawer = round2(cashReceived - cashRefunded - expenseTotal - deskCashFromDrawer);
+  const vendorCashFromDrawer = vendorCashInfo.vendorCashDrawerTotal;
+  const expectedCashInDrawer = round2(
+    cashReceived - cashRefunded - expenseTotal - deskCashFromDrawer - vendorCashFromDrawer
+  );
 
   return {
     paymentsReceivedByMethod: paymentsIn,
@@ -225,6 +231,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskPurchaseGrandTotal: deskInfo.deskPurchaseGrandTotal,
     deskPurchaseByTreasuryMethod: deskInfo.deskPurchaseByTreasuryMethod,
     deskPurchaseIntakeCount: deskInfo.deskPurchaseIntakeCount,
+    vendorCashDrawerTotal: vendorCashFromDrawer,
+    vendorCashDrawerPaymentCount: vendorCashInfo.vendorCashDrawerPaymentCount,
     cashReceivedTotal: cashReceived,
     cashRefundedTotal: cashRefunded,
     expectedCashInDrawer,

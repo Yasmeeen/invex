@@ -88,6 +88,13 @@ const vendorSchema = new mongoose.Schema(
           required: false,
         },
         note: { type: String, default: '', trim: true },
+        /** When true, amount left the physical cash drawer (see vendor-cash-drawer utils). */
+        affectsCashDrawer: { type: Boolean, default: false },
+        branch: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Branch',
+          required: false,
+        },
         createdAt: { type: Date, default: Date.now },
         createdByUserId: {
           type: mongoose.Schema.Types.ObjectId,
@@ -101,6 +108,8 @@ const vendorSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+vendorSchema.index({ 'ledgerEntries.branch': 1, 'ledgerEntries.createdAt': -1 });
 
 // ✅ Auto-clear installments if paymentTerms = "cash"
 vendorSchema.pre('save', function (next) {

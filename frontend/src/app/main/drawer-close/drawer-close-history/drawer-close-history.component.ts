@@ -148,7 +148,7 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     };
 
     const ref = this.dialog.open(DrawerCloseDialogComponent, {
-      width: '580px',
+      width: '640px',
       maxWidth: '96vw',
       panelClass: 'drawer-close-dialog-panel',
       backdropClass: 'drawer-close-dialog-backdrop',

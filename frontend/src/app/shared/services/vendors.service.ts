@@ -64,14 +64,20 @@ settleVendorBalances(
 
 addVendorDeposit(
   vendorId: string,
-  payload: { amount: number; userId?: string; note?: string }
+  payload: { amount: number; userId?: string; branchId?: string; note?: string }
 ): Observable<any> {
   return this.http.post(`${VENDORS_URL}/${vendorId}/deposit`, payload);
 }
 
 recordDeferredPurchasePayment(
   vendorId: string,
-  payload: { purchasingRequestId: string; amount: number; userId?: string; note?: string }
+  payload: {
+    purchasingRequestId: string;
+    amount: number;
+    userId?: string;
+    branchId?: string;
+    note?: string;
+  }
 ): Observable<any> {
   return this.http.post(`${VENDORS_URL}/${vendorId}/deferred-payment`, payload);
 }

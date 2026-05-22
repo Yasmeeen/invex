@@ -14,6 +14,23 @@
   </div>
 
   <div [formGroup]="form">
+    <div class="form-group mb-3" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branches' | translate }}</label>
+      <div class="input-with-icon">
+        <ng-select
+          class="s-control s-select"
+          formControlName="branchId"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          placeholder="{{ 'tr_branches' | translate }}"
+        >
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+    </div>
+
     <div class="form-group mb-3">
       <label>{{ 'tr_payment_amount' | translate }}</label>
       <input

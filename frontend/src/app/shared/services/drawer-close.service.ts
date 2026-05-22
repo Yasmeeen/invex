@@ -24,6 +24,9 @@ export interface DrawerClosePreview {
   deskPurchaseGrandTotal?: number;
   deskPurchaseByTreasuryMethod?: DeskPurchaseTreasuryLine[];
   deskPurchaseIntakeCount: number;
+  /** Cash paid to suppliers from vendor ledger (deposits + deferred/installment payments). */
+  vendorCashDrawerTotal?: number;
+  vendorCashDrawerPaymentCount?: number;
   cashReceivedTotal: number;
   cashRefundedTotal: number;
   expectedCashInDrawer: number;

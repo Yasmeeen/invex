@@ -1,6 +1,7 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import {
+  Branch,
   Vendor,
   VendorHistoryResponse,
   VendorPurchasingRequestRow,
@@ -10,10 +11,12 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { TranslateService } from '@ngx-translate/core';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 
-export type VendorHistoryDialogData = { vendor: Vendor };
+export type VendorHistoryDialogData = { vendor: Vendor; forcedBranchId?: string | null };
 
 @Component({
   selector: 'app-vendor-history-dialog',
@@ -26,19 +29,48 @@ export class VendorHistoryDialogComponent implements OnInit {
   recordingDeferredId: string | null = null;
   deferredPaymentDraft: Record<string, number> = {};
   history: VendorHistoryResponse | null = null;
+  /** Branch for cash-drawer attribution (deposits / deferred payments). */
+  paymentBranchId: string | null = null;
+  showBranchPicker = false;
+  branches: Branch[] = [];
 
   constructor(
     private vendors: VendorsSerivce,
+    private branchesService: BranchesServce,
     private auth: AuthenticationService,
     private translate: TranslateService,
     private notify: AppNotificationService,
     private dialog: MatDialog,
     private ref: MatDialogRef<VendorHistoryDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: VendorHistoryDialogData
-  ) {}
+  ) {
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
+    this.paymentBranchId = ctx.branchId;
+    this.showBranchPicker = ctx.showBranchPicker;
+  }
 
   ngOnInit(): void {
+    if (this.showBranchPicker) {
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => {
+          this.branches = res?.branches || [];
+          if (!this.paymentBranchId && this.branches[0]?._id) {
+            this.paymentBranchId = String(this.branches[0]._id);
+          }
+        },
+        error: () => {
+          this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+        },
+      });
+    } else if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+    }
     this.loadHistory();
+  }
+
+  onPaymentBranchChange(branchId: string): void {
+    this.paymentBranchId = String(branchId || '').trim() || null;
   }
 
   get settlementPreview(): VendorSettlementPreview | null {
@@ -183,11 +215,15 @@ export class VendorHistoryDialogComponent implements OnInit {
   }
 
   openDepositDialog(): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     this.dialog
       .open(VendorDepositDialogComponent, {
         width: '480px',
         maxWidth: '96vw',
-        data: { vendor: this.data.vendor },
+        data: { vendor: this.data.vendor, forcedBranchId: this.paymentBranchId },
         disableClose: true,
       })
       .afterClosed()
@@ -241,6 +277,11 @@ export class VendorHistoryDialogComponent implements OnInit {
       return;
     }
 
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+
     this.recordingDeferredId = prId;
     const u = this.auth.getUserFromLocalStorage();
     this.vendors
@@ -248,6 +289,7 @@ export class VendorHistoryDialogComponent implements OnInit {
         purchasingRequestId: String(prId),
         amount,
         userId: u?._id,
+        branchId: this.paymentBranchId,
       })
       .subscribe({
         next: () => {

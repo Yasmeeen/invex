@@ -7,6 +7,26 @@
   <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
 
   <ng-container *ngIf="!loading && history">
+    <div class="form-group mb-3" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branches' | translate }}</label>
+      <div class="input-with-icon">
+        <ng-select
+          class="s-control s-select"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          [(ngModel)]="paymentBranchId"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onPaymentBranchChange($event)"
+          placeholder="{{ 'tr_branches' | translate }}"
+        >
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+      <p class="size-small text-muted m-0 mt-1">{{ 'tr_vendor_payment_branch_hint' | translate }}</p>
+    </div>
+
     <div class="row mb-3">
       <div class="col-md-4">
         <div class="balance-card balance-card--owe">

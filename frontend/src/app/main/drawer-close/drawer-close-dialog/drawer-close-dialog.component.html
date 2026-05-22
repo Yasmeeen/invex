@@ -82,6 +82,17 @@
             ></span
           >
         </div>
+        <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight">
+          <span>{{ 'tr_drawer_close_vendor_cash_drawer' | translate }}</span>
+          <span
+            >−{{ vendorCashDrawerAmount(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+            <span class="drawer-close-dialog__hint" *ngIf="preview.vendorCashDrawerPaymentCount"
+              >({{
+                'tr_drawer_close_vendor_cash_count' | translate : { count: preview.vendorCashDrawerPaymentCount }
+              }})</span
+            ></span
+          >
+        </div>
 
         <div
           class="drawer-close-dialog__muted mb-1"
@@ -101,6 +112,7 @@
 
         <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_refunds' | translate }}</p>
         <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_desk_treasury' | translate }}</p>
+        <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_vendor_cash' | translate }}</p>
       </div>
 
       <div *ngIf="!previewLoading && previewError && !preview" class="drawer-close-dialog__muted">

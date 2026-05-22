@@ -22,6 +22,11 @@ import {
   syncVendorPurchaseLedger,
   unpaidInstallmentsTotal,
 } from "../../utils/vendor-purchase-ledger.js";
+import {
+  buildCashDrawerLedgerFields,
+  recordVendorCashDrawerPayment,
+  resolveBranchForCashDrawer,
+} from "../../utils/vendor-cash-drawer.js";
 
 // 📌 Create Vendor
 export const createVendor = async (req, res) => {
@@ -462,6 +467,7 @@ export const recordVendorDeferredPurchasePayment = async (req, res) => {
 
     const result = await recordVendorDeferredPayment(request, amount, {
       userId: req.body?.userId,
+      branchId: req.body?.branchId,
       note: req.body?.note,
     });
 
@@ -503,15 +509,32 @@ export const addVendorDeposit = async (req, res) => {
       ? new mongoose.Types.ObjectId(String(req.body.userId))
       : undefined;
 
+    const branchId = await resolveBranchForCashDrawer({
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+    });
+
+    const note = String(req.body?.note || 'Prepaid deposit').trim();
+
     vendor.ledgerEntries = vendor.ledgerEntries || [];
     vendor.ledgerEntries.push({
       type: 'deposit',
       amount: applied,
-      note: String(req.body?.note || 'Prepaid deposit').trim(),
+      note,
       createdAt: new Date(),
       createdByUserId: uid,
+      ...buildCashDrawerLedgerFields({ fromCashDrawer: true, branchId }),
     });
     await vendor.save();
+
+    await recordVendorCashDrawerPayment({
+      branchId: req.body?.branchId,
+      userId: req.body?.userId,
+      vendorId: vendor._id,
+      amount: applied,
+      paymentType: 'deposit',
+      note,
+    });
 
     res.json({
       message: 'Deposit recorded',

@@ -345,6 +345,8 @@ export const markInstallmentPaid = async (req, res) => {
     try {
       await recordVendorInstallmentPayment(request, installment, {
         userId: req.body?.userId,
+        branchId: req.body?.branchId,
+        fromCashDrawer: true,
       });
     } catch (ledgerErr) {
       console.error('⚠️ Failed to log vendor installment payment:', ledgerErr.message);

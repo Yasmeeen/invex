@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, from, of } from 'rxjs';
-import { catchError, concatMap, tap } from 'rxjs/operators';
+import { catchError, concatMap, map, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { STORE_SETTINGS_URL } from '@core/base/urls';
 import { PAYMENT_APP_FEE_METHOD_IDS } from '@shared/constants/payment-app-fee-methods';
@@ -123,18 +123,25 @@ export class StoreSettingsService {
   }
 
   /**
-   * Load missing i18n JSON for receipt languages (sequential — avoids ngx-translate races from parallel getTranslation).
-   * Safe to call repeatedly; skips langs already on TranslateService.store.
+   * Preload i18n JSON for receipt printing only (receipt lang + English fallback).
+   * Uses HttpClient + setTranslation — NOT getTranslation — so we never stomp TranslateService.pending
+   * while the UI language pack is loading via translate.use().
    */
   private ensureReceiptTranslationPacks(): void {
-    const missing = RECEIPT_LANGUAGE_CODES.filter((lang) => !this.translate.translations[lang]);
+    const receiptLang = this._settings.value.receiptLanguage;
+    const langs = Array.from(new Set<ReceiptLanguageCode>([receiptLang, 'en']));
+    const missing = langs.filter((lang) => !this.translate.translations[lang]);
     if (!missing.length) {
       return;
     }
     from(missing)
       .pipe(
         concatMap((lang) =>
-          this.translate.getTranslation(lang).pipe(catchError(() => of(null)))
+          this.http.get<Record<string, unknown>>(`/assets/i18n/${lang}.json`).pipe(
+            map((body) => ({ lang, body })),
+            tap(({ lang, body }) => this.translate.setTranslation(lang, body, false)),
+            catchError(() => of(null))
+          )
         )
       )
       .subscribe();

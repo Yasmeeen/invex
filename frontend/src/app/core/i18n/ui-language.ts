@@ -7,25 +7,38 @@ function isSupported(code: string | null | undefined): code is (typeof SUPPORTED
   return !!code && (SUPPORTED_UI_LANGS as readonly string[]).includes(code);
 }
 
+function loggedInUserLocale(): string | null {
+  try {
+    const raw = localStorage.getItem('currentUser');
+    if (!raw) {
+      return null;
+    }
+    const u = JSON.parse(raw);
+    const loc = u?.locale;
+    if (typeof loc === 'string' && isSupported(loc.trim().toLowerCase())) {
+      return loc.trim().toLowerCase();
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 /**
- * Resolves UI language: explicit preference → stored user locale → browser → English.
+ * Resolves UI language: explicit preference → stored user locale → (guests only) browser → English.
+ * Logged-in users never fall back to browser language — avoids German/French flashes on refresh.
  */
 export function resolveUiLanguageCode(translate: TranslateService, preferred?: string | null): string {
   const p = preferred?.trim().toLowerCase();
   if (isSupported(p)) {
     return p;
   }
-  try {
-    const raw = localStorage.getItem('currentUser');
-    if (raw) {
-      const u = JSON.parse(raw);
-      const loc = u?.locale;
-      if (typeof loc === 'string' && isSupported(loc.trim().toLowerCase())) {
-        return loc.trim().toLowerCase();
-      }
-    }
-  } catch {
-    /* ignore */
+  const stored = loggedInUserLocale();
+  if (stored) {
+    return stored;
+  }
+  if (localStorage.getItem('currentUser')) {
+    return 'en';
   }
   const browser = translate.getBrowserLang()?.split('-')[0]?.toLowerCase();
   if (isSupported(browser)) {

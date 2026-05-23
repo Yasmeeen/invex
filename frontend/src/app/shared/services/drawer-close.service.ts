@@ -27,6 +27,9 @@ export interface DrawerClosePreview {
   /** Cash paid to suppliers from vendor ledger (deposits + deferred/installment payments). */
   vendorCashDrawerTotal?: number;
   vendorCashDrawerPaymentCount?: number;
+  /** Cash collected from clients on credit sales (installments) — included in cashReceivedTotal. */
+  clientOrderCashDrawerTotal?: number;
+  clientOrderCashDrawerPaymentCount?: number;
   cashReceivedTotal: number;
   cashRefundedTotal: number;
   expectedCashInDrawer: number;

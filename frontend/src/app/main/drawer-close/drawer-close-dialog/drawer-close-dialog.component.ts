@@ -189,6 +189,27 @@ export class DrawerCloseDialogComponent implements OnInit {
     return round2(Number(p.vendorCashDrawerTotal ?? 0));
   }
 
+  clientOrderCashDrawerAmount(p: DrawerClosePreview | null): number {
+    if (!p) return 0;
+    return round2(Number(p.clientOrderCashDrawerTotal ?? 0));
+  }
+
+  showVendorCashRow(p: DrawerClosePreview | null): boolean {
+    if (!p) return false;
+    return (
+      this.vendorCashDrawerAmount(p) > 0.005 ||
+      Number(p.vendorCashDrawerPaymentCount || 0) > 0
+    );
+  }
+
+  showClientCashRow(p: DrawerClosePreview | null): boolean {
+    if (!p) return false;
+    return (
+      this.clientOrderCashDrawerAmount(p) > 0.005 ||
+      Number(p.clientOrderCashDrawerPaymentCount || 0) > 0
+    );
+  }
+
   goToConfirm(): void {
     if (this.previewLoading || !this.preview) {
       if (!this.previewLoading && !this.preview) {

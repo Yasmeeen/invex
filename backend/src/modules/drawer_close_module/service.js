@@ -97,6 +97,37 @@ async function paymentsReceivedByMethod(branchOid, start, end) {
   return byMethod;
 }
 
+/** Cash collected today on client credit sales (pay-later installments) — subset of paymentsIn. */
+async function sumClientCreditOrderCashPayments(branchOid, start, end) {
+  const orders = await Order.find({
+    branch: branchOid,
+    paymentMethod: 'credit',
+    partyType: { $ne: 'supplier' },
+    payments: { $elemMatch: { paidAt: { $gte: start, $lte: end } } },
+  })
+    .select('payments')
+    .lean();
+
+  let total = 0;
+  let count = 0;
+  for (const o of orders) {
+    for (const p of o.payments || []) {
+      const t = p.paidAt ? new Date(p.paidAt).getTime() : NaN;
+      if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      if (!isPhysicalCashMethod(p.method)) continue;
+      const amt = Number(p.amount || 0);
+      if (!Number.isFinite(amt) || amt <= 0) continue;
+      total = round2(total + amt);
+      count += 1;
+    }
+  }
+
+  return {
+    clientOrderCashDrawerTotal: total,
+    clientOrderCashDrawerPaymentCount: count,
+  };
+}
+
 /** Refund allocation for restored invoices (same split as original payments when possible). */
 function refundAllocationFromOrder(order) {
   const pays = order.payments || [];
@@ -202,6 +233,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     expenseTotal,
     deskInfo,
     vendorCashInfo,
+    clientCashInfo,
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
@@ -209,6 +241,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
+    sumClientCreditOrderCashPayments(branchOid, start, end),
   ]);
 
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
@@ -234,6 +267,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskPurchaseIntakeCount: deskInfo.deskPurchaseIntakeCount,
     vendorCashDrawerTotal: vendorCashFromDrawer,
     vendorCashDrawerPaymentCount: vendorCashInfo.vendorCashDrawerPaymentCount,
+    clientOrderCashDrawerTotal: clientCashInfo.clientOrderCashDrawerTotal,
+    clientOrderCashDrawerPaymentCount: clientCashInfo.clientOrderCashDrawerPaymentCount,
     cashReceivedTotal: cashReceived,
     cashRefundedTotal: cashRefunded,
     expectedCashInDrawer,

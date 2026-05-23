@@ -80,6 +80,11 @@
       font-size: 1rem;
     }
 
+    &--in strong,
+    &--in > span:last-child {
+      color: #0d7a4a;
+    }
+
     &--sub {
       padding-left: 0.5rem;
       font-size: 0.85rem;

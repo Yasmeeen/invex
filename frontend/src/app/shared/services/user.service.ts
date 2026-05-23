@@ -36,6 +36,26 @@ export class UserSerivce {
     return this.http.get<ClientHistoryResponse>(`${CLIENTS_URL}/${clientId}/history`);
   }
 
+  addClientDeposit(
+    clientId: string,
+    payload: {
+      amount: number;
+      userId?: string;
+      branchId?: string;
+      note?: string;
+      paymentSplits?: { method: string; amount: number }[];
+      paymentFeeAllocations?: {
+        forMethod: string;
+        feeNet: number;
+        paidVia: string;
+        feeGrossOnPaidVia: number;
+        feePercentSnapshot?: number;
+      }[];
+    }
+  ): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/${clientId}/deposit`, payload);
+  }
+
   createUser(user: User): Observable<User> {
     return this.http.post<User>(USER_CREATE_URL, user).pipe(
       tap({

@@ -10,6 +10,8 @@ import { OrdersModule } from '../orders/orders.module';
 import { SharedModule } from '@shared/shared.module';
 import { VendorsRoutingModule } from './vendors-routing.module';
 import { VendorsSerivce } from '@shared/services/vendors.service';
+import { MatDialogModule } from '@angular/material/dialog';
+import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
 
 @NgModule({
@@ -25,6 +27,8 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
     SharedModule,
     VendorDeferredPaymentDialogModule,
     OrdersModule,
+    MatDialogModule,
+    PaymentSplitsDialogModule,
   ],
   providers: [
     VendorsSerivce

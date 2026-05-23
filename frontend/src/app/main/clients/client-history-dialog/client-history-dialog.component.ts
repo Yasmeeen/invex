@@ -8,6 +8,8 @@ import {
   ClientHistoryPurchaseRow,
   ClientHistoryResponse,
 } from '@core/models/users-interfaces.model';
+import { AuthenticationService } from '@core/services/authentication.service';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
@@ -16,6 +18,7 @@ import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
 import { DeskPurchaseDeferredPaymentDialogComponent } from '../../orders/desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
+import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
 
 export type ClientHistoryDialogData = { client: Client };
@@ -28,16 +31,22 @@ export type ClientHistoryDialogData = { client: Client };
 export class ClientHistoryDialogComponent implements OnInit {
   loading = true;
   history: ClientHistoryResponse | null = null;
+  paymentBranchId: string | null = null;
 
   constructor(
     private userService: UserSerivce,
+    private auth: AuthenticationService,
     private translate: TranslateService,
     private notify: AppNotificationService,
     private ref: MatDialogRef<ClientHistoryDialogComponent>,
     private storeSettings: StoreSettingsService,
     private dialog: MatDialog,
     @Inject(MAT_DIALOG_DATA) public data: ClientHistoryDialogData
-  ) {}
+  ) {
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, null);
+    this.paymentBranchId = ctx.branchId;
+  }
 
   ngOnInit(): void {
     this.loadHistory();
@@ -158,6 +167,29 @@ export class ClientHistoryDialogComponent implements OnInit {
     ref.afterClosed().subscribe((ok) => {
       if (ok) this.loadHistory();
     });
+  }
+
+  openDepositDialog(): void {
+    this.dialog
+      .open(ClientDepositDialogComponent, {
+        width: '520px',
+        maxWidth: '96vw',
+        data: { client: this.data.client, forcedBranchId: this.paymentBranchId },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) {
+          this.loadHistory();
+        }
+      });
+  }
+
+  ledgerTypeLabel(type: string): string {
+    if (type === 'deposit') {
+      return this.translate.instant('tr_client_ledger_deposit');
+    }
+    return type || '—';
   }
 
   close(): void {

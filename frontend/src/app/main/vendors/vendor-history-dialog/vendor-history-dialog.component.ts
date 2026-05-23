@@ -223,7 +223,7 @@ export class VendorHistoryDialogComponent implements OnInit {
     }
     this.dialog
       .open(VendorDepositDialogComponent, {
-        width: '480px',
+        width: '520px',
         maxWidth: '96vw',
         data: { vendor: this.data.vendor, forcedBranchId: this.paymentBranchId },
         disableClose: true,

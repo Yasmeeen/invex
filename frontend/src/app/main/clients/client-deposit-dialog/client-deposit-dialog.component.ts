@@ -1,13 +1,14 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Branch, Vendor } from '@core/models/products.model';
+import { Branch } from '@core/models/products.model';
+import { Client } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
-import { VendorsSerivce } from '@shared/services/vendors.service';
+import { UserSerivce } from '@shared/services/user.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -17,36 +18,36 @@ import {
   paymentSplitsNetTotal,
 } from '@shared/utils/payment-app-fee.util';
 
-export type VendorDepositDialogData = {
-  vendor: Vendor;
+export type ClientDepositDialogData = {
+  client: Client;
   forcedBranchId?: string | null;
 };
 
 @Component({
-  selector: 'app-vendor-deposit-dialog',
-  templateUrl: './vendor-deposit-dialog.component.html',
-  styleUrls: ['./vendor-deposit-dialog.component.scss'],
+  selector: 'app-client-deposit-dialog',
+  templateUrl: './client-deposit-dialog.component.html',
+  styleUrls: ['./client-deposit-dialog.component.scss'],
 })
-export class VendorDepositDialogComponent implements OnInit {
+export class ClientDepositDialogComponent implements OnInit {
   saving = false;
   form: FormGroup;
-  readonly vendor: Vendor;
+  readonly client: Client;
   branches: Branch[] = [];
   showBranchPicker = false;
   confirmedPayment: PaymentSplitsResult | null = null;
 
   constructor(
     private fb: FormBuilder,
-    private vendors: VendorsSerivce,
+    private users: UserSerivce,
     private auth: AuthenticationService,
     private branchesService: BranchesServce,
     private translate: TranslateService,
     private notify: AppNotificationService,
     private dialog: MatDialog,
-    private ref: MatDialogRef<VendorDepositDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) data: VendorDepositDialogData
+    private ref: MatDialogRef<ClientDepositDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) data: ClientDepositDialogData
   ) {
-    this.vendor = data.vendor;
+    this.client = data.client;
     const actor = this.auth.getUserFromLocalStorage();
     const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
     this.showBranchPicker = ctx.showBranchPicker;
@@ -134,7 +135,7 @@ export class VendorDepositDialogComponent implements OnInit {
       return;
     }
 
-    const id = this.vendor._id;
+    const id = this.client._id;
     if (!id) return;
 
     const v = this.form.getRawValue();
@@ -153,8 +154,8 @@ export class VendorDepositDialogComponent implements OnInit {
 
     this.saving = true;
     const u = this.auth.getUserFromLocalStorage();
-    this.vendors
-      .addVendorDeposit(String(id), {
+    this.users
+      .addClientDeposit(String(id), {
         amount: netTotal,
         paymentSplits: splits,
         paymentFeeAllocations: this.confirmedPayment.feeAllocations,
@@ -165,12 +166,13 @@ export class VendorDepositDialogComponent implements OnInit {
       .subscribe({
         next: () => {
           this.saving = false;
-          this.notify.push(this.translate.instant('tr_vendor_deposit_ok'), 'success');
+          this.notify.push(this.translate.instant('tr_client_deposit_ok'), 'success');
           this.ref.close(true);
         },
         error: (err) => {
           this.saving = false;
           const msg =
+            err?.error?.error ||
             err?.error?.message ||
             this.translate.instant('tr_unexpected_error_message');
           this.notify.push(msg, 'error');

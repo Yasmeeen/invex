@@ -157,7 +157,7 @@ export class VendorsListComponent implements OnInit {
 
   openVendorDeposit(vendor: Vendor): void {
     this.dialog.open(VendorDepositDialogComponent, {
-      width: '480px',
+      width: '520px',
       maxWidth: '96vw',
       data: { vendor },
       disableClose: true,

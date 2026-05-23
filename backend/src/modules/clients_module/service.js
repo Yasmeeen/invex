@@ -15,6 +15,19 @@ import {
   isClientCreditOrder,
   pointsEarnedForOrder,
 } from "../../utils/client-order-utils.js";
+import {
+  buildTreasurySplitsFromPayment,
+  cashAmountFromPaymentSplits,
+  isPhysicalCashMethod,
+  normalizePaymentFeeAllocations,
+  normalizePaymentSplitsRaw,
+  totalNetFromPaymentSplits,
+} from "../../utils/deposit-payment-splits.js";
+import {
+  buildCashDrawerLedgerFields,
+  recordClientCashDrawerReceipt,
+} from "../../utils/client-cash-drawer.js";
+import { resolveBranchForCashDrawer } from "../../utils/vendor-cash-drawer.js";
 
 /**
  * GET client by phone (cashier / lookup). Must match stored phoneNumber flexibly.
@@ -304,6 +317,7 @@ export const getClientHistory = async (req, res) => {
     });
 
     const creditBalanceDue = await computeClientCreditDue(client._id);
+    const prepaidBalance = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
     const creditOrders = ordersWithMeta.filter(
       (o) => o.isPayLater && o.remaining > 0 && o.status !== "restored"
     );
@@ -375,15 +389,100 @@ export const getClientHistory = async (req, res) => {
       },
       totalPointsEarned,
       creditBalanceDue,
+      prepaidBalance,
       creditOrdersCount: creditOrders.length,
       orders: ordersWithMeta,
       creditOrders,
       purchases,
       purchasesCount: purchases.length,
+      ledgerEntries: (client.ledgerEntries || []).slice().reverse(),
     });
   } catch (error) {
     console.error("❌ Error fetching client history:", error.message);
     res.status(500).json({ error: "Failed to fetch client history" });
+  }
+};
+
+/** POST add prepaid deposit (client money held at store). */
+export const addClientDeposit = async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const splitsRaw = req.body?.paymentSplits ?? req.body?.paymentMethodSplits;
+    let splits = normalizePaymentSplitsRaw(splitsRaw);
+    const feeAllocations = normalizePaymentFeeAllocations(req.body?.paymentFeeAllocations);
+
+    if (!splits.length) {
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ error: "Valid amount is required" });
+      }
+      splits = [{ method: "cash", amount: Math.round(amount * 100) / 100 }];
+    }
+
+    const applied = totalNetFromPaymentSplits(splits);
+    if (applied <= 0) {
+      return res.status(400).json({ error: "Valid amount is required" });
+    }
+
+    client.creditBalance =
+      Math.round(((Number(client.creditBalance) || 0) + applied) * 100) / 100;
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ""))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    const branchId = await resolveBranchForCashDrawer({
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+    });
+
+    const note = String(req.body?.note || "Client prepaid deposit").trim();
+    const treasuryAudit = buildTreasurySplitsFromPayment(splits, feeAllocations);
+    const cashDrawerAmount = cashAmountFromPaymentSplits(splits, feeAllocations);
+
+    client.ledgerEntries = client.ledgerEntries || [];
+    for (const s of splits) {
+      const splitNote = `${note}${splits.length > 1 ? ` — ${s.method}` : ""}`;
+      client.ledgerEntries.push({
+        type: "deposit",
+        amount: s.amount,
+        paymentMethod: s.method,
+        note: splitNote,
+        createdAt: new Date(),
+        createdByUserId: uid,
+        ...buildCashDrawerLedgerFields({
+          fromCashDrawer: isPhysicalCashMethod(s.method),
+          branchId: isPhysicalCashMethod(s.method) ? branchId : undefined,
+        }),
+      });
+    }
+    await client.save();
+
+    if (cashDrawerAmount > 0) {
+      await recordClientCashDrawerReceipt({
+        branchId: req.body?.branchId,
+        userId: req.body?.userId,
+        clientId: client._id,
+        amount: cashDrawerAmount,
+        paymentType: "deposit",
+        note,
+        paymentTreasurySplits: treasuryAudit,
+      });
+    }
+
+    res.json({
+      message: "Deposit recorded",
+      prepaidBalance: client.creditBalance,
+      cashDrawerAmount,
+      paymentTreasurySplits: treasuryAudit,
+    });
+  } catch (error) {
+    console.error("❌ Error adding client deposit:", error.message);
+    res.status(500).json({ error: "Failed to record deposit" });
   }
 };
 

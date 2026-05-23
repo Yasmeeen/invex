@@ -64,15 +64,26 @@ export interface ClientHistoryPurchaseRow {
   createdByName?: string;
 }
 
+export interface ClientLedgerEntry {
+  type: string;
+  amount: number;
+  paymentMethod?: string;
+  note?: string;
+  createdAt?: string;
+}
+
 export interface ClientHistoryResponse {
   client: Pick<Client, '_id' | 'name' | 'phoneNumber' | 'address'>;
   totalPointsEarned: number;
   creditBalanceDue: number;
+  /** Prepaid balance held for client (store owes goods / credit). */
+  prepaidBalance?: number;
   creditOrdersCount: number;
   orders: ClientHistoryOrderRow[];
   creditOrders: ClientHistoryOrderRow[];
   purchases?: ClientHistoryPurchaseRow[];
   purchasesCount?: number;
+  ledgerEntries?: ClientLedgerEntry[];
 }
 export class Employee extends User {
 

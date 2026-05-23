@@ -69,7 +69,20 @@ settleVendorBalances(
 
 addVendorDeposit(
   vendorId: string,
-  payload: { amount: number; userId?: string; branchId?: string; note?: string }
+  payload: {
+    amount: number;
+    userId?: string;
+    branchId?: string;
+    note?: string;
+    paymentSplits?: { method: string; amount: number }[];
+    paymentFeeAllocations?: {
+      forMethod: string;
+      feeNet: number;
+      paidVia: string;
+      feeGrossOnPaidVia: number;
+      feePercentSnapshot?: number;
+    }[];
+  }
 ): Observable<any> {
   return this.http.post(`${VENDORS_URL}/${vendorId}/deposit`, payload);
 }

@@ -4,12 +4,15 @@
   </h2>
 
   <div mat-dialog-content class="payment-splits-dialog__body">
-    <div class="payment-splits-dialog__summary mb-3">
+    <div class="payment-splits-dialog__summary mb-3" *ngIf="mode !== 'deposit'">
       <div>
         {{ 'tr_payment_splits_invoice_total' | translate }}:
         <strong>{{ invoiceNetTotal | currency:'EGP ':'symbol':'1.2-2' }}</strong>
       </div>
     </div>
+    <p class="text-muted size-small mb-3" *ngIf="mode === 'deposit'">
+      {{ 'tr_deposit_payment_splits_hint' | translate }}
+    </p>
 
     <div class="payment-splits-dialog__section">
       <div class="form-group mb-0">
@@ -92,24 +95,30 @@
         />
       </div>
 
-      <div
-        class="size-small text-muted mt-1"
-        *ngIf="hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
-      >
-        {{ 'tr_cashier_credit_balance_due' | translate }}:
-        <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-      </div>
-      <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
-        {{ 'tr_cashier_payment_allocated' | translate }}:
+      <ng-container *ngIf="mode !== 'deposit'">
+        <div
+          class="size-small text-muted mt-1"
+          *ngIf="hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+        >
+          {{ 'tr_cashier_credit_balance_due' | translate }}:
+          <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
+          {{ 'tr_cashier_payment_allocated' | translate }}:
+          <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          / {{ invoiceNetTotal | currency:'EGP ':'symbol':'1.2-2' }}
+        </div>
+        <div
+          class="size-small text-muted mt-1"
+          *ngIf="!hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+        >
+          {{ 'tr_cashier_payment_remaining_credit' | translate }}:
+          <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        </div>
+      </ng-container>
+      <div class="size-small mt-2" *ngIf="mode === 'deposit'">
+        {{ 'tr_deposit_payment_total' | translate }}:
         <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-        / {{ invoiceNetTotal | currency:'EGP ':'symbol':'1.2-2' }}
-      </div>
-      <div
-        class="size-small text-muted mt-1"
-        *ngIf="!hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
-      >
-        {{ 'tr_cashier_payment_remaining_credit' | translate }}:
-        <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
       </div>
     </div>
 

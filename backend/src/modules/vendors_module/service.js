@@ -27,6 +27,14 @@ import {
   recordVendorCashDrawerPayment,
   resolveBranchForCashDrawer,
 } from "../../utils/vendor-cash-drawer.js";
+import {
+  buildTreasurySplitsFromPayment,
+  cashAmountFromPaymentSplits,
+  isPhysicalCashMethod,
+  normalizePaymentFeeAllocations,
+  normalizePaymentSplitsRaw,
+  totalNetFromPaymentSplits,
+} from "../../utils/deposit-payment-splits.js";
 
 // 📌 Create Vendor
 export const createVendor = async (req, res) => {
@@ -498,17 +506,28 @@ export const recordVendorDeferredPurchasePayment = async (req, res) => {
 /** POST add prepaid deposit (supplier money held at store). */
 export const addVendorDeposit = async (req, res) => {
   try {
-    const amount = Number(req.body?.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: 'Valid amount is required' });
-    }
-
     const vendor = await Vendor.findById(req.params.id);
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    const applied = Math.round(amount * 100) / 100;
+    const splitsRaw = req.body?.paymentSplits ?? req.body?.paymentMethodSplits;
+    let splits = normalizePaymentSplitsRaw(splitsRaw);
+    const feeAllocations = normalizePaymentFeeAllocations(req.body?.paymentFeeAllocations);
+
+    if (!splits.length) {
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ message: 'Valid amount is required' });
+      }
+      splits = [{ method: 'cash', amount: Math.round(amount * 100) / 100 }];
+    }
+
+    const applied = totalNetFromPaymentSplits(splits);
+    if (applied <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
     vendor.creditBalance =
       Math.round(((Number(vendor.creditBalance) || 0) + applied) * 100) / 100;
 
@@ -522,30 +541,44 @@ export const addVendorDeposit = async (req, res) => {
     });
 
     const note = String(req.body?.note || 'Prepaid deposit').trim();
+    const treasuryAudit = buildTreasurySplitsFromPayment(splits, feeAllocations);
+    const cashDrawerAmount = cashAmountFromPaymentSplits(splits, feeAllocations);
 
     vendor.ledgerEntries = vendor.ledgerEntries || [];
-    vendor.ledgerEntries.push({
-      type: 'deposit',
-      amount: applied,
-      note,
-      createdAt: new Date(),
-      createdByUserId: uid,
-      ...buildCashDrawerLedgerFields({ fromCashDrawer: true, branchId }),
-    });
+    for (const s of splits) {
+      const splitNote = `${note}${splits.length > 1 ? ` — ${s.method}` : ''}`;
+      vendor.ledgerEntries.push({
+        type: 'deposit',
+        amount: s.amount,
+        note: splitNote,
+        createdAt: new Date(),
+        createdByUserId: uid,
+        ...buildCashDrawerLedgerFields({
+          fromCashDrawer: isPhysicalCashMethod(s.method),
+          branchId: isPhysicalCashMethod(s.method) ? branchId : undefined,
+        }),
+      });
+    }
     await vendor.save();
 
-    await recordVendorCashDrawerPayment({
-      branchId: req.body?.branchId,
-      userId: req.body?.userId,
-      vendorId: vendor._id,
-      amount: applied,
-      paymentType: 'deposit',
-      note,
-    });
+    if (cashDrawerAmount > 0) {
+      await recordVendorCashDrawerPayment({
+        branchId: req.body?.branchId,
+        userId: req.body?.userId,
+        vendorId: vendor._id,
+        amount: cashDrawerAmount,
+        paymentType: 'deposit',
+        note,
+        paymentTreasurySplits: treasuryAudit,
+      });
+    }
 
     res.json({
       message: 'Deposit recorded',
       weOweSupplier: vendor.creditBalance,
+      prepaidBalance: vendor.creditBalance,
+      cashDrawerAmount,
+      paymentTreasurySplits: treasuryAudit,
     });
   } catch (error) {
     console.error('Error adding vendor deposit:', error);

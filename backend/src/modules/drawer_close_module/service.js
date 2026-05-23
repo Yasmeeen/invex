@@ -13,6 +13,7 @@ import {
   sumCashDrawerOutflowFromPurchases,
 } from '../../utils/purchase-treasury-splits.js';
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
+import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 /** Business day boundaries for drawer close (store operations). */
@@ -379,6 +380,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskInfo,
     vendorCashInfo,
     clientCashInfo,
+    clientDepositCashInfo,
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
@@ -387,6 +389,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
     sumClientCreditOrderCashPayments(branchOid, start, end),
+    sumClientCashDrawerInflows(branchOid, start, end),
   ]);
 
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
@@ -394,8 +397,14 @@ export async function computeDrawerPreview(branchOid, bounds) {
 
   const deskCashFromDrawer = deskInfo.deskPurchaseCashDrawerTotal;
   const vendorCashFromDrawer = vendorCashInfo.vendorCashDrawerTotal;
+  const clientDepositCashIn = clientDepositCashInfo.clientDepositCashDrawerTotal;
   const periodNetCashMovements = round2(
-    cashReceived - cashRefunded - expenseTotal - deskCashFromDrawer - vendorCashFromDrawer
+    cashReceived -
+      cashRefunded -
+      expenseTotal -
+      deskCashFromDrawer -
+      vendorCashFromDrawer +
+      clientDepositCashIn
   );
 
   return {
@@ -414,6 +423,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     vendorCashDrawerPaymentCount: vendorCashInfo.vendorCashDrawerPaymentCount,
     clientOrderCashDrawerTotal: clientCashInfo.clientOrderCashDrawerTotal,
     clientOrderCashDrawerPaymentCount: clientCashInfo.clientOrderCashDrawerPaymentCount,
+    clientDepositCashDrawerTotal: clientDepositCashInfo.clientDepositCashDrawerTotal,
+    clientDepositCashDrawerCount: clientDepositCashInfo.clientDepositCashDrawerCount,
     cashReceivedTotal: cashReceived,
     cashRefundedTotal: cashRefunded,
     periodNetCashMovements,

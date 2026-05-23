@@ -76,10 +76,17 @@
               <td>
                 <button
                   type="button"
-                  class="s-btn btn-secondary size-small"
+                  class="s-btn btn-secondary size-small mr-1"
                   (click)="openClientHistory(client)"
                 >
                   {{ 'tr_client_history' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="s-btn btn-primary size-small"
+                  (click)="openClientDeposit(client)"
+                >
+                  {{ 'tr_client_add_deposit' | translate }}
                 </button>
               </td>
             </tr>
@@ -130,10 +137,17 @@
           <div class="client-card__actions">
             <button
               type="button"
-              class="s-btn btn-secondary size-small width-100"
+              class="s-btn btn-secondary size-small width-100 mb-2"
               (click)="openClientHistory(client)"
             >
               {{ 'tr_client_history' | translate }}
+            </button>
+            <button
+              type="button"
+              class="s-btn btn-primary size-small width-100"
+              (click)="openClientDeposit(client)"
+            >
+              {{ 'tr_client_add_deposit' | translate }}
             </button>
           </div>
         </div>

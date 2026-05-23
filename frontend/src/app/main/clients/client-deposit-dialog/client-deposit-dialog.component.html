@@ -1,15 +1,15 @@
-<div class="vendor-deposit-dialog bg-white plr-4 ptb-4">
+<div class="client-deposit-dialog bg-white plr-4 ptb-4">
   <div class="flex flex-space-between flex-middle mb-3">
-    <h3 class="m-0">{{ 'tr_vendor_add_deposit' | translate }}</h3>
+    <h3 class="m-0">{{ 'tr_client_add_deposit' | translate }}</h3>
     <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
   </div>
 
   <div class="mb-3 size-small text-muted">
     <div>
-      {{ 'tr_name' | translate }}: <b>{{ vendor?.name }}</b>
+      {{ 'tr_name' | translate }}: <b>{{ client?.name }}</b>
     </div>
-    <div *ngIf="vendor?.phone">
-      {{ 'tr_phone' | translate }}: <b>{{ vendor.phone }}</b>
+    <div>
+      {{ 'tr_phone' | translate }}: <b>{{ client.phoneNumber }}</b>
     </div>
   </div>
 
@@ -42,7 +42,7 @@
       <p class="text-muted size-small m-0 mt-1" *ngIf="!confirmedPayment">
         {{ 'tr_payment_splits_not_set' | translate }}
       </p>
-      <p class="text-muted size-small m-0 mt-1">{{ 'tr_vendor_deposit_payment_hint' | translate }}</p>
+      <p class="text-muted size-small m-0 mt-1">{{ 'tr_client_deposit_payment_hint' | translate }}</p>
     </div>
 
     <div class="form-group mb-3">

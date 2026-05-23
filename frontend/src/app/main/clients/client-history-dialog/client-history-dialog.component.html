@@ -29,14 +29,20 @@
         </div>
       </div>
       <div class="col-md-4">
-        <div class="balance-card balance-card--info">
-          <div class="balance-card__label">{{ 'tr_phone_number' | translate }}</div>
-          <div class="balance-card__value balance-card__value--sm">{{ history.client.phoneNumber }}</div>
-          <p class="size-small text-muted m-0 mt-1" *ngIf="history.client.address">
-            {{ history.client.address }}
-          </p>
+        <div class="balance-card balance-card--prepaid">
+          <div class="balance-card__label">{{ 'tr_client_prepaid_balance' | translate }}</div>
+          <div class="balance-card__value">
+            {{ (history.prepaidBalance || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </div>
+          <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_prepaid_balance_hint' | translate }}</p>
         </div>
       </div>
+    </div>
+
+    <div class="flex flex-end mb-3">
+      <button type="button" class="s-btn btn-secondary" (click)="openDepositDialog()">
+        {{ 'tr_client_add_deposit' | translate }}
+      </button>
     </div>
 
     <h5 *ngIf="history.creditOrders?.length">{{ 'tr_client_unpaid_credit_orders' | translate }}</h5>
@@ -171,5 +177,30 @@
       </table>
     </div>
     <p *ngIf="!history.orders?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+
+    <h5>{{ 'tr_client_ledger' | translate }}</h5>
+    <div class="table-container" *ngIf="history.ledgerEntries?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_type' | translate }}</th>
+            <th>{{ 'tr_payment_method' | translate }}</th>
+            <th>{{ 'tr_payment_amount' | translate }}</th>
+            <th>{{ 'tr_payment_note' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let e of history.ledgerEntries">
+            <td>{{ e.createdAt | date:'short' }}</td>
+            <td>{{ ledgerTypeLabel(e.type) }}</td>
+            <td>{{ paymentMethodLabel(e.paymentMethod) }}</td>
+            <td>{{ e.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+            <td>{{ e.note }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.ledgerEntries?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
   </ng-container>
 </div>

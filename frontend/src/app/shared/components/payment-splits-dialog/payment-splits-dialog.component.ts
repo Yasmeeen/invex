@@ -21,7 +21,7 @@ import {
 } from '@shared/utils/payment-app-fee.util';
 import { Subscription } from 'rxjs';
 
-export type PaymentSplitsDialogMode = 'checkout' | 'installment';
+export type PaymentSplitsDialogMode = 'checkout' | 'installment' | 'deposit';
 
 export interface PaymentSplitsDialogInitialState {
   selectedPayMethods?: string[];
@@ -69,7 +69,12 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     private notify: AppNotificationService
   ) {
     this.invoiceNetTotal = round2(Number(data.invoiceNetTotal) || 0);
-    this.mode = data.mode === 'installment' ? 'installment' : 'checkout';
+    this.mode =
+      data.mode === 'installment'
+        ? 'installment'
+        : data.mode === 'deposit'
+          ? 'deposit'
+          : 'checkout';
 
     const init = data.initialState;
     if (init?.selectedPayMethods?.length) {
@@ -96,7 +101,9 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       this.translate
     );
     this.paymentMethods =
-      this.mode === 'installment' ? all.filter((m) => m.id !== 'credit') : all;
+      this.mode === 'installment' || this.mode === 'deposit'
+        ? all.filter((m) => m.id !== 'credit')
+        : all;
     this.paymentMethodsForSplit = this.paymentMethods;
 
     const keys = new Set(this.paymentMethods.map((m) => m.id));
@@ -388,7 +395,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.paymentOverAllocated()) {
+    if (this.mode !== 'deposit' && this.paymentOverAllocated()) {
       this.notify.push(this.translate.instant('tr_cashier_payment_over'), 'error');
       return;
     }

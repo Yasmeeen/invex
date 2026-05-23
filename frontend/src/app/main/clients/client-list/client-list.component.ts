@@ -2,7 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Globals } from '@core/globals';
 import { Client, PaginationData } from '@core/models/users-interfaces.model';
+import { AuthenticationService } from '@core/services/authentication.service';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { ClientHistoryDialogComponent } from '../client-history-dialog/client-history-dialog.component';
+import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
@@ -32,6 +35,7 @@ export class ClientListComponent implements OnInit {
   constructor(
     private userSerivce: UserSerivce,
     private dialog: MatDialog,
+    private auth: AuthenticationService,
     private notificationService: AppNotificationService,
     private translate: TranslateService,
     public globals: Globals
@@ -92,6 +96,24 @@ export class ClientListComponent implements OnInit {
       data: { client },
       disableClose: false,
     });
+  }
+
+  openClientDeposit(client: Client): void {
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, this.globals.currentUser?.branch?._id);
+    this.dialog
+      .open(ClientDepositDialogComponent, {
+        width: '520px',
+        maxWidth: '96vw',
+        data: { client, forcedBranchId: ctx.branchId },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) {
+          this.getClients();
+        }
+      });
   }
 
   ngOnDestroy(): void {

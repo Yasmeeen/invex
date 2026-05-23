@@ -26,6 +26,35 @@ const clientSchema = new mongoose.Schema(
         ref: "Branch",
       },
     ],
+
+    /** Prepaid balance the client holds with us (we owe them goods / credit). */
+    creditBalance: { type: Number, default: 0, min: 0 },
+
+    /** Audit trail: deposits and future settlements. */
+    ledgerEntries: [
+      {
+        type: {
+          type: String,
+          enum: ["deposit"],
+          required: true,
+        },
+        amount: { type: Number, required: true, min: 0 },
+        paymentMethod: { type: String, default: "", trim: true },
+        note: { type: String, default: "", trim: true },
+        affectsCashDrawer: { type: Boolean, default: false },
+        branch: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Branch",
+          required: false,
+        },
+        createdAt: { type: Date, default: Date.now },
+        createdByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: false,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

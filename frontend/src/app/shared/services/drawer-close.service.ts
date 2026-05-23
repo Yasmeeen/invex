@@ -3,6 +3,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { DRAWER_CLOSE_URL } from '@core/base/urls';
 
+export type CashDisposition = 'deposit_all' | 'retain_all' | 'retain_partial';
+
 export interface DeskPurchaseTreasuryLine {
   key: string;
   label: string;
@@ -13,6 +15,11 @@ export interface DeskPurchaseTreasuryLine {
 export interface DrawerClosePreview {
   businessDate: string;
   branchId: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  missedDaysCount: number;
+  openingCashBalance: number;
+  periodNetCashMovements: number;
   paymentsReceivedByMethod: Record<string, number>;
   refundsByMethod: Record<string, number>;
   restoredInvoiceCount: number;
@@ -35,15 +42,32 @@ export interface DrawerClosePreview {
   expectedCashInDrawer: number;
 }
 
+export interface DrawerOpeningBalance {
+  branchId: string;
+  businessDate: string;
+  openingCashBalance: number;
+  periodStartDate: string;
+  periodEndDate: string;
+  missedDaysCount: number;
+  periodAlreadyClosed: boolean;
+}
+
 export interface DrawerCloseRecord {
   _id: string;
   branch?: { _id: string; name?: string };
   businessDate: string;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  openingCashBalance?: number;
+  periodNetCashMovements?: number;
   snapshot?: DrawerClosePreview & Record<string, unknown>;
   expectedCashInDrawer: number;
   actualCashCounted: number;
   variance: number;
   shortageReason?: string;
+  cashDisposition?: CashDisposition;
+  retainedCash?: number;
+  depositedCash?: number;
   closedBy?: { _id: string; name?: string; email?: string; role?: string };
   createdAt?: string;
   updatedAt?: string;
@@ -68,6 +92,8 @@ export interface CloseDrawerPayload {
   userId: string;
   actualCashCounted: number;
   shortageReason?: string;
+  cashDisposition: CashDisposition;
+  retainedCash?: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -80,6 +106,20 @@ export class DrawerCloseService {
       .set('branch', params.branch)
       .set('date', params.date);
     return this.http.get<DrawerClosePreview>(`${DRAWER_CLOSE_URL}/preview`, { params: httpParams });
+  }
+
+  openingBalance(params: {
+    userId: string;
+    branch: string;
+    date: string;
+  }): Observable<DrawerOpeningBalance> {
+    let httpParams = new HttpParams()
+      .set('userId', params.userId)
+      .set('branch', params.branch)
+      .set('date', params.date);
+    return this.http.get<DrawerOpeningBalance>(`${DRAWER_CLOSE_URL}/opening-balance`, {
+      params: httpParams,
+    });
   }
 
   close(payload: CloseDrawerPayload): Observable<DrawerCloseRecord> {

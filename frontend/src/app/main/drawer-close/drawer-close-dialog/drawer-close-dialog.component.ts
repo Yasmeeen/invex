@@ -8,7 +8,11 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
-import { DrawerClosePreview, DrawerCloseService } from '@shared/services/drawer-close.service';
+import {
+  CashDisposition,
+  DrawerClosePreview,
+  DrawerCloseService,
+} from '@shared/services/drawer-close.service';
 
 export interface DrawerCloseDialogData {
   userId: string;
@@ -40,6 +44,10 @@ export class DrawerCloseDialogComponent implements OnInit {
 
   countForm: FormGroup;
   shortageReasonForm: FormGroup;
+
+  /** deposit_all | retain (then retainMode: all | partial) */
+  cashAction: 'deposit' | 'retain' = 'deposit';
+  retainMode: 'all' | 'partial' = 'all';
 
   constructor(
     private fb: FormBuilder,
@@ -81,6 +89,7 @@ export class DrawerCloseDialogComponent implements OnInit {
 
     this.shortageReasonForm = this.fb.group({
       actualCashCounted: ['', [Validators.required, Validators.min(0)]],
+      retainedCash: ['', [Validators.min(0)]],
       shortageReason: ['', Validators.maxLength(2000)],
     });
   }
@@ -120,6 +129,14 @@ export class DrawerCloseDialogComponent implements OnInit {
   effectiveBranchId(): string {
     const raw = this.countForm.getRawValue();
     return String(raw.branchId || '').trim();
+  }
+
+  isMultiDayPeriod(): boolean {
+    if (!this.preview) return false;
+    return (
+      Boolean(this.preview.periodStartDate && this.preview.periodEndDate) &&
+      this.preview.periodStartDate !== this.preview.periodEndDate
+    );
   }
 
   loadPreview(): void {
@@ -218,23 +235,77 @@ export class DrawerCloseDialogComponent implements OnInit {
       return;
     }
     this.step = 2;
+    this.cashAction = 'deposit';
+    this.retainMode = 'all';
     const exp = this.preview.expectedCashInDrawer;
     this.shortageReasonForm.patchValue({
       actualCashCounted: round2(exp),
+      retainedCash: '',
       shortageReason: '',
     });
+    this.updateRetainedValidators();
   }
 
   goBack(): void {
     this.step = 1;
   }
 
-  variance(): number {
-    const exp = this.preview?.expectedCashInDrawer ?? 0;
+  actualCounted(): number {
     const raw = this.shortageReasonForm.get('actualCashCounted')?.value;
     const a = round2(Number(raw));
-    if (!Number.isFinite(a)) return 0;
-    return round2(a - exp);
+    return Number.isFinite(a) ? a : 0;
+  }
+
+  retainedAmount(): number {
+    if (this.cashAction !== 'retain') return 0;
+    if (this.retainMode === 'all') return this.actualCounted();
+    const raw = this.shortageReasonForm.get('retainedCash')?.value;
+    const r = round2(Number(raw));
+    return Number.isFinite(r) ? r : 0;
+  }
+
+  depositedAmount(): number {
+    return round2(Math.max(0, this.actualCounted() - this.retainedAmount()));
+  }
+
+  onCashActionChange(): void {
+    this.updateRetainedValidators();
+  }
+
+  onRetainModeChange(): void {
+    this.updateRetainedValidators();
+  }
+
+  onActualCashChange(): void {
+    this.updateRetainedValidators();
+  }
+
+  private updateRetainedValidators(): void {
+    const ctrl = this.shortageReasonForm.get('retainedCash');
+    if (!ctrl) return;
+    if (this.cashAction === 'retain' && this.retainMode === 'partial') {
+      const max = this.actualCounted();
+      ctrl.setValidators([
+        Validators.required,
+        Validators.min(0.01),
+        Validators.max(max > 0 ? max - 0.01 : 0),
+      ]);
+    } else {
+      ctrl.clearValidators();
+      ctrl.setValidators([Validators.min(0)]);
+    }
+    ctrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  resolveCashDisposition(): CashDisposition | null {
+    if (this.cashAction === 'deposit') return 'deposit_all';
+    if (this.retainMode === 'all') return 'retain_all';
+    return 'retain_partial';
+  }
+
+  variance(): number {
+    const exp = this.preview?.expectedCashInDrawer ?? 0;
+    return round2(this.actualCounted() - exp);
   }
 
   isShortage(): boolean {
@@ -257,10 +328,23 @@ export class DrawerCloseDialogComponent implements OnInit {
     if (!this.preview) return;
 
     this.shortageReasonForm.markAllAsTouched();
-    const actualRaw = this.shortageReasonForm.get('actualCashCounted')?.value;
-    const actual = round2(Number(actualRaw));
+    this.updateRetainedValidators();
+
+    const actual = this.actualCounted();
     if (!Number.isFinite(actual) || actual < 0 || this.shortageReasonForm.get('actualCashCounted')?.invalid) {
       return;
+    }
+
+    const disposition = this.resolveCashDisposition();
+    if (!disposition) return;
+
+    if (disposition === 'retain_partial') {
+      const retained = this.retainedAmount();
+      if (retained <= 0 || retained >= actual) {
+        this.shortageReasonForm.get('retainedCash')?.markAsTouched();
+        this.notify.push(this.translate.instant('tr_drawer_close_retained_invalid'), 'error');
+        return;
+      }
     }
 
     const needsNote = this.needsVarianceNote();
@@ -281,27 +365,32 @@ export class DrawerCloseDialogComponent implements OnInit {
       return;
     }
 
+    const payload: Parameters<DrawerCloseService['close']>[0] = {
+      branch: branchId,
+      businessDate: dateStr,
+      userId: this.data.userId,
+      actualCashCounted: actual,
+      cashDisposition: disposition,
+      ...(needsNote ? { shortageReason: reason } : {}),
+    };
+
+    if (disposition === 'retain_partial') {
+      payload.retainedCash = this.retainedAmount();
+    }
+
     this.saving = true;
-    this.drawerClose
-      .close({
-        branch: branchId,
-        businessDate: dateStr,
-        userId: this.data.userId,
-        actualCashCounted: actual,
-        ...(needsNote ? { shortageReason: reason } : {}),
-      })
-      .subscribe({
-        next: () => {
-          this.saving = false;
-          this.notify.push(this.translate.instant('tr_drawer_close_saved'), 'success');
-          this.dialogRef.close(true);
-        },
-        error: (err) => {
-          this.saving = false;
-          const msg = err?.error?.error || this.translate.instant('tr_unexpected_error_message');
-          this.notify.push(msg, 'error');
-        },
-      });
+    this.drawerClose.close(payload).subscribe({
+      next: () => {
+        this.saving = false;
+        this.notify.push(this.translate.instant('tr_drawer_close_saved'), 'success');
+        this.dialogRef.close(true);
+      },
+      error: (err) => {
+        this.saving = false;
+        const msg = err?.error?.error || this.translate.instant('tr_unexpected_error_message');
+        this.notify.push(msg, 'error');
+      },
+    });
   }
 
   cancel(): void {

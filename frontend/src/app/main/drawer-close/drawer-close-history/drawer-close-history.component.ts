@@ -83,6 +83,13 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     return canPickBranchRole(this.globals.currentUser?.role);
   }
 
+  periodLabel(row: DrawerCloseRecord): string {
+    const start = row.periodStartDate || row.businessDate;
+    const end = row.periodEndDate || row.businessDate;
+    if (start === end) return end;
+    return `${start} → ${end}`;
+  }
+
   applyFilters(): void {
     this.params.page = 1;
     this.params.branch_id = this.filterBranchId || undefined;

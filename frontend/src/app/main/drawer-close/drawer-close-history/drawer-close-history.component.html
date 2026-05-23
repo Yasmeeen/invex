@@ -59,10 +59,12 @@
       <table class="s-table table layout-fixed">
         <thead>
           <tr>
-            <th>{{ 'tr_drawer_close_col_day' | translate }}</th>
+            <th>{{ 'tr_drawer_close_col_period' | translate }}</th>
             <th>{{ 'tr_branch' | translate }}</th>
             <th>{{ 'tr_drawer_close_expected_cash' | translate }}</th>
             <th>{{ 'tr_drawer_close_actual_cash' | translate }}</th>
+            <th>{{ 'tr_drawer_close_col_retained' | translate }}</th>
+            <th>{{ 'tr_drawer_close_col_deposited' | translate }}</th>
             <th>{{ 'tr_drawer_close_variance' | translate }}</th>
             <th>{{ 'tr_drawer_close_shortage_reason' | translate }}</th>
             <th>{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
@@ -71,10 +73,12 @@
         </thead>
         <tbody>
           <tr *ngFor="let row of closes">
-            <td>{{ row.businessDate }}</td>
+            <td>{{ periodLabel(row) }}</td>
             <td>{{ row.branch?.name || '—' }}</td>
             <td>{{ row.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td>{{ row.actualCashCounted | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ (row.retainedCash ?? 0) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ (row.depositedCash ?? row.actualCashCounted) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td>{{ row.variance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td class="drawer-close-history__notes">{{ row.shortageReason || '—' }}</td>
             <td>{{ row.closedBy?.name || row.closedBy?.email || '—' }}</td>

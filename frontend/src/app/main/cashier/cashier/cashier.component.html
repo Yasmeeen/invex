@@ -54,6 +54,18 @@
     </div>
   </div>
 
+  <div
+    class="cashier-opening-balance"
+    *ngIf="drawerOpeningBalance > 0.005 && !drawerPeriodAlreadyClosed"
+    role="status"
+  >
+    <i class="fa fa-inbox" aria-hidden="true"></i>
+    <span>{{
+      'tr_drawer_close_cashier_opening_hint'
+        | translate : { amount: drawerOpeningBalanceFormatted() }
+    }}</span>
+  </div>
+
   <!-- Body -->
   <div class="cashier-body">
 
@@ -68,43 +80,74 @@
       (keyup.enter)="scanProduct(barcode); barcode = ''"
       autofocus
     />
-           <!-- Client Information (collapsible): payment + client fields -->
-           <div class="card mb-3">
-            <div class="card-header flex flex-space-between pointer" (click)="toggleClientInfo()">
-              <h5 class="m-0">{{ partyInfoTitleKey() | translate }}</h5>
-              <i class="fa" [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"></i>
-            </div>
-            <div class="card-body" *ngIf="isClientInfoOpen">
-              <div class="party-type-toggle mb-3">
-                <label class="mr-3">
-                  <input
-                    type="radio"
-                    name="partyType"
-                    [checked]="partyType === 'client'"
-                    (change)="onPartyTypeChange('client')"
-                  />
-                  {{ 'tr_party_client' | translate }}
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="partyType"
-                    [checked]="partyType === 'supplier'"
-                    (change)="onPartyTypeChange('supplier')"
-                  />
-                  {{ 'tr_party_supplier' | translate }}
-                </label>
-              </div>
-            
-              <div [formGroup]="clientForm">
-    
-              <div class="row">
-                
-                <div
-                  class="col-md-3"
-                  [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
+           <!-- Client Information (collapsible) -->
+           <div class="card cashier-client-card mb-2">
+            <div class="card-header cashier-client-card__header">
+              <button
+                type="button"
+                class="cashier-client-card__collapse-btn cashier-client-card__header-row"
+                (click)="toggleClientInfo()"
+                [attr.aria-expanded]="isClientInfoOpen"
+              >
+                <span class="cashier-client-card__title">{{ partyInfoTitleKey() | translate }}</span>
+                <span
+                  class="cashier-client-card__preview size-small text-muted"
+                  *ngIf="!isClientInfoOpen && clientInfoPreview()"
                 >
-                  <div class="form-group">
+                  {{ clientInfoPreview() }}
+                </span>
+                <i
+                  class="fa cashier-client-card__chevron"
+                  [ngClass]="{ 'fa-chevron-down': !isClientInfoOpen, 'fa-chevron-up': isClientInfoOpen }"
+                ></i>
+              </button>
+            </div>
+            <div class="card-body cashier-client-card__body" *ngIf="isClientInfoOpen">
+              <div [formGroup]="clientForm" class="cashier-client-form">
+                <div class="cashier-client-card__actions-row">
+                  <div class="party-type-toggle party-type-toggle--segmented">
+                    <label [class.is-active]="partyType === 'client'">
+                      <input
+                        type="radio"
+                        name="partyType"
+                        [checked]="partyType === 'client'"
+                        (change)="onPartyTypeChange('client')"
+                      />
+                      {{ 'tr_party_client' | translate }}
+                    </label>
+                    <label [class.is-active]="partyType === 'supplier'">
+                      <input
+                        type="radio"
+                        name="partyType"
+                        [checked]="partyType === 'supplier'"
+                        (change)="onPartyTypeChange('supplier')"
+                      />
+                      {{ 'tr_party_supplier' | translate }}
+                    </label>
+                  </div>
+
+                  <div class="cashier-client-card__payment">
+                    <button
+                      type="button"
+                      class="s-btn btn-secondary btn-sm"
+                      (click)="openPaymentSplitsDialog()"
+                    >
+                      {{ 'tr_payment_splits_open' | translate }}
+                    </button>
+                    <span class="size-small text-muted" *ngIf="hasValidConfirmedPayment()">
+                      {{ paymentSummaryText() }}
+                    </span>
+                    <span class="size-small text-muted" *ngIf="!hasValidConfirmedPayment()">
+                      {{ 'tr_payment_splits_not_set' | translate }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="cashier-client-fields cashier-client-fields--row">
+                  <div
+                    class="cashier-client-fields__item"
+                    [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
+                  >
                     <label>{{ 'tr_client_phone' | translate }}</label>
                     <div class="input-with-icon bg-white width-100">
                       <input type="text" class="s-control width-100" formControlName="phone" />
@@ -122,12 +165,10 @@
                       {{ 'tr_client_phone_invalid' | translate }}
                     </span>
                   </div>
-                </div>
-                <div
-                  class="col-md-3"
-                  [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
-                >
-                  <div class="form-group">
+                  <div
+                    class="cashier-client-fields__item"
+                    [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
+                  >
                     <label>{{ partyNameLabelKey() | translate }}</label>
                     <div class="input-with-icon bg-white width-100">
                       <input type="text" class="s-control width-100" formControlName="name" />
@@ -139,52 +180,32 @@
                       {{ 'tr_client_name_required' | translate }}
                     </span>
                   </div>
-                </div>
-                <div
-                class="col-md-3"
-                [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
-              >
-                <div class="form-group mb-0">
-                  <label>{{ 'tr_client_address' | translate }}</label>
-                  <div class="input-with-icon bg-white width-100">
-                    <input type="text" class="s-control width-100" formControlName="address" />
-                  </div>
-                  <span
-                    class="text-error size-small validator"
-                    *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                  <div
+                    class="cashier-client-fields__item"
+                    [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
                   >
-                    {{ 'tr_client_address_required' | translate }}
-                  </span>
+                    <label>{{ 'tr_client_address' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <input type="text" class="s-control width-100" formControlName="address" />
+                    </div>
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                    >
+                      {{ 'tr_client_address_required' | translate }}
+                    </span>
+                  </div>
+                  <div
+                    class="cashier-client-fields__item"
+                    *ngIf="partyType === 'supplier' && supplierCompanyName"
+                  >
+                    <label>{{ 'tr_legal_name' | translate }}</label>
+                    <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
+                  </div>
                 </div>
               </div>
-              <div class="col-md-3" *ngIf="partyType === 'supplier' && supplierCompanyName">
-                <div class="form-group mb-0">
-                  <label>{{ 'tr_legal_name' | translate }}</label>
-                  <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
-                </div>
-              </div>
-              </div>
-              </div>
-
-              <div class="cashier-payment-summary card-body--payment mt-3 pt-3">
-                <button
-                  type="button"
-                  class="s-btn btn-secondary btn-sm"
-                  (click)="openPaymentSplitsDialog()"
-                >
-                  {{ 'tr_payment_splits_open' | translate }}
-                </button>
-                <div class="size-small text-muted mt-2" *ngIf="hasValidConfirmedPayment()">
-                  {{ paymentSummaryText() }}
-                </div>
-                <div class="size-small text-muted mt-1" *ngIf="!hasValidConfirmedPayment()">
-                  {{ 'tr_payment_splits_not_set' | translate }}
-                </div>
-              </div>
-
             </div>
           </div>
-
  
       <div class="products-grid">
         <div [class.disabled-container]="product.stock == 0"

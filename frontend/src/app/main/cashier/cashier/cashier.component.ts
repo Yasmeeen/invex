@@ -7,6 +7,7 @@ import {
   OnInit,
   ViewChild,
 } from '@angular/core';
+import { formatDate } from '@angular/common';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
@@ -33,12 +34,14 @@ import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
+import { DrawerCloseService } from '@shared/services/drawer-close.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
 } from '@shared/components/payment-splits-dialog/payment-splits-dialog.component';
 import {
   PaymentSplitsResult,
+  buildPaymentSplitsResult,
   paymentSplitsNetTotal,
   round2,
 } from '@shared/utils/payment-app-fee.util';
@@ -73,6 +76,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string
+
+  /** Cash left in drawer from the last close (opening balance for today). */
+  drawerOpeningBalance = 0;
+  drawerPeriodAlreadyClosed = false;
 
   /** Desk product purchase (inventory intake); receipt print uses shared component. */
   createdDeskPurchase: any = null;
@@ -112,6 +119,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private fb: FormBuilder,
     private translate: TranslateService,
     public storeSettings: StoreSettingsService,
+    private drawerCloseService: DrawerCloseService,
     private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
@@ -126,6 +134,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnInit(): void {
     this.rebuildPaymentMethods();
     this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
+    this.loadDrawerOpeningBalance();
   }
 
   ngOnDestroy(): void {
@@ -157,6 +166,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       count: methods,
       total,
     });
+  }
+
+  /** Short preview shown in collapsed client-info header (phone / name). */
+  clientInfoPreview(): string {
+    const phone = String(this.clientForm.get('phone')?.value ?? '').trim();
+    const name = String(this.clientForm.get('name')?.value ?? '').trim();
+    if (phone && name) {
+      return `${phone} · ${name}`;
+    }
+    return phone || name;
   }
 
   openPaymentSplitsDialog(autoCheckout = false): void {
@@ -266,7 +285,51 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       disableClose: true,
     });
 
-    ref.afterClosed().subscribe(() => {});
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.loadDrawerOpeningBalance();
+      }
+    });
+  }
+
+  private cashierBranchId(): string | null {
+    const id = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : (this.globals.currentUser?.branch as { _id?: string } | string | undefined);
+    if (!id) return null;
+    return typeof id === 'string' ? String(id).trim() : id?._id ? String(id._id).trim() : null;
+  }
+
+  loadDrawerOpeningBalance(): void {
+    const branchId = this.cashierBranchId();
+    const uid = this.curentUser?._id;
+    if (!branchId || !uid) {
+      this.drawerOpeningBalance = 0;
+      this.drawerPeriodAlreadyClosed = false;
+      return;
+    }
+
+    const today = formatDate(new Date(), 'yyyy-MM-dd', 'en-US');
+    this.drawerCloseService.openingBalance({ userId: uid, branch: branchId, date: today }).subscribe({
+      next: (res) => {
+        this.drawerOpeningBalance = round2(Number(res.openingCashBalance ?? 0));
+        this.drawerPeriodAlreadyClosed = Boolean(res.periodAlreadyClosed);
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.drawerOpeningBalance = 0;
+        this.drawerPeriodAlreadyClosed = false;
+      },
+    });
+  }
+
+  drawerOpeningBalanceFormatted(): string {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: 'EGP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(this.drawerOpeningBalance);
   }
 
   /** Desk intake purchase popup (`exchange`: trade-in step; defer purchase receipt until after sale checkout). */
@@ -714,6 +777,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.productsSerivce.getProducts(params).subscribe((res: any) => {
       this.products = res.products;
     });
+    this.loadDrawerOpeningBalance();
   }
 
   filteredProducts() {
@@ -969,14 +1033,17 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (this.isClientInfoOpen) {
-      this.clientForm.markAllAsTouched();
-      if (!this.clientForm.valid) {
-        this.translate.get('tr_invalid_cashier_client').subscribe((msg) =>
-          this.appNotificationService.push(msg, 'error')
-        );
-        return;
-      }
+    if (!this.isClientInfoOpen) {
+      this.performCheckout(this.buildDefaultCashPayment());
+      return;
+    }
+
+    this.clientForm.markAllAsTouched();
+    if (!this.clientForm.valid) {
+      this.translate.get('tr_invalid_cashier_client').subscribe((msg) =>
+        this.appNotificationService.push(msg, 'error')
+      );
+      return;
     }
 
     if (this.hasValidConfirmedPayment() && this.confirmedPayment) {
@@ -985,6 +1052,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.openPaymentSplitsDialog(true);
+  }
+
+  /** Walk-in checkout when client-info card is collapsed: full amount as cash, no dialog. */
+  private buildDefaultCashPayment(): PaymentSplitsResult {
+    const total = this.effectiveCheckoutTotal();
+    return buildPaymentSplitsResult(
+      [{ method: 'cash', amount: total }],
+      [],
+      this.storeSettings.snapshot.paymentAppFeePercents
+    );
   }
 
   private performCheckout(payment: PaymentSplitsResult): void {

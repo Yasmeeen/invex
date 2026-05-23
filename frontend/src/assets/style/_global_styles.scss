@@ -142,6 +142,31 @@ tooltip-content .tooltip {
  * Cashier fullscreen overlay uses z-index 9999 — without this, clicks hit the overlay instead of options.
  */
 
+.payment-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.25;
+  max-width: 100%;
+}
+
+.payment-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.ng-dropdown-panel .ng-option .payment-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.ng-select .ng-value-container .payment-logo {
+  width: 16px;
+  height: 16px;
+}
 
 .ng-select.ng-select-multiple .ng-select-container .ng-value-container .ng-value {
     @extend %flex-centered;

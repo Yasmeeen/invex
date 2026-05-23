@@ -270,14 +270,6 @@
     gap: 8px;
   }
 
-  .payment-logo {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    border-radius: 4px;
-    flex-shrink: 0;
-  }
-
   /* Same global .s-select rules as drawer-close (no custom panel height/padding overrides). */
   /* Project .s-select sets .ng-select-container { position: static }, which breaks dropdown placement. */
   .cashier-payment-splits ::ng-deep ng-select.ng-select .ng-select-container {

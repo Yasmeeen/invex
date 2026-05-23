@@ -16,6 +16,9 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorDeferredPaymentDialogComponent } from '../vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.component';
+import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
+import { Order } from '@core/models/products.model';
+import { isPayLaterMethod, orderDisplayRemaining } from '@core/utils/order-display.util';
 
 export type VendorHistoryDialogData = { vendor: Vendor; forcedBranchId?: string | null };
 
@@ -263,6 +266,28 @@ export class VendorHistoryDialogComponent implements OnInit {
       default:
         return status || '—';
     }
+  }
+
+  canPaySalesOrder(o: { _id?: string; paymentMethod?: string; status?: string; remaining?: number }): boolean {
+    if (!o?._id || o.status === 'restored') return false;
+    if (!isPayLaterMethod(o.paymentMethod)) return false;
+    const rem = Number(o.remaining);
+    if (Number.isFinite(rem)) return rem > 0.005;
+    return orderDisplayRemaining(o as Order) > 0.005;
+  }
+
+  openPaySalesOrderDialog(o: { _id?: string } & Partial<Order>): void {
+    const ref = this.dialog.open(PayOrderDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'pay-order-dialog-panel',
+      backdropClass: 'pay-order-dialog-backdrop',
+      data: { order: o as Order },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.loadHistory();
+    });
   }
 
   openDeferredPaymentDialog(pr: VendorPurchasingRequestRow): void {

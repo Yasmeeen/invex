@@ -115,7 +115,7 @@
             *ngFor="let p of purchasesList"
             [class.purchase-row--deferred]="isDeferredPurchase(p)"
             class="pointer"
-            (click)="openPurchaseDetail(p)"
+            (click)="onPurchaseRowClick($event, p)"
           >
             <td>{{ purchaseRef(p) }}</td>
             <td>
@@ -141,10 +141,22 @@
             <td>{{ treasuryDisplay(p) }}</td>
             <td>{{ statusLabel(p?.status) }}</td>
             <td>{{ createdAtDisplay(p) }}</td>
-            <td (click)="$event.stopPropagation()">
-              <button type="button" class="s-btn btn-secondary btn-sm" (click)="openPurchaseDetail(p)">
-                {{ 'tr_purchase_invoice_view' | translate }}
-              </button>
+            <td>
+              <span class="options-menu">
+                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                <div class="options-menu-container p-0">
+                  <div
+                    class="single-option"
+                    *ngIf="canPayDeferredPurchase(p)"
+                    (click)="openPayDeferredPurchase(p)"
+                  >
+                    {{ 'tr_add_payment' | translate }}
+                  </div>
+                  <div class="single-option" (click)="openPurchaseDetail(p)">
+                    {{ 'tr_purchase_invoice_view' | translate }}
+                  </div>
+                </div>
+              </span>
             </td>
           </tr>
         </tbody>
@@ -156,7 +168,7 @@
         class="order-card purchase-card"
         *ngFor="let p of purchasesList"
         [class.order-card--pay-later]="isDeferredPurchase(p)"
-        (click)="openPurchaseDetail(p)"
+        (click)="onPurchaseRowClick($event, p)"
       >
         <div class="order-card__top">
           <div class="order-card__icon">
@@ -181,6 +193,21 @@
               <span *ngIf="p?.productPayload?.code">{{ p?.productPayload?.code }}</span>
             </div>
           </div>
+          <span class="options-menu">
+            <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+            <div class="options-menu-container p-0">
+              <div
+                class="single-option"
+                *ngIf="canPayDeferredPurchase(p)"
+                (click)="openPayDeferredPurchase(p)"
+              >
+                {{ 'tr_add_payment' | translate }}
+              </div>
+              <div class="single-option" (click)="openPurchaseDetail(p)">
+                {{ 'tr_purchase_invoice_view' | translate }}
+              </div>
+            </div>
+          </span>
         </div>
 
         <div class="order-card__stats">

@@ -39,6 +39,9 @@ addPayment(
     paidAt?: string;
     userId?: string;
     note?: string;
+    /** Customer payment methods (cash, visa, …) — net amounts per method. */
+    paymentSplits?: { method: string; amount: number }[];
+    /** @deprecated Use paymentSplits for sales invoices. */
     paymentTreasurySplits?: TreasurySplitPayload[];
   }
 ) {

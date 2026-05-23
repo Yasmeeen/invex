@@ -19,6 +19,7 @@ import {
   treasuryMethodMap,
 } from '../settings_module/treasuryMethods.js';
 import {
+  recordDeskPurchaseDeferredPayment,
   syncDeferredSupplierDeskPurchase,
 } from '../../utils/desk-purchase-deferred.js';
 import {
@@ -26,6 +27,7 @@ import {
   normalizePurchaseTreasuryInput,
   purchaseHasDeferredTreasury,
 } from '../../utils/purchase-treasury-splits.js';
+import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -121,6 +123,8 @@ export const getProductPurchaseRequest = async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    await enrichPurchasesAcquiredFromDisplay([purchase]);
+
     return res.json({ purchase });
   } catch (e) {
     console.error('getProductPurchaseRequest:', e);
@@ -154,6 +158,8 @@ export const listProductPurchaseRequests = async (req, res) => {
         .lean(),
       ProductPurchaseRequest.countDocuments(q),
     ]);
+
+    await enrichPurchasesAcquiredFromDisplay(items);
 
     return res.json({ purchases: items, meta: { totalCount: total, page: p, limit: lim } });
   } catch (e) {
@@ -962,5 +968,48 @@ export const rejectProductPurchaseRequest = async (req, res) => {
     session.endSession();
     console.error('rejectProductPurchaseRequest:', e);
     return res.status(500).json({ error: 'Failed to reject purchase', details: e?.message });
+  }
+};
+
+/** POST pay deferred balance on approved desk purchase (purchase treasury — store pays party). */
+export const recordProductPurchaseDeferredPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentTreasurySplits, amount, userId, branchId, note } = req.body || {};
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      return res.status(400).json({ error: 'Valid userId is required' });
+    }
+
+    const result = await recordDeskPurchaseDeferredPayment(id, {
+      paymentTreasurySplits,
+      amount,
+      userId,
+      branchId,
+      note,
+    });
+
+    const purchase = await ProductPurchaseRequest.findById(id).lean();
+
+    await auditLog(req, {
+      action: 'payment',
+      module: 'product_purchase_requests',
+      entityType: 'ProductPurchaseRequest',
+      entityId: id,
+      message: 'Desk purchase deferred payment recorded',
+      metadata: { amount: result.applied, amountPaid: result.amountPaid },
+    });
+
+    return res.json({
+      message: '✅ Payment recorded',
+      purchase,
+      ...result,
+    });
+  } catch (error) {
+    const msg = error?.message || 'Failed to record payment';
+    const status =
+      msg.includes('not found') || msg.includes('Nothing remaining') ? 400 : 500;
+    console.error('recordProductPurchaseDeferredPayment:', error);
+    return res.status(status).json({ error: msg });
   }
 };

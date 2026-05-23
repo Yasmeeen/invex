@@ -9,12 +9,6 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
 import { auditLog } from '../audit_module/audit.service.js';
-import {
-  getEffectivePurchaseTreasuryMethodsFromDb,
-  isDeferredPurchaseTreasury,
-  treasuryMethodMap,
-} from '../settings_module/treasuryMethods.js';
-import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -580,8 +574,12 @@ export const addOrderPayment = async (req, res) => {
       userId,
       note,
       method: methodRaw,
-      paymentTreasurySplits: splitsRaw,
+      paymentSplits: paymentSplitsRaw,
+      paymentMethodSplits: paymentMethodSplitsRaw,
+      /** @deprecated Sales installments use paymentSplits (customer methods), not purchase treasury. */
+      paymentTreasurySplits: legacyTreasuryRaw,
     } = req.body || {};
+    const splitsRaw = paymentSplitsRaw ?? paymentMethodSplitsRaw;
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
     if (order.status === 'restored') return res.status(400).json({ error: 'Order is restored' });
@@ -591,41 +589,15 @@ export const addOrderPayment = async (req, res) => {
     const remaining = Math.max(0, Math.round((total - alreadyPaid) * 100) / 100);
 
     let applied = 0;
-    let treasurySplits = [];
-    const hasSplits = Array.isArray(splitsRaw) && splitsRaw.length > 0;
+    const hasPaymentSplits = Array.isArray(splitsRaw) && splitsRaw.length > 0;
+    const hasLegacyTreasury =
+      Array.isArray(legacyTreasuryRaw) && legacyTreasuryRaw.length > 0;
 
-    if (hasSplits) {
-      applied = Math.round(
-        splitsRaw.reduce((acc, row) => acc + (Number(row?.amount) || 0), 0) * 100
-      ) / 100;
-    } else {
-      const payAmount = Number(amount);
-      if (!Number.isFinite(payAmount) || payAmount <= 0) {
-        return res.status(400).json({ error: 'Valid amount is required' });
-      }
-      applied = Math.round(payAmount * 100) / 100;
-    }
-
-    applied = Math.min(applied, remaining);
-    if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
-
-    if (hasSplits) {
-      const filtered = splitsRaw.filter(
-        (row) => !isDeferredPurchaseTreasury(String(row?.key || '').trim().toLowerCase())
-      );
-      const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
-      const tMap = treasuryMethodMap(treasuryMethods);
-      const treasuryNorm = normalizeTreasurySplitsInput({
-        purchaseTreasurySplits: filtered,
-        purchaseTreasuryKey: undefined,
-        lineTotal: applied,
-        treasuryMethods,
-        tMap,
+    if (hasLegacyTreasury && !hasPaymentSplits) {
+      return res.status(400).json({
+        error:
+          'Use paymentSplits (customer payment methods) for sales invoice payments, not purchase treasury',
       });
-      if (treasuryNorm.error) {
-        return res.status(400).json({ error: treasuryNorm.error });
-      }
-      treasurySplits = treasuryNorm.splits;
     }
 
     const dt = paidAt ? new Date(paidAt) : new Date();
@@ -638,24 +610,48 @@ export const addOrderPayment = async (req, res) => {
     order.payments = order.payments || [];
     const noteStr = String(note || '').trim();
 
-    if (treasurySplits.length) {
-      for (const s of treasurySplits) {
+    if (hasPaymentSplits) {
+      const splits = splitsRaw
+        .map((s) => ({
+          method: String(s?.method ?? s?.key ?? '').trim().toLowerCase(),
+          amount: Math.round((Number(s?.amount) || 0) * 100) / 100,
+        }))
+        .filter((s) => s.method && s.method !== 'credit' && Number.isFinite(s.amount) && s.amount > 0);
+
+      if (!splits.length) {
+        return res.status(400).json({ error: 'At least one payment method with amount is required' });
+      }
+
+      applied = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
+      applied = Math.min(applied, remaining);
+      if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
+
+      for (const s of splits) {
         order.payments.push({
           amount: s.amount,
           paidAt: dt,
           paidByUserId: uid,
-          method: s.key,
-          paymentTreasurySplits: treasurySplits,
-          note: noteStr,
+          method: s.method,
+          note: noteStr || `Payment · ${s.method}`,
         });
       }
     } else {
-      const methodSlug = String(methodRaw || '').trim().toLowerCase();
+      const payAmount = Number(amount);
+      if (!Number.isFinite(payAmount) || payAmount <= 0) {
+        return res.status(400).json({ error: 'Valid amount is required' });
+      }
+      applied = Math.min(Math.round(payAmount * 100) / 100, remaining);
+      if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
+
+      const methodSlug = String(methodRaw || 'cash').trim().toLowerCase();
+      if (methodSlug === 'credit') {
+        return res.status(400).json({ error: 'Use a customer payment method (not credit) for installments' });
+      }
       order.payments.push({
         amount: applied,
         paidAt: dt,
         paidByUserId: uid,
-        ...(methodSlug ? { method: methodSlug } : {}),
+        method: methodSlug || 'cash',
         note: noteStr,
       });
     }

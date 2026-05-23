@@ -58,6 +58,19 @@ export class ProductPurchaseRequestsService {
     });
   }
 
+  recordDeferredPayment(
+    purchaseId: string,
+    payload: {
+      userId: string;
+      branchId?: string;
+      amount: number;
+      paymentTreasurySplits: PurchaseTreasurySplit[];
+      note?: string;
+    }
+  ): Observable<any> {
+    return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}/deferred-payment`, payload);
+  }
+
   list(params: {
     status?: 'pending' | 'approved' | 'rejected';
     branchId?: string;

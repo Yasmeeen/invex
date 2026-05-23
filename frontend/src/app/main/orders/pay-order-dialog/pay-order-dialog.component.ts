@@ -6,8 +6,12 @@ import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-displ
 import { AuthenticationService } from '@core/services/authentication.service';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
-import { OrdersSerivce, TreasurySplitPayload } from '@shared/services/orders.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import {
+  buildCashierPaymentMethods,
+  CashierPaymentMethod,
+} from '@shared/utils/cashier-payment-methods.util';
 import { Subscription } from 'rxjs';
 
 export type PayOrderDialogData = { order: Order };
@@ -21,11 +25,14 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
   form: FormGroup;
   saving = false;
   readonly order: Order;
-  private subscriptions: Subscription[] = [];
 
-  treasuryMethodOptions: { key: string; label: string }[] = [];
-  selectedTreasuryKeys: string[] = ['cash'];
-  treasuryAmounts: Record<string, number> = {};
+  /** Customer payment methods (from store settings); credit excluded for installments. */
+  paymentMethods: CashierPaymentMethod[] = [];
+  paymentMethodsForSplit: CashierPaymentMethod[] = [];
+  selectedPayMethods: string[] = ['cash'];
+  payAmounts: Record<string, number> = {};
+
+  private subscriptions: Subscription[] = [];
 
   constructor(
     private fb: FormBuilder,
@@ -54,9 +61,9 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.syncTreasuryOptions();
+    this.rebuildPaymentMethods();
     this.subscriptions.push(
-      this.storeSettings.settings$.subscribe(() => this.syncTreasuryOptions())
+      this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods())
     );
   }
 
@@ -68,100 +75,116 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
     return orderDisplayPaid(this.order);
   }
 
-  private syncTreasuryOptions(): void {
-    const deferredKey = 'deferred';
-    const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
-    const raw = Array.isArray(m) && m.length ? m : [{ key: 'cash', label: 'Cash' }];
-    this.treasuryMethodOptions = raw
-      .map((x) => ({
-        key: String(x.key || '').trim().toLowerCase(),
-        label: String(x.label || x.key || '').trim(),
-      }))
-      .filter((o) => o.key && o.key !== deferredKey);
-
-    const keys = new Set(this.treasuryMethodOptions.map((o) => o.key));
-    const valid = this.selectedTreasuryKeys.filter((k) => keys.has(k));
+  private rebuildPaymentMethods(): void {
+    const all = buildCashierPaymentMethods(
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
+    this.paymentMethods = all.filter((m) => m.id !== 'credit');
+    this.paymentMethodsForSplit = this.paymentMethods;
+    const keys = new Set(this.paymentMethods.map((m) => m.id));
+    const valid = this.selectedPayMethods.filter((k) => keys.has(k));
     if (!valid.length) {
-      const cash = this.treasuryMethodOptions.find((o) => o.key === 'cash');
-      this.selectedTreasuryKeys = [cash ? cash.key : this.treasuryMethodOptions[0]?.key || 'cash'];
+      this.selectedPayMethods = ['cash'];
+      this.payAmounts = { cash: 0 };
     } else {
-      this.selectedTreasuryKeys = valid;
+      this.selectedPayMethods = valid;
+      this.reconcilePayAmountsKeys(valid);
     }
-    this.reconcileTreasuryAmountsKeys(this.selectedTreasuryKeys);
   }
 
-  treasuryOptionLabel(key: string): string {
-    return this.treasuryMethodOptions.find((o) => o.key === key)?.label || key;
+  paymentAppFeePercent(methodId: string | undefined | null): number {
+    const m = String(methodId || '').trim().toLowerCase();
+    const row = this.storeSettings.snapshot.paymentAppFeePercents?.find((x) => x.method === m);
+    const p = Number(row?.percent);
+    return Number.isFinite(p) && p > 0 ? Math.min(p, 100) : 0;
   }
 
-  onSelectedTreasuryChange(ids: string[] | null): void {
+  payAmountNetForInvoice(methodId: string, enteredGross: number): number {
+    const pct = this.paymentAppFeePercent(methodId);
+    const g = Number(enteredGross) || 0;
+    if (pct <= 0) {
+      return Math.round(g * 100) / 100;
+    }
+    return Math.round((g / (1 + pct / 100)) * 100) / 100;
+  }
+
+  getPayMethodDef(id: string): CashierPaymentMethod | undefined {
+    return this.paymentMethods.find((m) => m.id === id);
+  }
+
+  payMethodDisplayLabel(methodId: string): string {
+    const m = this.paymentMethods.find((x) => x.id === methodId);
+    return m?.label || methodId;
+  }
+
+  onSelectedPayMethodsChange(ids: string[] | null): void {
     const raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
     if (!raw.length) {
-      this.selectedTreasuryKeys = ['cash'];
-      this.reconcileTreasuryAmountsKeys(['cash']);
+      this.selectedPayMethods = ['cash'];
+      this.reconcilePayAmountsKeys(['cash']);
       return;
     }
-    this.reconcileTreasuryAmountsKeys(raw);
+    this.reconcilePayAmountsKeys(raw);
   }
 
-  private reconcileTreasuryAmountsKeys(ids: string[]): void {
+  private reconcilePayAmountsKeys(ids: string[]): void {
     const next: Record<string, number> = {};
     for (const id of ids) {
-      next[id] = Number(this.treasuryAmounts[id]) || 0;
+      next[id] = Number(this.payAmounts[id]) || 0;
     }
-    this.treasuryAmounts = next;
-    this.selectedTreasuryKeys = ids;
+    this.payAmounts = next;
+    this.selectedPayMethods = ids;
   }
 
-  trackTreasuryKey(_index: number, key: string): string {
-    return key;
+  trackPayMethodId(_index: number, id: string): string {
+    return id;
   }
 
-  treasuryOverflowTitle(items: readonly { key?: string; label?: string }[] | null | undefined): string {
+  payMethodsOverflowTitle(items: readonly CashierPaymentMethod[] | null | undefined): string {
     if (!items?.length || items.length <= 2) {
       return '';
     }
     return items
       .slice(2)
-      .map((row) => String(row?.label || row?.key || '').trim())
+      .map((row) => row?.label || '')
       .filter(Boolean)
       .join(', ');
   }
 
-  treasurySplitsTotal(): number {
-    const sum = this.selectedTreasuryKeys.reduce(
-      (acc, key) => acc + (Number(this.treasuryAmounts[key]) || 0),
+  paymentSplitsTotal(): number {
+    const sum = this.selectedPayMethods.reduce(
+      (acc, id) => acc + this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
       0
     );
     return Math.round(sum * 100) / 100;
   }
 
-  treasuryRemaining(): number {
-    return Math.round((this.remaining - this.treasurySplitsTotal()) * 100) / 100;
+  paymentRemaining(): number {
+    return Math.round((this.remaining - this.paymentSplitsTotal()) * 100) / 100;
   }
 
-  treasuryOverAllocated(): boolean {
-    return this.treasurySplitsTotal() > this.remaining + 0.001;
+  paymentOverAllocated(): boolean {
+    return this.paymentSplitsTotal() > this.remaining + 0.001;
   }
 
-  private buildTreasurySplitsPayload(): TreasurySplitPayload[] | null {
-    const splits = this.selectedTreasuryKeys
-      .map((key) => ({
-        key,
-        label: this.treasuryOptionLabel(key),
-        amount: Math.round((Number(this.treasuryAmounts[key]) || 0) * 100) / 100,
+  private buildPaymentSplitsPayload(): { method: string; amount: number }[] | null {
+    const splits = this.selectedPayMethods
+      .map((id) => ({
+        method: id,
+        amount: this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
       }))
       .filter((s) => s.amount > 0);
 
     if (!splits.length) {
-      this.notify.push(this.translate.instant('tr_vendor_deferred_treasury_required'), 'error');
+      this.notify.push(this.translate.instant('tr_order_payment_method_required'), 'error');
       return null;
     }
-    if (this.treasuryOverAllocated()) {
+    if (this.paymentOverAllocated()) {
       this.notify.push(this.translate.instant('tr_vendor_deferred_payment_over'), 'error');
       return null;
     }
-    if (this.treasurySplitsTotal() <= 0) {
+    if (this.paymentSplitsTotal() <= 0) {
       this.notify.push(this.translate.instant('tr_vendor_deferred_amount_required'), 'error');
       return null;
     }
@@ -176,7 +199,7 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
     const orderId = this.order._id;
     if (!orderId) return;
 
-    const splits = this.buildTreasurySplitsPayload();
+    const splits = this.buildPaymentSplitsPayload();
     if (!splits) return;
 
     const v = this.form.getRawValue();
@@ -187,8 +210,8 @@ export class PayOrderDialogComponent implements OnInit, OnDestroy {
     this.saving = true;
     this.orders
       .addPayment(String(orderId), {
-        amount: this.treasurySplitsTotal(),
-        paymentTreasurySplits: splits,
+        amount: this.paymentSplitsTotal(),
+        paymentSplits: splits,
         paidAt,
         userId: u?._id,
         note,

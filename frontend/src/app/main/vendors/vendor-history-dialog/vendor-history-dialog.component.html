@@ -125,6 +125,7 @@
             <th>{{ 'tr_remaining' | translate }}</th>
             <th>{{ 'tr_payment_method' | translate }}</th>
             <th>{{ 'tr_created_at' | translate }}</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -135,6 +136,16 @@
             <td>{{ o.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ o.paymentMethod }}</td>
             <td>{{ o.createdAt | date:'short' }}</td>
+            <td>
+              <button
+                type="button"
+                class="s-btn btn-primary btn-sm"
+                *ngIf="canPaySalesOrder(o)"
+                (click)="openPaySalesOrderDialog(o)"
+              >
+                {{ 'tr_add_payment' | translate }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>

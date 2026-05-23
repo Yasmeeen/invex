@@ -6,6 +6,7 @@ import { ClientListComponent } from './client-list/client-list.component';
 import { ClientHistoryDialogComponent } from './client-history-dialog/client-history-dialog.component';
 import { SharedModule } from '@shared/shared.module';
 import { UserSerivce } from '@shared/services/user.service';
+import { OrdersModule } from '../orders/orders.module';
 
 
 @NgModule({
@@ -16,7 +17,8 @@ import { UserSerivce } from '@shared/services/user.service';
   imports: [
     CommonModule,
     ClientsRoutingModule,
-    SharedModule
+    SharedModule,
+    OrdersModule,
   ],
   providers: [
     UserSerivce

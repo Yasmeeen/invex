@@ -12,6 +12,7 @@ import {
   ProductPurchaseApprovalDialogComponent,
 } from '@shared/components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
+import { DeskPurchaseDeferredPaymentDialogComponent } from '../desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
 
 const DEFERRED_KEY = 'deferred';
 
@@ -197,9 +198,13 @@ export class PurchaseInvoicesListComponent implements OnInit {
       : this.translate.instant('tr_party_client');
   }
 
-  partyName(p: any): string {
+  partyNameRaw(p: any): string {
     const af = p?.productPayload?.acquiredFrom;
-    return String(af?.displayName || af?.name || af?.phone || '').trim() || '—';
+    return String(af?.displayName || af?.name || af?.phone || '').trim();
+  }
+
+  partyName(p: any): string {
+    return this.partyNameRaw(p) || '—';
   }
 
   treasuryDisplay(p: any): string {
@@ -265,6 +270,47 @@ export class PurchaseInvoicesListComponent implements OnInit {
   paginationUpdate(page: number): void {
     this.params.page = page;
     this.loadPurchases();
+  }
+
+  canPayDeferredPurchase(p: any): boolean {
+    return (
+      p?.status === 'approved' &&
+      this.isDeferredPurchase(p) &&
+      this.remaining(p) > 0.005
+    );
+  }
+
+  openPayDeferredPurchase(p: any): void {
+    const id = normalizeMongoId(p?._id);
+    if (!id) return;
+    const branchId = this.resolveBranchId();
+    const ref = this.dialog.open(DeskPurchaseDeferredPaymentDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'vendor-deferred-payment-dialog-panel',
+      backdropClass: 'vendor-deferred-payment-dialog-backdrop',
+      data: {
+        purchaseId: id,
+        remaining: this.remaining(p),
+        partyTypeLabel: this.partyTypeLabel(p),
+        partyName: this.partyNameRaw(p),
+        productName: String(p?.productPayload?.name || '').trim(),
+        requestDate: p?.createdAt,
+        forcedBranchId: branchId,
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.loadPurchases();
+      }
+    });
+  }
+
+  /** Row/card click opens detail; ignore clicks on the ⋮ options menu (document listener toggles it). */
+  onPurchaseRowClick(event: MouseEvent, p: any): void {
+    if ((event.target as HTMLElement)?.closest?.('.options-menu')) return;
+    this.openPurchaseDetail(p);
   }
 
   openPurchaseDetail(p: any): void {

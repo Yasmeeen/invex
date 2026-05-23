@@ -48,6 +48,38 @@ function buildInvoiceAttributesSnapshot(productDoc, categoryDoc) {
   return out;
 }
 
+function round2(n) {
+  return Math.round(Number(n || 0) * 100) / 100;
+}
+
+function normalizePaymentFeeAllocations(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((row) => ({
+      forMethod: String(row?.forMethod ?? '').trim().toLowerCase(),
+      feeNet: round2(Number(row?.feeNet) || 0),
+      paidVia: String(row?.paidVia ?? '').trim().toLowerCase(),
+      feeGrossOnPaidVia: round2(Number(row?.feeGrossOnPaidVia) || 0),
+      feePercentSnapshot: round2(Number(row?.feePercentSnapshot) || 0),
+    }))
+    .filter((r) => r.forMethod && r.feeNet > 0 && r.paidVia);
+}
+
+function appendFeePaymentLines(payments, feeAllocations, { paidAt, paidByUserId }) {
+  for (const fee of feeAllocations) {
+    payments.push({
+      amount: fee.feeNet,
+      paidAt,
+      paidByUserId,
+      method: fee.paidVia,
+      countsTowardInvoice: false,
+      feeForMethod: fee.forMethod,
+      feePercentSnapshot: fee.feePercentSnapshot > 0 ? fee.feePercentSnapshot : undefined,
+      note: `Fee · ${fee.forMethod}`,
+    });
+  }
+}
+
 export const getOrders = async (req, res) => {
   try {
     const {
@@ -174,6 +206,7 @@ export const createOrder = async (req, res) => {
       invoiceDiscountAmount: invoiceDiscountRaw,
       paidAmount: paidAmountRaw,
       paymentSplits: paymentSplitsRaw,
+      paymentFeeAllocations: paymentFeeAllocationsRaw,
       exchangeTradeInCreditAmount: exchangeCreditRaw,
       exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
       partyType: partyTypeRaw,
@@ -399,18 +432,27 @@ export const createOrder = async (req, res) => {
 
       const hasCreditSplit = splits.some((s) => s.method === 'credit');
 
+      const checkoutPaidAt = new Date();
+      const feeAllocations = normalizePaymentFeeAllocations(paymentFeeAllocationsRaw);
+
       for (const s of splits) {
         if (s.amount > 0) {
           const isCreditLine = s.method === 'credit';
           payments.push({
             amount: s.amount,
-            paidAt: new Date(),
+            paidAt: checkoutPaidAt,
             paidByUserId: uid,
             method: isCreditLine ? undefined : s.method,
+            countsTowardInvoice: true,
             note: isCreditLine ? 'Initial payment (cashier)' : `Checkout · ${s.method}`,
           });
         }
       }
+
+      appendFeePaymentLines(payments, feeAllocations, {
+        paidAt: checkoutPaidAt,
+        paidByUserId: uid,
+      });
 
       const withMoney = splits.filter((s) => s.amount > 0 && s.method !== 'credit');
       if (paidAmount >= amountDueForPayment - 0.001) {
@@ -576,6 +618,7 @@ export const addOrderPayment = async (req, res) => {
       method: methodRaw,
       paymentSplits: paymentSplitsRaw,
       paymentMethodSplits: paymentMethodSplitsRaw,
+      paymentFeeAllocations: paymentFeeAllocationsRaw,
       /** @deprecated Sales installments use paymentSplits (customer methods), not purchase treasury. */
       paymentTreasurySplits: legacyTreasuryRaw,
     } = req.body || {};
@@ -632,9 +675,16 @@ export const addOrderPayment = async (req, res) => {
           paidAt: dt,
           paidByUserId: uid,
           method: s.method,
+          countsTowardInvoice: true,
           note: noteStr || `Payment · ${s.method}`,
         });
       }
+
+      const feeAllocations = normalizePaymentFeeAllocations(paymentFeeAllocationsRaw);
+      appendFeePaymentLines(order.payments, feeAllocations, {
+        paidAt: dt,
+        paidByUserId: uid,
+      });
     } else {
       const payAmount = Number(amount);
       if (!Number.isFinite(payAmount) || payAmount <= 0) {

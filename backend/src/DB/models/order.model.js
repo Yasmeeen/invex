@@ -70,6 +70,11 @@ const orderSchema = new mongoose.Schema(
         paidByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
         /** cash, visa, aman, … (split checkout / follow-up payments). */
         method: { type: String, required: false, trim: true },
+        /** When false, line is a payment-app fee (does not increase amountPaid). */
+        countsTowardInvoice: { type: Boolean, default: true },
+        /** Method that generated this fee line (e.g. aman). */
+        feeForMethod: { type: String, required: false, trim: true },
+        feePercentSnapshot: { type: Number, required: false, min: 0 },
         /** Purchase treasuries when recording pay-later settlement (same keys as desk purchase). */
         paymentTreasurySplits: {
           type: [

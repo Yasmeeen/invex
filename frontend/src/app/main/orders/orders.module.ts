@@ -11,6 +11,7 @@ import { PurchaseInvoicesListComponent } from './purchase-invoices-list/purchase
 import { SharedModule } from '@shared/shared.module';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { MatDialogModule } from '@angular/material/dialog';
+import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
 
 @NgModule({
@@ -27,6 +28,7 @@ import { MatDialogModule } from '@angular/material/dialog';
     OrdersRoutingModule,
     SharedModule,
     MatDialogModule,
+    PaymentSplitsDialogModule,
   ],
   providers: [OrdersSerivce],
   exports: [PayOrderDialogComponent, DeskPurchaseDeferredPaymentDialogComponent],

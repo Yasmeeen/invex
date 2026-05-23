@@ -1,0 +1,206 @@
+<div class="payment-splits-dialog" id="payment-splits-dialog-root">
+  <h2 mat-dialog-title class="payment-splits-dialog__title">
+    {{ 'tr_payment_splits_dialog_title' | translate }}
+  </h2>
+
+  <div mat-dialog-content class="payment-splits-dialog__body">
+    <div class="payment-splits-dialog__summary mb-3">
+      <div>
+        {{ 'tr_payment_splits_invoice_total' | translate }}:
+        <strong>{{ invoiceNetTotal | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+      </div>
+    </div>
+
+    <div class="payment-splits-dialog__section">
+      <div class="form-group mb-0">
+        <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
+        <div class="input-with-icon">
+          <ng-select
+            class="s-control s-select"
+            [items]="paymentMethodsForSplit"
+            bindLabel="label"
+            bindValue="id"
+            [multiple]="true"
+            [closeOnSelect]="false"
+            [clearable]="true"
+            [searchable]="true"
+            placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
+            [(ngModel)]="selectedPayMethods"
+            [ngModelOptions]="{ standalone: true }"
+            name="payMethodsMulti"
+            (ngModelChange)="onSelectedPayMethodsChange($event)"
+          >
+            <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+              <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                <span class="ng-value-label">{{ $any(item).label }}</span>
+                <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+              </div>
+              <div
+                class="ng-value"
+                *ngIf="items.length > 2"
+                [attr.title]="payMethodsOverflowTitle(items)"
+              >
+                <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+              </div>
+            </ng-template>
+            <ng-template ng-option-tmp let-item="item">
+              <span class="payment-option">
+                <img [src]="$any(item).logo" class="payment-logo" alt="" />
+                {{ $any(item).label }}
+                <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
+                  (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
+                </span>
+              </span>
+            </ng-template>
+          </ng-select>
+          <i class="fa fa-caret-down input-icon"></i>
+        </div>
+      </div>
+
+      <p class="text-muted size-small mt-1 mb-2">{{ 'tr_payment_splits_net_hint' | translate }}</p>
+
+      <div class="size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
+        {{ 'tr_cashier_payment_amounts_hint' | translate }}
+      </div>
+
+      <div
+        class="payment-splits-dialog__split-row"
+        *ngFor="let mid of selectedPayMethods; trackBy: trackPayMethodId"
+      >
+        <div class="payment-splits-dialog__split-row__method">
+          <img *ngIf="getPayMethodDef(mid) as pm" [src]="pm.logo" class="payment-logo" alt="" />
+          <span class="payment-splits-dialog__split-row__label">
+            <ng-container *ngIf="isCreditPayMethod(mid); else payMethodRowLabel">
+              {{ 'tr_paid_now_amount' | translate }}
+            </ng-container>
+            <ng-template #payMethodRowLabel>{{ payMethodDisplayLabel(mid) }}</ng-template>
+          </span>
+          <span *ngIf="paymentAppFeePercent(mid) > 0" class="text-muted size-small">
+            (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
+          </span>
+        </div>
+        <input
+          type="number"
+          class="s-control payment-splits-dialog__split-row__amount"
+          min="0"
+          [attr.max]="payAmountInputMax(mid)"
+          step="0.01"
+          [(ngModel)]="payAmounts[mid]"
+          [ngModelOptions]="{ standalone: true }"
+          [name]="'payAmt_' + mid"
+          (ngModelChange)="onPayAmountChange()"
+        />
+      </div>
+
+      <div
+        class="size-small text-muted mt-1"
+        *ngIf="hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+      >
+        {{ 'tr_cashier_credit_balance_due' | translate }}:
+        <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+      </div>
+      <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
+        {{ 'tr_cashier_payment_allocated' | translate }}:
+        <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        / {{ invoiceNetTotal | currency:'EGP ':'symbol':'1.2-2' }}
+      </div>
+      <div
+        class="size-small text-muted mt-1"
+        *ngIf="!hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
+      >
+        {{ 'tr_cashier_payment_remaining_credit' | translate }}:
+        <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+      </div>
+    </div>
+
+    <div class="payment-splits-dialog__section mt-3" *ngIf="hasAnyFee()">
+      <h3 class="payment-splits-dialog__section-title">{{ 'tr_payment_fee_allocation_title' | translate }}</h3>
+      <p class="text-muted size-small">{{ 'tr_payment_fee_allocation_hint' | translate }}</p>
+
+      <div class="payment-splits-dialog__fee-row" *ngFor="let src of feeSources; trackBy: trackFeeSourceId">
+        <div class="payment-splits-dialog__fee-row__info">
+          <strong>{{ payMethodDisplayLabel(src.forMethod) }}</strong>
+          <span class="text-muted size-small">
+            {{ 'tr_payment_fee_on_net' | translate }}:
+            {{ feeNetForMethod(src.forMethod) | currency:'EGP ':'symbol':'1.2-2' }}
+            ({{ paymentAppFeePercent(src.forMethod) | number : '1.0-2' }}%)
+          </span>
+        </div>
+        <div class="payment-splits-dialog__fee-row__source">
+          <label class="size-small">{{ 'tr_payment_fee_source_label' | translate }}</label>
+          <ng-select
+            class="s-control s-select payment-splits-dialog__fee-select"
+            [items]="feeSourceOptions(src.forMethod)"
+            bindLabel="label"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="true"
+            appendTo="body"
+            [(ngModel)]="src.paidVia"
+            [ngModelOptions]="{ standalone: true }"
+            [name]="'feeSrc_' + src.forMethod"
+            (ngModelChange)="onFeePaidViaChange(src.forMethod, $event)"
+          >
+            <ng-template ng-label-tmp let-item="item">
+              <span class="payment-option">
+                <img *ngIf="$any(item).logo" [src]="$any(item).logo" class="payment-logo" alt="" />
+                {{ $any(item).label }}
+                <span *ngIf="$any(item).percent > 0" class="text-muted size-small">
+                  (+{{ $any(item).percent | number : '1.0-2' }}%)
+                </span>
+              </span>
+            </ng-template>
+            <ng-template ng-option-tmp let-item="item">
+              <span class="payment-option">
+                <img *ngIf="$any(item).logo" [src]="$any(item).logo" class="payment-logo" alt="" />
+                {{ $any(item).label }}
+                <span *ngIf="$any(item).percent > 0" class="text-muted size-small">
+                  (+{{ $any(item).percent | number : '1.0-2' }}%)
+                </span>
+                <span *ngIf="!$any(item).percent" class="text-muted size-small">
+                  (0%)
+                </span>
+              </span>
+            </ng-template>
+          </ng-select>
+        </div>
+        <div class="payment-splits-dialog__fee-row__gross size-small text-muted">
+          {{ 'tr_payment_fee_gross_withdraw' | translate }}:
+          <strong>{{ feeGrossPreview(src.forMethod) | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          ({{ feePaidViaLabel(src.forMethod) }})
+        </div>
+      </div>
+    </div>
+
+    <div class="payment-splits-dialog__section mt-3" *ngIf="grossWithdrawalPreview().length">
+      <h3 class="payment-splits-dialog__section-title">{{ 'tr_payment_gross_summary_title' | translate }}</h3>
+      <table class="payment-splits-dialog__summary-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_payment_methods_fees_col_method' | translate }}</th>
+            <th>{{ 'tr_payment_gross_col_invoice' | translate }}</th>
+            <th>{{ 'tr_payment_gross_col_fees' | translate }}</th>
+            <th>{{ 'tr_payment_gross_col_total' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of grossWithdrawalPreview()">
+            <td>{{ payMethodDisplayLabel(row.method) }}</td>
+            <td>{{ row.invoiceNet | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td>{{ row.feeGross | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td><strong>{{ row.totalGross | currency:'EGP ':'symbol':'1.2-2' }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div mat-dialog-actions align="end" class="payment-splits-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="confirm()">
+      {{ 'tr_action.save' | translate }}
+    </button>
+  </div>
+</div>

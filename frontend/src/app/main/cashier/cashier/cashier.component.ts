@@ -33,6 +33,15 @@ import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
+import {
+  PaymentSplitsDialogComponent,
+  PaymentSplitsDialogData,
+} from '@shared/components/payment-splits-dialog/payment-splits-dialog.component';
+import {
+  PaymentSplitsResult,
+  paymentSplitsNetTotal,
+  round2,
+} from '@shared/utils/payment-app-fee.util';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
 
@@ -54,11 +63,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
   /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
   invoiceExtraValue = 0;
-  /**
-   * Split payment: multi-select methods, then amount per selected method.
-   */
-  selectedPayMethods: string[] = ['cash'];
-  payAmounts: Record<string, number> = { cash: 0 };
+  /** Confirmed split payment from dialog (net splits + fee allocations). */
+  confirmedPayment: PaymentSplitsResult | null = null;
+  private confirmedPaymentForTotal: number | null = null;
 
   searchTerm = '';
   barcode = '';
@@ -88,10 +95,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Avoid repeating the same “registered” toast for the same lookup. */
   private lastNotifiedPartyId: string | null = null;
 
-  /** Built from store settings + cash/credit; refreshed on settings$ updates. */
+  /** Built from store settings; refreshed on settings$ updates (receipt labels). */
   paymentMethods: CashierPaymentMethod[] = [];
-  /** Stable array reference for ng-select (do not use a getter — breaks multi-select). */
-  paymentMethodsForSplit: CashierPaymentMethod[] = [];
 
   private settingsSub?: Subscription;
 
@@ -132,8 +137,73 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.storeSettings.snapshot.paymentAppFeePercents,
       this.translate
     );
-    this.paymentMethodsForSplit = this.paymentMethods;
     this.cdr.markForCheck();
+  }
+
+  hasValidConfirmedPayment(): boolean {
+    if (!this.confirmedPayment || this.confirmedPaymentForTotal == null) {
+      return false;
+    }
+    return Math.abs(this.confirmedPaymentForTotal - this.effectiveCheckoutTotal()) < 0.01;
+  }
+
+  paymentSummaryText(): string {
+    if (!this.confirmedPayment) {
+      return '';
+    }
+    const methods = this.confirmedPayment.paymentSplits.filter((s) => s.amount > 0).length;
+    const total = paymentSplitsNetTotal(this.confirmedPayment.paymentSplits);
+    return this.translate.instant('tr_payment_splits_summary', {
+      count: methods,
+      total,
+    });
+  }
+
+  openPaymentSplitsDialog(autoCheckout = false): void {
+    const data: PaymentSplitsDialogData = {
+      invoiceNetTotal: this.effectiveCheckoutTotal(),
+      mode: 'checkout',
+      initialState: this.hasValidConfirmedPayment()
+        ? {
+            selectedPayMethods: this.confirmedPayment!.paymentSplits.map((s) => s.method),
+            payAmounts: this.confirmedPayment!.paymentSplits.reduce(
+              (acc, s) => {
+                acc[s.method] = s.amount;
+                return acc;
+              },
+              {} as Record<string, number>
+            ),
+            feeSources: this.confirmedPayment!.feeAllocations.map((f) => ({
+              forMethod: f.forMethod,
+              paidVia: f.paidVia === f.forMethod ? 'same' : f.paidVia,
+            })),
+          }
+        : undefined,
+    };
+
+    const ref = this.dialog.open(PaymentSplitsDialogComponent, {
+      width: '560px',
+      maxWidth: '95vw',
+      panelClass: 'payment-splits-dialog-panel',
+      backdropClass: 'payment-splits-dialog-backdrop',
+      data,
+    });
+
+    ref.afterClosed().subscribe((result: PaymentSplitsResult | null) => {
+      if (!result) {
+        return;
+      }
+      this.confirmedPayment = result;
+      this.confirmedPaymentForTotal = this.effectiveCheckoutTotal();
+      if (autoCheckout) {
+        this.performCheckout(result);
+      }
+    });
+  }
+
+  private invalidateConfirmedPayment(): void {
+    this.confirmedPayment = null;
+    this.confirmedPaymentForTotal = null;
   }
 
   startExchangeFlow(): void {
@@ -282,8 +352,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private refreshExchangePaymentDefaults(): void {
-    if (!this.exchangeTradeInPurchase) return;
-    this.ensureDefaultPayAmounts();
+    this.invalidateConfirmedPayment();
   }
 
   receiptExchangeCredit(): number {
@@ -601,8 +670,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private resetPaymentLinesAfterCheckout(): void {
-    this.selectedPayMethods = ['cash'];
-    this.payAmounts = { cash: 0 };
+    this.invalidateConfirmedPayment();
   }
 
   ngAfterViewInit() {
@@ -668,128 +736,6 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   freeSellableQty(product: Product | any): number {
     const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
     return Math.max(0, stock - this.bookedQty(product));
-  }
-
-  ensureDefaultPayAmounts(): void {
-    if (this.selectedPayMethods.length !== 1) {
-      return;
-    }
-    const id = this.selectedPayMethods[0];
-    const netDue = Math.round(this.effectiveCheckoutTotal() * 100) / 100;
-    const cur = Number(this.payAmounts[id]);
-    if (!Number.isFinite(cur) || cur <= 0) {
-      if (id === 'credit') {
-        this.payAmounts = { ...this.payAmounts, credit: 0 };
-        return;
-      }
-      const pct = this.paymentAppFeePercent(id);
-      const gross =
-        pct > 0 ? Math.round(netDue * (1 + pct / 100) * 100) / 100 : netDue;
-      this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, gross) };
-    }
-  }
-
-  isCreditPayMethod(id: string | undefined | null): boolean {
-    return String(id || '').trim().toLowerCase() === 'credit';
-  }
-
-  hasCreditPayMethodSelected(): boolean {
-    return this.selectedPayMethods.some((id) => this.isCreditPayMethod(id));
-  }
-
-  /** `max` on number inputs must be string | number (not null). */
-  payAmountInputMax(methodId: string): number | undefined {
-    return this.isCreditPayMethod(methodId)
-      ? this.effectiveCheckoutTotal()
-      : undefined;
-  }
-
-  onSelectedPayMethodsChange(ids: string[] | null): void {
-    const raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
-    if (!raw.length) {
-      this.selectedPayMethods = ['cash'];
-      this.reconcilePayAmountsKeys(['cash']);
-      return;
-    }
-    this.reconcilePayAmountsKeys(raw);
-  }
-
-  private reconcilePayAmountsKeys(ids: string[]): void {
-    const next: Record<string, number> = {};
-    for (const id of ids) {
-      if (this.isCreditPayMethod(id) && !Number.isFinite(Number(this.payAmounts[id]))) {
-        next[id] = 0;
-      } else {
-        next[id] = Number(this.payAmounts[id]) || 0;
-      }
-    }
-    this.payAmounts = next;
-  }
-
-  trackPayMethodId(_index: number, id: string): string {
-    return id;
-  }
-
-  /** Native tooltip for “+N” overflow chips (no skolera-tooltip in this app). */
-  payMethodsOverflowTitle(items: readonly unknown[] | null | undefined): string {
-    if (!items?.length || items.length <= 2) {
-      return '';
-    }
-    return items
-      .slice(2)
-      .map((row) => {
-        const item = row as CashierPaymentMethod;
-        return item?.label || '';
-      })
-      .filter(Boolean)
-      .join(', ');
-  }
-
-  getPayMethodDef(id: string): CashierPaymentMethod | undefined {
-    return this.paymentMethods.find((m) => m.id === id);
-  }
-
-  /** BNPL / wallet surcharge from store settings (0 if unset). */
-  paymentAppFeePercent(methodId: string | undefined | null): number {
-    const m = String(methodId || '')
-      .trim()
-      .toLowerCase();
-    const row = this.storeSettings.snapshot.paymentAppFeePercents?.find((x) => x.method === m);
-    const p = Number(row?.percent);
-    return Number.isFinite(p) && p > 0 ? Math.min(p, 100) : 0;
-  }
-
-  /**
-   * Converts cashier-entered gross (what customer paid in the app, incl. fee) to invoice net.
-   */
-  payAmountNetForInvoice(methodId: string, enteredGross: number): number {
-    const pct = this.paymentAppFeePercent(methodId);
-    const g = Number(enteredGross) || 0;
-    if (pct <= 0) {
-      return Math.round(g * 100) / 100;
-    }
-    const net = g / (1 + pct / 100);
-    return Math.round(net * 100) / 100;
-  }
-
-  cashierPaymentHasAnyFee(): boolean {
-    return this.selectedPayMethods.some((id) => this.paymentAppFeePercent(id) > 0);
-  }
-
-  paymentSplitsTotal(): number {
-    const sum = this.selectedPayMethods.reduce(
-      (acc, id) => acc + this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
-      0
-    );
-    return Math.round(sum * 100) / 100;
-  }
-
-  paymentRemaining(): number {
-    return Math.round((this.effectiveCheckoutTotal() - this.paymentSplitsTotal()) * 100) / 100;
-  }
-
-  paymentOverAllocated(): boolean {
-    return this.paymentSplitsTotal() > this.effectiveCheckoutTotal() + 0.001;
   }
 
   /** UI label for a payment method id (uses store settings names when set). */
@@ -1017,18 +963,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return totalDiscount / this.orderItems.length;
   }
 
-  checkout() {
+  onPayClick(): void {
     if (!this.orderItems.length) {
       this.translate.get('tr_cashier.NO_ITEMS').subscribe((msg) => alert(msg));
-      return;
-    }
-
-    this.ensureDefaultPayAmounts();
-
-    if (this.paymentOverAllocated()) {
-      this.translate
-        .get('tr_cashier_payment_over')
-        .subscribe((msg) => this.appNotificationService.push(msg, 'error'));
       return;
     }
 
@@ -1042,18 +979,25 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }
 
+    if (this.hasValidConfirmedPayment() && this.confirmedPayment) {
+      this.performCheckout(this.confirmedPayment);
+      return;
+    }
+
+    this.openPaymentSplitsDialog(true);
+  }
+
+  private performCheckout(payment: PaymentSplitsResult): void {
     const selectedBranchId = canPickBranchRole(this.curentUser?.role)
       ? this.adminSelectedBranchId
       : this.globals.currentUser.branch._id;
 
     const clientDetails = this.resolveCheckoutClientDetails();
 
-    const paymentSplits = this.selectedPayMethods
-      .filter((id) => String(id || '').trim())
-      .map((id) => ({
-        method: String(id).trim().toLowerCase(),
-        amount: this.payAmountNetForInvoice(id, Number(this.payAmounts[id]) || 0),
-      }));
+    const paymentSplits = payment.paymentSplits.map((s) => ({
+      method: s.method,
+      amount: round2(s.amount),
+    }));
 
     const exchangeCredit = this.exchangeTradeInPurchase ? this.exchangeTradeInCredit() : 0;
     const exchangePurchaseId = this.exchangeTradeInPurchase?._id;
@@ -1065,6 +1009,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       clientPhoneNumber: clientDetails.clientPhoneNumber,
       clientAddress: clientDetails.clientAddress,
       paymentSplits,
+      paymentFeeAllocations: payment.feeAllocations,
       branch: selectedBranchId,
       status: 'completed',
       userId: this.curentUser._id,
@@ -1196,12 +1141,22 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return Math.round((sub - disc) * 100) / 100;
   }
 
-  receiptPaidPayments(): Array<{ method?: string; amount: number }> {
+  receiptPaidPayments(): Array<{ method?: string; amount: number; feeForMethod?: string }> {
     const list = this.createdOrder?.payments;
     if (!Array.isArray(list)) {
       return [];
     }
-    return list.filter((p: any) => Number(p?.amount) > 0);
+    return list.filter(
+      (p: any) => Number(p?.amount) > 0 && p?.countsTowardInvoice !== false && !p?.feeForMethod
+    );
+  }
+
+  receiptFeePayments(): Array<{ method?: string; amount: number; feeForMethod?: string }> {
+    const list = this.createdOrder?.payments;
+    if (!Array.isArray(list)) {
+      return [];
+    }
+    return list.filter((p: any) => Number(p?.amount) > 0 && p?.feeForMethod);
   }
 
   /**

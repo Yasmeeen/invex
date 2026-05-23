@@ -174,8 +174,10 @@
           </span>
         </div>
 
-        <div class="form-group mb-0" *ngIf="isShortage()">
-          <label>{{ 'tr_drawer_close_shortage_reason' | translate }}</label>
+        <div class="form-group mb-0" *ngIf="needsVarianceNote()">
+          <label>{{
+            (isShortage() ? 'tr_drawer_close_shortage_reason' : 'tr_drawer_close_surplus_reason') | translate
+          }}</label>
           <textarea
             class="s-control width-100"
             rows="3"

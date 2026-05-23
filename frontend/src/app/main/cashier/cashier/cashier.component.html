@@ -166,117 +166,22 @@
               </div>
               </div>
 
-              <div class="cashier-payment-splits card-body--payment mt-3 pt-3">
-                <div class="form-group mb-0">
-                  <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
-                  <div class="input-with-icon">
-                    <ng-select
-                      class="s-control s-select"
-                      [items]="paymentMethodsForSplit"
-                      bindLabel="label"
-                      bindValue="id"
-                      [multiple]="true"
-                      [closeOnSelect]="false"
-                      [clearable]="true"
-                      [searchable]="true"
-                      placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-                      [(ngModel)]="selectedPayMethods"
-                      [ngModelOptions]="{ standalone: true }"
-                      name="payMethodsMulti"
-                      (ngModelChange)="onSelectedPayMethodsChange($event)"
-                    >
-                      <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                        <div class="ng-value" *ngFor="let item of items | slice:0:2">
-                          <span class="ng-value-label">{{ $any(item).label }}</span>
-                          <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
-                        </div>
-                        <div
-                          class="ng-value"
-                          *ngIf="items.length > 2"
-                          [attr.title]="payMethodsOverflowTitle(items)"
-                        >
-                          <span class="ng-value-label">+ {{ items.length - 2 }}</span>
-                        </div>
-                      </ng-template>
-                      <ng-template ng-option-tmp let-item="item">
-                        <span class="payment-option">
-                          <img [src]="$any(item).logo" class="payment-logo" alt="" />
-                          {{ $any(item).label }}
-                          <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
-                            (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
-                          </span>
-                        </span>
-                      </ng-template>
-                    </ng-select>
-                    <i class="fa fa-caret-down input-icon"></i>
-                  </div>
-                </div>
-
-                <div class="cashier-payment-amount-heading size-small text-muted mtb-2" *ngIf="selectedPayMethods?.length">
-                  {{ 'tr_cashier_payment_amounts_hint' | translate }}
-                </div>
-                <div
-                  class="cashier-payment-amount-heading size-small text-muted mt-4"
-                  *ngIf="selectedPayMethods?.length && cashierPaymentHasAnyFee()"
+              <div class="cashier-payment-summary card-body--payment mt-3 pt-3">
+                <button
+                  type="button"
+                  class="s-btn btn-secondary btn-sm"
+                  (click)="openPaymentSplitsDialog()"
                 >
-                  {{ 'tr_cashier_payment_gross_fee_hint' | translate }}
+                  {{ 'tr_payment_splits_open' | translate }}
+                </button>
+                <div class="size-small text-muted mt-2" *ngIf="hasValidConfirmedPayment()">
+                  {{ paymentSummaryText() }}
                 </div>
-                <div
-                  class="cashier-payment-split-row"
-                  *ngFor="let mid of selectedPayMethods; trackBy: trackPayMethodId"
-                >
-                  <div class="cashier-payment-split-row__method cashier-payment-split-row__method--labeled">
-                    <img
-                      *ngIf="getPayMethodDef(mid) as pm"
-                      [src]="pm.logo"
-                      class="payment-logo"
-                      alt=""
-                    />
-                    <span class="cashier-payment-split-row__label">
-                      <ng-container *ngIf="isCreditPayMethod(mid); else payMethodRowLabel">
-                        {{ 'tr_paid_now_amount' | translate }}
-                      </ng-container>
-                      <ng-template #payMethodRowLabel>
-                        {{ payMethodDisplayLabel(mid) }}
-                      </ng-template>
-                    </span>
-                    <span *ngIf="paymentAppFeePercent(mid) > 0" class="cashier-payment-split-row__fee-pct text-muted size-small">
-                      (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
-                    </span>
-                  </div>
-                  <input
-                    type="number"
-                    class="s-control cashier-payment-split-row__amount"
-                    min="0"
-                    [attr.max]="payAmountInputMax(mid)"
-                    step="0.01"
-                    [(ngModel)]="payAmounts[mid]"
-                    [ngModelOptions]="{ standalone: true }"
-                    [name]="'payAmt_' + mid"
-                  />
-                </div>
-                <div
-                  class="size-small text-muted mt-1"
-                  *ngIf="hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
-                >
-                  {{ 'tr_cashier_credit_balance_due' | translate }}:
-                  <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-                </div>
-                <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
-                  {{ 'tr_cashier_payment_allocated' | translate }}:
-                  <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-                  /
-                  {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
-                </div>
-                <div
-                  class="size-small text-muted mt-1"
-                  *ngIf="!hasCreditPayMethodSelected() && paymentRemaining() > 0.005"
-                >
-                  {{ 'tr_cashier_payment_remaining_credit' | translate }}:
-                  <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+                <div class="size-small text-muted mt-1" *ngIf="!hasValidConfirmedPayment()">
+                  {{ 'tr_payment_splits_not_set' | translate }}
                 </div>
               </div>
-          
+
             </div>
           </div>
 
@@ -462,7 +367,7 @@
             {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
         </div>
-        <button class="pay-btn" (click)="checkout()">
+        <button class="pay-btn" (click)="onPayClick()">
           {{ "tr_cashier.PAY" | translate }}
         </button>
       </div>
@@ -618,6 +523,24 @@
       </tr>
       <tr *ngFor="let p of receiptPaidPayments()">
         <td>{{ payMethodReceiptLabel(p.method) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <table
+      class="invoice-table invoice-payments-table"
+      *ngIf="receiptFeePayments().length"
+    >
+      <tr class="header bold">
+        <td colspan="2">{{ 'tr_invoice_payment_fees' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+      <tr *ngFor="let p of receiptFeePayments()">
+        <td>
+          {{ 'tr_invoice_fee_for_method' | receiptTranslate: st.receiptLanguage }} {{ payMethodReceiptLabel(p.feeForMethod) }}
+          → {{ payMethodReceiptLabel(p.method) }}
+        </td>
         <td class="money">
           {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>

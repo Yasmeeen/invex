@@ -357,9 +357,13 @@ export const closeDrawer = async (req, res) => {
     const variance = round2(actual - expected);
 
     const shortage = variance < -VARIANCE_EPS;
+    const surplus = variance > VARIANCE_EPS;
     const reasonTrim = String(shortageReason || '').trim();
     if (shortage && !reasonTrim) {
       return res.status(400).json({ error: 'Shortage reason is required when counted cash is below expected' });
+    }
+    if (surplus && !reasonTrim) {
+      return res.status(400).json({ error: 'Surplus reason is required when counted cash is above expected' });
     }
 
     const existing = await DrawerClose.findOne({ branch: branchOid, businessDate: dateStr }).select('_id').lean();
@@ -380,7 +384,7 @@ export const closeDrawer = async (req, res) => {
         expectedCashInDrawer: expected,
         actualCashCounted: actual,
         variance,
-        shortageReason: shortage ? reasonTrim.slice(0, 2000) : '',
+        shortageReason: shortage || surplus ? reasonTrim.slice(0, 2000) : '',
         closedBy: userId,
       });
     } catch (e) {

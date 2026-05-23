@@ -241,6 +241,14 @@ export class DrawerCloseDialogComponent implements OnInit {
     return this.variance() < -0.02;
   }
 
+  isSurplus(): boolean {
+    return this.variance() > 0.02;
+  }
+
+  needsVarianceNote(): boolean {
+    return this.isShortage() || this.isSurplus();
+  }
+
   isBalanced(): boolean {
     return Math.abs(this.variance()) <= 0.02;
   }
@@ -255,11 +263,14 @@ export class DrawerCloseDialogComponent implements OnInit {
       return;
     }
 
-    const short = this.isShortage();
+    const needsNote = this.needsVarianceNote();
     const reason = String(this.shortageReasonForm.get('shortageReason')?.value || '').trim();
-    if (short && !reason) {
+    if (needsNote && !reason) {
       this.shortageReasonForm.get('shortageReason')?.markAsTouched();
-      this.notify.push(this.translate.instant('tr_drawer_close_shortage_reason_required'), 'error');
+      const msgKey = this.isShortage()
+        ? 'tr_drawer_close_shortage_reason_required'
+        : 'tr_drawer_close_surplus_reason_required';
+      this.notify.push(this.translate.instant(msgKey), 'error');
       return;
     }
 
@@ -277,7 +288,7 @@ export class DrawerCloseDialogComponent implements OnInit {
         businessDate: dateStr,
         userId: this.data.userId,
         actualCashCounted: actual,
-        ...(short ? { shortageReason: reason } : {}),
+        ...(needsNote ? { shortageReason: reason } : {}),
       })
       .subscribe({
         next: () => {

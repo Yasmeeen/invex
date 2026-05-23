@@ -282,6 +282,48 @@ body[dir=rtl] {
   background: rgba(15, 23, 42, 0.22);
 }
 
+.cdk-overlay-backdrop.payment-splits-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.payment-splits-dialog-panel {
+  box-shadow: none;
+  max-height: 90vh !important;
+}
+
+.payment-splits-dialog-panel .mat-dialog-container,
+.payment-splits-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+}
+
+.payment-splits-dialog-panel .mat-dialog-content,
+.payment-splits-dialog-panel .mat-mdc-dialog-content {
+  margin: 0;
+  padding: 0;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+.payment-splits-dialog-panel .payment-splits-dialog {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: min(85vh, 720px) !important;
+  overflow: hidden !important;
+}
+
+.payment-splits-dialog-panel .payment-splits-dialog__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: min(62vh, 520px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (min-width: 992px){
     @import 'desktop_styles';
 }

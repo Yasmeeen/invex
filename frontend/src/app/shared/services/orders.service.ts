@@ -41,6 +41,13 @@ addPayment(
     note?: string;
     /** Customer payment methods (cash, visa, …) — net amounts per method. */
     paymentSplits?: { method: string; amount: number }[];
+    paymentFeeAllocations?: {
+      forMethod: string;
+      feeNet: number;
+      paidVia: string;
+      feeGrossOnPaidVia: number;
+      feePercentSnapshot?: number;
+    }[];
     /** @deprecated Use paymentSplits for sales invoices. */
     paymentTreasurySplits?: TreasurySplitPayload[];
   }

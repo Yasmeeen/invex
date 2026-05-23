@@ -1,0 +1,150 @@
+:host {
+  display: block;
+}
+
+.payment-splits-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 720px);
+  padding: 1rem 1.15rem 1.05rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+  color: #1f2937;
+
+  &__title {
+    flex-shrink: 0;
+    margin: 0;
+    padding-bottom: 0.65rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 1px solid #e8ede9;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: min(520px, 92vw);
+    margin: 0;
+    padding: 0.6rem 0.35rem 0.25rem 0;
+    max-height: min(62vh, 520px);
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      background-color: rgba(15, 23, 42, 0.22);
+    }
+  }
+
+  &__summary {
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    background: #f8faf9;
+  }
+
+  &__section-title {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+
+  &__split-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+
+    &__method {
+      flex: 1 1 160px;
+      min-width: 140px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    &__label {
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    &__amount {
+      width: 120px;
+      flex-shrink: 0;
+    }
+  }
+
+  &__fee-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid #eee;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &__source {
+      label {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+    }
+  }
+
+  &__summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+
+    th,
+    td {
+      padding: 0.35rem 0.5rem;
+      text-align: start;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      font-weight: 600;
+      color: #555;
+    }
+  }
+
+  &__actions {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.85rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e8ede9;
+  }
+
+  .payment-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+  }
+
+  .payment-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+}

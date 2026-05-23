@@ -28,96 +28,17 @@
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">
-      <div class="expense-treasury-splits">
-        <div class="form-group">
-          <label>{{ 'tr_cashier_payment_methods_multi' | translate }}</label>
-          <div class="input-with-icon">
-            <ng-select
-              class="s-control s-select"
-              [items]="paymentMethodsForSplit"
-              bindLabel="label"
-              bindValue="id"
-              [multiple]="true"
-              [closeOnSelect]="false"
-              [clearable]="true"
-              [searchable]="true"
-              placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-              [(ngModel)]="selectedPayMethods"
-              [ngModelOptions]="{ standalone: true }"
-              name="orderPayMethodsMulti"
-              (ngModelChange)="onSelectedPayMethodsChange($event)"
-            >
-              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
-                <div class="ng-value" *ngFor="let item of items | slice:0:2">
-                  <span class="ng-value-label">{{ $any(item).label }}</span>
-                  <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
-                </div>
-                <div
-                  class="ng-value"
-                  *ngIf="items.length > 2"
-                  [attr.title]="payMethodsOverflowTitle(items)"
-                >
-                  <span class="ng-value-label">+ {{ items.length - 2 }}</span>
-                </div>
-              </ng-template>
-              <ng-template ng-option-tmp let-item="item">
-                <span class="payment-option">
-                  <img [src]="$any(item).logo" class="payment-logo" alt="" />
-                  {{ $any(item).label }}
-                  <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
-                    (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
-                  </span>
-                </span>
-              </ng-template>
-            </ng-select>
-            <i class="fa fa-caret-down input-icon"></i>
-          </div>
-          <p class="text-muted size-small m-0 mt-1">{{ 'tr_order_payment_methods_hint' | translate }}</p>
-        </div>
-
-        <div class="size-small text-muted mb-1" *ngIf="selectedPayMethods?.length">
-          {{ 'tr_cashier_payment_amounts_hint' | translate }}
-        </div>
-        <div
-          class="expense-treasury-split-row"
-          *ngFor="let mid of selectedPayMethods; trackBy: trackPayMethodId"
-        >
-          <span class="expense-treasury-split-row__label">
-            <img
-              *ngIf="getPayMethodDef(mid) as pm"
-              [src]="pm.logo"
-              class="payment-logo"
-              alt=""
-            />
-            {{ payMethodDisplayLabel(mid) }}
-            <span *ngIf="paymentAppFeePercent(mid) > 0" class="text-muted size-small">
-              (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
-            </span>
-          </span>
-          <input
-            type="number"
-            class="s-control expense-treasury-split-row__amount"
-            min="0"
-            step="0.01"
-            [(ngModel)]="payAmounts[mid]"
-            [ngModelOptions]="{ standalone: true }"
-            [name]="'orderPayAmt_' + mid"
-          />
-        </div>
-
-        <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
-          {{ 'tr_vendor_deferred_payment_allocated' | translate }}:
-          <strong>{{ paymentSplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-          /
-          <strong>{{ remaining | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-        </div>
-        <div
-          class="size-small text-muted mt-1"
-          *ngIf="paymentRemaining() > 0.005 && !paymentOverAllocated()"
-        >
-          {{ 'tr_vendor_deferred_payment_left' | translate }}:
-          <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
-        </div>
+      <div class="mb-3">
+        <button type="button" class="s-btn btn-secondary btn-sm" (click)="openPaymentSplitsDialog()">
+          {{ 'tr_payment_splits_open' | translate }}
+        </button>
+        <p class="text-muted size-small m-0 mt-2" *ngIf="confirmedPayment">
+          {{ paymentSummaryText() }}
+        </p>
+        <p class="text-muted size-small m-0 mt-1" *ngIf="!confirmedPayment">
+          {{ 'tr_payment_splits_not_set' | translate }}
+        </p>
+        <p class="text-muted size-small m-0 mt-1">{{ 'tr_order_payment_methods_hint' | translate }}</p>
       </div>
 
       <div class="form-group">

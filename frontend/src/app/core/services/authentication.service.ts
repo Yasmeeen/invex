@@ -98,6 +98,7 @@ export class AuthenticationService {
       });
     }
     this.userSubject.next(new User());
+    this.globals.currentUser = new User() as any;
     localStorage.removeItem(USER_KEY);
     this.router.navigate(['/login']);
   }

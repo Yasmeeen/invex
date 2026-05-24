@@ -56,7 +56,7 @@ export class LoginComponent implements OnInit {
             return;
           }
           this.realtimeNotifications.init();
-          const role = this.globals.currentUser.role;
+          const role = res?.user?.role;
           if (role === 'Cashier') {
             this.router.navigate(['/orders']);
           } else if (role === 'Moderator' || role === 'Warehouse' || role === 'Operation Manager') {

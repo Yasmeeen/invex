@@ -890,7 +890,7 @@
   "tr_total_orders_price": "Total orders price",
   "tr_open_cashier": "Open Cashier",
   "tr_close_cashier": "Close Cashier",
-  "tr_product_purchase_button": "Purchase product (add to stock)",
+  "tr_product_purchase_button": "Purchase product",
   "tr_product_purchase_title": "Product purchase",
   "tr_product_purchase_hint": "Opens the same product form used elsewhere. If you are not an administrator or branch manager, the intake stays pending until it is approved before stock increases.",
   "tr_product_purchase_submit": "Submit intake",

@@ -22,7 +22,7 @@ export class VendorsListComponent implements OnInit {
   vendorsLoading: boolean = true;
   isFilterOpen: boolean = true;
   paginationPerPage:number = 10;
-  viewMode: 'table' | 'cards' = 'table';
+  viewMode: 'table' | 'cards' = 'cards';
   selectedcategory: string;
   vendorsList: Vendor[] = [];
   categorysLoading: boolean = false;
@@ -63,7 +63,7 @@ export class VendorsListComponent implements OnInit {
 
   ngOnInit(): void {
     const saved = localStorage.getItem('vendors.viewMode');
-    this.viewMode = saved === 'cards' ? 'cards' : 'table';
+    this.viewMode = saved === 'table' ? 'table' : 'cards';
     this.getVendors();
   }
 

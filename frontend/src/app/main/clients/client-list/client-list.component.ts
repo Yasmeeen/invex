@@ -27,7 +27,7 @@ export class ClientListComponent implements OnInit {
   nameSearchTerm: string = '';
   paginationData: PaginationData;
   paginationPerPage = 10;
-  viewMode: 'table' | 'cards' = 'table';
+  viewMode: 'table' | 'cards' = 'cards';
   params: any = { page: 1, perPage: this.paginationPerPage };
   private searchTimeout: any;
   private subscriptions: Subscription[] = [];
@@ -43,7 +43,7 @@ export class ClientListComponent implements OnInit {
 
   ngOnInit(): void {
     const saved = localStorage.getItem('clients.viewMode');
-    this.viewMode = saved === 'cards' ? 'cards' : 'table';
+    this.viewMode = saved === 'table' ? 'table' : 'cards';
     if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
       this.params.branch_id = this.globals.currentUser.branch._id;
     }

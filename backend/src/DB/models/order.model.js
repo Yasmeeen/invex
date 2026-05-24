@@ -68,6 +68,12 @@ const orderSchema = new mongoose.Schema(
         amount: { type: Number, required: true, min: 0 },
         paidAt: { type: Date, required: true },
         paidByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
+        /** Branch drawer that received this payment (follow-up installments); falls back to order.branch. */
+        branch: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Branch',
+          required: false,
+        },
         /** cash, visa, aman, … (split checkout / follow-up payments). */
         method: { type: String, required: false, trim: true },
         /** When false, line is a payment-app fee (does not increase amountPaid). */

@@ -226,7 +226,9 @@ export const getVendorHistory = async (req, res) => {
     }
 
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
-    const supplierOwesUs = owesFromSales;
+    const owesFromOpeningBalance =
+      Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+    const supplierOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
     const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
     const purchasePayable = purchasePayableBreakdown.total;
@@ -313,6 +315,7 @@ export const getVendorHistory = async (req, res) => {
       vendor,
       supplierOwesUs,
       owesFromSales,
+      owesFromOpeningBalance,
       weOweSupplier,
       prepaidBalance,
       purchasePayable,
@@ -396,6 +399,14 @@ export const settleVendorBalances = async (req, res) => {
       remaining = Math.round((remaining - apply) * 100) / 100;
     }
 
+    if (remaining > 0) {
+      const openingBefore =
+        Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+      const fromOpening = Math.min(remaining, openingBefore);
+      vendor.openingDebitBalance = Math.round((openingBefore - fromOpening) * 100) / 100;
+      remaining = Math.round((remaining - fromOpening) * 100) / 100;
+    }
+
     let creditToReduce = settleAmount;
     const fromPrepaid = Math.min(creditToReduce, prepaidBefore);
     vendor.creditBalance = Math.round((prepaidBefore - fromPrepaid) * 100) / 100;
@@ -419,7 +430,9 @@ export const settleVendorBalances = async (req, res) => {
     await vendor.save();
 
     const newOwesFromSales = await computeSupplierOwesFromOrders(vendor._id);
-    const newSupplierOwesUs = newOwesFromSales;
+    const newOwesFromOpening =
+      Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+    const newSupplierOwesUs = await computeSupplierOwesUs(vendor._id);
     const newPrepaid = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const newPayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
     const newWeOwe = computeTotalCreditOwed(newPrepaid, newPayableBreakdown.total);
@@ -431,6 +444,7 @@ export const settleVendorBalances = async (req, res) => {
       settled: settleAmount,
       supplierOwesUs: newSupplierOwesUs,
       owesFromSales: newOwesFromSales,
+      owesFromOpeningBalance: newOwesFromOpening,
       weOweSupplier: newWeOwe,
       prepaidBalance: newPrepaid,
       purchasePayable: newPayableBreakdown.total,
@@ -500,6 +514,119 @@ export const recordVendorDeferredPurchasePayment = async (req, res) => {
     const status = msg.includes('Nothing remaining') ? 400 : 500;
     console.error('Error recording deferred purchase payment:', error);
     res.status(status).json({ message: msg });
+  }
+};
+
+/** POST set one-time opening debit (pre-system credit sales). */
+export const setVendorOpeningDebitBalance = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const amount = Math.round((Number(req.body?.amount) || 0) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    const existing = Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+    const alreadySet = (vendor.ledgerEntries || []).some((e) => e.type === 'opening_debit');
+    if (existing > 0 || alreadySet) {
+      return res.status(400).json({
+        message: 'Opening debit balance already set',
+        openingDebitBalance: existing,
+      });
+    }
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ''))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    const note =
+      String(req.body?.note || 'Opening debit — pre-system credit sales').trim() ||
+      'Opening debit — pre-system credit sales';
+
+    vendor.openingDebitBalance = amount;
+    vendor.ledgerEntries = vendor.ledgerEntries || [];
+    vendor.ledgerEntries.push({
+      type: 'opening_debit',
+      amount,
+      note,
+      affectsCashDrawer: false,
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await vendor.save();
+
+    const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
+    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+
+    res.json({
+      message: 'Opening debit balance set',
+      openingDebitBalance: vendor.openingDebitBalance,
+      owesFromOpeningBalance: vendor.openingDebitBalance,
+      owesFromSales,
+      supplierOwesUs,
+    });
+  } catch (error) {
+    console.error('Error setting vendor opening debit:', error);
+    res.status(500).json({ message: 'Server error while setting opening debit balance' });
+  }
+};
+
+/** POST pay down opening debit (supplier pays pre-system debt). */
+export const payVendorOpeningDebitBalance = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const amount = Math.round((Number(req.body?.amount) || 0) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    const openingBefore = Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+    if (openingBefore <= 0) {
+      return res.status(400).json({ message: 'No opening debit balance to pay' });
+    }
+
+    const applied = Math.min(amount, openingBefore);
+    const method = String(req.body?.method || 'cash').trim().toLowerCase() || 'cash';
+    const note = String(req.body?.note || 'Opening debit payment').trim();
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ''))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    vendor.openingDebitBalance = Math.round((openingBefore - applied) * 100) / 100;
+    vendor.ledgerEntries = vendor.ledgerEntries || [];
+    vendor.ledgerEntries.push({
+      type: 'opening_debit_payment',
+      amount: applied,
+      note: `${note}${method ? ` — ${method}` : ''}`,
+      affectsCashDrawer: false,
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await vendor.save();
+
+    const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
+    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+
+    res.json({
+      message: 'Opening debit payment recorded',
+      applied,
+      openingDebitBalance: vendor.openingDebitBalance,
+      owesFromOpeningBalance: vendor.openingDebitBalance,
+      owesFromSales,
+      supplierOwesUs,
+    });
+  } catch (error) {
+    console.error('Error paying vendor opening debit:', error);
+    res.status(500).json({ message: 'Server error while recording opening debit payment' });
   }
 };
 

@@ -15,6 +15,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
+import { VendorOpeningDebitDialogComponent } from '../vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
 import { VendorDeferredPaymentDialogComponent } from '../vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.component';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
 import { Order } from '@core/models/products.model';
@@ -216,6 +217,28 @@ export class VendorHistoryDialogComponent implements OnInit {
       });
   }
 
+  canSetOpeningDebit(): boolean {
+    const hasOpeningLedger = (this.history?.ledgerEntries || []).some(
+      (e) => e.type === 'opening_debit'
+    );
+    return !hasOpeningLedger && (this.history?.owesFromOpeningBalance || 0) <= 0.005;
+  }
+
+  openOpeningDebitDialog(): void {
+    const ref = this.dialog.open(VendorOpeningDebitDialogComponent, {
+      width: '480px',
+      maxWidth: '96vw',
+      data: {
+        vendor: this.data.vendor,
+        mode: 'set',
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((saved) => {
+      if (saved) this.loadHistory();
+    });
+  }
+
   openDepositDialog(): void {
     if (!this.paymentBranchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
@@ -244,6 +267,10 @@ export class VendorHistoryDialogComponent implements OnInit {
         return this.translate.instant('tr_vendor_ledger_settlement');
       case 'order_payment':
         return this.translate.instant('tr_vendor_ledger_payment');
+      case 'opening_debit':
+        return this.translate.instant('tr_vendor_ledger_opening_debit');
+      case 'opening_debit_payment':
+        return this.translate.instant('tr_vendor_ledger_opening_debit_payment');
       case 'purchase':
         return this.translate.instant('tr_vendor_ledger_purchase');
       case 'purchase_installment_paid':
@@ -277,12 +304,16 @@ export class VendorHistoryDialogComponent implements OnInit {
   }
 
   openPaySalesOrderDialog(o: { _id?: string } & Partial<Order>): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     const ref = this.dialog.open(PayOrderDialogComponent, {
       width: '520px',
       maxWidth: '96vw',
       panelClass: 'pay-order-dialog-panel',
       backdropClass: 'pay-order-dialog-backdrop',
-      data: { order: o as Order },
+      data: { order: o as Order, forcedBranchId: this.paymentBranchId },
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {

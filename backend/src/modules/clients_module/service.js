@@ -11,10 +11,15 @@ import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
 import { orderAmountRemaining } from "../../utils/vendor-balance-utils.js";
 import {
-  computeClientCreditDue,
+  computeClientCreditDueFromOrders,
+  computeClientOwesUs,
   isClientCreditOrder,
   pointsEarnedForOrder,
 } from "../../utils/client-order-utils.js";
+import {
+  buildClientNetBalanceMessage,
+  buildClientSettlementPreview,
+} from "../../utils/client-balance-summary.js";
 import {
   buildTreasurySplitsFromPayment,
   cashAmountFromPaymentSplits,
@@ -316,8 +321,15 @@ export const getClientHistory = async (req, res) => {
       };
     });
 
-    const creditBalanceDue = await computeClientCreditDue(client._id);
+    const owesFromSales = await computeClientCreditDueFromOrders(client._id);
+    const owesFromOpeningBalance =
+      Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
+    const clientOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
+    const creditBalanceDue = clientOwesUs;
     const prepaidBalance = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
+    const weOweClient = prepaidBalance;
+    const netBalanceMessage = buildClientNetBalanceMessage(clientOwesUs, weOweClient);
+    const settlementPreview = buildClientSettlementPreview(clientOwesUs, weOweClient);
     const creditOrders = ordersWithMeta.filter(
       (o) => o.isPayLater && o.remaining > 0 && o.status !== "restored"
     );
@@ -388,8 +400,15 @@ export const getClientHistory = async (req, res) => {
         address: client.address,
       },
       totalPointsEarned,
+      clientOwesUs,
       creditBalanceDue,
+      owesFromSales,
+      owesFromOpeningBalance,
+      weOweClient,
       prepaidBalance,
+      canSettle: settlementPreview.canSettle,
+      settlementPreview,
+      netBalanceMessage,
       creditOrdersCount: creditOrders.length,
       orders: ordersWithMeta,
       creditOrders,
@@ -400,6 +419,171 @@ export const getClientHistory = async (req, res) => {
   } catch (error) {
     console.error("❌ Error fetching client history:", error.message);
     res.status(500).json({ error: "Failed to fetch client history" });
+  }
+};
+
+/** POST set one-time opening debit (pre-system credit sales). */
+export const setClientOpeningDebitBalance = async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const amount = Math.round((Number(req.body?.amount) || 0) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: "Valid amount is required" });
+    }
+
+    const existing = Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
+    const alreadySet = (client.ledgerEntries || []).some((e) => e.type === "opening_debit");
+    if (existing > 0 || alreadySet) {
+      return res.status(400).json({
+        error: "Opening debit balance already set",
+        openingDebitBalance: existing,
+      });
+    }
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ""))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    const note =
+      String(req.body?.note || "Opening debit — pre-system credit sales").trim() ||
+      "Opening debit — pre-system credit sales";
+
+    client.openingDebitBalance = amount;
+    client.ledgerEntries = client.ledgerEntries || [];
+    client.ledgerEntries.push({
+      type: "opening_debit",
+      amount,
+      note,
+      affectsCashDrawer: false,
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await client.save();
+
+    const owesFromSales = await computeClientCreditDueFromOrders(client._id);
+    const clientOwesUs = await computeClientOwesUs(client._id);
+
+    res.json({
+      message: "Opening debit balance set",
+      openingDebitBalance: client.openingDebitBalance,
+      owesFromOpeningBalance: client.openingDebitBalance,
+      owesFromSales,
+      clientOwesUs,
+    });
+  } catch (error) {
+    console.error("❌ Error setting client opening debit:", error.message);
+    res.status(500).json({ error: "Failed to set opening debit balance" });
+  }
+};
+
+/** POST net settlement between client debt and prepaid balance. */
+export const settleClientBalances = async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const clientOwesUs = await computeClientOwesUs(client._id);
+    const prepaidBefore = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
+    const settleAmount = Math.min(clientOwesUs, prepaidBefore);
+
+    if (settleAmount <= 0) {
+      return res.status(400).json({
+        error: "No overlapping balances to settle",
+        clientOwesUs,
+        weOweClient: prepaidBefore,
+        prepaidBalance: prepaidBefore,
+      });
+    }
+
+    let remaining = settleAmount;
+    const unpaidOrders = await Order.find({
+      clientId: client._id,
+      partyType: { $in: [null, "client"] },
+      paymentMethod: "credit",
+      paymentStatus: { $in: ["unpaid", "partial"] },
+      status: { $ne: "restored" },
+    }).sort({ createdAt: 1 });
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ""))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    for (const order of unpaidOrders) {
+      if (remaining <= 0) break;
+      const orderRem = orderAmountRemaining(order);
+      if (orderRem <= 0) continue;
+
+      const apply = Math.min(remaining, orderRem);
+      order.payments = order.payments || [];
+      order.payments.push({
+        amount: apply,
+        paidAt: new Date(),
+        paidByUserId: uid,
+        method: "settlement",
+        note: "Balance settlement (netting)",
+      });
+      const paid = Number(order.amountPaid) || 0;
+      order.amountPaid = Math.round((paid + apply) * 100) / 100;
+      const total = Number(order.totalPrice) || 0;
+      order.paymentStatus =
+        order.amountPaid >= total - 0.001
+          ? "paid"
+          : order.amountPaid > 0
+            ? "partial"
+            : "unpaid";
+      await order.save();
+      remaining = Math.round((remaining - apply) * 100) / 100;
+    }
+
+    if (remaining > 0) {
+      const openingBefore =
+        Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
+      const fromOpening = Math.min(remaining, openingBefore);
+      client.openingDebitBalance = Math.round((openingBefore - fromOpening) * 100) / 100;
+      remaining = Math.round((remaining - fromOpening) * 100) / 100;
+    }
+
+    client.creditBalance = Math.round((prepaidBefore - settleAmount) * 100) / 100;
+
+    client.ledgerEntries = client.ledgerEntries || [];
+    client.ledgerEntries.push({
+      type: "settlement",
+      amount: settleAmount,
+      note: String(req.body?.note || "Balance settlement").trim(),
+      affectsCashDrawer: false,
+      createdAt: new Date(),
+      createdByUserId: uid,
+    });
+    await client.save();
+
+    const newOwesFromSales = await computeClientCreditDueFromOrders(client._id);
+    const newOwesFromOpening =
+      Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
+    const newClientOwesUs = await computeClientOwesUs(client._id);
+    const newPrepaid = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
+    const netBalanceMessage = buildClientNetBalanceMessage(newClientOwesUs, newPrepaid);
+    const settlementPreview = buildClientSettlementPreview(newClientOwesUs, newPrepaid);
+
+    res.json({
+      message: "Balances settled",
+      settled: settleAmount,
+      clientOwesUs: newClientOwesUs,
+      owesFromSales: newOwesFromSales,
+      owesFromOpeningBalance: newOwesFromOpening,
+      weOweClient: newPrepaid,
+      prepaidBalance: newPrepaid,
+      netBalanceMessage,
+      settlementPreview,
+    });
+  } catch (error) {
+    console.error("❌ Error settling client balances:", error.message);
+    res.status(500).json({ error: "Failed to settle balances" });
   }
 };
 

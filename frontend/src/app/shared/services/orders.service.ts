@@ -39,6 +39,8 @@ addPayment(
     paidAt?: string;
     userId?: string;
     note?: string;
+    /** Branch drawer that receives cash for this installment payment. */
+    branchId?: string;
     /** Customer payment methods (cash, visa, …) — net amounts per method. */
     paymentSplits?: { method: string; amount: number }[];
     paymentFeeAllocations?: {

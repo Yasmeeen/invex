@@ -9,6 +9,7 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
 import { auditLog } from '../audit_module/audit.service.js';
+import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -619,6 +620,7 @@ export const addOrderPayment = async (req, res) => {
       paymentSplits: paymentSplitsRaw,
       paymentMethodSplits: paymentMethodSplitsRaw,
       paymentFeeAllocations: paymentFeeAllocationsRaw,
+      branchId: branchIdRaw,
       /** @deprecated Sales installments use paymentSplits (customer methods), not purchase treasury. */
       paymentTreasurySplits: legacyTreasuryRaw,
     } = req.body || {};
@@ -650,6 +652,11 @@ export const addOrderPayment = async (req, res) => {
       ? new mongoose.Types.ObjectId(String(userId))
       : undefined;
 
+    const resolvedPaymentBranch = await resolveBranchForCashDrawer({
+      userId,
+      branchId: branchIdRaw,
+    });
+
     order.payments = order.payments || [];
     const noteStr = String(note || '').trim();
 
@@ -674,6 +681,7 @@ export const addOrderPayment = async (req, res) => {
           amount: s.amount,
           paidAt: dt,
           paidByUserId: uid,
+          ...(resolvedPaymentBranch ? { branch: resolvedPaymentBranch } : {}),
           method: s.method,
           countsTowardInvoice: true,
           note: noteStr || `Payment · ${s.method}`,
@@ -701,6 +709,7 @@ export const addOrderPayment = async (req, res) => {
         amount: applied,
         paidAt: dt,
         paidByUserId: uid,
+        ...(resolvedPaymentBranch ? { branch: resolvedPaymentBranch } : {}),
         method: methodSlug || 'cash',
         note: noteStr,
       });

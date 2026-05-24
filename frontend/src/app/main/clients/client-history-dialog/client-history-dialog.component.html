@@ -9,37 +9,117 @@
   <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
 
   <ng-container *ngIf="!loading && history">
+    <div class="form-group mb-3" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branches' | translate }}</label>
+      <div class="input-with-icon">
+        <ng-select
+          class="s-control s-select"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          [(ngModel)]="paymentBranchId"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onPaymentBranchChange($event)"
+          placeholder="{{ 'tr_branches' | translate }}"
+        >
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+      <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_payment_branch_hint' | translate }}</p>
+    </div>
+
     <div class="row mb-3">
-      <div class="col-md-4">
-        <div class="balance-card balance-card--points">
+      <div class="col-md-12 mb-2">
+        <div class="balance-card balance-card--points balance-card--compact">
           <div class="balance-card__label">{{ 'tr_client_total_points' | translate }}</div>
-          <div class="balance-card__value">{{ history.totalPointsEarned }}</div>
+          <div class="balance-card__value balance-card__value--sm">{{ history.totalPointsEarned }}</div>
           <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_points_hint' | translate }}</p>
         </div>
       </div>
+    </div>
+
+    <div class="row mb-3">
       <div class="col-md-4">
-        <div class="balance-card balance-card--credit">
-          <div class="balance-card__label">{{ 'tr_client_credit_balance_due' | translate }}</div>
+        <div class="balance-card balance-card--owe">
+          <div class="balance-card__label">{{ 'tr_client_debit_balance' | translate }}</div>
           <div class="balance-card__value">
-            {{ history.creditBalanceDue | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            {{ (history.clientOwesUs ?? history.creditBalanceDue) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
           </div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromOpeningBalance || 0) > 0">
+            {{ 'tr_client_debit_from_opening' | translate }}:
+            {{ history.owesFromOpeningBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromSales || 0) > 0">
+            {{ 'tr_client_debit_from_sales' | translate }}:
+            {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
           <p class="size-small text-muted m-0 mt-1" *ngIf="history.creditOrdersCount > 0">
             {{ 'tr_client_credit_invoices_count' | translate:{ count: history.creditOrdersCount } }}
           </p>
         </div>
       </div>
       <div class="col-md-4">
-        <div class="balance-card balance-card--prepaid">
-          <div class="balance-card__label">{{ 'tr_client_prepaid_balance' | translate }}</div>
+        <div class="balance-card balance-card--credit">
+          <div class="balance-card__label">{{ 'tr_client_credit_balance' | translate }}</div>
           <div class="balance-card__value">
-            {{ (history.prepaidBalance || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            {{ (history.weOweClient ?? history.prepaidBalance ?? 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
           </div>
           <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_prepaid_balance_hint' | translate }}</p>
         </div>
       </div>
+      <div class="col-md-4">
+        <div class="balance-card balance-card--net" *ngIf="history.netBalanceMessage">
+          <div class="balance-card__label">{{ 'tr_client_net_balance' | translate }}</div>
+          <div class="balance-card__value balance-card__value--net">
+            {{ netBalanceText() }}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="flex flex-end mb-3">
+    <div class="client-settlement-row card mb-3 plr-3 ptb-3" *ngIf="settlementPreview">
+      <h5 class="mt-0 mb-2">{{ 'tr_client_settlement_section' | translate }}</h5>
+      <p class="size-small text-muted mb-2">{{ 'tr_client_settlement_section_hint' | translate }}</p>
+      <div class="row">
+        <div class="col-md-3 col-6 mb-2">
+          <span class="size-small text-muted d-block">{{ 'tr_client_settlement_debit' | translate }}</span>
+          <strong>{{ settlementPreview.debitTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+          <span class="size-small text-muted d-block">{{ 'tr_client_settlement_credit' | translate }}</span>
+          <strong>{{ settlementPreview.creditTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="settlementPreview.canSettle">
+          <span class="size-small text-muted d-block">{{ 'tr_client_settlement_will_offset' | translate }}</span>
+          <strong class="text-primary">{{ settlementPreview.settleAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </div>
+        <div class="col-md-3 col-12 flex flex-end flex-bottom">
+          <button
+            type="button"
+            class="s-btn btn-primary"
+            *ngIf="settlementPreview.canSettle"
+            [disabled]="settling"
+            (click)="confirmSettle()"
+          >
+            {{ 'tr_client_settle_balances' | translate }}
+          </button>
+        </div>
+      </div>
+      <p class="size-small m-0 mt-2 text-muted" *ngIf="settlementPreview.canSettle">
+        {{ settlementNetAfterText(settlementPreview) }}
+      </p>
+    </div>
+
+    <div class="flex flex-end mb-3 gap-2 client-history-actions">
+      <button
+        type="button"
+        class="s-btn btn-primary"
+        *ngIf="canSetOpeningDebit()"
+        (click)="openOpeningDebitDialog()"
+      >
+        {{ 'tr_client_opening_debit_set' | translate }}
+      </button>
       <button type="button" class="s-btn btn-secondary" (click)="openDepositDialog()">
         {{ 'tr_client_add_deposit' | translate }}
       </button>

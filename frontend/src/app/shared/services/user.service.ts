@@ -56,6 +56,20 @@ export class UserSerivce {
     return this.http.post(`${CLIENTS_URL}/${clientId}/deposit`, payload);
   }
 
+  setClientOpeningDebitBalance(
+    clientId: string,
+    payload: { amount: number; note?: string; userId?: string }
+  ): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/${clientId}/opening-debit-balance`, payload);
+  }
+
+  settleClientBalances(
+    clientId: string,
+    payload: { userId?: string; note?: string }
+  ): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/${clientId}/settle`, payload);
+  }
+
   createUser(user: User): Observable<User> {
     return this.http.post<User>(USER_CREATE_URL, user).pipe(
       tap({

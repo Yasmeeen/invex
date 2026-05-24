@@ -7,6 +7,8 @@ import {
   getClientByPhone,
   getClientHistory,
   addClientDeposit,
+  setClientOpeningDebitBalance,
+  settleClientBalances,
   createClient,
   updateClient,
   deleteClient,
@@ -23,6 +25,8 @@ router.get("/:id/history", getClientHistory);
 
 // POST prepaid deposit
 router.post("/:id/deposit", addClientDeposit);
+router.post("/:id/opening-debit-balance", setClientOpeningDebitBalance);
+router.post("/:id/settle", settleClientBalances);
 
 // GET client by ID
 router.get("/:id", getClientById);

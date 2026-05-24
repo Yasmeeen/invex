@@ -87,6 +87,20 @@ addVendorDeposit(
   return this.http.post(`${VENDORS_URL}/${vendorId}/deposit`, payload);
 }
 
+setVendorOpeningDebitBalance(
+  vendorId: string,
+  payload: { amount: number; note?: string; userId?: string }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/opening-debit-balance`, payload);
+}
+
+payVendorOpeningDebitBalance(
+  vendorId: string,
+  payload: { amount: number; method?: string; note?: string; userId?: string }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/opening-debit-payment`, payload);
+}
+
 recordDeferredPurchasePayment(
   vendorId: string,
   payload: {

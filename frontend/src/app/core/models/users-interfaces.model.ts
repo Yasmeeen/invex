@@ -28,6 +28,18 @@ export class Client{
   totalOrdersPrice: number;
   created_at: string;
   branches?: Branch[];
+  creditBalance?: number;
+  openingDebitBalance?: number;
+}
+
+export interface ClientSettlementPreview {
+  debitTotal: number;
+  creditTotal: number;
+  settleAmount: number;
+  afterDebit: number;
+  afterCredit: number;
+  netAfter?: { who: 'client' | 'store' | 'even'; amount: number } | null;
+  canSettle: boolean;
 }
 
 export interface ClientHistoryOrderRow {
@@ -75,9 +87,17 @@ export interface ClientLedgerEntry {
 export interface ClientHistoryResponse {
   client: Pick<Client, '_id' | 'name' | 'phoneNumber' | 'address'>;
   totalPointsEarned: number;
+  /** Total debit — client owes us (orders + opening). */
+  clientOwesUs?: number;
   creditBalanceDue: number;
-  /** Prepaid balance held for client (store owes goods / credit). */
+  owesFromSales?: number;
+  owesFromOpeningBalance?: number;
+  /** Credit — prepaid deposit (we owe client). */
+  weOweClient?: number;
   prepaidBalance?: number;
+  canSettle?: boolean;
+  settlementPreview?: ClientSettlementPreview;
+  netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
   creditOrdersCount: number;
   orders: ClientHistoryOrderRow[];
   creditOrders: ClientHistoryOrderRow[];

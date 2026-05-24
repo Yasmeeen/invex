@@ -90,10 +90,12 @@ export class ClientListComponent implements OnInit {
   }
 
   openClientHistory(client: Client): void {
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, this.globals.currentUser?.branch?._id);
     this.dialog.open(ClientHistoryDialogComponent, {
       width: '960px',
       maxWidth: '96vw',
-      data: { client },
+      data: { client, forcedBranchId: ctx.branchId },
       disableClose: false,
     });
   }

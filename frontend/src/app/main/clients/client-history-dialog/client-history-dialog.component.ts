@@ -1,27 +1,31 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Order } from '@core/models/products.model';
+import { Order, Branch } from '@core/models/products.model';
 import { isPayLaterMethod } from '@core/utils/order-display.util';
 import {
   Client,
   ClientHistoryOrderRow,
   ClientHistoryPurchaseRow,
   ClientHistoryResponse,
+  ClientSettlementPreview,
 } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
 import { DeskPurchaseDeferredPaymentDialogComponent } from '../../orders/desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
+import { ClientOpeningDebitDialogComponent } from '../client-opening-debit-dialog/client-opening-debit-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
 
-export type ClientHistoryDialogData = { client: Client };
+export type ClientHistoryDialogData = { client: Client; forcedBranchId?: string | null };
 
 @Component({
   selector: 'app-client-history-dialog',
@@ -30,11 +34,16 @@ export type ClientHistoryDialogData = { client: Client };
 })
 export class ClientHistoryDialogComponent implements OnInit {
   loading = true;
+  settling = false;
   history: ClientHistoryResponse | null = null;
+  /** Branch for cash-drawer attribution (deposits / credit invoice payments). */
   paymentBranchId: string | null = null;
+  showBranchPicker = false;
+  branches: Branch[] = [];
 
   constructor(
     private userService: UserSerivce,
+    private branchesService: BranchesServce,
     private auth: AuthenticationService,
     private translate: TranslateService,
     private notify: AppNotificationService,
@@ -44,12 +53,174 @@ export class ClientHistoryDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: ClientHistoryDialogData
   ) {
     const actor = this.auth.getUserFromLocalStorage();
-    const ctx = resolveActorBranchContext(actor, null);
+    const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
     this.paymentBranchId = ctx.branchId;
+    this.showBranchPicker = ctx.showBranchPicker;
   }
 
   ngOnInit(): void {
+    if (this.showBranchPicker) {
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => {
+          this.branches = res?.branches || [];
+          if (!this.paymentBranchId && this.branches[0]?._id) {
+            this.paymentBranchId = String(this.branches[0]._id);
+          }
+        },
+        error: () => {
+          this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+        },
+      });
+    } else if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+    }
     this.loadHistory();
+  }
+
+  onPaymentBranchChange(branchId: string): void {
+    this.paymentBranchId = String(branchId || '').trim() || null;
+  }
+
+  get settlementPreview(): ClientSettlementPreview | null {
+    return this.history?.settlementPreview || null;
+  }
+
+  netBalanceText(): string {
+    const net = this.history?.netBalanceMessage;
+    if (!net) return '';
+    if (net.who === 'even') {
+      return this.translate.instant('tr_client_balance_even');
+    }
+    if (net.who === 'client') {
+      return this.translate.instant('tr_client_owes_us_net', { amount: net.amount });
+    }
+    return this.translate.instant('tr_we_owe_client_net', { amount: net.amount });
+  }
+
+  settlementNetAfterText(preview: ClientSettlementPreview): string {
+    const net = preview.netAfter;
+    if (!net) {
+      return this.translate.instant('tr_client_settlement_net_cleared');
+    }
+    if (net.who === 'even') {
+      return this.translate.instant('tr_client_balance_even');
+    }
+    if (net.who === 'client') {
+      return this.translate.instant('tr_client_settlement_after_client_owes', { amount: net.amount });
+    }
+    return this.translate.instant('tr_client_settlement_after_we_owe', { amount: net.amount });
+  }
+
+  formatMoney(amount: number): string {
+    return new Intl.NumberFormat('en-EG', {
+      style: 'currency',
+      currency: 'EGP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(amount) || 0);
+  }
+
+  confirmSettle(): void {
+    const preview = this.settlementPreview;
+    if (!preview?.canSettle || this.settling) return;
+
+    const details = [
+      this.translate.instant('tr_client_settlement_line_debit', {
+        amount: this.formatMoney(preview.debitTotal),
+      }),
+      this.translate.instant('tr_client_settlement_line_credit', {
+        amount: this.formatMoney(preview.creditTotal),
+      }),
+      this.translate.instant('tr_client_settlement_line_offset', {
+        amount: this.formatMoney(preview.settleAmount),
+      }),
+      this.translate.instant('tr_client_settlement_line_after_debit', {
+        amount: this.formatMoney(preview.afterDebit),
+      }),
+      this.translate.instant('tr_client_settlement_line_after_credit', {
+        amount: this.formatMoney(preview.afterCredit),
+      }),
+      this.settlementNetAfterText(preview),
+    ];
+
+    this.dialog
+      .open(ConfirmationDialogComponent, {
+        width: '520px',
+        data: {
+          title: this.translate.instant('tr_client_settlement_confirm_title'),
+          message: this.translate.instant('tr_client_settlement_confirm_message'),
+          details,
+          buttons: [
+            {
+              label: this.translate.instant('tr_action.cancel'),
+              actionCallback: 'cancel',
+              type: 'btn-secondary',
+            },
+            {
+              label: this.translate.instant('tr_client_settle_balances'),
+              actionCallback: 'confirm',
+              type: 'btn-primary',
+            },
+          ],
+        },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'confirm') {
+          this.settle();
+        }
+      });
+  }
+
+  settle(): void {
+    if (!this.history?.canSettle || this.settling) return;
+    const id = this.data.client._id;
+    if (!id) return;
+
+    this.settling = true;
+    const u = this.auth.getUserFromLocalStorage();
+    this.userService.settleClientBalances(String(id), { userId: u?._id }).subscribe({
+      next: (res) => {
+        this.settling = false;
+        this.notify.push(this.translate.instant('tr_client_settlement_ok'), 'success');
+        if (res?.netBalanceMessage) {
+          this.history!.netBalanceMessage = res.netBalanceMessage;
+        }
+        if (res?.settlementPreview) {
+          this.history!.settlementPreview = res.settlementPreview;
+          this.history!.canSettle = res.settlementPreview.canSettle;
+        }
+        this.loadHistory();
+      },
+      error: (err) => {
+        this.settling = false;
+        const msg =
+          err?.error?.error ||
+          err?.error?.message ||
+          this.translate.instant('tr_unexpected_error_message');
+        this.notify.push(msg, 'error');
+      },
+    });
+  }
+
+  canSetOpeningDebit(): boolean {
+    const hasOpeningLedger = (this.history?.ledgerEntries || []).some(
+      (e) => e.type === 'opening_debit'
+    );
+    return !hasOpeningLedger && (this.history?.owesFromOpeningBalance || 0) <= 0.005;
+  }
+
+  openOpeningDebitDialog(): void {
+    const ref = this.dialog.open(ClientOpeningDebitDialogComponent, {
+      width: '480px',
+      maxWidth: '96vw',
+      data: { client: this.data.client },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((saved) => {
+      if (saved) this.loadHistory();
+    });
   }
 
   loadHistory(): void {
@@ -124,12 +295,16 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   openPayOrderDialog(order: ClientHistoryOrderRow): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     const ref = this.dialog.open(PayOrderDialogComponent, {
       width: '520px',
       maxWidth: '96vw',
       panelClass: 'pay-order-dialog-panel',
       backdropClass: 'pay-order-dialog-backdrop',
-      data: { order: order as Order },
+      data: { order: order as Order, forcedBranchId: this.paymentBranchId },
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
@@ -160,7 +335,7 @@ export class ClientHistoryDialogComponent implements OnInit {
         partyName: String(this.data.client?.name || '').trim(),
         productName: row.productName || '',
         requestDate: row.createdAt,
-        forcedBranchId: row.branch?._id,
+        forcedBranchId: this.paymentBranchId,
       },
       disableClose: true,
     });
@@ -170,6 +345,10 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   openDepositDialog(): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     this.dialog
       .open(ClientDepositDialogComponent, {
         width: '520px',
@@ -186,10 +365,16 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   ledgerTypeLabel(type: string): string {
-    if (type === 'deposit') {
-      return this.translate.instant('tr_client_ledger_deposit');
+    switch (type) {
+      case 'deposit':
+        return this.translate.instant('tr_client_ledger_deposit');
+      case 'opening_debit':
+        return this.translate.instant('tr_client_ledger_opening_debit');
+      case 'settlement':
+        return this.translate.instant('tr_client_ledger_settlement');
+      default:
+        return type || '—';
     }
-    return type || '—';
   }
 
   close(): void {

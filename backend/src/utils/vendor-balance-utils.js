@@ -1,4 +1,5 @@
 import Order from '../DB/models/order.model.js';
+import Vendor from '../DB/models/vendor.model.js';
 
 export function orderAmountRemaining(order) {
   const total = Number(order?.totalPrice) || 0;
@@ -21,7 +22,10 @@ export async function computeSupplierOwesFromOrders(vendorId) {
   return Math.round(total * 100) / 100;
 }
 
-/** Unpaid balances on supplier sales (مدين — المورد عليه). */
+/** Unpaid balances on supplier sales + opening debit (مدين — المورد عليه). */
 export async function computeSupplierOwesUs(vendorId) {
-  return computeSupplierOwesFromOrders(vendorId);
+  const owesFromOrders = await computeSupplierOwesFromOrders(vendorId);
+  const vendor = await Vendor.findById(vendorId).select('openingDebitBalance').lean();
+  const opening = Math.round((Number(vendor?.openingDebitBalance) || 0) * 100) / 100;
+  return Math.round((owesFromOrders + opening) * 100) / 100;
 }

@@ -63,6 +63,12 @@ const vendorSchema = new mongoose.Schema(
     /** Prepaid balance / deposit the supplier holds with us (we owe them). */
     creditBalance: { type: Number, default: 0, min: 0 },
 
+    /**
+     * Opening debit: supplier owes us from pre-system credit sales (مبيعات آجل قبل النظام).
+     * Set once at onboarding; reduced by payments or balance settlement.
+     */
+    openingDebitBalance: { type: Number, default: 0, min: 0 },
+
     /** Audit trail: deposits, settlements, order payments. */
     ledgerEntries: [
       {
@@ -72,6 +78,8 @@ const vendorSchema = new mongoose.Schema(
             'deposit',
             'settlement',
             'order_payment',
+            'opening_debit',
+            'opening_debit_payment',
             'purchase',
             'purchase_installment_paid',
             'purchase_deferred',

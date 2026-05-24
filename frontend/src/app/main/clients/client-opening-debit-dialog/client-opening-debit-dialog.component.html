@@ -1,0 +1,40 @@
+<div class="client-opening-debit-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">
+      {{ 'tr_client_opening_debit_set_title' | translate }} —
+      {{ client.name || client.phoneNumber }}
+    </h3>
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">✖</button>
+  </div>
+
+  <p class="size-small text-muted mb-3">
+    {{ 'tr_client_opening_debit_set_hint' | translate }}
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="form-group">
+      <label>{{ 'tr_payment_amount' | translate }}</label>
+      <input
+        class="s-control width-100"
+        type="number"
+        min="0.01"
+        step="0.01"
+        formControlName="amount"
+      />
+    </div>
+
+    <div class="form-group">
+      <label>{{ 'tr_payment_note' | translate }}</label>
+      <textarea class="s-control width-100" rows="2" formControlName="note"></textarea>
+    </div>
+
+    <div class="flex flex-end gap-2">
+      <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+        {{ 'tr_cancel' | translate }}
+      </button>
+      <button type="submit" class="s-btn btn-primary" [disabled]="saving">
+        {{ 'tr_save' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

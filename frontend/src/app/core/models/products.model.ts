@@ -166,6 +166,8 @@ export interface VendorLedgerEntry {
     | 'deposit'
     | 'settlement'
     | 'order_payment'
+    | 'opening_debit'
+    | 'opening_debit_payment'
     | 'purchase'
     | 'purchase_installment_paid'
     | 'purchase_deferred'
@@ -190,6 +192,7 @@ export interface Vendor {
   paymentTerms: string[] ;
   categories: Category[];         // Array of Category IDs
   creditBalance?: number;
+  openingDebitBalance?: number;
   ledgerEntries?: VendorLedgerEntry[];
   createdAt?: string;
   updatedAt?: string;
@@ -220,6 +223,8 @@ export interface VendorHistoryResponse {
   vendor: Vendor;
   supplierOwesUs: number;
   owesFromSales?: number;
+  /** Pre-system credit sales debt (opening debit). */
+  owesFromOpeningBalance?: number;
   /** Total credit = prepaid + purchase payables (for display and netting). */
   weOweSupplier: number;
   /** Prepaid deposit held for supplier (subset of weOweSupplier). */

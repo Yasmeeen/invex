@@ -30,12 +30,17 @@ const clientSchema = new mongoose.Schema(
     /** Prepaid balance the client holds with us (we owe them goods / credit). */
     creditBalance: { type: Number, default: 0, min: 0 },
 
-    /** Audit trail: deposits and future settlements. */
+    /**
+     * Opening debit: client owes us from pre-system credit sales (بيع بالآجل قبل النظام).
+     */
+    openingDebitBalance: { type: Number, default: 0, min: 0 },
+
+    /** Audit trail: deposits, opening debit, settlements. */
     ledgerEntries: [
       {
         type: {
           type: String,
-          enum: ["deposit"],
+          enum: ["deposit", "opening_debit", "opening_debit_payment", "settlement"],
           required: true,
         },
         amount: { type: Number, required: true, min: 0 },

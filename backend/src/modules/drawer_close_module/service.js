@@ -214,13 +214,22 @@ function mergeAmounts(target, map) {
   return out;
 }
 
+/** Drawer branch for a payment line: explicit collection branch, else invoice branch. */
+function paymentDrawerBranch(payment, order) {
+  return payment?.branch || order?.branch || null;
+}
+
+function paymentBelongsToBranch(payment, order, branchOid) {
+  const b = paymentDrawerBranch(payment, order);
+  return b && String(b) === String(branchOid);
+}
+
 /** Payments received into the branch today (split lines), grouped by method. */
 async function paymentsReceivedByMethod(branchOid, start, end) {
   const orders = await Order.find({
-    branch: branchOid,
     payments: { $elemMatch: { paidAt: { $gte: start, $lte: end } } },
   })
-    .select('payments')
+    .select('payments branch')
     .lean();
 
   const byMethod = {};
@@ -228,6 +237,7 @@ async function paymentsReceivedByMethod(branchOid, start, end) {
     for (const p of o.payments || []) {
       const t = p.paidAt ? new Date(p.paidAt).getTime() : NaN;
       if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      if (!paymentBelongsToBranch(p, o, branchOid)) continue;
       const splits = Array.isArray(p.paymentTreasurySplits) ? p.paymentTreasurySplits : [];
       if (splits.length) {
         for (const s of splits) {
@@ -246,12 +256,11 @@ async function paymentsReceivedByMethod(branchOid, start, end) {
 /** Cash collected today on client credit sales (pay-later installments) — subset of paymentsIn. */
 async function sumClientCreditOrderCashPayments(branchOid, start, end) {
   const orders = await Order.find({
-    branch: branchOid,
     paymentMethod: 'credit',
     partyType: { $ne: 'supplier' },
     payments: { $elemMatch: { paidAt: { $gte: start, $lte: end } } },
   })
-    .select('payments')
+    .select('payments branch')
     .lean();
 
   let total = 0;
@@ -260,6 +269,7 @@ async function sumClientCreditOrderCashPayments(branchOid, start, end) {
     for (const p of o.payments || []) {
       const t = p.paidAt ? new Date(p.paidAt).getTime() : NaN;
       if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      if (!paymentBelongsToBranch(p, o, branchOid)) continue;
       if (!isPhysicalCashMethod(p.method)) continue;
       const amt = Number(p.amount || 0);
       if (!Number.isFinite(amt) || amt <= 0) continue;

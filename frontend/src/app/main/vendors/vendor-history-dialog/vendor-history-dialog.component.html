@@ -34,6 +34,10 @@
           <div class="balance-card__value">
             {{ history.supplierOwesUs | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
           </div>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromOpeningBalance || 0) > 0">
+            {{ 'tr_vendor_debit_from_opening' | translate }}:
+            {{ history.owesFromOpeningBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
           <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromSales || 0) > 0">
             {{ 'tr_vendor_debit_from_sales' | translate }}:
             {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
@@ -108,7 +112,15 @@
       </p>
     </div>
 
-    <div class="flex flex-end mb-3">
+    <div class="flex flex-end mb-3 gap-2 vendor-history-actions">
+      <button
+        type="button"
+        class="s-btn btn-primary"
+        *ngIf="canSetOpeningDebit()"
+        (click)="openOpeningDebitDialog()"
+      >
+        {{ 'tr_vendor_opening_debit_set' | translate }}
+      </button>
       <button type="button" class="s-btn btn-secondary" (click)="openDepositDialog()">
         {{ 'tr_vendor_add_deposit' | translate }}
       </button>

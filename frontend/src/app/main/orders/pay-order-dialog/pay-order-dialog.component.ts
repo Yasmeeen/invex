@@ -4,6 +4,7 @@ import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dial
 import { Order } from '@core/models/products.model';
 import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
 import { AuthenticationService } from '@core/services/authentication.service';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
@@ -16,7 +17,7 @@ import {
   paymentSplitsNetTotal,
 } from '@shared/utils/payment-app-fee.util';
 
-export type PayOrderDialogData = { order: Order };
+export type PayOrderDialogData = { order: Order; forcedBranchId?: string | null };
 
 @Component({
   selector: 'app-pay-order-dialog',
@@ -27,6 +28,7 @@ export class PayOrderDialogComponent {
   form: FormGroup;
   saving = false;
   readonly order: Order;
+  readonly paymentBranchId: string | null;
   confirmedPayment: PaymentSplitsResult | null = null;
 
   constructor(
@@ -40,6 +42,9 @@ export class PayOrderDialogComponent {
     @Inject(MAT_DIALOG_DATA) data: PayOrderDialogData
   ) {
     this.order = data.order;
+    const actor = this.auth.getUserFromLocalStorage();
+    const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
+    this.paymentBranchId = ctx.branchId;
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -120,6 +125,11 @@ export class PayOrderDialogComponent {
       return;
     }
 
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+
     this.postPayment(this.confirmedPayment);
   }
 
@@ -154,6 +164,7 @@ export class PayOrderDialogComponent {
         paidAt,
         userId: u?._id,
         note,
+        branchId: this.paymentBranchId || undefined,
       })
       .subscribe({
         next: () => {

@@ -13,6 +13,7 @@ import {
   sumCashDrawerOutflowFromPurchases,
 } from '../../utils/purchase-treasury-splits.js';
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
+import { sumVendorCashDrawerInflows } from '../../utils/vendor-cash-drawer-inflow.js';
 import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
@@ -389,6 +390,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     expenseTotal,
     deskInfo,
     vendorCashInfo,
+    vendorCashInflowInfo,
     clientCashInfo,
     clientDepositCashInfo,
   ] = await Promise.all([
@@ -398,6 +400,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
+    sumVendorCashDrawerInflows(branchOid, start, end),
     sumClientCreditOrderCashPayments(branchOid, start, end),
     sumClientCashDrawerInflows(branchOid, start, end),
   ]);
@@ -407,6 +410,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
 
   const deskCashFromDrawer = deskInfo.deskPurchaseCashDrawerTotal;
   const vendorCashFromDrawer = vendorCashInfo.vendorCashDrawerTotal;
+  const vendorCashInDrawer = vendorCashInflowInfo.vendorCashDrawerInflowTotal;
   const clientDepositCashIn = clientDepositCashInfo.clientDepositCashDrawerTotal;
   const periodNetCashMovements = round2(
     cashReceived -
@@ -414,6 +418,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
       expenseTotal -
       deskCashFromDrawer -
       vendorCashFromDrawer +
+      vendorCashInDrawer +
       clientDepositCashIn
   );
 
@@ -431,6 +436,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskPurchaseIntakeCount: deskInfo.deskPurchaseIntakeCount,
     vendorCashDrawerTotal: vendorCashFromDrawer,
     vendorCashDrawerPaymentCount: vendorCashInfo.vendorCashDrawerPaymentCount,
+    vendorCashDrawerInflowTotal: vendorCashInDrawer,
+    vendorCashDrawerInflowCount: vendorCashInflowInfo.vendorCashDrawerInflowCount,
     clientOrderCashDrawerTotal: clientCashInfo.clientOrderCashDrawerTotal,
     clientOrderCashDrawerPaymentCount: clientCashInfo.clientOrderCashDrawerPaymentCount,
     clientDepositCashDrawerTotal: clientDepositCashInfo.clientDepositCashDrawerTotal,

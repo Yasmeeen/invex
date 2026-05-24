@@ -28,6 +28,10 @@ import {
   resolveBranchForCashDrawer,
 } from "../../utils/vendor-cash-drawer.js";
 import {
+  buildCashDrawerInflowLedgerFields,
+  recordVendorCashDrawerReceipt,
+} from "../../utils/vendor-cash-drawer-inflow.js";
+import {
   buildTreasurySplitsFromPayment,
   cashAmountFromPaymentSplits,
   isPhysicalCashMethod,
@@ -50,7 +54,7 @@ export const createVendor = async (req, res) => {
       categories
     } = req.body;
 
-    console.log("req.body",req.body);
+
     
     if  (
         !nameOfcompany ||
@@ -230,9 +234,15 @@ export const getVendorHistory = async (req, res) => {
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
     const supplierOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
     const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const buyerPrepaidBalance =
+      Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
     const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
     const purchasePayable = purchasePayableBreakdown.total;
-    const weOweSupplier = computeTotalCreditOwed(prepaidBalance, purchasePayable);
+    const weOweSupplier = computeTotalCreditOwed(
+      prepaidBalance,
+      purchasePayable,
+      buyerPrepaidBalance
+    );
     const ledgerPurchases = await PurchasingRequest.find({
       supplier: vendor._id,
       paymentStatus: { $in: ['Installments', 'Deferred'] },
@@ -318,6 +328,7 @@ export const getVendorHistory = async (req, res) => {
       owesFromOpeningBalance,
       weOweSupplier,
       prepaidBalance,
+      buyerPrepaidBalance,
       purchasePayable,
       purchasePayableInstallments: purchasePayableBreakdown.installments,
       purchasePayableDeferred: purchasePayableBreakdown.deferred,
@@ -344,10 +355,13 @@ export const settleVendorBalances = async (req, res) => {
 
     const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
     const prepaidBefore = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const buyerPrepaidBefore =
+      Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
     const purchasePayableBefore = await computePurchasePayableBreakdown(vendor._id);
     const totalCreditBefore = computeTotalCreditOwed(
       prepaidBefore,
-      purchasePayableBefore.total
+      purchasePayableBefore.total,
+      buyerPrepaidBefore
     );
     const settleAmount = Math.min(supplierOwesUs, totalCreditBefore);
 
@@ -408,6 +422,10 @@ export const settleVendorBalances = async (req, res) => {
     }
 
     let creditToReduce = settleAmount;
+    const fromBuyerPrepaid = Math.min(creditToReduce, buyerPrepaidBefore);
+    vendor.buyerPrepaidBalance = Math.round((buyerPrepaidBefore - fromBuyerPrepaid) * 100) / 100;
+    creditToReduce = Math.round((creditToReduce - fromBuyerPrepaid) * 100) / 100;
+
     const fromPrepaid = Math.min(creditToReduce, prepaidBefore);
     vendor.creditBalance = Math.round((prepaidBefore - fromPrepaid) * 100) / 100;
     creditToReduce = Math.round((creditToReduce - fromPrepaid) * 100) / 100;
@@ -434,8 +452,14 @@ export const settleVendorBalances = async (req, res) => {
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
     const newSupplierOwesUs = await computeSupplierOwesUs(vendor._id);
     const newPrepaid = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const newBuyerPrepaid =
+      Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
     const newPayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
-    const newWeOwe = computeTotalCreditOwed(newPrepaid, newPayableBreakdown.total);
+    const newWeOwe = computeTotalCreditOwed(
+      newPrepaid,
+      newPayableBreakdown.total,
+      newBuyerPrepaid
+    );
     const netBalanceMessage = buildNetBalanceMessage(newSupplierOwesUs, newWeOwe);
     const settlementPreview = buildSettlementPreview(newSupplierOwesUs, newWeOwe);
 
@@ -447,6 +471,7 @@ export const settleVendorBalances = async (req, res) => {
       owesFromOpeningBalance: newOwesFromOpening,
       weOweSupplier: newWeOwe,
       prepaidBalance: newPrepaid,
+      buyerPrepaidBalance: newBuyerPrepaid,
       purchasePayable: newPayableBreakdown.total,
       purchasePayableInstallments: newPayableBreakdown.installments,
       purchasePayableDeferred: newPayableBreakdown.deferred,
@@ -601,17 +626,37 @@ export const payVendorOpeningDebitBalance = async (req, res) => {
       ? new mongoose.Types.ObjectId(String(req.body.userId))
       : undefined;
 
+    const branchId = await resolveBranchForCashDrawer({
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+    });
+    const fromCashDrawer = isPhysicalCashMethod(method);
+
     vendor.openingDebitBalance = Math.round((openingBefore - applied) * 100) / 100;
     vendor.ledgerEntries = vendor.ledgerEntries || [];
     vendor.ledgerEntries.push({
       type: 'opening_debit_payment',
       amount: applied,
       note: `${note}${method ? ` — ${method}` : ''}`,
-      affectsCashDrawer: false,
       createdAt: new Date(),
       createdByUserId: uid,
+      ...buildCashDrawerInflowLedgerFields({
+        fromCashDrawer,
+        branchId: fromCashDrawer ? branchId : undefined,
+      }),
     });
     await vendor.save();
+
+    if (fromCashDrawer && applied > 0) {
+      await recordVendorCashDrawerReceipt({
+        branchId: req.body?.branchId,
+        userId: req.body?.userId,
+        vendorId: vendor._id,
+        amount: applied,
+        paymentType: 'opening_debit_payment',
+        note,
+      });
+    }
 
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
     const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
@@ -623,6 +668,7 @@ export const payVendorOpeningDebitBalance = async (req, res) => {
       owesFromOpeningBalance: vendor.openingDebitBalance,
       owesFromSales,
       supplierOwesUs,
+      cashDrawerAmount: fromCashDrawer ? applied : 0,
     });
   } catch (error) {
     console.error('Error paying vendor opening debit:', error);
@@ -630,7 +676,7 @@ export const payVendorOpeningDebitBalance = async (req, res) => {
   }
 };
 
-/** POST add prepaid deposit (supplier money held at store). */
+/** POST pay supplier in advance (we purchase FROM them — cash leaves drawer). */
 export const addVendorDeposit = async (req, res) => {
   try {
     const vendor = await Vendor.findById(req.params.id);
@@ -667,7 +713,7 @@ export const addVendorDeposit = async (req, res) => {
       branchId: req.body?.branchId,
     });
 
-    const note = String(req.body?.note || 'Prepaid deposit').trim();
+    const note = String(req.body?.note || 'Prepaid payment to supplier').trim();
     const treasuryAudit = buildTreasurySplitsFromPayment(splits, feeAllocations);
     const cashDrawerAmount = cashAmountFromPaymentSplits(splits, feeAllocations);
 
@@ -710,6 +756,97 @@ export const addVendorDeposit = async (req, res) => {
   } catch (error) {
     console.error('Error adding vendor deposit:', error);
     res.status(500).json({ message: 'Server error while recording deposit' });
+  }
+};
+
+/** POST receive prepaid deposit from supplier (they buy FROM us — cash enters drawer). */
+export const addVendorReceivedDeposit = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const splitsRaw = req.body?.paymentSplits ?? req.body?.paymentMethodSplits;
+    let splits = normalizePaymentSplitsRaw(splitsRaw);
+    const feeAllocations = normalizePaymentFeeAllocations(req.body?.paymentFeeAllocations);
+
+    if (!splits.length) {
+      const amount = Number(req.body?.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ message: 'Valid amount is required' });
+      }
+      splits = [{ method: 'cash', amount: Math.round(amount * 100) / 100 }];
+    }
+
+    const applied = totalNetFromPaymentSplits(splits);
+    if (applied <= 0) {
+      return res.status(400).json({ message: 'Valid amount is required' });
+    }
+
+    vendor.buyerPrepaidBalance =
+      Math.round(((Number(vendor.buyerPrepaidBalance) || 0) + applied) * 100) / 100;
+
+    const uid = mongoose.Types.ObjectId.isValid(String(req.body?.userId || ''))
+      ? new mongoose.Types.ObjectId(String(req.body.userId))
+      : undefined;
+
+    const branchId = await resolveBranchForCashDrawer({
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+    });
+
+    const note = String(req.body?.note || 'Supplier prepaid deposit received').trim();
+    const treasuryAudit = buildTreasurySplitsFromPayment(splits, feeAllocations);
+    const cashDrawerAmount = cashAmountFromPaymentSplits(splits, feeAllocations);
+
+    vendor.ledgerEntries = vendor.ledgerEntries || [];
+    for (const s of splits) {
+      const splitNote = `${note}${splits.length > 1 ? ` — ${s.method}` : ''}`;
+      vendor.ledgerEntries.push({
+        type: 'received_deposit',
+        amount: s.amount,
+        note: splitNote,
+        createdAt: new Date(),
+        createdByUserId: uid,
+        ...buildCashDrawerInflowLedgerFields({
+          fromCashDrawer: isPhysicalCashMethod(s.method),
+          branchId: isPhysicalCashMethod(s.method) ? branchId : undefined,
+        }),
+      });
+    }
+    await vendor.save();
+
+    if (cashDrawerAmount > 0) {
+      await recordVendorCashDrawerReceipt({
+        branchId: req.body?.branchId,
+        userId: req.body?.userId,
+        vendorId: vendor._id,
+        amount: cashDrawerAmount,
+        paymentType: 'received_deposit',
+        note,
+        paymentTreasurySplits: treasuryAudit,
+      });
+    }
+
+    const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+    const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const weOweSupplier = computeTotalCreditOwed(
+      prepaidBalance,
+      purchasePayableBreakdown.total,
+      vendor.buyerPrepaidBalance
+    );
+
+    res.json({
+      message: 'Received deposit recorded',
+      buyerPrepaidBalance: vendor.buyerPrepaidBalance,
+      weOweSupplier,
+      cashDrawerAmount,
+      paymentTreasurySplits: treasuryAudit,
+    });
+  } catch (error) {
+    console.error('Error adding vendor received deposit:', error);
+    res.status(500).json({ message: 'Server error while recording received deposit' });
   }
 };
 

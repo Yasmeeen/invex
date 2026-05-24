@@ -9,7 +9,7 @@ import {
 
 // ✅ Get all Purchasing Requests (with pagination & optional search)
 export const getPurchasingRequests = async (req, res) => {
-    console.log("req.query",req.query);
+  
     
   try {
     const { page = 1, limit = 10, search = '' } = req.query;

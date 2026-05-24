@@ -7,6 +7,7 @@ import {
   getVendorHistory,
   settleVendorBalances,
   addVendorDeposit,
+  addVendorReceivedDeposit,
   setVendorOpeningDebitBalance,
   payVendorOpeningDebitBalance,
   recordVendorDeferredPurchasePayment,
@@ -20,6 +21,7 @@ router.get('/by-phone/:phone', getVendorByPhone);
 router.get('/:id/history', getVendorHistory);
 router.post('/:id/settle', settleVendorBalances);
 router.post('/:id/deposit', addVendorDeposit);
+router.post('/:id/received-deposit', addVendorReceivedDeposit);
 router.post('/:id/opening-debit-balance', setVendorOpeningDebitBalance);
 router.post('/:id/opening-debit-payment', payVendorOpeningDebitBalance);
 router.post('/:id/deferred-payment', recordVendorDeferredPurchasePayment);

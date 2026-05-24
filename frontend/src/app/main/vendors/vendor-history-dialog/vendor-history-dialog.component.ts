@@ -248,7 +248,10 @@ export class VendorHistoryDialogComponent implements OnInit {
       .open(VendorDepositDialogComponent, {
         width: '520px',
         maxWidth: '96vw',
-        data: { vendor: this.data.vendor, forcedBranchId: this.paymentBranchId },
+        data: {
+          vendor: this.data.vendor,
+          forcedBranchId: this.paymentBranchId,
+        },
         disableClose: true,
       })
       .afterClosed()
@@ -263,6 +266,8 @@ export class VendorHistoryDialogComponent implements OnInit {
     switch (type) {
       case 'deposit':
         return this.translate.instant('tr_vendor_ledger_deposit');
+      case 'received_deposit':
+        return this.translate.instant('tr_vendor_ledger_received_deposit');
       case 'settlement':
         return this.translate.instant('tr_vendor_ledger_settlement');
       case 'order_payment':

@@ -141,6 +141,21 @@
             ></span
           >
         </div>
+        <div
+          class="drawer-close-dialog__row drawer-close-dialog__row--highlight"
+          *ngIf="showVendorCashInflowRow(preview)"
+        >
+          <span>{{ 'tr_drawer_close_vendor_cash_inflow' | translate }}</span>
+          <span
+            >+{{ vendorCashDrawerInflowAmount(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+            <span class="drawer-close-dialog__hint" *ngIf="preview.vendorCashDrawerInflowCount"
+              >({{
+                'tr_drawer_close_vendor_cash_inflow_count'
+                  | translate : { count: preview.vendorCashDrawerInflowCount }
+              }})</span
+            ></span
+          >
+        </div>
 
         <div
           class="drawer-close-dialog__muted mb-1"

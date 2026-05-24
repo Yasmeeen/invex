@@ -1,8 +1,9 @@
-/** Total credit = prepaid balance held for supplier + purchase payables (we owe). */
-export function computeTotalCreditOwed(prepaidBalance, purchasePayable) {
+/** Total credit = our prepaid to supplier + purchase payables + supplier prepaid with us (buyer). */
+export function computeTotalCreditOwed(prepaidBalance, purchasePayable, buyerPrepaidBalance = 0) {
   const prepaid = Math.round((Number(prepaidBalance) || 0) * 100) / 100;
   const payable = Math.round((Number(purchasePayable) || 0) * 100) / 100;
-  return Math.round((prepaid + payable) * 100) / 100;
+  const buyerPrepaid = Math.round((Number(buyerPrepaidBalance) || 0) * 100) / 100;
+  return Math.round((prepaid + payable + buyerPrepaid) * 100) / 100;
 }
 
 /** Build who owes whom after comparing debit (supplier owes us) vs credit (we owe supplier). */

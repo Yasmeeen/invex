@@ -60,8 +60,17 @@ const vendorSchema = new mongoose.Schema(
       },
     ],
 
-    /** Prepaid balance / deposit the supplier holds with us (we owe them). */
+    /**
+     * Prepaid balance we paid the supplier (for purchasing FROM them).
+     * Increased by vendor deposit (outflow); reduced by settlement / purchases.
+     */
     creditBalance: { type: Number, default: 0, min: 0 },
+
+    /**
+     * Prepaid balance the supplier paid us (for selling TO them).
+     * Increased by received deposit (inflow); reduced by settlement / sales.
+     */
+    buyerPrepaidBalance: { type: Number, default: 0, min: 0 },
 
     /**
      * Opening debit: supplier owes us from pre-system credit sales (مبيعات آجل قبل النظام).
@@ -76,6 +85,7 @@ const vendorSchema = new mongoose.Schema(
           type: String,
           enum: [
             'deposit',
+            'received_deposit',
             'settlement',
             'order_payment',
             'opening_debit',

@@ -135,4 +135,30 @@ recordDeferredPurchasePayment(
   return this.http.post(`${VENDORS_URL}/${vendorId}/deferred-payment`, payload);
 }
 
+recordInstallmentPurchasePayment(
+  vendorId: string,
+  payload: {
+    purchasingRequestId: string;
+    installmentId: string;
+    userId?: string;
+    branchId?: string;
+    note?: string;
+    paymentTreasurySplits: TreasurySplitPayload[];
+  }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/installment-payment`, payload);
+}
+
+payVendorSupplier(
+  vendorId: string,
+  payload: {
+    userId?: string;
+    branchId?: string;
+    note?: string;
+    paymentTreasurySplits: TreasurySplitPayload[];
+  }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/pay-supplier`, payload);
+}
+
 }

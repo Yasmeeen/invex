@@ -6,7 +6,9 @@ import { VendorsListComponent } from './vendors-list/vendors-list.component';
 import { VendorHistoryDialogComponent } from './vendor-history-dialog/vendor-history-dialog.component';
 import { VendorDepositDialogComponent } from './vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from './vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
+import { VendorPaySupplierDialogModule } from './vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.module';
 import { VendorDeferredPaymentDialogModule } from './vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.module';
+import { VendorInstallmentPaymentDialogModule } from './vendor-installment-payment-dialog/vendor-installment-payment-dialog.module';
 import { OrdersModule } from '../orders/orders.module';
 import { SharedModule } from '@shared/shared.module';
 import { VendorsRoutingModule } from './vendors-routing.module';
@@ -27,7 +29,9 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     CommonModule,
     VendorsRoutingModule,
     SharedModule,
+    VendorPaySupplierDialogModule,
     VendorDeferredPaymentDialogModule,
+    VendorInstallmentPaymentDialogModule,
     OrdersModule,
     MatDialogModule,
     PaymentSplitsDialogModule,

@@ -11,6 +11,8 @@ import {
   setVendorOpeningDebitBalance,
   payVendorOpeningDebitBalance,
   recordVendorDeferredPurchasePayment,
+  recordVendorInstallmentPurchasePayment,
+  payVendorSupplier,
   createVendor,
   updateVendor,
   deleteVendor,
@@ -25,6 +27,8 @@ router.post('/:id/received-deposit', addVendorReceivedDeposit);
 router.post('/:id/opening-debit-balance', setVendorOpeningDebitBalance);
 router.post('/:id/opening-debit-payment', payVendorOpeningDebitBalance);
 router.post('/:id/deferred-payment', recordVendorDeferredPurchasePayment);
+router.post('/:id/installment-payment', recordVendorInstallmentPurchasePayment);
+router.post('/:id/pay-supplier', payVendorSupplier);
 router.get('/:id', getVendorById);
 router.post('/createVendor', createVendor);
 router.put('/updateVendor/:id', updateVendor);

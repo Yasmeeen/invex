@@ -77,6 +77,9 @@
                                 ></ng-select>
                                 <i class="fa fa-caret-down input-icon"></i>
                               </div>
+                              <span class="text-error size-small validator" *ngIf="paymentTerms.invalid && vendorForm.submitted">
+                                {{ 'tr_payment_terms_required' | translate }}
+                              </span>
                             </div>
                           </div>
             
@@ -98,6 +101,9 @@
                                 ></ng-select>
                                 <i class="fa fa-caret-down input-icon"></i>
                               </div>
+                              <span class="text-error size-small validator" *ngIf="categories.invalid && vendorForm.submitted">
+                                {{ 'tr_vendor_categories_required' | translate }}
+                              </span>
                             </div>
                           </div>
   
@@ -137,7 +143,7 @@
                         name="phone"
                         ngModel
                         #phone="ngModel"
-                        required="true"
+                        required
                       />
                       <span class="text-error size-small validator" *ngIf="phone.invalid && vendorForm.submitted">
                         {{ 'tr_phone_number_required' | translate }}

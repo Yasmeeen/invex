@@ -80,10 +80,25 @@ export class CreateEditVendorComponent implements OnInit {
 
 
 
+  /**
+   * Save button is in modal-footer outside `<form>`, so ngSubmit never runs
+   * and `vendorForm.submitted` stays false — field errors never show.
+   */
+  private markVendorFormSubmitted(): void {
+    if (this.vendorForm) {
+      this.vendorForm.onSubmit(null as any);
+    }
+  }
+
+  private notifyRequiredFieldsMissing(): void {
+    this.appNotificationService.push(
+      this.translateService.instant('tr_fill_required_fields'),
+      'error'
+    );
+  }
+
   createVendor() {
     const vendor: Vendor = { ...this.vendorForm.value, installments: this.installments };
-
-    if (!this.vendorForm.valid) return;
 
     this.vendorsService.createVendor(vendor).subscribe({
       next: () => {
@@ -97,8 +112,6 @@ export class CreateEditVendorComponent implements OnInit {
   updateVendor() {
     const vendor: Vendor = { ...this.vendorForm.value, installments: this.installments };
 
-    if (!this.vendorForm.valid) return;
-
     this.vendorsService.updateVendor(vendor, this.vendorId).subscribe({
       next: () => {
         this.appNotificationService.push('Vendor updated successfully', 'success');
@@ -109,6 +122,11 @@ export class CreateEditVendorComponent implements OnInit {
   }
 
   submitForm() {
+    this.markVendorFormSubmitted();
+    if (!this.vendorForm.valid) {
+      this.notifyRequiredFieldsMissing();
+      return;
+    }
     this.isEdit ? this.updateVendor() : this.createVendor();
   }
 

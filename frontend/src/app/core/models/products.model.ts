@@ -201,6 +201,13 @@ export interface Vendor {
   updatedAt?: string;
 }
 
+export interface VendorPurchasingInstallmentRow {
+  _id?: string;
+  dueDate?: string;
+  amount?: number;
+  paid?: boolean;
+}
+
 export interface VendorPurchasingRequestRow {
   _id?: string;
   requestDate?: string;
@@ -210,6 +217,7 @@ export interface VendorPurchasingRequestRow {
   amountPaid?: number;
   remaining?: number;
   paymentStatus?: 'Installments' | 'Deferred' | string;
+  installments?: VendorPurchasingInstallmentRow[];
 }
 
 export interface VendorSettlementPreview {

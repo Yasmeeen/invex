@@ -752,8 +752,10 @@ export const generateBarcodeImage = async (req, res) => {
         bcid: 'code128',
         text: code,
         scale: 3,
-        height: 10,
-        includetext: false, // هنكتب الكود لوحدنا لو حابة
+        height: 8,
+        includetext: true,
+        textxalign: 'center',
+        textsize: 9,
       },
       (err, png) => {
         if (err) {
@@ -808,17 +810,10 @@ export const generateBarcodeImage = async (req, res) => {
       }
 
       img {
-        max-width: 90%;
-        max-height: 60%; 
+        max-width: 92%;
+        max-height: 14mm;
         height: auto;
         display: block;
-      }
-
-      .code-name {
-        margin-top: 1mm;
-        text-align: center;
-           font-size: 12px;
-        font-weight: bold;
       }
 
       .barcode-attr-line {
@@ -839,8 +834,7 @@ export const generateBarcodeImage = async (req, res) => {
             <div class="sticker-name">
                <div class="product-name">${name || ''}</div>
                ${barcodeAttrHtml}
-               <img src="data:image/png;base64,${png.toString('base64')}" />
-               <div class="code-name">${code || ''}</div>
+               <img src="data:image/png;base64,${png.toString('base64')}" alt="${escapeHtml(code)}" />
             </div>
            
             </body>

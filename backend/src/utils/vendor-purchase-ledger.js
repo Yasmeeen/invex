@@ -14,6 +14,7 @@ import {
 } from './purchase-treasury-splits.js';
 import {
   getEffectivePurchaseTreasuryMethodsFromDb,
+  isDeferredPurchaseTreasury,
   treasuryKeyIsCashDrawer,
   treasuryMethodMap,
 } from '../modules/settings_module/treasuryMethods.js';
@@ -142,6 +143,123 @@ export async function syncVendorPurchaseLedger(request, { userId } = {}) {
 
   vendor.ledgerEntries = rest;
   await vendor.save();
+}
+
+/** Record payment for one unpaid installment (treasury splits + optional cash drawer). */
+export async function recordVendorInstallmentPaymentWithTreasury(
+  request,
+  installmentId,
+  { userId, branchId, note, paymentTreasurySplits: splitsRaw } = {}
+) {
+  const supplierId = request?.supplier;
+  if (!supplierId || !mongoose.Types.ObjectId.isValid(String(supplierId))) {
+    throw new Error('Invalid supplier');
+  }
+  if (request.paymentStatus !== 'Installments') {
+    throw new Error('Not an installment purchase');
+  }
+  if (!installmentId || !mongoose.Types.ObjectId.isValid(String(installmentId))) {
+    throw new Error('Valid installmentId is required');
+  }
+
+  const installment = request.installments?.id
+    ? request.installments.id(installmentId)
+    : (request.installments || []).find((i) => String(i._id) === String(installmentId));
+
+  if (!installment) {
+    throw new Error('Installment not found');
+  }
+  if (installment.paid) {
+    throw new Error('Installment already paid');
+  }
+
+  const instAmount = Math.round((Number(installment.amount) || 0) * 100) / 100;
+  if (instAmount <= 0) {
+    throw new Error('Invalid installment amount');
+  }
+
+  const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+  const tMap = treasuryMethodMap(treasuryMethods);
+
+  const treasuryNorm = normalizeTreasurySplitsInput({
+    purchaseTreasurySplits: splitsRaw,
+    purchaseTreasuryKey: undefined,
+    lineTotal: instAmount,
+    treasuryMethods,
+    tMap,
+  });
+  if (treasuryNorm.error) {
+    throw new Error(treasuryNorm.error);
+  }
+
+  const splits = treasuryNorm.splits || [];
+  if (splits.some((s) => isDeferredPurchaseTreasury(s.key))) {
+    throw new Error('Deferred treasury cannot be used when paying an installment');
+  }
+
+  installment.paid = true;
+  request.markModified('installments');
+  await request.save();
+
+  const vendor = await Vendor.findById(supplierId);
+  if (!vendor) throw new Error('Vendor not found');
+
+  const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+    ? new mongoose.Types.ObjectId(String(userId))
+    : undefined;
+
+  const resolvedBranch = await resolveBranchForCashDrawer({ userId, branchId });
+  const cashDrawerAmount = cashAmountFromTreasurySplits(splits);
+  const splitsNote = formatTreasurySplitsNote(splits);
+  const due = installment.dueDate
+    ? new Date(installment.dueDate).toLocaleDateString('ar-EG')
+    : '';
+  const baseNote =
+    String(note || '').trim() ||
+    (due
+      ? `سداد قسط — استحقاق ${due}${splitsNote ? ` (${splitsNote})` : ''}`
+      : splitsNote
+        ? `سداد قسط (${splitsNote})`
+        : 'سداد قسط');
+
+  vendor.ledgerEntries = vendor.ledgerEntries || [];
+  for (const s of splits) {
+    const splitNote = `${baseNote}${splits.length > 1 ? ` — ${s.label || s.key}` : ''}`;
+    vendor.ledgerEntries.push({
+      type: 'purchase_installment_paid',
+      amount: s.amount,
+      purchasingRequestId: request._id,
+      note: splitNote,
+      createdAt: new Date(),
+      createdByUserId: uid,
+      ...buildCashDrawerLedgerFields({
+        fromCashDrawer: treasuryKeyIsCashDrawer(s.key),
+        branchId: treasuryKeyIsCashDrawer(s.key) ? resolvedBranch : undefined,
+      }),
+    });
+  }
+  await vendor.save();
+
+  if (cashDrawerAmount > 0) {
+    await recordVendorCashDrawerPayment({
+      branchId,
+      userId,
+      vendorId: vendor._id,
+      amount: cashDrawerAmount,
+      paymentType: 'purchase_installment_paid',
+      purchasingRequestId: request._id,
+      note: baseNote,
+      paymentTreasurySplits: splits,
+    });
+  }
+
+  return {
+    applied: instAmount,
+    installmentId: String(installment._id),
+    cashDrawerAmount,
+    paymentTreasurySplits: splits,
+    remainingInstallments: unpaidInstallmentsTotal(request),
+  };
 }
 
 /** Log installment payment in vendor ledger (we paid supplier). */
@@ -445,6 +563,205 @@ export async function removeVendorPurchaseLedger(purchasingRequestId, supplierId
     (e) => String(e.purchasingRequestId || '') !== rid
   );
   await vendor.save();
+}
+
+/** Take treasury lines from a pool until `target` amount is allocated. */
+function takeTreasurySplitsFromPool(pool, target) {
+  let need = Math.round(Number(target) * 100) / 100;
+  const taken = [];
+  if (need <= 0) return { taken, pool };
+
+  const nextPool = pool.map((row) => ({ ...row, amount: round2(row.amount) }));
+
+  for (const row of nextPool) {
+    if (need <= 0) break;
+    if (row.amount <= 0) continue;
+    const slice = Math.min(need, row.amount);
+    if (slice > 0) {
+      taken.push({ key: row.key, label: row.label, amount: slice });
+      row.amount = round2(row.amount - slice);
+      need = round2(need - slice);
+    }
+  }
+
+  return { taken, pool: nextPool.filter((r) => r.amount > 0) };
+}
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+/**
+ * Pay supplier from purchase treasuries: reduces purchase payables then prepaid (creditBalance).
+ */
+export async function payVendorSupplierWithTreasury(
+  vendor,
+  { userId, branchId, note, paymentTreasurySplits: splitsRaw } = {}
+) {
+  if (!vendor?._id) {
+    throw new Error('Vendor not found');
+  }
+
+  const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+  const tMap = treasuryMethodMap(treasuryMethods);
+
+  const lineTotal = round2(
+    (splitsRaw || []).reduce((acc, row) => acc + (Number(row?.amount) || 0), 0)
+  );
+  if (lineTotal <= 0) {
+    throw new Error('Valid payment amount is required');
+  }
+
+  const treasuryNorm = normalizeTreasurySplitsInput({
+    purchaseTreasurySplits: splitsRaw,
+    purchaseTreasuryKey: undefined,
+    lineTotal,
+    treasuryMethods,
+    tMap,
+  });
+  if (treasuryNorm.error) {
+    throw new Error(treasuryNorm.error);
+  }
+
+  const splits = treasuryNorm.splits || [];
+  if (splits.some((s) => isDeferredPurchaseTreasury(s.key))) {
+    throw new Error('Deferred treasury cannot be used when paying the supplier');
+  }
+
+  const payableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+  const prepaidBefore = round2(vendor.creditBalance);
+  const maxPay = round2(payableBreakdown.total + prepaidBefore);
+  if (lineTotal > maxPay + 0.01) {
+    throw new Error('Payment exceeds supplier credit balance');
+  }
+
+  let splitPool = splits.map((s) => ({ ...s }));
+  let budget = lineTotal;
+  let appliedToPurchases = 0;
+  let appliedToPrepaid = 0;
+
+  const requests = await PurchasingRequest.find({
+    supplier: vendor._id,
+    paymentStatus: { $in: ['Deferred', 'Installments'] },
+  }).sort({ requestDate: 1 });
+
+  for (const req of requests) {
+    if (budget <= 0) break;
+
+    if (req.paymentStatus === 'Deferred') {
+      const due = deferredPurchaseRemaining(req);
+      if (due <= 0) continue;
+      const chunk = Math.min(budget, due);
+      const { taken, pool } = takeTreasurySplitsFromPool(splitPool, chunk);
+      if (!taken.length) break;
+      await recordVendorDeferredPayment(req, chunk, {
+        userId,
+        branchId,
+        note: String(note || '').trim() || 'سداد للمورد',
+        paymentTreasurySplits: taken,
+      });
+      splitPool = pool;
+      budget = round2(budget - chunk);
+      appliedToPurchases = round2(appliedToPurchases + chunk);
+      continue;
+    }
+
+    if (req.paymentStatus === 'Installments') {
+      let reqDoc = await PurchasingRequest.findById(req._id);
+      for (const inst of reqDoc?.installments || []) {
+        if (budget <= 0) break;
+        if (inst.paid) continue;
+        const instAmount = round2(inst.amount);
+        if (instAmount <= 0 || instAmount > budget + 0.001) continue;
+
+        const { taken, pool } = takeTreasurySplitsFromPool(splitPool, instAmount);
+        if (!taken.length) break;
+
+        await recordVendorInstallmentPaymentWithTreasury(reqDoc, inst._id, {
+          userId,
+          branchId,
+          note: String(note || '').trim() || 'سداد للمورد',
+          paymentTreasurySplits: taken,
+        });
+        splitPool = pool;
+        budget = round2(budget - instAmount);
+        appliedToPurchases = round2(appliedToPurchases + instAmount);
+        reqDoc = await PurchasingRequest.findById(req._id);
+      }
+    }
+  }
+
+  if (budget > 0 && prepaidBefore > 0) {
+    const chunk = Math.min(budget, prepaidBefore);
+    const { taken, pool } = takeTreasurySplitsFromPool(splitPool, chunk);
+    if (taken.length) {
+      const vendorDoc = await Vendor.findById(vendor._id);
+      if (!vendorDoc) throw new Error('Vendor not found');
+
+      const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+        ? new mongoose.Types.ObjectId(String(userId))
+        : undefined;
+      const resolvedBranch = await resolveBranchForCashDrawer({ userId, branchId });
+      const cashDrawerAmount = cashAmountFromTreasurySplits(taken);
+      const splitsNote = formatTreasurySplitsNote(taken);
+      const payNote =
+        String(note || '').trim() ||
+        (splitsNote ? `سداد للمورد — رصيد مسبق (${splitsNote})` : 'سداد للمورد — رصيد مسبق');
+
+      vendorDoc.creditBalance = round2((Number(vendorDoc.creditBalance) || 0) - chunk);
+      vendorDoc.ledgerEntries = vendorDoc.ledgerEntries || [];
+      for (const s of taken) {
+        const splitNote = `${payNote}${taken.length > 1 ? ` — ${s.label || s.key}` : ''}`;
+        vendorDoc.ledgerEntries.push({
+          type: 'purchase_deferred_paid',
+          amount: s.amount,
+          note: splitNote,
+          createdAt: new Date(),
+          createdByUserId: uid,
+          ...buildCashDrawerLedgerFields({
+            fromCashDrawer: treasuryKeyIsCashDrawer(s.key),
+            branchId: treasuryKeyIsCashDrawer(s.key) ? resolvedBranch : undefined,
+          }),
+        });
+      }
+      await vendorDoc.save();
+
+      if (cashDrawerAmount > 0) {
+        await recordVendorCashDrawerPayment({
+          branchId,
+          userId,
+          vendorId: vendorDoc._id,
+          amount: cashDrawerAmount,
+          paymentType: 'purchase_deferred_paid',
+          note: payNote,
+          paymentTreasurySplits: taken,
+        });
+      }
+
+      appliedToPrepaid = chunk;
+      budget = round2(budget - chunk);
+      splitPool = pool;
+    }
+  }
+
+  if (budget > 0.01) {
+    throw new Error('Could not apply full payment amount');
+  }
+
+  const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+  const vendorFresh = await Vendor.findById(vendor._id).lean();
+
+  return {
+    applied: lineTotal,
+    appliedToPurchases,
+    appliedToPrepaid,
+    cashDrawerAmount: cashAmountFromTreasurySplits(splits),
+    paymentTreasurySplits: splits,
+    purchasePayable: purchasePayableBreakdown.total,
+    purchasePayableInstallments: purchasePayableBreakdown.installments,
+    purchasePayableDeferred: purchasePayableBreakdown.deferred,
+    prepaidBalance: round2(vendorFresh?.creditBalance),
+  };
 }
 
 export { unpaidInstallmentsTotal };

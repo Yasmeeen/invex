@@ -154,7 +154,7 @@ export class VendorDepositDialogComponent implements OnInit {
     this.saving = true;
     const u = this.auth.getUserFromLocalStorage();
     this.vendors
-      .addVendorReceivedDeposit(String(id), {
+      .addVendorDeposit(String(id), {
         amount: netTotal,
         paymentSplits: splits,
         paymentFeeAllocations: this.confirmedPayment.feeAllocations,
@@ -165,7 +165,7 @@ export class VendorDepositDialogComponent implements OnInit {
       .subscribe({
         next: () => {
           this.saving = false;
-          this.notify.push(this.translate.instant('tr_vendor_received_deposit_ok'), 'success');
+          this.notify.push(this.translate.instant('tr_vendor_credit_deposit_ok'), 'success');
           this.ref.close(true);
         },
         error: (err) => {

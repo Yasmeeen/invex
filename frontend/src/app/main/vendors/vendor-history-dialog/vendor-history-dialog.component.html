@@ -126,7 +126,15 @@
         {{ 'tr_vendor_opening_debit_set' | translate }}
       </button>
       <button type="button" class="s-btn btn-primary ml-2" (click)="openDepositDialog()">
-        {{ 'tr_vendor_receive_deposit' | translate }}
+        {{ 'tr_vendor_credit_deposit' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-primary ml-2"
+        *ngIf="canPaySupplier()"
+        (click)="openPaySupplierDialog()"
+      >
+        {{ 'tr_vendor_pay_supplier' | translate }}
       </button>
     </div>
 
@@ -195,12 +203,25 @@
               <button
                 type="button"
                 class="s-btn btn-primary btn-sm"
+                *ngIf="pr.paymentStatus === 'Installments' && hasUnpaidInstallments(pr)"
+                (click)="openInstallmentPaymentDialog(pr)"
+              >
+                {{ 'tr_vendor_pay_installment' | translate }}
+              </button>
+              <button
+                type="button"
+                class="s-btn btn-primary btn-sm"
                 *ngIf="pr.paymentStatus === 'Deferred' && (pr.remaining || 0) > 0"
                 (click)="openDeferredPaymentDialog(pr)"
               >
                 {{ 'tr_record_payment' | translate }}
               </button>
-              <span *ngIf="pr.paymentStatus !== 'Deferred' || !(pr.remaining || 0)">—</span>
+              <span
+                *ngIf="
+                  (pr.paymentStatus !== 'Deferred' || !(pr.remaining || 0)) &&
+                  (pr.paymentStatus !== 'Installments' || !hasUnpaidInstallments(pr))
+                "
+              >—</span>
             </td>
           </tr>
         </tbody>

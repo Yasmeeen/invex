@@ -16,7 +16,9 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from '../vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
+import { VendorPaySupplierDialogComponent } from '../vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.component';
 import { VendorDeferredPaymentDialogComponent } from '../vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.component';
+import { VendorInstallmentPaymentDialogComponent } from '../vendor-installment-payment-dialog/vendor-installment-payment-dialog.component';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
 import { Order } from '@core/models/products.model';
 import { isPayLaterMethod, orderDisplayRemaining } from '@core/utils/order-display.util';
@@ -323,6 +325,65 @@ export class VendorHistoryDialogComponent implements OnInit {
     });
     ref.afterClosed().subscribe((ok) => {
       if (ok) this.loadHistory();
+    });
+  }
+
+  maxPaySupplierAmount(): number {
+    const prepaid = Number(this.history?.prepaidBalance) || 0;
+    const payable = Number(this.history?.purchasePayable) || 0;
+    return Math.round((prepaid + payable) * 100) / 100;
+  }
+
+  canPaySupplier(): boolean {
+    return this.maxPaySupplierAmount() > 0.005;
+  }
+
+  openPaySupplierDialog(): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    const ref = this.dialog.open(VendorPaySupplierDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'vendor-pay-supplier-dialog-panel',
+      backdropClass: 'vendor-pay-supplier-dialog-backdrop',
+      data: {
+        vendor: this.data.vendor,
+        forcedBranchId: this.paymentBranchId,
+        maxAmount: this.maxPaySupplierAmount(),
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.loadHistory();
+    });
+  }
+
+  hasUnpaidInstallments(pr: VendorPurchasingRequestRow): boolean {
+    return (pr.installments || []).some(
+      (i) => !i.paid && (Number(i.amount) || 0) > 0.005
+    );
+  }
+
+  openInstallmentPaymentDialog(pr: VendorPurchasingRequestRow): void {
+    const ref = this.dialog.open(VendorInstallmentPaymentDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'vendor-installment-payment-dialog-panel',
+      backdropClass: 'vendor-installment-payment-dialog-backdrop',
+      data: {
+        vendor: this.data.vendor,
+        purchasingRequest: pr,
+        forcedBranchId: this.paymentBranchId || this.data.forcedBranchId,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.loadHistory();
+      }
     });
   }
 

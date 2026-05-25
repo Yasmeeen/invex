@@ -19,6 +19,8 @@ import {
   computePurchasePayableBreakdown,
   deferredPurchaseRemaining,
   recordVendorDeferredPayment,
+  recordVendorInstallmentPaymentWithTreasury,
+  payVendorSupplierWithTreasury,
   syncVendorPurchaseLedger,
   unpaidInstallmentsTotal,
 } from "../../utils/vendor-purchase-ledger.js";
@@ -481,6 +483,123 @@ export const settleVendorBalances = async (req, res) => {
   } catch (error) {
     console.error('Error settling vendor balances:', error);
     res.status(500).json({ message: 'Server error while settling balances' });
+  }
+};
+
+/** POST pay supplier (purchase treasuries) — reduces credit / payables; cash leaves drawer. */
+export const payVendorSupplier = async (req, res) => {
+  try {
+    const { paymentTreasurySplits: splitsRaw } = req.body || {};
+    if (!Array.isArray(splitsRaw) || !splitsRaw.length) {
+      return res.status(400).json({ message: 'Payment treasury splits are required' });
+    }
+
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const result = await payVendorSupplierWithTreasury(vendor, {
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+      note: req.body?.note,
+      paymentTreasurySplits: splitsRaw,
+    });
+
+    const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+    const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+    const buyerPrepaidBalance =
+      Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
+    const weOweSupplier = computeTotalCreditOwed(
+      prepaidBalance,
+      purchasePayableBreakdown.total,
+      buyerPrepaidBalance
+    );
+
+    res.json({
+      message: 'Supplier payment recorded',
+      ...result,
+      weOweSupplier,
+    });
+  } catch (error) {
+    const msg = error?.message || 'Failed to record supplier payment';
+    const status =
+      msg.includes('exceeds') ||
+      msg.includes('required') ||
+      msg.includes('Invalid') ||
+      msg.includes('Treasury') ||
+      msg.includes('Deferred') ||
+      msg.includes('Could not apply')
+        ? 400
+        : 500;
+    console.error('Error paying vendor supplier:', error);
+    res.status(status).json({ message: msg });
+  }
+};
+
+/** POST record our payment to supplier for one purchase installment. */
+export const recordVendorInstallmentPurchasePayment = async (req, res) => {
+  try {
+    const {
+      purchasingRequestId,
+      installmentId,
+      paymentTreasurySplits: splitsRaw,
+    } = req.body || {};
+
+    if (!purchasingRequestId || !mongoose.Types.ObjectId.isValid(String(purchasingRequestId))) {
+      return res.status(400).json({ message: 'Valid purchasingRequestId is required' });
+    }
+    if (!installmentId || !mongoose.Types.ObjectId.isValid(String(installmentId))) {
+      return res.status(400).json({ message: 'Valid installmentId is required' });
+    }
+    if (!Array.isArray(splitsRaw) || !splitsRaw.length) {
+      return res.status(400).json({ message: 'Payment treasury splits are required' });
+    }
+
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    const request = await PurchasingRequest.findOne({
+      _id: purchasingRequestId,
+      supplier: vendor._id,
+      paymentStatus: 'Installments',
+    });
+
+    if (!request) {
+      return res.status(404).json({ message: 'Installment purchasing request not found' });
+    }
+
+    const result = await recordVendorInstallmentPaymentWithTreasury(request, installmentId, {
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+      note: req.body?.note,
+      paymentTreasurySplits: splitsRaw,
+    });
+
+    const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
+
+    res.json({
+      message: 'Installment payment recorded',
+      ...result,
+      purchasePayable: purchasePayableBreakdown.total,
+      purchasePayableInstallments: purchasePayableBreakdown.installments,
+      purchasePayableDeferred: purchasePayableBreakdown.deferred,
+    });
+  } catch (error) {
+    const msg = error?.message || 'Failed to record installment payment';
+    const status =
+      msg.includes('already paid') ||
+      msg.includes('not found') ||
+      msg.includes('required') ||
+      msg.includes('Invalid') ||
+      msg.includes('Treasury') ||
+      msg.includes('Deferred')
+        ? 400
+        : 500;
+    console.error('Error recording installment purchase payment:', error);
+    res.status(status).json({ message: msg });
   }
 };
 

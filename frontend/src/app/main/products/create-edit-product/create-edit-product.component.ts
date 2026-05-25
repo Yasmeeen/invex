@@ -1233,9 +1233,14 @@ private submitDeskPurchaseRequest(): void {
     deskProduct.addedBy = addedByTrim;
   }
 
-  const treasurySplits = this.buildPurchaseTreasurySplitsPayload();
-  if (!treasurySplits) {
-    return;
+  const isExchangeTradeIn = !!this.data?.exchangeFlow;
+  let treasurySplits: { key: string; label?: string; amount: number }[] | undefined;
+  if (!isExchangeTradeIn) {
+    const built = this.buildPurchaseTreasurySplitsPayload();
+    if (!built) {
+      return;
+    }
+    treasurySplits = built;
   }
 
   this.isSubmitting = true;
@@ -1245,7 +1250,8 @@ private submitDeskPurchaseRequest(): void {
       branchId,
       quantity: qty,
       product: deskProduct,
-      purchaseTreasurySplits: treasurySplits,
+      exchangeTradeIn: isExchangeTradeIn,
+      ...(treasurySplits ? { purchaseTreasurySplits: treasurySplits } : {}),
     })
     .subscribe({
       next: (res: any) => {

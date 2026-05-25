@@ -1061,6 +1061,8 @@
   "tr_drawer_close_note_client_cash": "Espèces perçues lorsque les clients paient des factures de vente à crédit. Déjà inclus dans « Encaissements du jour » ; affiché ici pour plus de clarté.",
   "tr_drawer_close_desk_purchase_grand_total": "Coût total des achats (toutes caisses)",
   "tr_drawer_close_desk_purchase_by_treasury": "Détail par caisse d’achat",
+  "tr_drawer_close_desk_purchase_devices": "Appareils achetés (code · coût)",
+  "tr_drawer_close_exchange_trade_in": "reprise",
   "tr_drawer_close_note_desk_treasury": "Seuls les montants en « cash » réduisent l’espèce attendue dans le tiroir ; banques/portefeuilles sont suivis séparément.",
   "tr_purchase_treasury_settings_title": "Caisses d’achat (comptoir / reprise)",
   "tr_purchase_treasury_settings_hint": "Ajoutez des lignes comme avant — saisissez seulement le nom affiché. Les nouvelles caisses reçoivent un identifiant interne automatique ; les existantes le conservent pour les rapports. La ligne « Espèces » ne peut pas être supprimée.",

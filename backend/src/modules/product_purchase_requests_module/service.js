@@ -179,7 +179,9 @@ export const createProductPurchaseRequest = async (req, res) => {
       product,
       purchaseTreasuryKey: treasuryKeyRaw,
       purchaseTreasurySplits: treasurySplitsRaw,
+      exchangeTradeIn: exchangeTradeInRaw,
     } = req.body || {};
+    const exchangeTradeIn = exchangeTradeInRaw === true || exchangeTradeInRaw === 'true';
 
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       await session.abortTransaction();
@@ -327,6 +329,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       lineTotal,
       treasuryMethods,
       tMap,
+      exchangeTradeIn,
     });
     if (treasuryNorm.error) {
       await session.abortTransaction();
@@ -352,6 +355,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
           purchaseTreasurySplits,
+          isExchangeTradeIn: exchangeTradeIn,
           ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
           ...(autoApprove
             ? { resolvedBy: actor._id, resolvedAt: new Date(), resolutionNote: 'Auto-approved' }

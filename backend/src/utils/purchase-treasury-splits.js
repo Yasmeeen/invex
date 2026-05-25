@@ -29,6 +29,21 @@ export function deskPurchaseLineTotal(purchase) {
 export function resolvePurchaseTreasurySplits(purchase) {
   const doc =
     purchase && typeof purchase.toObject === 'function' ? purchase.toObject() : purchase;
+  if (doc?.isExchangeTradeIn) {
+    const settlement = coerceTreasurySplitsArray(doc?.exchangeSettlementSplits);
+    if (settlement.length) {
+      return settlement
+        .map((row) => ({
+          key: String(row?.key ?? '')
+            .trim()
+            .toLowerCase(),
+          label: String(row?.label ?? '').trim(),
+          amount: round2(row?.amount),
+        }))
+        .filter((s) => s.key && s.amount > 0);
+    }
+    return [];
+  }
   const raw = coerceTreasurySplitsArray(doc?.purchaseTreasurySplits);
   if (raw.length) {
     return raw
@@ -102,10 +117,21 @@ export function normalizePurchaseTreasuryInput({
   lineTotal,
   treasuryMethods,
   tMap,
+  exchangeTradeIn = false,
 }) {
   const total = round2(lineTotal);
   if (total <= 0) {
     return { error: 'Invalid purchase total' };
+  }
+
+  if (exchangeTradeIn) {
+    return {
+      splits: [],
+      treasuryKey: 'exchange',
+      treasuryLabel: 'Exchange',
+      amountPaid: 0,
+      hasDeferred: false,
+    };
   }
 
   const keysAllowed = new Set((treasuryMethods || []).map((m) => m.key));

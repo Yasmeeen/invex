@@ -83,6 +83,17 @@ const productPurchaseRequestSchema = new mongoose.Schema(
     /** Amount paid to client on deferred desk purchase (supplier uses PurchasingRequest). */
     amountPaid: { type: Number, default: 0, min: 0 },
 
+    /** Cashier exchange: intake without upfront treasury; settlement recorded at checkout. */
+    isExchangeTradeIn: { type: Boolean, default: false, index: true },
+    /** Store pays party the difference (trade-in credit > sale); affects drawer when cash. */
+    exchangeSettlementSplits: { type: [purchaseTreasurySplitSchema], default: undefined },
+    linkedExchangeOrderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Order',
+      required: false,
+      index: true,
+    },
+
     createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
     /** When multi-code purchase creates several products. */
     createdProductIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }], default: undefined },

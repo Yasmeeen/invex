@@ -14,8 +14,13 @@ import {
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { Subscription } from 'rxjs';
 
+export type ExchangeSettlementTreasuryResult = {
+  paymentTreasurySplits: PurchaseTreasurySplit[];
+  amount: number;
+};
+
 export type DeskPurchaseDeferredPaymentDialogData = {
-  purchaseId: string;
+  purchaseId?: string;
   remaining: number;
   /** @deprecated Use partyTypeLabel + partyName */
   partyLabel?: string;
@@ -24,7 +29,13 @@ export type DeskPurchaseDeferredPaymentDialogData = {
   productName?: string;
   requestDate?: string | Date;
   forcedBranchId?: string | null;
+  /** Cashier exchange: collect treasury only; parent records settlement on checkout. */
+  exchangeSettlementOnly?: boolean;
 };
+
+export type DeskPurchaseDeferredPaymentDialogResult =
+  | boolean
+  | ExchangeSettlementTreasuryResult;
 
 @Component({
   selector: 'app-desk-purchase-deferred-payment-dialog',
@@ -34,8 +45,9 @@ export type DeskPurchaseDeferredPaymentDialogData = {
 export class DeskPurchaseDeferredPaymentDialogComponent implements OnInit, OnDestroy {
   form: FormGroup;
   saving = false;
-  readonly purchaseId: string;
+  readonly purchaseId: string | null;
   readonly remaining: number;
+  readonly exchangeSettlementOnly: boolean;
   readonly partyTypeLabel: string;
   readonly partyName: string;
   readonly productName: string;
@@ -58,10 +70,14 @@ export class DeskPurchaseDeferredPaymentDialogComponent implements OnInit, OnDes
     private storeSettings: StoreSettingsService,
     private translate: TranslateService,
     private notify: AppNotificationService,
-    private ref: MatDialogRef<DeskPurchaseDeferredPaymentDialogComponent, boolean>,
+    private ref: MatDialogRef<
+      DeskPurchaseDeferredPaymentDialogComponent,
+      DeskPurchaseDeferredPaymentDialogResult
+    >,
     @Inject(MAT_DIALOG_DATA) data: DeskPurchaseDeferredPaymentDialogData
   ) {
-    this.purchaseId = data.purchaseId;
+    this.purchaseId = data.purchaseId ? String(data.purchaseId) : null;
+    this.exchangeSettlementOnly = !!data.exchangeSettlementOnly;
     this.remaining = Math.max(0, Math.round((Number(data.remaining) || 0) * 100) / 100);
     this.partyTypeLabel = String(data.partyTypeLabel || '').trim();
     this.partyName = String(data.partyName || data.partyLabel || '').trim();
@@ -140,6 +156,10 @@ export class DeskPurchaseDeferredPaymentDialogComponent implements OnInit, OnDes
       this.selectedTreasuryKeys = valid;
     }
     this.reconcileTreasuryAmountsKeys(this.selectedTreasuryKeys);
+    if (this.exchangeSettlementOnly && this.selectedTreasuryKeys.length === 1) {
+      const key = this.selectedTreasuryKeys[0];
+      this.treasuryAmounts = { ...this.treasuryAmounts, [key]: this.remaining };
+    }
   }
 
   treasuryOptionLabel(key: string): string {
@@ -236,6 +256,21 @@ export class DeskPurchaseDeferredPaymentDialogComponent implements OnInit, OnDes
 
     const splits = this.buildTreasurySplitsPayload();
     if (!splits) return;
+
+    if (this.exchangeSettlementOnly) {
+      const amount = this.treasurySplitsTotal();
+      if (Math.abs(amount - this.remaining) > 0.01) {
+        this.notify.push(this.translate.instant('tr_exchange_settlement_amount_mismatch'), 'error');
+        return;
+      }
+      this.ref.close({ paymentTreasurySplits: splits, amount });
+      return;
+    }
+
+    if (!this.purchaseId) {
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      return;
+    }
 
     const u = this.auth.getUserFromLocalStorage();
     this.saving = true;

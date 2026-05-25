@@ -32,6 +32,11 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
+import {
+  DeskPurchaseDeferredPaymentDialogComponent,
+  ExchangeSettlementTreasuryResult,
+} from '../../orders/desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
+import { PurchaseTreasurySplit } from '@shared/services/product-purchase-requests.service';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
 import { DrawerCloseService } from '@shared/services/drawer-close.service';
@@ -89,6 +94,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   exchangeTradeInPurchase: any = null;
   /** After sale receipt print, optionally print trade-in purchase receipt. */
   private pendingExchangePurchaseReceipt: any = null;
+  /** Store pays customer/supplier the exchange difference — treasury chosen at checkout. */
+  private pendingExchangeSettlement: ExchangeSettlementTreasuryResult | null = null;
 
   // Client / supplier information section
   isClientInfoOpen = false;
@@ -231,6 +238,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   cancelExchangeFlow(): void {
     this.exchangeTradeInPurchase = null;
+    this.pendingExchangeSettlement = null;
     this.refreshExchangePaymentDefaults();
     this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
   }
@@ -1033,6 +1041,17 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    if (this.exchangeTradeInPurchase) {
+      const storeOwes = this.exchangeStoreOwesCustomer();
+      if (storeOwes > 0.01) {
+        this.openExchangeSettlementTreasuryDialog(storeOwes, () => this.continueExchangeCheckout());
+        return;
+      }
+      this.pendingExchangeSettlement = null;
+      this.continueExchangeCheckout();
+      return;
+    }
+
     if (!this.isClientInfoOpen) {
       this.performCheckout(this.buildDefaultCashPayment());
       return;
@@ -1052,6 +1071,82 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.openPaymentSplitsDialog(true);
+  }
+
+  /** After trade-in intake: collect due payment and/or record store payout treasury. */
+  private continueExchangeCheckout(): void {
+    const amountDue = this.exchangeAmountDue();
+
+    if (!this.isClientInfoOpen) {
+      if (amountDue > 0.01) {
+        this.openPaymentSplitsDialog(true);
+        return;
+      }
+      this.performCheckout(this.buildDefaultCashPayment());
+      return;
+    }
+
+    this.clientForm.markAllAsTouched();
+    if (!this.clientForm.valid) {
+      this.translate.get('tr_invalid_cashier_client').subscribe((msg) =>
+        this.appNotificationService.push(msg, 'error')
+      );
+      return;
+    }
+
+    if (amountDue <= 0.01) {
+      this.performCheckout(this.buildDefaultCashPayment());
+      return;
+    }
+
+    if (this.hasValidConfirmedPayment() && this.confirmedPayment) {
+      this.performCheckout(this.confirmedPayment);
+      return;
+    }
+
+    this.openPaymentSplitsDialog(true);
+  }
+
+  private openExchangeSettlementTreasuryDialog(
+    amount: number,
+    onConfirmed: () => void
+  ): void {
+    const selectedBranchId = canPickBranchRole(this.curentUser?.role)
+      ? this.adminSelectedBranchId
+      : this.globals.currentUser?.branch?._id;
+
+    if (!selectedBranchId) {
+      this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
+    const af = this.exchangeTradeInPurchase?.productPayload?.acquiredFrom;
+    const partyType = String(af?.partyType || 'client').toLowerCase();
+    const partyTypeKey =
+      partyType === 'supplier' ? 'tr_supplier_info' : 'tr_client_info';
+
+    const ref = this.dialog.open(DeskPurchaseDeferredPaymentDialogComponent, {
+      width: '520px',
+      maxWidth: '95vw',
+      panelClass: 'payment-splits-dialog-panel',
+      data: {
+        exchangeSettlementOnly: true,
+        remaining: amount,
+        productName: this.exchangeTradeInPurchase?.productPayload?.name || '',
+        partyName: String(af?.displayName || af?.name || '').trim(),
+        partyTypeLabel: this.translate.instant(partyTypeKey),
+        forcedBranchId: String(selectedBranchId),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((res) => {
+      if (!res || typeof res !== 'object' || !('paymentTreasurySplits' in res)) {
+        return;
+      }
+      this.pendingExchangeSettlement = res as ExchangeSettlementTreasuryResult;
+      onConfirmed();
+    });
   }
 
   /** Walk-in checkout when client-info card is collapsed: full amount as cash, no dialog. */
@@ -1107,6 +1202,18 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         orderData.exchangeProductPurchaseRequestId = exchangePurchaseId;
       }
     }
+
+    const settlement = this.pendingExchangeSettlement;
+    if (settlement?.paymentTreasurySplits?.length) {
+      orderData.exchangeSettlementTreasurySplits = settlement.paymentTreasurySplits.map(
+        (s: PurchaseTreasurySplit) => ({
+          key: s.key,
+          label: s.label,
+          amount: round2(s.amount),
+        })
+      );
+    }
+    this.pendingExchangeSettlement = null;
 
     const receiptSubtotal = Math.round(this.orderSubtotal() * 100) / 100;
     const receiptInvoiceDisc = Math.round(this.appliedInvoiceDiscount() * 100) / 100;

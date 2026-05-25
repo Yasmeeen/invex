@@ -1,6 +1,9 @@
 <div class="vendor-deferred-payment-dialog">
   <h2 mat-dialog-title class="vendor-deferred-payment-dialog__title">
-    {{ 'tr_desk_purchase_deferred_payment_title' | translate }}
+    {{
+      (exchangeSettlementOnly ? 'tr_exchange_settlement_treasury_title' : 'tr_desk_purchase_deferred_payment_title')
+        | translate
+    }}
   </h2>
 
   <div mat-dialog-content class="vendor-deferred-payment-dialog__body">
@@ -18,9 +21,14 @@
         <strong>{{ requestDate | date:'shortDate' }}</strong>
       </div>
       <div class="size-small">
-        {{ 'tr_remaining' | translate }}:
+        {{
+          (exchangeSettlementOnly ? 'tr_exchange_settlement_amount_label' : 'tr_remaining') | translate
+        }}:
         <strong>{{ remaining | currency:'EGP ':'symbol':'1.2-2' }}</strong>
       </div>
+      <p class="text-muted size-small m-0 mt-2" *ngIf="exchangeSettlementOnly">
+        {{ 'tr_exchange_settlement_treasury_hint' | translate }}
+      </p>
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">

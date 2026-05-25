@@ -389,7 +389,7 @@
                     </p>
                   </div>
 
-                  <div class="col-md-12 mt-4 desk-treasury-splits" *ngIf="cashDeskPurchase">
+                  <div class="col-md-12 mt-4 desk-treasury-splits" *ngIf="cashDeskPurchase && !data?.exchangeFlow">
                     <div class="form-group">
                       <label>{{ 'tr_purchase_treasury_method_multi' | translate }}</label>
                       <div class="input-with-icon bg-white">

@@ -11,6 +11,7 @@ import { CreateEditProductModule } from '../products/create-edit-product/create-
 import { DailyExpenseDialogModule } from '../expenses/daily-expense-dialog/daily-expense-dialog.module';
 import { DrawerCloseDialogModule } from '../drawer-close/drawer-close-dialog/drawer-close-dialog.module';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
+import { OrdersModule } from '../orders/orders.module';
 
 
 @NgModule({
@@ -26,6 +27,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     DailyExpenseDialogModule,
     DrawerCloseDialogModule,
     PaymentSplitsDialogModule,
+    OrdersModule,
   ],
   providers: [
     ProductsSerivce,

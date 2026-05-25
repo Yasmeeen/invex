@@ -40,6 +40,8 @@ export class ProductPurchaseRequestsService {
     purchaseTreasuryKey?: string;
     /** Split cost across treasuries; amounts must sum to netPrice × quantity. */
     purchaseTreasurySplits?: PurchaseTreasurySplit[];
+    /** Cashier exchange trade-in: device intake only; treasury at settlement. */
+    exchangeTradeIn?: boolean;
   }): Observable<any> {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }

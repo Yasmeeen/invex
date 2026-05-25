@@ -12,6 +12,15 @@ export interface DeskPurchaseTreasuryLine {
   count: number;
 }
 
+export interface DrawerDeskPurchaseDevice {
+  name: string;
+  codes: string[];
+  quantity: number;
+  unitNetPrice: number;
+  lineTotal: number;
+  isExchangeTradeIn?: boolean;
+}
+
 export interface DrawerClosePreview {
   businessDate: string;
   branchId: string;
@@ -31,6 +40,7 @@ export interface DrawerClosePreview {
   deskPurchaseGrandTotal?: number;
   deskPurchaseByTreasuryMethod?: DeskPurchaseTreasuryLine[];
   deskPurchaseIntakeCount: number;
+  deskPurchaseDevices?: DrawerDeskPurchaseDevice[];
   /** Cash paid to suppliers from vendor ledger (deposits + deferred/installment payments). */
   vendorCashDrawerTotal?: number;
   vendorCashDrawerPaymentCount?: number;

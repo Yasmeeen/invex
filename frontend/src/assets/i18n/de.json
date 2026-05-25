@@ -1078,6 +1078,8 @@
   "tr_drawer_close_note_client_cash": "Bargeld von Kunden bei Ratenzahlung auf Kredit-Verkaufsrechnungen. Bereits in «Zahlungseingänge heute» unter Bar enthalten; hier zur Übersicht.",
   "tr_drawer_close_desk_purchase_grand_total": "Gesamtkosten Ankäufe (alle Kassen)",
   "tr_drawer_close_desk_purchase_by_treasury": "Aufschlüsselung nach Ankauf-Kasse",
+  "tr_drawer_close_desk_purchase_devices": "Eingekaufte Geräte (Code · Kosten)",
+  "tr_drawer_close_exchange_trade_in": "Inzahlungnahme",
   "tr_drawer_close_note_desk_treasury": "Nur Beträge mit Schlüssel «cash» mindern das erwartete Kassenbar; Bank-/Wallet-Zahlungen werden nur ausgewiesen.",
   "tr_purchase_treasury_settings_title": "Ankauf-Kassen (Schalter / Inzahlungnahme)",
   "tr_purchase_treasury_settings_hint": "Zeilen wie zuvor hinzufügen — nur der Anzeigename. Neue «Buckets» erhalten automatisch eine interne Id; bestehende behalten sie für Auswertungen. Die Zeile «Bar» kann nicht entfernt werden.",

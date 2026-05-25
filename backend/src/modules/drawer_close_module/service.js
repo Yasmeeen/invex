@@ -347,16 +347,16 @@ async function deskPurchaseTreasuryBreakdown(branchOid, start, end) {
     status: { $ne: 'rejected' },
   })
     .select(
-      'quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits status'
+      'quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits exchangeSettlementSplits isExchangeTradeIn status'
     )
     .lean();
 
   const byKey = aggregateTreasuryAmountsFromPurchases(rows);
   let grandTotal = 0;
   for (const r of rows) {
-    for (const s of resolvePurchaseTreasurySplits(r)) {
-      grandTotal = round2(grandTotal + s.amount);
-    }
+    const q = Math.max(1, Math.floor(Number(r?.quantity) || 1));
+    const net = Number(r?.productPayload?.netPrice) || 0;
+    grandTotal = round2(grandTotal + net * q);
   }
   const cashDrawerTotal = sumCashDrawerOutflowFromPurchases(rows);
 
@@ -364,11 +364,29 @@ async function deskPurchaseTreasuryBreakdown(branchOid, start, end) {
     String(a.key).localeCompare(String(b.key))
   );
 
+  const deskPurchaseDevices = rows.map((r) => {
+    const pp = r.productPayload || {};
+    const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
+    const net = round2(Number(pp.netPrice) || 0);
+    const codes = Array.isArray(pp.unitCodes) && pp.unitCodes.length
+      ? pp.unitCodes.map((c) => String(c || '').trim()).filter(Boolean)
+      : [String(pp.code || '').trim()].filter(Boolean);
+    return {
+      name: String(pp.name || '').trim(),
+      codes,
+      quantity: q,
+      unitNetPrice: net,
+      lineTotal: round2(net * q),
+      isExchangeTradeIn: !!r.isExchangeTradeIn,
+    };
+  });
+
   return {
     deskPurchaseCashDrawerTotal: cashDrawerTotal,
     deskPurchaseGrandTotal: grandTotal,
     deskPurchaseByTreasuryMethod,
     deskPurchaseIntakeCount: rows.length,
+    deskPurchaseDevices,
   };
 }
 
@@ -434,6 +452,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     deskPurchaseGrandTotal: deskInfo.deskPurchaseGrandTotal,
     deskPurchaseByTreasuryMethod: deskInfo.deskPurchaseByTreasuryMethod,
     deskPurchaseIntakeCount: deskInfo.deskPurchaseIntakeCount,
+    deskPurchaseDevices: deskInfo.deskPurchaseDevices || [],
     vendorCashDrawerTotal: vendorCashFromDrawer,
     vendorCashDrawerPaymentCount: vendorCashInfo.vendorCashDrawerPaymentCount,
     vendorCashDrawerInflowTotal: vendorCashInDrawer,

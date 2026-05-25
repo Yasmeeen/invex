@@ -10,6 +10,7 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 import mongoose from 'mongoose';
 import { auditLog } from '../audit_module/audit.service.js';
 import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
+import { recordExchangeSettlement } from '../../utils/exchange-settlement.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -210,6 +211,7 @@ export const createOrder = async (req, res) => {
       paymentFeeAllocations: paymentFeeAllocationsRaw,
       exchangeTradeInCreditAmount: exchangeCreditRaw,
       exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
+      exchangeSettlementTreasurySplits: exchangeSettlementSplitsRaw,
       partyType: partyTypeRaw,
       vendorId: vendorIdRaw,
     } = req.body;
@@ -551,6 +553,35 @@ export const createOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    const storeOwesExchange = round2(
+      Math.max(0, exchangeTradeInCreditAmount - totalRounded)
+    );
+    if (
+      storeOwesExchange > 0.01 &&
+      exchangeProductPurchaseRequestId &&
+      Array.isArray(exchangeSettlementSplitsRaw) &&
+      exchangeSettlementSplitsRaw.length
+    ) {
+      try {
+        await recordExchangeSettlement(exchangeProductPurchaseRequestId, {
+          orderId: newOrder._id,
+          amount: storeOwesExchange,
+          paymentTreasurySplits: exchangeSettlementSplitsRaw,
+          userId,
+          branchId: branch,
+        });
+      } catch (settlementErr) {
+        console.error('⚠️ exchange settlement:', settlementErr?.message || settlementErr);
+        return res.status(400).json({
+          error: settlementErr?.message || 'Failed to record exchange settlement',
+        });
+      }
+    } else if (storeOwesExchange > 0.01 && exchangeProductPurchaseRequestId) {
+      return res.status(400).json({
+        error: 'Exchange settlement treasury is required when store owes the customer',
+      });
+    }
 
     // Stock movement logs (non-transactional audit trail)
     try {

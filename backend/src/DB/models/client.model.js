@@ -40,7 +40,7 @@ const clientSchema = new mongoose.Schema(
       {
         type: {
           type: String,
-          enum: ["deposit", "opening_debit", "opening_debit_payment", "settlement"],
+          enum: ["deposit", "opening_debit", "opening_debit_payment", "settlement", "payout"],
           required: true,
         },
         amount: { type: Number, required: true, min: 0 },

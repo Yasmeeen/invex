@@ -33,6 +33,14 @@ import {
   recordClientCashDrawerReceipt,
 } from "../../utils/client-cash-drawer.js";
 import { resolveBranchForCashDrawer } from "../../utils/vendor-cash-drawer.js";
+import {
+  computeClientPayableBreakdown,
+  payClientWithTreasury,
+} from "../../utils/client-pay-treasury.js";
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
 
 /**
  * GET client by phone (cashier / lookup). Must match stored phoneNumber flexibly.
@@ -224,24 +232,36 @@ export const getClientById = async (req, res) => {
  */
 export const createClient = async (req, res) => {
   try {
-    const { name, address, branchs } = req.body;
+    const { name, address, phoneNumber, phone, branches, branchs } = req.body;
+    const phoneRaw = String(phoneNumber || phone || "").trim();
 
     if (!name) {
       return res.status(400).json({ error: "Client name is required" });
     }
+    if (!phoneRaw) {
+      return res.status(400).json({ error: "Client phone number is required" });
+    }
 
-    // Validate branches if provided
-    if (branchs?.length) {
-      const count = await Branch.countDocuments({ _id: { $in: branchs } });
-      if (count !== branchs.length) {
+    const branchIds = Array.isArray(branches)
+      ? branches
+      : Array.isArray(branchs)
+        ? branchs
+        : branchs
+          ? [branchs]
+          : [];
+
+    if (branchIds.length) {
+      const count = await Branch.countDocuments({ _id: { $in: branchIds } });
+      if (count !== branchIds.length) {
         return res.status(404).json({ error: "One or more branches not found" });
       }
     }
 
     const client = await Client.create({
-      name,
-      address,
-      branchs,
+      name: String(name).trim(),
+      phoneNumber: phoneRaw,
+      address: String(address || "").trim(),
+      branches: branchIds,
     });
 
     res.status(201).json({
@@ -327,6 +347,10 @@ export const getClientHistory = async (req, res) => {
     const clientOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
     const creditBalanceDue = clientOwesUs;
     const prepaidBalance = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
+    const payableBreakdown = await computeClientPayableBreakdown(
+      client._id,
+      client.phoneNumber
+    );
     const weOweClient = prepaidBalance;
     const netBalanceMessage = buildClientNetBalanceMessage(clientOwesUs, weOweClient);
     const settlementPreview = buildClientSettlementPreview(clientOwesUs, weOweClient);
@@ -406,6 +430,8 @@ export const getClientHistory = async (req, res) => {
       owesFromOpeningBalance,
       weOweClient,
       prepaidBalance,
+      clientPayable: payableBreakdown.total,
+      clientPayableDeferred: payableBreakdown.deferred,
       canSettle: settlementPreview.canSettle,
       settlementPreview,
       netBalanceMessage,
@@ -584,6 +610,62 @@ export const settleClientBalances = async (req, res) => {
   } catch (error) {
     console.error("❌ Error settling client balances:", error.message);
     res.status(500).json({ error: "Failed to settle balances" });
+  }
+};
+
+/** POST pay client (purchase treasuries) — deferred purchases + prepaid refund. */
+export const payClient = async (req, res) => {
+  try {
+    const { paymentTreasurySplits: splitsRaw } = req.body || {};
+    if (!Array.isArray(splitsRaw) || !splitsRaw.length) {
+      return res.status(400).json({ error: "Payment treasury splits are required" });
+    }
+
+    const client = await Client.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const result = await payClientWithTreasury(client, {
+      userId: req.body?.userId,
+      branchId: req.body?.branchId,
+      note: req.body?.note,
+      paymentTreasurySplits: splitsRaw,
+    });
+
+    const payableBreakdown = await computeClientPayableBreakdown(
+      client._id,
+      client.phoneNumber
+    );
+    const owesFromSales = await computeClientCreditDueFromOrders(client._id);
+    const owesFromOpeningBalance =
+      Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
+    const clientOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
+    const prepaidBalance = round2(result.prepaidBalance);
+    const weOweClient = prepaidBalance;
+
+    res.json({
+      message: "Client payment recorded",
+      ...result,
+      clientOwesUs,
+      weOweClient,
+      prepaidBalance,
+      clientPayable: payableBreakdown.total,
+      clientPayableDeferred: payableBreakdown.deferred,
+    });
+  } catch (error) {
+    const msg = error?.message || "Failed to record client payment";
+    const status =
+      msg.includes("exceeds") ||
+      msg.includes("required") ||
+      msg.includes("Invalid") ||
+      msg.includes("Treasury") ||
+      msg.includes("Deferred") ||
+      msg.includes("Could not apply")
+        ? 400
+        : 500;
+    console.error("❌ Error paying client:", error.message);
+    res.status(status).json({ error: msg });
   }
 };
 

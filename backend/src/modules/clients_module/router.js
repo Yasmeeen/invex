@@ -7,6 +7,7 @@ import {
   getClientByPhone,
   getClientHistory,
   addClientDeposit,
+  payClient,
   setClientOpeningDebitBalance,
   settleClientBalances,
   createClient,
@@ -25,6 +26,7 @@ router.get("/:id/history", getClientHistory);
 
 // POST prepaid deposit
 router.post("/:id/deposit", addClientDeposit);
+router.post("/:id/pay-client", payClient);
 router.post("/:id/opening-debit-balance", setClientOpeningDebitBalance);
 router.post("/:id/settle", settleClientBalances);
 

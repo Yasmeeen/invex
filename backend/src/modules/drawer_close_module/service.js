@@ -74,32 +74,64 @@ function countDaysInclusive(startStr, endStr) {
 
 const CASH_DISPOSITIONS = ['deposit_all', 'retain_all', 'retain_partial'];
 
-async function getLastDrawerCloseBefore(branchOid, targetDateStr) {
-  const rows = await DrawerClose.find({
+async function getLatestDrawerClose(branchOid) {
+  return DrawerClose.findOne({ branch: branchOid })
+    .sort({ periodEndDate: -1, businessDate: -1, createdAt: -1 })
+    .lean();
+}
+
+/** Drawer close record whose period includes targetDateStr (YYYY-MM-DD). */
+async function findCloseCoveringDate(branchOid, targetDateStr) {
+  return DrawerClose.findOne({
     branch: branchOid,
     $or: [
-      { periodEndDate: { $lt: targetDateStr } },
-      { periodEndDate: { $exists: false }, businessDate: { $lt: targetDateStr } },
+      {
+        periodStartDate: { $lte: targetDateStr },
+        periodEndDate: { $gte: targetDateStr },
+      },
+      {
+        periodStartDate: { $exists: false },
+        businessDate: targetDateStr,
+      },
     ],
   })
     .sort({ periodEndDate: -1, businessDate: -1, createdAt: -1 })
-    .limit(1)
     .lean();
-  return rows[0] || null;
+}
+
+function todayBusinessDateStr() {
+  return moment.tz(DRAWER_BUSINESS_TZ).format('YYYY-MM-DD');
 }
 
 async function resolveClosePeriod(branchOid, targetDateStr) {
-  const lastClose = await getLastDrawerCloseBefore(branchOid, targetDateStr);
-  const openingCashBalance = round2(Number(lastClose?.retainedCash ?? 0));
+  const covering = await findCloseCoveringDate(branchOid, targetDateStr);
+  const lastClose = await getLatestDrawerClose(branchOid);
+  let openingCashBalance = 0;
   let periodStartDate = targetDateStr;
+  const periodAlreadyClosed = Boolean(covering);
+
   if (lastClose) {
     const lastEnd = lastClose.periodEndDate || lastClose.businessDate;
+    openingCashBalance = round2(Number(lastClose.retainedCash ?? 0));
     periodStartDate = dayAfter(lastEnd);
   }
+
   const periodEndDate = targetDateStr;
-  const bounds = parseBusinessPeriod(periodStartDate, periodEndDate);
-  const missedDaysCount = countDaysInclusive(periodStartDate, periodEndDate);
-  return { openingCashBalance, periodStartDate, periodEndDate, bounds, missedDaysCount };
+  const bounds =
+    periodAlreadyClosed || periodStartDate > periodEndDate
+      ? null
+      : parseBusinessPeriod(periodStartDate, periodEndDate);
+  const missedDaysCount =
+    bounds && !periodAlreadyClosed ? countDaysInclusive(periodStartDate, periodEndDate) : 0;
+
+  return {
+    openingCashBalance,
+    periodStartDate,
+    periodEndDate,
+    bounds,
+    missedDaysCount,
+    periodAlreadyClosed,
+  };
 }
 
 async function periodOverlapsExisting(branchOid, periodStartDate, periodEndDate) {
@@ -138,10 +170,16 @@ function resolveCashDisposition(actual, cashDisposition, retainedCashRaw) {
     deposited = 0;
   } else {
     retained = round2(retainedCashRaw);
-    if (!Number.isFinite(retained) || retained <= 0 || retained >= actualR) {
+    const partialOk =
+      actualR > 0
+        ? Number.isFinite(retained) && retained > 0 && retained < actualR
+        : actualR < 0
+          ? Number.isFinite(retained) && retained < 0 && retained > actualR
+          : false;
+    if (!partialOk) {
       return {
         error:
-          'For retain_partial, retainedCash must be greater than 0 and less than actualCashCounted',
+          'For retain_partial, retainedCash must be between 0 and actualCashCounted (same sign as actual)',
       };
     }
     deposited = round2(actualR - retained);
@@ -497,11 +535,39 @@ export const previewDrawerClose = async (req, res) => {
     }
 
     const branchOid = new mongoose.Types.ObjectId(String(branch));
+    const period = await resolveClosePeriod(branchOid, dateStr);
+
+    if (period.periodAlreadyClosed) {
+      return res.json({
+        businessDate: dateStr,
+        branchId: String(branch),
+        periodStartDate: period.periodStartDate,
+        periodEndDate: period.periodEndDate,
+        missedDaysCount: 0,
+        openingCashBalance: 0,
+        periodNetCashMovements: 0,
+        expectedCashInDrawer: 0,
+        paymentsReceivedByMethod: {},
+        refundsByMethod: {},
+        restoredInvoiceCount: 0,
+        invoiceCount: 0,
+        dailyExpenseTotal: 0,
+        deskPurchaseCashOutTotal: 0,
+        deskPurchaseCashDrawerTotal: 0,
+        deskPurchaseIntakeCount: 0,
+        deskPurchaseDevices: [],
+        cashReceivedTotal: 0,
+        cashRefundedTotal: 0,
+        periodAlreadyClosed: true,
+      });
+    }
+
     const preview = await computeDrawerPreviewWithPeriod(branchOid, dateStr);
 
     res.json({
       businessDate: dateStr,
       branchId: String(branch),
+      periodAlreadyClosed: false,
       ...preview,
     });
   } catch (err) {
@@ -536,20 +602,16 @@ export const getDrawerOpeningBalance = async (req, res) => {
 
     const branchOid = new mongoose.Types.ObjectId(String(branch));
     const period = await resolveClosePeriod(branchOid, dateStr);
-    const overlap = await periodOverlapsExisting(
-      branchOid,
-      period.periodStartDate,
-      period.periodEndDate
-    );
+    const covering = await findCloseCoveringDate(branchOid, dateStr);
 
     res.json({
       branchId: String(branch),
       businessDate: dateStr,
-      openingCashBalance: period.openingCashBalance,
+      openingCashBalance: covering ? 0 : period.openingCashBalance,
       periodStartDate: period.periodStartDate,
       periodEndDate: period.periodEndDate,
       missedDaysCount: period.missedDaysCount,
-      periodAlreadyClosed: Boolean(overlap),
+      periodAlreadyClosed: Boolean(covering),
     });
   } catch (err) {
     console.error('❌ getDrawerOpeningBalance:', err.message);
@@ -593,7 +655,7 @@ export const closeDrawer = async (req, res) => {
     }
 
     const actual = round2(actualCashCounted);
-    if (!Number.isFinite(actual) || actual < 0) {
+    if (!Number.isFinite(actual)) {
       return res.status(400).json({ error: 'Valid actualCashCounted is required' });
     }
 
@@ -604,6 +666,12 @@ export const closeDrawer = async (req, res) => {
 
     const branchOid = new mongoose.Types.ObjectId(String(branch));
     const period = await resolveClosePeriod(branchOid, dateStr);
+
+    if (period.periodAlreadyClosed) {
+      return res.status(409).json({
+        error: 'Drawer already closed for this business day',
+      });
+    }
 
     const overlap = await periodOverlapsExisting(
       branchOid,
@@ -679,6 +747,48 @@ function canListDrawerHistory(actor) {
   if (!actor) return false;
   return ADMIN_ROLES.includes(actor.role) || actor.role === 'Branch Manager' || actor.role === 'Cashier';
 }
+
+export const reopenLastDrawerClose = async (req, res) => {
+  try {
+    const { userId, branch, date: dateRaw } = req.query;
+
+    const actor = await loadActor(userId);
+    if (!canUseDrawerClose(actor)) {
+      return res.status(403).json({ error: 'Not allowed to reopen drawer' });
+    }
+
+    if (!branch || !mongoose.Types.ObjectId.isValid(String(branch))) {
+      return res.status(400).json({ error: 'Valid branch is required' });
+    }
+
+    if (!actorMayUseBranch(actor, String(branch))) {
+      return res.status(403).json({ error: 'Cannot reopen drawer for this branch' });
+    }
+
+    const dateStr = String(dateRaw || '').trim() || todayBusinessDateStr();
+    if (!parseBusinessDay(dateStr)) {
+      return res.status(400).json({ error: 'Valid date (YYYY-MM-DD) is required' });
+    }
+
+    const branchOid = new mongoose.Types.ObjectId(String(branch));
+    const covering = await findCloseCoveringDate(branchOid, dateStr);
+    const latest = covering || (await getLatestDrawerClose(branchOid));
+    if (!latest) {
+      return res.status(404).json({ error: 'No drawer close found for this branch' });
+    }
+
+    const removed = normalizeDrawerCloseRow(latest);
+    await DrawerClose.findByIdAndDelete(latest._id);
+
+    res.json({
+      success: true,
+      removed,
+    });
+  } catch (err) {
+    console.error('❌ reopenLastDrawerClose:', err.message);
+    res.status(500).json({ error: 'Failed to reopen drawer' });
+  }
+};
 
 export const listDrawerCloses = async (req, res) => {
   try {

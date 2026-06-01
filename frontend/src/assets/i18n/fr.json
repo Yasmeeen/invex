@@ -891,6 +891,7 @@
   "tr_report_chart_suffix": "Graphique",
   "tr_report_export_excel": "Exporter Excel",
   "tr_report_export_pdf": "Exporter PDF",
+  "tr_exported_at": "Exporté le",
   "tr_report_print": "Imprimer",
   "tr_report_filter_branch_id": "Succursale",
   "tr_report_filter_product_id": "Produit",

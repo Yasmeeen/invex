@@ -13,6 +13,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { AccountHistoryPdfService } from '@shared/services/account-history-pdf.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
@@ -36,6 +37,7 @@ export type ClientHistoryDialogData = { client: Client; forcedBranchId?: string 
 export class ClientHistoryDialogComponent implements OnInit {
   loading = true;
   settling = false;
+  exportingPdf = false;
   history: ClientHistoryResponse | null = null;
   /** Branch for cash-drawer attribution (deposits / credit invoice payments). */
   paymentBranchId: string | null = null;
@@ -48,6 +50,7 @@ export class ClientHistoryDialogComponent implements OnInit {
     private auth: AuthenticationService,
     private translate: TranslateService,
     private notify: AppNotificationService,
+    private accountHistoryPdf: AccountHistoryPdfService,
     private ref: MatDialogRef<ClientHistoryDialogComponent>,
     private storeSettings: StoreSettingsService,
     private dialog: MatDialog,
@@ -409,6 +412,34 @@ export class ClientHistoryDialogComponent implements OnInit {
         return this.translate.instant('tr_client_ledger_payout');
       default:
         return type || '—';
+    }
+  }
+
+  async exportPdf(): Promise<void> {
+    if (!this.history || this.exportingPdf) return;
+    this.exportingPdf = true;
+    try {
+      await this.accountHistoryPdf.exportClientHistory(
+        this.data.client,
+        this.history,
+        this.translate,
+        {
+          netBalanceText: () => this.netBalanceText(),
+          settlementNetAfterText: (p) => this.settlementNetAfterText(p),
+          ledgerTypeLabel: (type) => this.ledgerTypeLabel(type),
+          paymentStatusLabel: (status) => this.paymentStatusLabel(status),
+          paymentMethodLabel: (method) => this.paymentMethodLabel(method),
+          purchaseStatusLabel: (status) => this.purchaseStatusLabel(status),
+          purchaseTreasuryLabel: (row) => this.purchaseTreasuryLabel(row),
+          orderPaid: (order) => this.orderPaid(order),
+          orderRemaining: (order) => this.orderRemaining(order),
+          formatMoney: (amount) => this.formatMoney(amount),
+        }
+      );
+    } catch {
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+    } finally {
+      this.exportingPdf = false;
     }
   }
 

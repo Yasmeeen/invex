@@ -1,7 +1,18 @@
 <div class="vendor-history-dialog bg-white plr-4 ptb-4">
   <div class="flex flex-space-between flex-middle mb-3">
     <h3 class="m-0">{{ 'tr_supplier_history' | translate }} — {{ data.vendor.name }}</h3>
-    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+    <div class="flex flex-middle gap-2">
+      <button
+        type="button"
+        class="s-btn btn-secondary"
+        *ngIf="!loading && history"
+        [disabled]="exportingPdf"
+        (click)="exportPdf()"
+      >
+        {{ 'tr_report_export_pdf' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+    </div>
   </div>
 
   <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>

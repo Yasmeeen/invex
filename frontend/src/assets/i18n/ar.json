@@ -1054,6 +1054,7 @@
   "tr_report_chart_suffix": "مخطط",
   "tr_report_export_excel": "تصدير Excel",
   "tr_report_export_pdf": "تصدير PDF",
+  "tr_exported_at": "تاريخ التصدير",
   "tr_report_print": "طباعة",
   "tr_report_filter_branch_id": "الفرع",
   "tr_report_filter_product_id": "المنتج",

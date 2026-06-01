@@ -6,6 +6,8 @@ import { ClientListComponent } from './client-list/client-list.component';
 import { ClientHistoryDialogComponent } from './client-history-dialog/client-history-dialog.component';
 import { ClientDepositDialogComponent } from './client-deposit-dialog/client-deposit-dialog.component';
 import { ClientOpeningDebitDialogComponent } from './client-opening-debit-dialog/client-opening-debit-dialog.component';
+import { ClientPayClientDialogModule } from './client-pay-client-dialog/client-pay-client-dialog.module';
+import { CreateEditClientComponent } from './create-edit-client/create-edit-client.component';
 import { SharedModule } from '@shared/shared.module';
 import { UserSerivce } from '@shared/services/user.service';
 import { OrdersModule } from '../orders/orders.module';
@@ -19,6 +21,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     ClientHistoryDialogComponent,
     ClientDepositDialogComponent,
     ClientOpeningDebitDialogComponent,
+    CreateEditClientComponent,
   ],
   imports: [
     CommonModule,
@@ -27,6 +30,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     OrdersModule,
     MatDialogModule,
     PaymentSplitsDialogModule,
+    ClientPayClientDialogModule,
   ],
   providers: [
     UserSerivce

@@ -1,0 +1,82 @@
+<div class="complex-modal">
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="closeModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">
+          {{ 'tr_add_client' | translate }}
+        </h3>
+      </div>
+
+      <div class="modal-body weight-medium steel">
+        <div class="content-container plr-4 ptb-3">
+          <div
+            class="alert alert-error mb-3"
+            *ngIf="clientForm.invalid && clientForm.submitted"
+          >
+            {{ 'tr_fill_required_fields' | translate }}
+          </div>
+
+          <form #clientForm="ngForm" (ngSubmit)="submit()">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="name.invalid && clientForm.submitted">
+                  <label>{{ 'tr_name' | translate }}</label>
+                  <input type="text" class="s-control" name="name" ngModel #name="ngModel" required />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group" [class.has-error]="phoneNumber.invalid && clientForm.submitted">
+                  <label>{{ 'tr_phone_number' | translate }}</label>
+                  <input
+                    type="text"
+                    class="s-control"
+                    name="phoneNumber"
+                    ngModel
+                    #phoneNumber="ngModel"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="col-md-12">
+                <div class="form-group">
+                  <label>{{ 'tr_address' | translate }}</label>
+                  <input type="text" class="s-control" name="address" ngModel />
+                </div>
+              </div>
+              <div class="col-md-12">
+                <div class="form-group">
+                  <label>{{ 'tr_branches' | translate }}</label>
+                  <div class="input-with-icon">
+                    <ng-select
+                      class="s-control s-select"
+                      name="branches"
+                      ngModel
+                      [items]="branches"
+                      bindLabel="name"
+                      bindValue="_id"
+                      [multiple]="true"
+                      [closeOnSelect]="false"
+                      placeholder="{{ 'tr_branches' | translate }}"
+                    >
+                    </ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-end gap-2 mt-3">
+              <button type="button" class="s-btn btn-secondary" (click)="closeModal()" [disabled]="isSubmitting">
+                {{ 'tr_action.cancel' | translate }}
+              </button>
+              <button type="submit" class="s-btn btn-primary" [disabled]="isSubmitting">
+                {{ 'tr_action.save' | translate }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

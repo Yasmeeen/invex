@@ -5,6 +5,15 @@
       <button type="button" class="s-btn btn-primary size-body" (click)="openCloseDialog()">
         {{ 'tr_drawer_close_open_action' | translate }}
       </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        *ngIf="canReopenLast()"
+        [disabled]="reopening || loading"
+        (click)="reopenLastClose()"
+      >
+        {{ 'tr_drawer_close_reopen_action' | translate }}
+      </button>
       <button type="button" class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
         <i class="fa fa-filter text-primary"></i>
       </button>

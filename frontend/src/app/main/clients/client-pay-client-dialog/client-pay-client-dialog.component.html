@@ -1,0 +1,123 @@
+<div class="client-pay-client-dialog bg-white">
+  <h2 mat-dialog-title class="client-pay-client-dialog__title">
+    {{ 'tr_client_pay_client' | translate }}
+  </h2>
+
+  <div mat-dialog-content class="client-pay-client-dialog__body">
+    <div class="client-pay-client-dialog__summary mb-3">
+      <div class="size-small text-muted">
+        {{ 'tr_name' | translate }}: <strong>{{ client.name || client.phoneNumber }}</strong>
+      </div>
+      <div>
+        {{ 'tr_client_pay_client_max' | translate }}:
+        <strong>{{ maxAmount | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+      </div>
+      <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_pay_client_hint' | translate }}</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-group" *ngIf="showBranchPicker">
+        <label>{{ 'tr_branches' | translate }}</label>
+        <div class="input-with-icon">
+          <ng-select
+            class="s-control s-select"
+            formControlName="branchId"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [clearable]="false"
+            placeholder="{{ 'tr_branches' | translate }}"
+          >
+          </ng-select>
+          <i class="fa fa-caret-down input-icon"></i>
+        </div>
+      </div>
+
+      <div class="expense-treasury-splits">
+        <div class="form-group">
+          <label>{{ 'tr_vendor_deferred_treasury_multi' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [items]="treasuryMethodOptions"
+              bindLabel="label"
+              bindValue="key"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [clearable]="true"
+              [searchable]="true"
+              placeholder="{{ 'tr_purchase_treasury_select_placeholder' | translate }}"
+              [(ngModel)]="selectedTreasuryKeys"
+              [ngModelOptions]="{ standalone: true }"
+              name="clientPayTreasuryMulti"
+              (ngModelChange)="onSelectedTreasuryChange($event)"
+            >
+              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                  <span class="ng-value-label">{{ $any(item).label }}</span>
+                  <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+                </div>
+                <div
+                  class="ng-value"
+                  *ngIf="items.length > 2"
+                  [attr.title]="treasuryOverflowTitle(items)"
+                >
+                  <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+                </div>
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+          <p class="text-muted size-small m-0 mt-1">{{ 'tr_client_pay_client_treasury_hint' | translate }}</p>
+        </div>
+
+        <div class="size-small text-muted mb-1" *ngIf="selectedTreasuryKeys?.length">
+          {{ 'tr_vendor_deferred_treasury_amounts_hint' | translate }}
+        </div>
+        <div
+          class="expense-treasury-split-row"
+          *ngFor="let tKey of selectedTreasuryKeys; trackBy: trackTreasuryKey"
+        >
+          <span class="expense-treasury-split-row__label">{{ treasuryOptionLabel(tKey) }}</span>
+          <input
+            type="number"
+            class="s-control expense-treasury-split-row__amount"
+            min="0"
+            [attr.max]="maxAmount"
+            step="0.01"
+            [(ngModel)]="treasuryAmounts[tKey]"
+            [ngModelOptions]="{ standalone: true }"
+            [name]="'clientPayTreasuryAmt_' + tKey"
+          />
+        </div>
+
+        <div class="size-small mt-2" [class.text-error]="treasuryOverAllocated()">
+          {{ 'tr_vendor_deferred_payment_allocated' | translate }}:
+          <strong>{{ treasurySplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          <span *ngIf="maxAmount > 0">
+            / <strong>{{ maxAmount | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </span>
+        </div>
+      </div>
+
+      <div class="form-group mb-0">
+        <label>{{ 'tr_payment_note' | translate }}</label>
+        <input class="s-control width-100" type="text" formControlName="note" maxlength="500" />
+      </div>
+    </form>
+  </div>
+
+  <div mat-dialog-actions align="end" class="client-pay-client-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      (click)="submit()"
+      [disabled]="saving || maxAmount <= 0"
+    >
+      {{ 'tr_client_pay_client' | translate }}
+    </button>
+  </div>
+</div>

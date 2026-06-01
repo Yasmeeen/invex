@@ -88,8 +88,8 @@ export class DrawerCloseDialogComponent implements OnInit {
     });
 
     this.shortageReasonForm = this.fb.group({
-      actualCashCounted: ['', [Validators.required, Validators.min(0)]],
-      retainedCash: ['', [Validators.min(0)]],
+      actualCashCounted: ['', Validators.required],
+      retainedCash: [''],
       shortageReason: ['', Validators.maxLength(2000)],
     });
   }
@@ -240,11 +240,19 @@ export class DrawerCloseDialogComponent implements OnInit {
     );
   }
 
+  isPeriodAlreadyClosed(): boolean {
+    return Boolean(this.preview?.periodAlreadyClosed);
+  }
+
   goToConfirm(): void {
     if (this.previewLoading || !this.preview) {
       if (!this.previewLoading && !this.preview) {
         this.notify.push(this.translate.instant('tr_drawer_close_preview_required'), 'error');
       }
+      return;
+    }
+    if (this.isPeriodAlreadyClosed()) {
+      this.notify.push(this.translate.instant('tr_drawer_close_period_already_closed'), 'error');
       return;
     }
     this.step = 2;
@@ -278,7 +286,7 @@ export class DrawerCloseDialogComponent implements OnInit {
   }
 
   depositedAmount(): number {
-    return round2(Math.max(0, this.actualCounted() - this.retainedAmount()));
+    return round2(this.actualCounted() - this.retainedAmount());
   }
 
   onCashActionChange(): void {
@@ -296,18 +304,31 @@ export class DrawerCloseDialogComponent implements OnInit {
   private updateRetainedValidators(): void {
     const ctrl = this.shortageReasonForm.get('retainedCash');
     if (!ctrl) return;
-    if (this.cashAction === 'retain' && this.retainMode === 'partial') {
-      const max = this.actualCounted();
-      ctrl.setValidators([
-        Validators.required,
-        Validators.min(0.01),
-        Validators.max(max > 0 ? max - 0.01 : 0),
-      ]);
+    const actual = this.actualCounted();
+    if (this.cashAction === 'retain' && this.retainMode === 'partial' && actual !== 0) {
+      if (actual > 0) {
+        ctrl.setValidators([
+          Validators.required,
+          Validators.min(0.01),
+          Validators.max(actual - 0.01),
+        ]);
+      } else {
+        ctrl.setValidators([
+          Validators.required,
+          Validators.min(actual + 0.01),
+          Validators.max(-0.01),
+        ]);
+      }
     } else {
       ctrl.clearValidators();
-      ctrl.setValidators([Validators.min(0)]);
     }
     ctrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private isValidPartialRetain(actual: number, retained: number): boolean {
+    if (actual > 0) return retained > 0 && retained < actual;
+    if (actual < 0) return retained < 0 && retained > actual;
+    return false;
   }
 
   resolveCashDisposition(): CashDisposition | null {
@@ -344,7 +365,10 @@ export class DrawerCloseDialogComponent implements OnInit {
     this.updateRetainedValidators();
 
     const actual = this.actualCounted();
-    if (!Number.isFinite(actual) || actual < 0 || this.shortageReasonForm.get('actualCashCounted')?.invalid) {
+    const actualCtrl = this.shortageReasonForm.get('actualCashCounted');
+    if (!Number.isFinite(actual) || actualCtrl?.invalid) {
+      actualCtrl?.markAsTouched();
+      this.notify.push(this.translate.instant('tr_drawer_close_actual_cash_required'), 'error');
       return;
     }
 
@@ -353,7 +377,7 @@ export class DrawerCloseDialogComponent implements OnInit {
 
     if (disposition === 'retain_partial') {
       const retained = this.retainedAmount();
-      if (retained <= 0 || retained >= actual) {
+      if (!this.isValidPartialRetain(actual, retained)) {
         this.shortageReasonForm.get('retainedCash')?.markAsTouched();
         this.notify.push(this.translate.instant('tr_drawer_close_retained_invalid'), 'error');
         return;

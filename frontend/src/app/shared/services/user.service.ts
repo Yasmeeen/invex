@@ -12,6 +12,12 @@ import { Client, ClientHistoryResponse, User } from '@core/models/users-interfac
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
+export interface TreasurySplitPayload {
+  key: string;
+  label?: string;
+  amount: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -68,6 +74,27 @@ export class UserSerivce {
     payload: { userId?: string; note?: string }
   ): Observable<any> {
     return this.http.post(`${CLIENTS_URL}/${clientId}/settle`, payload);
+  }
+
+  createClient(payload: {
+    name: string;
+    phoneNumber: string;
+    address?: string;
+    branches?: string[];
+  }): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/create`, payload);
+  }
+
+  payClient(
+    clientId: string,
+    payload: {
+      userId?: string;
+      branchId?: string;
+      note?: string;
+      paymentTreasurySplits: TreasurySplitPayload[];
+    }
+  ): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/${clientId}/pay-client`, payload);
   }
 
   createUser(user: User): Observable<User> {

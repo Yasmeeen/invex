@@ -54,6 +54,19 @@
     </div>
   </div>
 
+  <div class="cashier-opening-balance cashier-opening-balance--closed" *ngIf="drawerPeriodAlreadyClosed" role="status">
+    <i class="fa fa-check-circle" aria-hidden="true"></i>
+    <span>{{ 'tr_drawer_close_period_already_closed' | translate }}</span>
+    <button
+      type="button"
+      class="cashier-opening-balance__reopen s-btn btn-secondary size-small"
+      [disabled]="drawerReopening"
+      (click)="reopenLastDrawerClose()"
+    >
+      {{ 'tr_drawer_close_reopen_action' | translate }}
+    </button>
+  </div>
+
   <div
     class="cashier-opening-balance"
     *ngIf="drawerOpeningBalance > 0.005 && !drawerPeriodAlreadyClosed"

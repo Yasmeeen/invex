@@ -120,8 +120,16 @@
       >
         {{ 'tr_client_opening_debit_set' | translate }}
       </button>
-      <button type="button" class="s-btn btn-secondary" (click)="openDepositDialog()">
+      <button type="button" class="s-btn btn-primary ml-2" (click)="openDepositDialog()">
         {{ 'tr_client_add_deposit' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-primary ml-2"
+        *ngIf="canPayClient()"
+        (click)="openPayClientDialog()"
+      >
+        {{ 'tr_client_pay_client' | translate }}
       </button>
     </div>
 

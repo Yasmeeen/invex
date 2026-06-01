@@ -40,6 +40,7 @@ import { PurchaseTreasurySplit } from '@shared/services/product-purchase-request
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
 import { DrawerCloseService } from '@shared/services/drawer-close.service';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -85,6 +86,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Cash left in drawer from the last close (opening balance for today). */
   drawerOpeningBalance = 0;
   drawerPeriodAlreadyClosed = false;
+  drawerReopening = false;
 
   /** Desk product purchase (inventory intake); receipt print uses shared component. */
   createdDeskPurchase: any = null;
@@ -306,6 +308,52 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       : (this.globals.currentUser?.branch as { _id?: string } | string | undefined);
     if (!id) return null;
     return typeof id === 'string' ? String(id).trim() : id?._id ? String(id._id).trim() : null;
+  }
+
+  reopenLastDrawerClose(): void {
+    const branchId = this.cashierBranchId();
+    const uid = this.curentUser?._id;
+    if (!branchId || !uid || this.drawerReopening) return;
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      disableClose: true,
+      data: {
+        title: this.translate.instant('tr_drawer_close_reopen_confirm_short'),
+        buttons: [
+          {
+            label: this.translate.instant('tr_action.cancel'),
+            actionCallback: 'cancel',
+            type: 'btn-secondary',
+          },
+          {
+            label: this.translate.instant('tr_drawer_close_reopen_action'),
+            actionCallback: 'reopen',
+            type: 'btn-danger',
+          },
+        ],
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result !== 'reopen') return;
+      this.drawerReopening = true;
+      const today = formatDate(new Date(), 'yyyy-MM-dd', 'en-US');
+      this.drawerCloseService.reopenLast({ userId: uid, branch: branchId, date: today }).subscribe({
+        next: () => {
+          this.drawerReopening = false;
+          this.translate
+            .get('tr_drawer_close_reopen_success')
+            .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+          this.loadDrawerOpeningBalance();
+        },
+        error: (err) => {
+          this.drawerReopening = false;
+          const msg = err?.error?.error || this.translate.instant('tr_unexpected_error_message');
+          this.appNotificationService.push(msg, 'error');
+        },
+      });
+    });
   }
 
   loadDrawerOpeningBalance(): void {

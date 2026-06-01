@@ -6,6 +6,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { ClientHistoryDialogComponent } from '../client-history-dialog/client-history-dialog.component';
 import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
+import { CreateEditClientComponent } from '../create-edit-client/create-edit-client.component';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
@@ -98,6 +99,22 @@ export class ClientListComponent implements OnInit {
       data: { client, forcedBranchId: ctx.branchId },
       disableClose: false,
     });
+  }
+
+  createClient(): void {
+    this.dialog
+      .open(CreateEditClientComponent, {
+        width: '640px',
+        maxWidth: '96vw',
+        data: {},
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) {
+          this.getClients();
+        }
+      });
   }
 
   openClientDeposit(client: Client): void {

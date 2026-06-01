@@ -95,6 +95,8 @@ export interface ClientHistoryResponse {
   /** Credit — prepaid deposit (we owe client). */
   weOweClient?: number;
   prepaidBalance?: number;
+  clientPayable?: number;
+  clientPayableDeferred?: number;
   canSettle?: boolean;
   settlementPreview?: ClientSettlementPreview;
   netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;

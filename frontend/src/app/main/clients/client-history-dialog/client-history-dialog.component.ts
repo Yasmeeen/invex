@@ -23,6 +23,7 @@ import { DeskPurchaseDeferredPaymentDialogComponent } from '../../orders/desk-pu
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
 import { ClientOpeningDebitDialogComponent } from '../client-opening-debit-dialog/client-opening-debit-dialog.component';
+import { ClientPayClientDialogComponent } from '../client-pay-client-dialog/client-pay-client-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
 
 export type ClientHistoryDialogData = { client: Client; forcedBranchId?: string | null };
@@ -344,6 +345,38 @@ export class ClientHistoryDialogComponent implements OnInit {
     });
   }
 
+  maxPayClientAmount(): number {
+    const prepaid = Number(this.history?.prepaidBalance) || 0;
+    const payable = Number(this.history?.clientPayable) || 0;
+    return Math.round((prepaid + payable) * 100) / 100;
+  }
+
+  canPayClient(): boolean {
+    return this.maxPayClientAmount() > 0.005;
+  }
+
+  openPayClientDialog(): void {
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    const ref = this.dialog.open(ClientPayClientDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'client-pay-client-dialog-panel',
+      backdropClass: 'client-pay-client-dialog-backdrop',
+      data: {
+        client: this.data.client,
+        forcedBranchId: this.paymentBranchId,
+        maxAmount: this.maxPayClientAmount(),
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.loadHistory();
+    });
+  }
+
   openDepositDialog(): void {
     if (!this.paymentBranchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
@@ -372,6 +405,8 @@ export class ClientHistoryDialogComponent implements OnInit {
         return this.translate.instant('tr_client_ledger_opening_debit');
       case 'settlement':
         return this.translate.instant('tr_client_ledger_settlement');
+      case 'payout':
+        return this.translate.instant('tr_client_ledger_payout');
       default:
         return type || '—';
     }

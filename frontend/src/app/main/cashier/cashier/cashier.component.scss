@@ -138,6 +138,17 @@
     .fa {
       opacity: 0.85;
     }
+
+    &--closed {
+      flex-wrap: wrap;
+      color: #2e7d32;
+      background: rgba(46, 125, 50, 0.1);
+      border-bottom-color: rgba(46, 125, 50, 0.15);
+    }
+
+    &__reopen {
+      margin-inline-start: auto;
+    }
   }
 
   /* Header */

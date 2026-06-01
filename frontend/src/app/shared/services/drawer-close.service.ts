@@ -53,6 +53,7 @@ export interface DrawerClosePreview {
   cashReceivedTotal: number;
   cashRefundedTotal: number;
   expectedCashInDrawer: number;
+  periodAlreadyClosed?: boolean;
 }
 
 export interface DrawerOpeningBalance {
@@ -137,6 +138,22 @@ export class DrawerCloseService {
 
   close(payload: CloseDrawerPayload): Observable<DrawerCloseRecord> {
     return this.http.post<DrawerCloseRecord>(DRAWER_CLOSE_URL, payload);
+  }
+
+  reopenLast(params: { userId: string; branch: string; date?: string }): Observable<{
+    success: boolean;
+    removed: DrawerCloseRecord;
+  }> {
+    let httpParams = new HttpParams()
+      .set('userId', params.userId)
+      .set('branch', params.branch);
+    if (params.date) {
+      httpParams = httpParams.set('date', params.date);
+    }
+    return this.http.delete<{ success: boolean; removed: DrawerCloseRecord }>(
+      `${DRAWER_CLOSE_URL}/latest`,
+      { params: httpParams }
+    );
   }
 
   list(params: {

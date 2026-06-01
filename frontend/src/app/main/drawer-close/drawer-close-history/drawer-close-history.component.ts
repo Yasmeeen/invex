@@ -16,6 +16,7 @@ import {
   DrawerCloseDialogComponent,
   DrawerCloseDialogData,
 } from '../drawer-close-dialog/drawer-close-dialog.component';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 
 @Component({
   selector: 'app-drawer-close-history',
@@ -24,6 +25,7 @@ import {
 })
 export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
   closes: DrawerCloseRecord[] = [];
+  reopening = false;
   loading = true;
   isNotAuthorized = false;
   isFilterOpen = true;
@@ -135,6 +137,72 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
   paginationUpdate(page: number): void {
     this.params.page = page;
     this.load();
+  }
+
+  private effectiveBranchIdForReopen(): string | null {
+    if (canPickBranchRole(this.globals.currentUser?.role)) {
+      return this.filterBranchId ? String(this.filterBranchId).trim() : null;
+    }
+    const b = this.globals.currentUser?.branch as { _id?: string } | string | undefined;
+    return typeof b === 'string' ? String(b).trim() : b?._id ? String(b._id).trim() : null;
+  }
+
+  reopenBranchId(): string | null {
+    const fromFilter = this.effectiveBranchIdForReopen();
+    if (fromFilter) return fromFilter;
+    const rowBranch = this.closes[0]?.branch as { _id?: string } | undefined;
+    return rowBranch?._id ? String(rowBranch._id).trim() : null;
+  }
+
+  canReopenLast(): boolean {
+    return Boolean(this.reopenBranchId() && this.closes.length > 0 && this.params.page === 1);
+  }
+
+  reopenLastClose(): void {
+    const branchId = this.reopenBranchId();
+    const uid = this.globals.currentUser?._id;
+    if (!branchId || !uid || this.reopening) return;
+
+    const latest = this.closes[0];
+    const period = this.periodLabel(latest);
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      disableClose: true,
+      data: {
+        title: this.translate.instant('tr_drawer_close_reopen_confirm', { period }),
+        buttons: [
+          {
+            label: this.translate.instant('tr_action.cancel'),
+            actionCallback: 'cancel',
+            type: 'btn-secondary',
+          },
+          {
+            label: this.translate.instant('tr_drawer_close_reopen_action'),
+            actionCallback: 'reopen',
+            type: 'btn-danger',
+          },
+        ],
+      },
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result !== 'reopen') return;
+      this.reopening = true;
+      const end = latest.periodEndDate || latest.businessDate;
+      this.drawerClose.reopenLast({ userId: uid, branch: branchId, date: end }).subscribe({
+        next: () => {
+          this.reopening = false;
+          this.notify.push(this.translate.instant('tr_drawer_close_reopen_success'), 'success');
+          this.load();
+        },
+        error: (err) => {
+          this.reopening = false;
+          const msg = err?.error?.error || this.translate.instant('tr_unexpected_error_message');
+          this.notify.push(msg, 'error');
+        },
+      });
+    });
   }
 
   openCloseDialog(): void {

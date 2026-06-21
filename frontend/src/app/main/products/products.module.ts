@@ -12,6 +12,7 @@ import { ViewProductBookingDialogComponent } from './view-product-booking-dialog
 import { ImportProductsDialogComponent } from './import-products-dialog/import-products-dialog.component';
 import { TransferProductBranchDialogComponent } from './transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { PendingBranchTransfersDialogComponent } from './pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
+import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
 
 
 @NgModule({
@@ -22,6 +23,7 @@ import { PendingBranchTransfersDialogComponent } from './pending-branch-transfer
     ImportProductsDialogComponent,
     TransferProductBranchDialogComponent,
     PendingBranchTransfersDialogComponent,
+    ProductHistoryDialogComponent,
   ],
   imports: [
     CommonModule,

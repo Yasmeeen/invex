@@ -57,8 +57,22 @@ addPayment(
   return this.http.post(`${ORDERS_URL}/${orderId}/payments`, payload);
 }
 
-restoreOrder(orderId: string): Observable<any> {
-  return this.http.put(`${ORDERS_URL}/${orderId}/restore`, {});
+restoreOrder(
+  orderId: string,
+  payload: {
+    userId?: string;
+    branchId?: string;
+    note?: string;
+    returnAll?: boolean;
+    items?: { productId: string; quantity: number; unitRefundPrice: number }[];
+    cashRefundVia?: 'drawer' | 'treasury';
+    cashTreasuryKey?: string;
+    cashTreasuryLabel?: string;
+    /** @deprecated Server computes refund splits from original payment. */
+    refundPaymentSplits?: { method: string; amount: number }[];
+  } = {}
+): Observable<any> {
+  return this.http.put(`${ORDERS_URL}/${orderId}/restore`, payload);
 }
 
 updateOrder(order:any): Observable<Order> {

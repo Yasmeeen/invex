@@ -52,3 +52,36 @@ export function formatCairoDMY(value: string | Date | null | undefined): string 
   return `${day}/${month}/${year}`;
 }
 
+/** dd/MM/yyyy HH:mm in Cairo time (return history, audit). */
+export function formatCairoDateTime(value: string | Date | null | undefined): string {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CAIRO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const day = parts.find((p) => p.type === 'day')?.value || '';
+  const month = parts.find((p) => p.type === 'month')?.value || '';
+  const year = parts.find((p) => p.type === 'year')?.value || '';
+  const hour = parts.find((p) => p.type === 'hour')?.value || '';
+  const minute = parts.find((p) => p.type === 'minute')?.value || '';
+  if (!day || !month || !year) return '';
+  return `${day}/${month}/${year} ${hour}:${minute}`;
+}
+
+/** Whole days elapsed since a date (for invoice age warnings). */
+export function daysSince(value: string | Date | null | undefined): number {
+  if (!value) return 0;
+  const start = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(start.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - start.getTime()) / 86400000));
+}
+

@@ -1,0 +1,63 @@
+<div class="product-history-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">
+      {{ 'tr_product_history' | translate }} — {{ data.product.name }}
+      <span class="text-muted size-small">({{ data.product.code }})</span>
+    </h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <app-ghost-line *ngIf="loading" [length]="8" [type]="'table'"></app-ghost-line>
+
+  <ng-container *ngIf="!loading && history">
+    <div class="product-history-meta row mb-3">
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_location' | translate }}</span>
+        <strong>{{ productLocation() }}</strong>
+      </div>
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_stock' | translate }}</span>
+        <strong>{{ history.product.stock }}</strong>
+      </div>
+      <div class="col-md-3 col-6" *ngIf="history.product.category?.name">
+        <span class="meta-label">{{ 'tr_category' | translate }}</span>
+        <strong>{{ history.product.category?.name }}</strong>
+      </div>
+      <div class="col-md-3 col-6" *ngIf="history.product.addedBy">
+        <span class="meta-label">{{ 'tr_product_added_by' | translate }}</span>
+        <strong>{{ history.product.addedBy }}</strong>
+      </div>
+    </div>
+
+    <div
+      class="empty-state-here text-center ptb-6"
+      *ngIf="!history.events?.length"
+    >
+      <i class="fa fa-history empty-icon text-primary"></i>
+      <p>{{ 'tr_product_history_empty' | translate }}</p>
+    </div>
+
+    <div class="table-container" *ngIf="history.events?.length">
+      <table class="s-table table layout-fixed product-history-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_product_history_event' | translate }}</th>
+            <th>{{ 'tr_product_history_details' | translate }}</th>
+            <th>{{ 'tr_product_history_by' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let event of history.events">
+            <td class="product-history-table__when">{{ formatWhen(event.occurredAt) }}</td>
+            <td>
+              <span class="history-type-badge">{{ eventTypeLabel(event.type) }}</span>
+            </td>
+            <td class="product-history-table__details">{{ eventDetails(event) }}</td>
+            <td>{{ event.actorName || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </ng-container>
+</div>

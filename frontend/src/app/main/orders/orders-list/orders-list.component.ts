@@ -14,17 +14,20 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { Branch, Order, OrderPartyType } from '@core/models/products.model';
 import { AddOrderComponent } from '../add-order/add-order.component';
 import { PayOrderDialogComponent } from '../pay-order-dialog/pay-order-dialog.component';
+import { InvoiceReturnDialogComponent } from '../invoice-return-dialog/invoice-return-dialog.component';
+import { InvoiceReturnDetailsDialogComponent } from '../invoice-return-details-dialog/invoice-return-details-dialog.component';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { BranchesServce } from '@shared/services/branches.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import {
+  canReturnOrder as canReturnOrderCheck,
+  hasOrderReturns,
   isPayLaterMethod,
   orderDisplayPaid,
   orderDisplayRemaining,
 } from '@core/utils/order-display.util';
-import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import {
   PAYMENT_METHOD_OPTIONS,
   PaymentMethodOption,
@@ -32,6 +35,7 @@ import {
 import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 
 @Component({
   selector: 'app-orders-list',
@@ -52,7 +56,7 @@ export class OrdersListComponent implements OnInit {
   isNotAuthorized: boolean = false;
   iscategoryNotAuthorized: boolean = false;
   isToday: boolean = true;
-  status = ['restored','completed']
+  status = ['restored', 'partially_restored', 'completed'];
   selectedStatus: string;
 
   currentOrder: any = {
@@ -79,6 +83,9 @@ export class OrdersListComponent implements OnInit {
   /** `null` = no date filter in stats (all time). */
   fromDate: Date | null = new Date();
   toDate: Date | null = new Date();
+  /** List filter dates (second filter card); independent from stats dates. */
+  listFromDate: Date | null = null;
+  listToDate: Date | null = null;
   selectedBranchId: string | null;
   branches:Branch[] =[]
   /** null = no filter (all payment methods) */
@@ -98,7 +105,8 @@ export class OrdersListComponent implements OnInit {
     private authenticationService: AuthenticationService,
     private dashboardService: DashboardService,
     private branchesServce: BranchesServce,
-    private storeSettings: StoreSettingsService
+    private storeSettings: StoreSettingsService,
+    private invoiceReprint: InvoiceReprintService
   ) { }
 
   orderPaid(order: Order): number {
@@ -129,6 +137,44 @@ export class OrdersListComponent implements OnInit {
     if (order.status === 'restored') return false;
     if (!isPayLaterMethod(order.paymentMethod)) return false;
     return orderDisplayRemaining(order) > 0;
+  }
+
+  canReturnOrder(order: Order): boolean {
+    return canReturnOrderCheck(order);
+  }
+
+  showOrderActions(order: Order): boolean {
+    return (
+      this.canPrintOrder(order) ||
+      this.canReturnOrder(order) ||
+      this.canPayOrder(order) ||
+      this.hasReturnDetails(order)
+    );
+  }
+
+  hasReturnDetails(order: Order): boolean {
+    return hasOrderReturns(order);
+  }
+
+  canPrintOrder(order: Order): boolean {
+    return !!order?._id;
+  }
+
+  printOrder(order: Order): void {
+    if (!this.canPrintOrder(order)) {
+      return;
+    }
+    this.ordersService.getOrder(order._id).subscribe({
+      next: (full: any) => {
+        this.invoiceReprint.printSale(full);
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      },
+    });
   }
 
   openPayDialog(order: Order): void {
@@ -189,6 +235,17 @@ export class OrdersListComponent implements OnInit {
       delete this.params['paymentMethod'];
     }
 
+    if (this.listFromDate) {
+      this.params.from = formatCairoYMD(this.listFromDate);
+    } else {
+      delete this.params.from;
+    }
+    if (this.listToDate) {
+      this.params.to = formatCairoYMD(this.listToDate);
+    } else {
+      delete this.params.to;
+    }
+
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
       this.ordersList = response.orders
@@ -223,6 +280,21 @@ export class OrdersListComponent implements OnInit {
   onPaymentMethodFilterChange(): void {
     this.params.page = 1;
     this.getOrders();
+  }
+
+  onListDateFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  clearListDateFilters(): void {
+    this.listFromDate = null;
+    this.listToDate = null;
+    this.onListDateFilterChange();
+  }
+
+  get hasListDateFilterToClear(): boolean {
+    return this.listFromDate != null || this.listToDate != null;
   }
 
   clearDateFilters(): void {
@@ -273,6 +345,20 @@ export class OrdersListComponent implements OnInit {
 
   createdAtCairo(order: Order): string {
     return formatCairoDMY(order?.createdAt as any);
+  }
+
+  orderStatusLabel(status: string | undefined): string {
+    const s = String(status || '').toLowerCase();
+    if (s === 'completed') {
+      return this.translateService.instant('tr_chart_completed');
+    }
+    if (s === 'partially_restored') {
+      return this.translateService.instant('tr_purchase_invoice_status_partially_returned');
+    }
+    if (s === 'restored') {
+      return this.translateService.instant('tr_restored');
+    }
+    return status || '—';
   }
 
   createOrEditOrder(isEdit: boolean, order?: Order){
@@ -329,46 +415,77 @@ export class OrdersListComponent implements OnInit {
     })
   }
 
-  restoreOrder(orderId: string): void {
-    let confirmationData = {
-      title: this.translateService.instant('tr_confirmation_message'),
-      buttons: [
-        {
-          label: this.translateService.instant('tr_action.cancel'),
-          actionCallback: 'cancel',
-          type: 'btn-secondary'
-        },
-        {
-          label: this.translateService.instant('tr_action.restore'),
-          actionCallback: 'restore',
-          type: 'btn-danger'
-        },
-      ]
+  restoreOrder(order: Order): void {
+    if (!order?._id) return;
+    this.ordersService.getOrder(order._id).subscribe({
+      next: (full: any) => {
+        const fresh: Order = full?.order || full;
+        if (!this.canReturnOrder(fresh)) {
+          this.getOrders();
+          return;
+        }
+        this.openReturnDialog(fresh);
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      },
+    });
+  }
+
+  openReturnDetails(order: Order): void {
+    if (!order?._id) return;
+    const open = (doc: Order) => {
+      this.dialog.open(InvoiceReturnDetailsDialogComponent, {
+        width: '640px',
+        maxWidth: '96vw',
+        panelClass: 'invoice-return-dialog-panel',
+        backdropClass: 'invoice-return-dialog-backdrop',
+        data: { mode: 'sales', order: doc },
+      });
     };
-    let dialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      width: '450px',
-      data: confirmationData,
+    if (hasOrderReturns(order) && order.returns?.length) {
+      open(order);
+      return;
+    }
+    this.ordersService.getOrder(order._id).subscribe({
+      next: (full: any) => open(full?.order || full),
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      },
+    });
+  }
+
+  private openReturnDialog(order: Order): void {
+    const branchId =
+      this.curentUser?.role === 'Cashier' || this.curentUser?.role === 'Branch Manager'
+        ? this.curentUser?.branch?._id || this.curentUser?.branch
+        : order.branch?._id || order.branch;
+
+    const ref = this.dialog.open(InvoiceReturnDialogComponent, {
+      width: '720px',
+      maxWidth: '96vw',
+      panelClass: 'invoice-return-dialog-panel',
+      backdropClass: 'invoice-return-dialog-backdrop',
+      data: {
+        mode: 'sales',
+        order,
+        forcedBranchId: branchId ? String(branchId) : null,
+      },
       disableClose: true,
     });
-    dialogRef.afterClosed().subscribe(result => {
-      if (result != 'restore') {
-        return;
+
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.getOrders();
+        this.getOrderStatistics();
       }
-      this.ordersService.restoreOrder(orderId).subscribe({
-        next: (res) => {
-          this.appNotificationService.push( this.translateService.instant('Order restored successfully!'), 'success');
-          // refresh orders list
-       this.getOrders();
-       this.getOrderStatistics();
-        },
-        error: (err) => {
-          this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
-        }
-      });
     });
-
-
-
   }
 
 

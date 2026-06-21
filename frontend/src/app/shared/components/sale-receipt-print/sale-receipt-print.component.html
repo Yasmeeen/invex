@@ -1,0 +1,194 @@
+<div class="invoice-container" *ngIf="order">
+  <ng-container *ngIf="storeSettings.settings$ | async as st">
+    <div class="center mb-2" *ngIf="st.logoUrl">
+      <img class="invoice-logo" [src]="st.logoUrl" alt="" />
+    </div>
+
+    <div class="store-name center mtb-4 bold">
+      {{ st.storeName }}
+    </div>
+
+    <table class="invoice-table meta-table">
+      <tr>
+        <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ order?.orderNumber }}</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_number_of_items' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ order?.numberOfProducts }}</td>
+      </tr>
+      <tr>
+        <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ printDate | date: 'dd MMM y' }}</td>
+      </tr>
+    </table>
+
+    <ng-container *ngIf="showReceiptClientSection">
+      <div class="invoice-client-block">
+        <div class="invoice-client-block__title">
+          {{ receiptPartyTypeLabelKey() | receiptTranslate: st.receiptLanguage }}
+        </div>
+        <table class="invoice-table invoice-client-block__table">
+          <tr *ngIf="order?.clientPhoneNumber && order.clientPhoneNumber !== '00'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_phone_number' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ order.clientPhoneNumber }}</td>
+          </tr>
+          <tr *ngIf="order?.clientName && order.clientName !== 'Walk-in'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_client_name' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ order.clientName }}</td>
+          </tr>
+          <tr *ngIf="order?.clientAddress && order.clientAddress !== '-'">
+            <td class="invoice-client-block__label">
+              {{ 'tr_client_address' | receiptTranslate: st.receiptLanguage }}
+            </td>
+            <td>{{ order.clientAddress }}</td>
+          </tr>
+        </table>
+      </div>
+    </ng-container>
+
+    <table class="invoice-table products-table">
+      <colgroup>
+        <col class="products-table__col-name" />
+        <col class="products-table__col-qty" />
+        <col class="products-table__col-price" />
+        <col class="products-table__col-total" />
+      </colgroup>
+      <tr class="header bold">
+        <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_cashier.QTY' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_total' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+
+      <tr *ngFor="let item of order?.products">
+        <td class="item-name">
+          {{ item.name }}
+          <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
+            <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
+              {{ ia.label }}: {{ ia.value }}
+            </span>
+          </div>
+        </td>
+        <td>{{ item.quantity }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+        <td class="money">
+          {{ formatReceiptAmount(item.price * item.quantity) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <table class="invoice-table totals-table">
+      <tr class="bold">
+        <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptLinesSubtotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
+        <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="receiptInvoiceSurchargeAmount() > 0">
+        <td>{{ 'tr_invoice_extra_surcharge' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptInvoiceSurchargeAmount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold">
+        <td>{{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="receiptExchangeCredit() > 0">
+        <td>{{ 'tr_exchange_trade_in_credit_line' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          -{{ formatReceiptAmount(receiptExchangeCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold" *ngIf="receiptExchangeCredit() > 0">
+        <td>{{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <table
+      class="invoice-table invoice-payments-table"
+      *ngIf="order?.payments?.length && receiptPaidPayments().length"
+    >
+      <tr class="header bold">
+        <td colspan="2">{{ 'tr_invoice_payments' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+      <tr *ngFor="let p of receiptPaidPayments()">
+        <td>{{ payMethodReceiptLabel(p.method) }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <table class="invoice-table invoice-payments-table" *ngIf="receiptFeePayments().length">
+      <tr class="header bold">
+        <td colspan="2">{{ 'tr_invoice_payment_fees' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+      <tr *ngFor="let p of receiptFeePayments()">
+        <td>
+          {{ 'tr_invoice_fee_for_method' | receiptTranslate: st.receiptLanguage }}
+          {{ payMethodReceiptLabel(p.feeForMethod) }}
+          → {{ payMethodReceiptLabel(p.method) }}
+        </td>
+        <td class="money">
+          {{ formatReceiptAmount(p.amount) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+    </table>
+
+    <div class="separator double-border"></div>
+
+    <div class="final-total center bold">
+      <ng-container *ngIf="receiptExchangeCredit() <= 0">
+        {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
+        <span class="money">
+          {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </span>
+      </ng-container>
+      <ng-container *ngIf="receiptExchangeCredit() > 0">
+        {{ 'tr_exchange_sale_and_trade_in' | receiptTranslate: st.receiptLanguage }} <br />
+        <span class="money">
+          {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </span>
+        <div class="size-small mt-2">
+          {{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}:
+          <span class="money">
+            {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </span>
+        </div>
+      </ng-container>
+    </div>
+
+    <div class="separator double-border"></div>
+
+    <div class="footer center">
+      <div class="bold">{{ st.storeName }}</div>
+      <div>{{ st.storePhoneNumber }}</div>
+    </div>
+
+    <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
+      <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
+      <div class="invoice-qr__caption">innovation-tec.com</div>
+    </div>
+  </ng-container>
+</div>

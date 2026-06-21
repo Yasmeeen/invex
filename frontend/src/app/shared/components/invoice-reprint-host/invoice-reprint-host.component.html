@@ -1,0 +1,11 @@
+<app-sale-receipt-print
+  *ngIf="mode === 'sale' && data"
+  [order]="data"
+  [printDate]="printDate"
+></app-sale-receipt-print>
+
+<app-purchase-receipt-print
+  *ngIf="mode === 'purchase' && data"
+  [purchase]="data"
+  [printDate]="printDate"
+></app-purchase-receipt-print>

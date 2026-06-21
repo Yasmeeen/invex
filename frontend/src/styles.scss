@@ -213,6 +213,28 @@ body[dir=rtl] {
   max-height: none;
 }
 
+.cdk-overlay-backdrop.invoice-return-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.invoice-return-dialog-panel {
+  box-shadow: none;
+}
+
+.invoice-return-dialog-panel .mat-dialog-container,
+.invoice-return-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.invoice-return-dialog-panel .mat-dialog-content,
+.invoice-return-dialog-panel .mat-mdc-dialog-content {
+  margin: 0;
+  padding: 0;
+  max-height: none;
+}
+
 .cdk-overlay-backdrop.drawer-close-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

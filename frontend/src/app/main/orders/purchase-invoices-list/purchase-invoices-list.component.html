@@ -88,6 +88,60 @@
         </div>
       </div>
     </div>
+    <div class="row mt-2">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label for="purchaseListFromDate">{{ 'tr_from' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <input
+              id="purchaseListFromDate"
+              name="purchaseListFromDate"
+              [(ngModel)]="listFromDate"
+              (dateChange)="onListDateFilterChange()"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="purchaseListFromPicker"
+              class="s-control bg-white"
+              autocomplete="off"
+            />
+            <mat-datepicker #purchaseListFromPicker></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="purchaseListFromPicker">
+            </mat-datepicker-toggle>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label for="purchaseListToDate">{{ 'tr_to' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <input
+              id="purchaseListToDate"
+              name="purchaseListToDate"
+              [(ngModel)]="listToDate"
+              (dateChange)="onListDateFilterChange()"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="purchaseListToPicker"
+              class="s-control bg-white"
+              autocomplete="off"
+            />
+            <mat-datepicker #purchaseListToPicker></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="purchaseListToPicker">
+            </mat-datepicker-toggle>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 d-flex flex-column">
+        <label class="invisible" aria-hidden="true">&nbsp;</label>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body date-filters-clear-btn"
+          (click)="clearListDateFilters()"
+          *ngIf="hasListDateFilterToClear"
+        >
+          <i class="fa fa-times" aria-hidden="true"></i>
+          {{ 'tr_clear' | translate }} {{ 'tr_date' | translate }}
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="plr-4 mt-4" *ngIf="!loading">
@@ -114,8 +168,6 @@
           <tr
             *ngFor="let p of purchasesList"
             [class.purchase-row--deferred]="isDeferredPurchase(p)"
-            class="pointer"
-            (click)="onPurchaseRowClick($event, p)"
           >
             <td>{{ purchaseRef(p) }}</td>
             <td>
@@ -147,10 +199,31 @@
                 <div class="options-menu-container p-0">
                   <div
                     class="single-option"
+                    *ngIf="canPrintPurchase(p)"
+                    (click)="printPurchase(p)"
+                  >
+                    {{ 'tr_print' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
                     *ngIf="canPayDeferredPurchase(p)"
                     (click)="openPayDeferredPurchase(p)"
                   >
                     {{ 'tr_add_payment' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="canReturnPurchase(p)"
+                    (click)="openPurchaseReturn(p)"
+                  >
+                    {{ 'tr_action.restore' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="hasReturnDetails(p)"
+                    (click)="openPurchaseReturnDetails(p)"
+                  >
+                    {{ 'tr_invoice_return_details_action' | translate }}
                   </div>
                   <div class="single-option" (click)="openPurchaseDetail(p)">
                     {{ 'tr_purchase_invoice_view' | translate }}
@@ -168,7 +241,6 @@
         class="order-card purchase-card"
         *ngFor="let p of purchasesList"
         [class.order-card--pay-later]="isDeferredPurchase(p)"
-        (click)="onPurchaseRowClick($event, p)"
       >
         <div class="order-card__top">
           <div class="order-card__icon">
@@ -198,10 +270,31 @@
             <div class="options-menu-container p-0">
               <div
                 class="single-option"
+                *ngIf="canPrintPurchase(p)"
+                (click)="printPurchase(p)"
+              >
+                {{ 'tr_print' | translate }}
+              </div>
+              <div
+                class="single-option"
                 *ngIf="canPayDeferredPurchase(p)"
                 (click)="openPayDeferredPurchase(p)"
               >
                 {{ 'tr_add_payment' | translate }}
+              </div>
+              <div
+                class="single-option"
+                *ngIf="canReturnPurchase(p)"
+                (click)="openPurchaseReturn(p)"
+              >
+                {{ 'tr_action.restore' | translate }}
+              </div>
+              <div
+                class="single-option"
+                *ngIf="hasReturnDetails(p)"
+                (click)="openPurchaseReturnDetails(p)"
+              >
+                {{ 'tr_invoice_return_details_action' | translate }}
               </div>
               <div class="single-option" (click)="openPurchaseDetail(p)">
                 {{ 'tr_purchase_invoice_view' | translate }}

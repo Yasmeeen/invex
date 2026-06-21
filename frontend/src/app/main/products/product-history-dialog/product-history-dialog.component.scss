@@ -1,0 +1,36 @@
+.product-history-dialog {
+  max-height: 90vh;
+  overflow-y: auto;
+  min-width: min(920px, 95vw);
+}
+
+.product-history-meta {
+  .meta-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 2px;
+  }
+}
+
+.product-history-table {
+  &__when {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__details {
+    font-size: 0.92rem;
+    color: #374151;
+  }
+}
+
+.history-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.85rem;
+  font-weight: 600;
+}

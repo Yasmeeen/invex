@@ -1,0 +1,99 @@
+<div class="invoice-return-details-dialog">
+  <h2 mat-dialog-title class="invoice-return-details-dialog__title">
+    {{ 'tr_invoice_return_details_title' | translate }}
+    <span class="invoice-return-details-dialog__ref">{{ titleRef }}</span>
+  </h2>
+
+  <div mat-dialog-content class="invoice-return-details-dialog__body">
+    <p class="invoice-return-details-dialog__empty" *ngIf="!returns.length">
+      {{ 'tr_invoice_return_details_empty' | translate }}
+    </p>
+
+    <div class="invoice-return-details-dialog__entry" *ngFor="let ret of returns; let i = index">
+      <div class="invoice-return-details-dialog__entry-head">
+        <span class="invoice-return-details-dialog__entry-index">
+          {{ 'tr_invoice_return_details_entry' | translate : { n: returns.length - i } }}
+        </span>
+        <span class="invoice-return-details-dialog__entry-when">
+          {{ formatWhen(ret.returnedAt) }}
+        </span>
+      </div>
+
+      <ng-container *ngIf="mode === 'sales'">
+        <div class="invoice-return-details-dialog__row" *ngIf="ret.returnAll">
+          <span>{{ 'tr_invoice_return_all' | translate }}</span>
+        </div>
+        <div class="invoice-return-details-dialog__items" *ngIf="ret.items?.length">
+          <div class="invoice-return-details-dialog__item" *ngFor="let item of ret.items">
+            <span>{{ salesItemName(item) }}</span>
+            <span>
+              {{ item.quantity }} × {{ item.unitRefundPrice | currency:'EGP ':'symbol':'1.2-2' }}
+              = {{ item.lineTotal | currency:'EGP ':'symbol':'1.2-2' }}
+            </span>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="mode === 'purchase'">
+        <div class="invoice-return-details-dialog__row">
+          <span>{{ 'tr_quantity' | translate }}</span>
+          <span>{{ ret.quantity }}</span>
+        </div>
+        <div class="invoice-return-details-dialog__row" *ngIf="ret.unitRefundPrice != null">
+          <span>{{ 'tr_invoice_return_unit_price' | translate }}</span>
+          <span>{{ ret.unitRefundPrice | currency:'EGP ':'symbol':'1.2-2' }}</span>
+        </div>
+      </ng-container>
+
+      <div class="invoice-return-details-dialog__row invoice-return-details-dialog__row--total">
+        <span>{{ 'tr_invoice_return_refund_total' | translate }}</span>
+        <span>{{ ret.refundTotal | currency:'EGP ':'symbol':'1.2-2' }}</span>
+      </div>
+
+      <div class="invoice-return-details-dialog__splits" *ngIf="ret.refundPaymentSplits?.length">
+        <div class="invoice-return-details-dialog__splits-title">
+          {{ 'tr_invoice_return_details_payment_splits' | translate }}
+        </div>
+        <div class="invoice-return-details-dialog__row" *ngFor="let s of ret.refundPaymentSplits">
+          <span>{{ paymentLabel(s.method) }}</span>
+          <span>{{ s.amount | currency:'EGP ':'symbol':'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="invoice-return-details-dialog__splits" *ngIf="ret.refundTreasurySplits?.length">
+        <div class="invoice-return-details-dialog__splits-title">
+          {{ 'tr_receipt_purchase_treasury' | translate }}
+        </div>
+        <div class="invoice-return-details-dialog__row" *ngFor="let s of ret.refundTreasurySplits">
+          <span>{{ treasuryLabel(s.key, s.label) }}</span>
+          <span>{{ s.amount | currency:'EGP ':'symbol':'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="invoice-return-details-dialog__row" *ngIf="(ret.creditAdjustmentAmount || 0) > 0">
+        <span>{{ 'tr_invoice_return_details_credit_adjustment' | translate }}</span>
+        <span>{{ ret.creditAdjustmentAmount | currency:'EGP ':'symbol':'1.2-2' }}</span>
+      </div>
+
+      <div class="invoice-return-details-dialog__row" *ngIf="(ret.deferredAdjustmentAmount || 0) > 0">
+        <span>{{ 'tr_invoice_return_details_deferred_adjustment' | translate }}</span>
+        <span>{{ ret.deferredAdjustmentAmount | currency:'EGP ':'symbol':'1.2-2' }}</span>
+      </div>
+
+      <div class="invoice-return-details-dialog__row" *ngIf="ret.cashRefundVia">
+        <span>{{ 'tr_invoice_return_details_cash_via' | translate }}</span>
+        <span>{{ cashViaLabel(ret.cashRefundVia) }}</span>
+      </div>
+
+      <div class="invoice-return-details-dialog__note" *ngIf="ret.note">
+        <span>{{ 'tr_notes' | translate }}:</span> {{ ret.note }}
+      </div>
+    </div>
+  </div>
+
+  <div mat-dialog-actions align="end" class="invoice-return-details-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="close()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+  </div>
+</div>

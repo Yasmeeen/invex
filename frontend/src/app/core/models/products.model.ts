@@ -110,6 +110,7 @@ export interface OrderProductLine {
   name: string;
   code: string;
   quantity: number;
+  returnedQuantity?: number;
   price?: number;
   cost?: number;
   isApplyDiscount?: boolean;
@@ -148,6 +149,28 @@ export interface Order {
   paymentMethod?: string;
   status?: string;
   createdAt?: string;
+  /** Partial / full return history. */
+  returns?: InvoiceReturnRecord[];
+}
+
+export interface InvoiceReturnRecord {
+  returnedAt: string;
+  returnAll?: boolean;
+  items?: Array<{
+    productId?: string;
+    quantity: number;
+    unitRefundPrice: number;
+    lineTotal: number;
+  }>;
+  quantity?: number;
+  unitRefundPrice?: number;
+  refundTotal: number;
+  refundPaymentSplits?: Array<{ method: string; amount: number }>;
+  refundTreasurySplits?: Array<{ key: string; label?: string; amount: number }>;
+  cashRefundVia?: 'drawer' | 'treasury';
+  creditAdjustmentAmount?: number;
+  deferredAdjustmentAmount?: number;
+  note?: string;
 }
 export interface productOrder{
   _id?: string;
@@ -228,6 +251,26 @@ export interface VendorSettlementPreview {
   afterCredit: number;
   netAfter?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
   canSettle: boolean;
+}
+
+export interface ProductHistoryEvent {
+  id: string;
+  type: string;
+  occurredAt: string;
+  actorName?: string;
+  summary?: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ProductHistoryResponse {
+  product: Pick<
+    Product,
+    '_id' | 'name' | 'code' | 'stock' | 'inWarehouse' | 'branch' | 'category' | 'addedBy'
+  > & {
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  events: ProductHistoryEvent[];
 }
 
 export interface VendorHistoryResponse {

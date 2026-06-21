@@ -1,0 +1,122 @@
+:host {
+  display: block;
+}
+
+.invoice-return-details-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 720px);
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.06),
+    0 18px 40px rgba(15, 23, 42, 0.14);
+
+  &__title {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 0 10px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  &__ref {
+    margin-inline-start: 0.35rem;
+    color: rgba(15, 23, 42, 0.55);
+    font-weight: 500;
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: min(60vh, 520px);
+    padding-top: 12px;
+    overflow-y: auto;
+  }
+
+  &__empty {
+    margin: 0;
+    color: rgba(15, 23, 42, 0.55);
+  }
+
+  &__entry {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  &__entry-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  &__entry-index {
+    font-weight: 600;
+  }
+
+  &__entry-when {
+    color: rgba(15, 23, 42, 0.65);
+    font-size: 0.925rem;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    font-size: 0.925rem;
+
+    &--total {
+      margin-top: 4px;
+      font-weight: 600;
+    }
+  }
+
+  &__items {
+    margin-bottom: 6px;
+  }
+
+  &__item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    font-size: 0.875rem;
+    color: rgba(15, 23, 42, 0.8);
+  }
+
+  &__splits {
+    margin-top: 6px;
+    padding-top: 4px;
+  }
+
+  &__splits-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: rgba(15, 23, 42, 0.5);
+    margin-bottom: 2px;
+  }
+
+  &__note {
+    margin-top: 6px;
+    font-size: 0.875rem;
+    color: rgba(15, 23, 42, 0.7);
+  }
+
+  &__actions {
+    flex-shrink: 0;
+    padding-top: 8px;
+  }
+}

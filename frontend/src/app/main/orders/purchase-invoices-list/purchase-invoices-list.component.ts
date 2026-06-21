@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
-import { formatCairoDMY } from '@core/utils/date-tz.util';
+import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -13,6 +13,10 @@ import {
 } from '@shared/components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
 import { DeskPurchaseDeferredPaymentDialogComponent } from '../desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
+import { InvoiceReturnDialogComponent } from '../invoice-return-dialog/invoice-return-dialog.component';
+import { InvoiceReturnDetailsDialogComponent } from '../invoice-return-details-dialog/invoice-return-details-dialog.component';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { canReturnPurchase as canReturnPurchaseCheck, hasPurchaseReturns } from '@core/utils/order-display.util';
 
 const DEFERRED_KEY = 'deferred';
 
@@ -35,6 +39,8 @@ export class PurchaseInvoicesListComponent implements OnInit {
   searchTimeout: any;
   selectedStatus: string | null = null;
   selectedBranchId: string | null = null;
+  listFromDate: Date | null = null;
+  listToDate: Date | null = null;
   branches: Branch[] = [];
   curentUser: any;
   viewMode: 'table' | 'cards' = 'table';
@@ -52,7 +58,8 @@ export class PurchaseInvoicesListComponent implements OnInit {
     private branchesService: BranchesServce,
     private translate: TranslateService,
     private notify: AppNotificationService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private invoiceReprint: InvoiceReprintService
   ) {}
 
   ngOnInit(): void {
@@ -87,6 +94,12 @@ export class PurchaseInvoicesListComponent implements OnInit {
     const branchId = this.resolveBranchId();
     if (branchId) {
       q.branchId = branchId;
+    }
+    if (this.listFromDate) {
+      q.from = formatCairoYMD(this.listFromDate);
+    }
+    if (this.listToDate) {
+      q.to = formatCairoYMD(this.listToDate);
     }
 
     this.loading = true;
@@ -235,6 +248,12 @@ export class PurchaseInvoicesListComponent implements OnInit {
     if (s === 'approved') {
       return this.translate.instant('tr_purchase_invoice_status_approved');
     }
+    if (s === 'partially_returned') {
+      return this.translate.instant('tr_purchase_invoice_status_partially_returned');
+    }
+    if (s === 'returned') {
+      return this.translate.instant('tr_purchase_invoice_status_returned');
+    }
     if (s === 'pending') {
       return this.translate.instant('tr_purchase_invoice_status_pending');
     }
@@ -265,6 +284,21 @@ export class PurchaseInvoicesListComponent implements OnInit {
   onBranchChange(): void {
     this.params.page = 1;
     this.loadPurchases();
+  }
+
+  onListDateFilterChange(): void {
+    this.params.page = 1;
+    this.loadPurchases();
+  }
+
+  clearListDateFilters(): void {
+    this.listFromDate = null;
+    this.listToDate = null;
+    this.onListDateFilterChange();
+  }
+
+  get hasListDateFilterToClear(): boolean {
+    return this.listFromDate != null || this.listToDate != null;
   }
 
   paginationUpdate(page: number): void {
@@ -307,10 +341,87 @@ export class PurchaseInvoicesListComponent implements OnInit {
     });
   }
 
-  /** Row/card click opens detail; ignore clicks on the ⋮ options menu (document listener toggles it). */
-  onPurchaseRowClick(event: MouseEvent, p: any): void {
-    if ((event.target as HTMLElement)?.closest?.('.options-menu')) return;
-    this.openPurchaseDetail(p);
+  openPurchaseReturn(p: any): void {
+    const id = normalizeMongoId(p?._id);
+    if (!id) return;
+    this.api.getById(id, this.auth.getUserFromLocalStorage()?._id).subscribe({
+      next: (res: any) => {
+        const fresh = res?.purchase || res;
+        if (!this.canReturnPurchase(fresh)) {
+          this.loadPurchases();
+          return;
+        }
+        this.openPurchaseReturnDialog(fresh);
+      },
+      error: () => {
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
+  }
+
+  openPurchaseReturnDialog(p: any): void {
+    const branchId = this.resolveBranchId();
+    const ref = this.dialog.open(InvoiceReturnDialogComponent, {
+      width: '720px',
+      maxWidth: '96vw',
+      panelClass: 'invoice-return-dialog-panel',
+      backdropClass: 'invoice-return-dialog-backdrop',
+      data: {
+        mode: 'purchase',
+        purchase: p,
+        forcedBranchId: branchId,
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) {
+        this.loadPurchases();
+      }
+    });
+  }
+
+  hasReturnDetails(p: any): boolean {
+    return hasPurchaseReturns(p);
+  }
+
+  openPurchaseReturnDetails(p: any): void {
+    const id = normalizeMongoId(p?._id);
+    if (!id) return;
+    const open = (doc: any) => {
+      this.dialog.open(InvoiceReturnDetailsDialogComponent, {
+        width: '640px',
+        maxWidth: '96vw',
+        panelClass: 'invoice-return-dialog-panel',
+        backdropClass: 'invoice-return-dialog-backdrop',
+        data: { mode: 'purchase', purchase: doc },
+      });
+    };
+    if (hasPurchaseReturns(p) && p.returns?.length) {
+      open(p);
+      return;
+    }
+    this.api.getById(id, this.auth.getUserFromLocalStorage()?._id).subscribe({
+      next: (res: any) => open(res?.purchase || res),
+      error: () => {
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
+  }
+
+  canReturnPurchase(p: any): boolean {
+    return canReturnPurchaseCheck(p);
+  }
+
+  canPrintPurchase(p: any): boolean {
+    const s = String(p?.status || '').toLowerCase();
+    return s === 'approved' || s === 'partially_returned' || s === 'returned';
+  }
+
+  printPurchase(p: any): void {
+    if (!this.canPrintPurchase(p)) {
+      return;
+    }
+    this.invoiceReprint.printPurchase(p);
   }
 
   openPurchaseDetail(p: any): void {

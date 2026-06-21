@@ -28,6 +28,7 @@ import { ImportProductsDialogComponent } from '../import-products-dialog/import-
 import { ProductsImportMetadata } from '@shared/services/products.service';
 import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { PendingBranchTransfersDialogComponent } from '../pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
+import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 
 @Component({
   selector: 'app-products-list',
@@ -207,12 +208,16 @@ export class ProductsListComponent implements OnInit {
     return String(pid) === String(myId);
   }
 
-  showProductActionsMenu(product: Product): boolean {
-    return (
-      this.canBranchManagerModifyProduct(product) ||
-      this.canBookProduct(product) ||
-      this.canTransferProduct(product)
-    );
+  showProductActionsMenu(_product: Product): boolean {
+    return true;
+  }
+
+  openProductHistory(product: Product): void {
+    this.dialog.open(ProductHistoryDialogComponent, {
+      width: '960px',
+      maxWidth: '96vw',
+      data: { product },
+    });
   }
 
   bookedQty(product: Product): number {

@@ -74,16 +74,40 @@ export class ProductPurchaseRequestsService {
   }
 
   list(params: {
-    status?: 'pending' | 'approved' | 'rejected';
+    status?: 'pending' | 'approved' | 'rejected' | 'partially_returned' | 'returned';
     branchId?: string;
     page?: number;
     limit?: number;
+    from?: string;
+    to?: string;
   }): Observable<any> {
     const q: Record<string, string> = {};
     if (params.status) q.status = params.status;
     if (params.branchId) q.branchId = params.branchId;
+    if (params.from) q.from = params.from;
+    if (params.to) q.to = params.to;
     if (params.page != null) q.page = String(params.page);
     if (params.limit != null) q.limit = String(params.limit);
     return this.http.get(PRODUCT_PURCHASE_REQUESTS_URL, { params: q });
+  }
+
+  returnPurchase(
+    purchaseId: string,
+    payload: {
+      userId?: string;
+      branchId?: string;
+      note?: string;
+      returnAll?: boolean;
+      quantity?: number;
+      unitRefundPrice?: number;
+      cashRefundVia?: 'drawer' | 'treasury';
+      cashTreasuryKey?: string;
+      cashTreasuryLabel?: string;
+      /** @deprecated Server computes treasury splits from original payment. */
+      refundTreasurySplits?: PurchaseTreasurySplit[];
+      returnedProductIds?: string[];
+    }
+  ): Observable<any> {
+    return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}/return`, payload);
   }
 }

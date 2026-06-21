@@ -303,6 +303,9 @@
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
                   <div class="options-menu-container p-0">
                     <div class="border-bottom"></div>
+                    <div class="single-option" (click)="openProductHistory(product)">
+                      {{ "tr_product_history" | translate }}
+                    </div>
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
                         class="single-option"
@@ -394,6 +397,9 @@
               <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
               <div class="options-menu-container p-0">
                 <div class="border-bottom"></div>
+                <div class="single-option" (click)="openProductHistory(product)">
+                  {{ "tr_product_history" | translate }}
+                </div>
                 <ng-container *ngIf="canBookProduct(product)">
                   <div
                     class="single-option"

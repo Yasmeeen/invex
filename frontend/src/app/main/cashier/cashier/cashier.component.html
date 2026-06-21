@@ -221,7 +221,7 @@
           </div>
  
       <div class="products-grid">
-        <div [class.disabled-container]="product.stock == 0"
+        <div
           class="product-card"
           *ngFor="let product of filteredProducts()"
           (click)="addProduct(product)"

@@ -1,0 +1,199 @@
+<div class="invoice-return-dialog">
+  <h2 mat-dialog-title class="invoice-return-dialog__title">
+    {{ (mode === 'sales' ? 'tr_invoice_return_sales_title' : 'tr_invoice_return_purchase_title') | translate }}
+  </h2>
+
+  <div mat-dialog-content class="invoice-return-dialog__body">
+    <div class="mb-3" *ngIf="loading">
+      <app-ghost-line [length]="4" [type]="'table'"></app-ghost-line>
+    </div>
+
+    <ng-container *ngIf="!loading">
+      <div class="invoice-return-dialog__warning mb-3" *ngIf="showAgeWarning">
+        <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+        {{ 'tr_invoice_return_age_warning' | translate : { days: invoiceAgeDays } }}
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="s-checkbox d-flex align-items-center gap-2">
+          <input type="checkbox" [(ngModel)]="returnAll" (ngModelChange)="onReturnAllChange()" />
+          {{ 'tr_invoice_return_all' | translate }}
+        </label>
+      </div>
+
+      <ng-container *ngIf="mode === 'sales'">
+        <div class="invoice-return-dialog__items mb-3">
+          <div
+            class="invoice-return-dialog__item"
+            *ngFor="let row of salesRows"
+            [class.invoice-return-dialog__item--disabled]="row.remaining <= 0"
+          >
+            <input
+              type="checkbox"
+              [(ngModel)]="row.selected"
+              [disabled]="returnAll || row.remaining <= 0"
+              (ngModelChange)="syncSalesRefundTotal()"
+            />
+            <div>
+              <div class="invoice-return-dialog__item-name">{{ row.name }}</div>
+              <div class="invoice-return-dialog__item-meta">
+                {{ row.code }} · {{ 'tr_remaining' | translate }}: {{ row.remaining }}
+              </div>
+            </div>
+            <div class="form-group mb-0">
+              <label class="size-small">{{ 'tr_quantity' | translate }}</label>
+              <input
+                class="s-control"
+                type="number"
+                min="1"
+                [max]="row.remaining"
+                [(ngModel)]="row.quantity"
+                [disabled]="!row.selected && !returnAll"
+                (ngModelChange)="syncSalesRefundTotal()"
+              />
+            </div>
+            <div class="form-group mb-0">
+              <label class="size-small">{{ 'tr_invoice_return_unit_price' | translate }}</label>
+              <input
+                class="s-control"
+                type="number"
+                min="0"
+                step="0.01"
+                [(ngModel)]="row.unitRefundPrice"
+                [disabled]="!row.selected && !returnAll"
+                (ngModelChange)="syncSalesRefundTotal()"
+              />
+            </div>
+            <div class="text-end">
+              {{ lineTotal(row.quantity, row.unitRefundPrice) | currency:'EGP ':'symbol':'1.2-2' }}
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="mode === 'purchase'">
+        <div class="mb-3 size-small text-muted" *ngIf="purchaseSummary">
+          {{ purchaseSummary }}
+        </div>
+
+        <div class="row mb-3" *ngIf="!returnAll">
+          <div class="col-md-4">
+            <div class="form-group mb-0">
+              <label>{{ 'tr_quantity' | translate }}</label>
+              <input
+                class="s-control"
+                type="number"
+                min="1"
+                [max]="purchaseRemaining"
+                [(ngModel)]="purchaseQty"
+                (ngModelChange)="syncPurchaseRefundTotal()"
+              />
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-group mb-0">
+              <label>{{ 'tr_invoice_return_unit_price' | translate }}</label>
+              <input
+                class="s-control"
+                type="number"
+                min="0"
+                step="0.01"
+                [(ngModel)]="purchaseUnitPrice"
+                (ngModelChange)="syncPurchaseRefundTotal()"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3" *ngIf="unitCodeOptions.length > 1 && !returnAll">
+          <label>{{ 'tr_invoice_return_select_units' | translate }}</label>
+          <div class="d-flex flex-wrap gap-2">
+            <label class="d-flex align-items-center gap-1" *ngFor="let code of unitCodeOptions">
+              <input
+                type="checkbox"
+                [checked]="selectedUnitCodes.has(code.id)"
+                (change)="toggleUnitCode(code.id)"
+              />
+              {{ code.label }}
+            </label>
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="invoice-return-dialog__total">
+        <span>{{ 'tr_invoice_return_refund_total' | translate }}</span>
+        <span>{{ refundTotal | currency:'EGP ':'symbol':'1.2-2' }}</span>
+      </div>
+
+      <div class="invoice-return-dialog__refund-plan mb-3" *ngIf="showRefundPlan">
+        <div class="invoice-return-dialog__refund-plan-title">
+          {{ 'tr_invoice_return_mirror_payment_title' | translate }}
+        </div>
+        <p class="invoice-return-dialog__hint mb-2">
+          {{ 'tr_invoice_return_mirror_payment_hint' | translate }}
+        </p>
+        <div class="invoice-return-dialog__refund-row" *ngFor="let row of displayRefundPreview">
+          <span>{{ row.label }}</span>
+          <span>{{ row.amount | currency:'EGP ':'symbol':'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="invoice-return-dialog__cash-choice mb-3" *ngIf="showCashChoice">
+        <label class="size-small weight-bold d-block mb-2">
+          {{ 'tr_invoice_return_cash_choice_title' | translate : { amount: cashPortionAmount | number:'1.2-2' } }}
+        </label>
+        <div class="d-flex flex-column gap-2">
+          <label class="d-flex align-items-center gap-2">
+            <input
+              type="radio"
+              name="cashRefundVia"
+              value="drawer"
+              [(ngModel)]="cashRefundVia"
+              (ngModelChange)="onCashRefundViaChange()"
+            />
+            {{ 'tr_invoice_return_cash_via_drawer' | translate }}
+          </label>
+          <label class="d-flex align-items-center gap-2">
+            <input
+              type="radio"
+              name="cashRefundVia"
+              value="treasury"
+              [(ngModel)]="cashRefundVia"
+              (ngModelChange)="onCashRefundViaChange()"
+            />
+            {{ 'tr_invoice_return_cash_via_treasury' | translate }}
+          </label>
+        </div>
+        <div class="form-group mt-2 mb-0" *ngIf="cashRefundVia === 'treasury'">
+          <label>{{ 'tr_receipt_purchase_treasury' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [items]="alternateTreasuryOptions"
+              bindLabel="label"
+              bindValue="key"
+              [clearable]="false"
+              [(ngModel)]="cashTreasuryKey"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>{{ 'tr_notes' | translate }}</label>
+        <textarea class="s-control" rows="2" [(ngModel)]="note" maxlength="500"></textarea>
+      </div>
+    </ng-container>
+  </div>
+
+  <div mat-dialog-actions align="end" class="invoice-return-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-danger" (click)="submit()" [disabled]="saving || loading">
+      {{ 'tr_action.restore' | translate }}
+    </button>
+  </div>
+</div>

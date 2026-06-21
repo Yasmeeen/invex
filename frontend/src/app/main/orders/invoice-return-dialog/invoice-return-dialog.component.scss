@@ -1,0 +1,165 @@
+:host {
+  display: block;
+}
+
+.invoice-return-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 720px);
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.06),
+    0 18px 40px rgba(15, 23, 42, 0.14);
+
+  &__title {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0 0 10px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    max-height: min(60vh, 520px);
+    padding-top: 12px;
+    padding-bottom: 4px;
+    padding-inline-end: 14px;
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      background-color: rgba(15, 23, 42, 0.22);
+    }
+  }
+
+  &__items {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  &__warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fff8e6;
+    border: 1px solid #f0c14b;
+    color: #856404;
+    font-size: 0.9rem;
+    line-height: 1.45;
+
+    .fa {
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+  }
+
+  &__item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &--disabled {
+      opacity: 0.55;
+    }
+  }
+
+  &__item-name {
+    font-weight: 600;
+  }
+
+  &__item-meta {
+    font-size: 12px;
+    color: #777;
+  }
+
+  &__total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    font-weight: 600;
+  }
+
+  &__hint {
+    font-size: 13px;
+    color: #666;
+    margin: 0 0 12px;
+  }
+
+  &__refund-plan {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: rgba(15, 23, 42, 0.02);
+  }
+
+  &__refund-plan-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  &__refund-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  &__cash-choice {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #fff;
+  }
+}
+
+.invoice-return-dialog__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 640px) {
+  .invoice-return-dialog__item {
+    grid-template-columns: 1fr;
+  }
+}

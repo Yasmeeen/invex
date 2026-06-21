@@ -100,7 +100,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private pendingExchangeSettlement: ExchangeSettlementTreasuryResult | null = null;
 
   // Client / supplier information section
-  isClientInfoOpen = false;
+  isClientInfoOpen = true;
   clientForm: FormGroup;
   partyType: OrderPartyType = 'client';
   isExistingClient = false;
@@ -837,8 +837,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   filteredProducts() {
-    if (!this.searchTerm) return this.products;
-    return this.products.filter((p:Product) =>
+    const inStock = this.products.filter((p: Product) => Number(p.stock ?? 0) > 0);
+    if (!this.searchTerm) return inStock;
+    return inStock.filter((p: Product) =>
       p.name.toLowerCase().includes(this.searchTerm.toLowerCase())
     );
   }

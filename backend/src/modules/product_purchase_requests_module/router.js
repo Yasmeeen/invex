@@ -8,6 +8,7 @@ import {
   approveProductPurchaseRequest,
   rejectProductPurchaseRequest,
   recordProductPurchaseDeferredPayment,
+  returnProductPurchaseRequest,
 } from './service.js';
 
 router.get('/', listProductPurchaseRequests);
@@ -16,5 +17,6 @@ router.post('/', createProductPurchaseRequest);
 router.patch('/:id/approve', approveProductPurchaseRequest);
 router.patch('/:id/reject', rejectProductPurchaseRequest);
 router.post('/:id/deferred-payment', recordProductPurchaseDeferredPayment);
+router.post('/:id/return', returnProductPurchaseRequest);
 
 export default router;

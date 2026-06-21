@@ -15,6 +15,8 @@ import {
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
 import { sumVendorCashDrawerInflows } from '../../utils/vendor-cash-drawer-inflow.js';
 import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
+import { refundAllocationFromReturnRecord } from '../../utils/order-return.js';
+import { refundTreasuryCashFromReturnRecord } from '../../utils/purchase-return.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 /** Business day boundaries for drawer close (store operations). */
@@ -340,19 +342,65 @@ function refundAllocationFromOrder(order) {
 }
 
 async function refundsByMethod(branchOid, start, end) {
-  const restored = await Order.find({
-    branch: branchOid,
-    status: 'restored',
-    restoredAt: { $gte: start, $lte: end },
-  })
-    .select('payments amountPaid paymentMethod orderNumber')
-    .lean();
+  const [legacyRestored, withReturns] = await Promise.all([
+    Order.find({
+      branch: branchOid,
+      status: 'restored',
+      restoredAt: { $gte: start, $lte: end },
+      $or: [{ returns: { $exists: false } }, { returns: { $size: 0 } }],
+    })
+      .select('payments amountPaid paymentMethod orderNumber')
+      .lean(),
+    Order.find({
+      branch: branchOid,
+      'returns.returnedAt': { $gte: start, $lte: end },
+    })
+      .select('returns orderNumber')
+      .lean(),
+  ]);
 
   let merged = {};
-  for (const o of restored) {
+  let count = 0;
+
+  for (const o of legacyRestored) {
     merged = mergeAmounts(merged, refundAllocationFromOrder(o));
+    count += 1;
   }
-  return { merged, count: restored.length };
+
+  for (const o of withReturns) {
+    for (const ret of o.returns || []) {
+      const t = ret.returnedAt ? new Date(ret.returnedAt).getTime() : NaN;
+      if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      merged = mergeAmounts(merged, refundAllocationFromReturnRecord(ret));
+      count += 1;
+    }
+  }
+
+  return { merged, count };
+}
+
+async function sumPurchaseReturnCashDrawerInflow(branchOid, start, end) {
+  const rows = await ProductPurchaseRequest.find({
+    branch: branchOid,
+    'returns.returnedAt': { $gte: start, $lte: end },
+  })
+    .select('returns')
+    .lean();
+
+  let total = 0;
+  let count = 0;
+  for (const r of rows) {
+    for (const ret of r.returns || []) {
+      const t = ret.returnedAt ? new Date(ret.returnedAt).getTime() : NaN;
+      if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      const cash = refundTreasuryCashFromReturnRecord(ret);
+      if (cash > 0) {
+        total = round2(total + cash);
+        count += 1;
+      }
+    }
+  }
+  return { purchaseReturnCashDrawerTotal: total, purchaseReturnCashDrawerCount: count };
 }
 
 async function invoiceCountForDay(branchOid, start, end) {
@@ -449,6 +497,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     vendorCashInflowInfo,
     clientCashInfo,
     clientDepositCashInfo,
+    purchaseReturnInfo,
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
@@ -459,6 +508,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     sumVendorCashDrawerInflows(branchOid, start, end),
     sumClientCreditOrderCashPayments(branchOid, start, end),
     sumClientCashDrawerInflows(branchOid, start, end),
+    sumPurchaseReturnCashDrawerInflow(branchOid, start, end),
   ]);
 
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
@@ -468,6 +518,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
   const vendorCashFromDrawer = vendorCashInfo.vendorCashDrawerTotal;
   const vendorCashInDrawer = vendorCashInflowInfo.vendorCashDrawerInflowTotal;
   const clientDepositCashIn = clientDepositCashInfo.clientDepositCashDrawerTotal;
+  const purchaseReturnCashIn = purchaseReturnInfo.purchaseReturnCashDrawerTotal;
   const periodNetCashMovements = round2(
     cashReceived -
       cashRefunded -
@@ -475,7 +526,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
       deskCashFromDrawer -
       vendorCashFromDrawer +
       vendorCashInDrawer +
-      clientDepositCashIn
+      clientDepositCashIn +
+      purchaseReturnCashIn
   );
 
   return {

@@ -13,6 +13,7 @@ import {
   resolveProductAcquiredFrom,
   shouldClearAcquiredFrom,
 } from '../../utils/product-source-party.js';
+import { buildProductHistoryEvents } from '../../utils/product-history.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -2166,5 +2167,45 @@ export const getProductStats = async (req, res) => {
   } catch (error) {
     console.error('Error fetching product stats:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/** GET /api/products/:id/history — full timeline for one product row */
+export const getProductHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const product = await Product.findById(id)
+      .populate('category', 'name code')
+      .populate('branch', 'name')
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const { events } = await buildProductHistoryEvents(product);
+
+    res.json({
+      product: {
+        _id: product._id,
+        name: product.name,
+        code: product.code,
+        stock: product.stock,
+        inWarehouse: !!product.inWarehouse,
+        branch: product.branch,
+        category: product.category,
+        addedBy: product.addedBy || '',
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+      },
+      events,
+    });
+  } catch (error) {
+    console.error('getProductHistory:', error);
+    res.status(500).json({ error: 'Failed to fetch product history' });
   }
 };

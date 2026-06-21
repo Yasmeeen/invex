@@ -96,6 +96,63 @@ const orderSchema = new mongoose.Schema(
       },
     ],
 
+    /** Partial / full invoice returns (refunds, drawer, credit adjustments). */
+    returns: [
+      {
+        returnedAt: { type: Date, required: true },
+        returnedByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: false,
+        },
+        returnAll: { type: Boolean, default: false },
+        items: [
+          {
+            productId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "Product",
+              required: true,
+            },
+            quantity: { type: Number, required: true, min: 1 },
+            unitRefundPrice: { type: Number, required: true, min: 0 },
+            lineTotal: { type: Number, required: true, min: 0 },
+          },
+        ],
+        refundTotal: { type: Number, required: true, min: 0 },
+        /** Customer payment methods used to refund (mirrors original checkout). */
+        refundPaymentSplits: {
+          type: [
+            {
+              method: { type: String, trim: true, required: true },
+              amount: { type: Number, required: true, min: 0 },
+            },
+          ],
+          default: undefined,
+        },
+        /** When cash portion is refunded via purchase treasury instead of drawer. */
+        refundTreasurySplits: {
+          type: [
+            {
+              key: { type: String, trim: true, required: true },
+              label: { type: String, trim: true, default: '' },
+              amount: { type: Number, required: true, min: 0 },
+            },
+          ],
+          default: undefined,
+        },
+        /** drawer = physical cash; treasury = purchase treasury for cash portion. */
+        cashRefundVia: {
+          type: String,
+          enum: ['drawer', 'treasury'],
+          default: 'drawer',
+          trim: true,
+        },
+        /** Amount applied to reduce credit balance (بيع بالآجل) instead of cash refund. */
+        creditAdjustmentAmount: { type: Number, default: 0, min: 0 },
+        note: { type: String, default: "", trim: true },
+      },
+    ],
+
     products: [
       {
         productId: {
@@ -106,6 +163,8 @@ const orderSchema = new mongoose.Schema(
         name: { type: String, required: true },
         code: { type: String, required: true },
         quantity: { type: Number, required: true },
+        /** Units already returned on this line. */
+        returnedQuantity: { type: Number, default: 0, min: 0 },
         price: { type: Number, required: true },
         /** Snapshot item cost at time of sale (for profit reports). */
         cost: { type: Number, required: false, default: 0, min: 0 },
@@ -125,7 +184,7 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["completed", "restored"],
+      enum: ["completed", "partially_restored", "restored"],
       default: "completed",
     },
 

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
@@ -22,6 +23,7 @@ import {
   recordDeskPurchaseDeferredPayment,
   syncDeferredSupplierDeskPurchase,
 } from '../../utils/desk-purchase-deferred.js';
+import { processPurchaseReturn } from '../../utils/purchase-return.js';
 import {
   deskPurchaseLineTotal,
   normalizePurchaseTreasuryInput,
@@ -134,17 +136,31 @@ export const getProductPurchaseRequest = async (req, res) => {
 
 export const listProductPurchaseRequests = async (req, res) => {
   try {
-    const { status, branchId, page = 1, limit = 20 } = req.query;
+    const { status, branchId, page = 1, limit = 20, from, to } = req.query;
     const p = Math.max(1, Number(page) || 1);
     const lim = Math.max(1, Math.min(50, Number(limit) || 20));
     const skip = (p - 1) * lim;
 
     const q = {};
-    if (status && ['pending', 'approved', 'rejected'].includes(String(status))) {
+    if (
+      status &&
+      ['pending', 'approved', 'rejected', 'partially_returned', 'returned'].includes(String(status))
+    ) {
       q.status = String(status);
     }
     if (branchId && mongoose.Types.ObjectId.isValid(String(branchId))) {
       q.branch = new mongoose.Types.ObjectId(String(branchId));
+    }
+    if (from || to) {
+      const timezone = 'Africa/Cairo';
+      const createdAt = {};
+      if (from) {
+        createdAt.$gte = moment.tz(String(from).trim(), 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
+      }
+      if (to) {
+        createdAt.$lte = moment.tz(String(to).trim(), 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
+      }
+      q.createdAt = createdAt;
     }
 
     const [items, total] = await Promise.all([
@@ -1014,6 +1030,79 @@ export const recordProductPurchaseDeferredPayment = async (req, res) => {
     const status =
       msg.includes('not found') || msg.includes('Nothing remaining') ? 400 : 500;
     console.error('recordProductPurchaseDeferredPayment:', error);
+    return res.status(status).json({ error: msg });
+  }
+};
+
+/** POST partial or full return on approved desk purchase invoice. */
+export const returnProductPurchaseRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid purchase id' });
+    }
+    if (!body.userId || !mongoose.Types.ObjectId.isValid(String(body.userId))) {
+      return res.status(400).json({ error: 'Valid userId is required' });
+    }
+
+    const actor = await User.findById(body.userId).select('_id name role branch').lean();
+    if (!actor) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const purchase = await ProductPurchaseRequest.findById(id);
+    if (!purchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+
+    const isAllowed =
+      actor.role === 'Super Admin' ||
+      actor.role === 'Co Admin' ||
+      actor.role === 'Cashier' ||
+      (actor.role === 'Branch Manager' &&
+        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch)));
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'You cannot return this purchase' });
+    }
+
+    const result = await processPurchaseReturn(purchase, {
+      returnAll: body.returnAll === true || body.returnAll === 'true',
+      quantity: body.quantity,
+      unitRefundPrice: body.unitRefundPrice,
+      returnedProductIds: body.returnedProductIds,
+      userId: body.userId,
+      branchId: body.branchId,
+      note: body.note,
+      cashRefundVia: body.cashRefundVia,
+      cashTreasuryKey: body.cashTreasuryKey,
+      cashTreasuryLabel: body.cashTreasuryLabel,
+    });
+
+    await auditLog(req, {
+      action: 'return',
+      module: 'product_purchase_requests',
+      entityType: 'ProductPurchaseRequest',
+      entityId: purchase._id,
+      message: 'Desk purchase return processed',
+      metadata: {
+        refundTotal: result.returnRecord?.refundTotal,
+        quantity: result.returnRecord?.quantity,
+        status: result.purchase?.status,
+      },
+    });
+
+    return res.json({
+      message: '✅ Purchase return processed',
+      purchase: result.purchase,
+      returnRecord: result.returnRecord,
+    });
+  } catch (error) {
+    const msg = error?.message || 'Failed to process purchase return';
+    const status =
+      msg.includes('not found') ? 404 : msg.includes('cannot') || msg.includes('already') || msg.includes('Only') ? 400 : 500;
+    console.error('returnProductPurchaseRequest:', error);
     return res.status(status).json({ error: msg });
   }
 };

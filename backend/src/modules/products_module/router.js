@@ -18,6 +18,7 @@ import {
     rejectBranchTransfer,
     listBranchTransfers,
     getPendingBranchTransferCount,
+    getProductHistory,
   } from './service.js';
   
 
@@ -33,6 +34,7 @@ router.post('/transfer-stock', transferProductStock);
 router.post('/branch-transfer/request', requestBranchTransfer);
 router.post('/branch-transfer/:id/approve', approveBranchTransfer);
 router.post('/branch-transfer/:id/reject', rejectBranchTransfer);
+router.get('/:id/history', getProductHistory);
 router.get('/:id', getProductById);        // GET one by ID
 router.post('/createProduct', createProduct);           // POST create
 router.post('/import-excel', importProductsFromExcelRows);

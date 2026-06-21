@@ -13,11 +13,48 @@ const productPurchaseRequestSchema = new mongoose.Schema(
   {
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'approved', 'rejected', 'partially_returned', 'returned'],
       default: 'pending',
       index: true,
       trim: true,
     },
+
+    /** Units returned to the source party (approved purchases only). */
+    returnedQuantity: { type: Number, default: 0, min: 0 },
+
+    /** When fully returned — used for drawer reconciliation timing. */
+    returnedAt: { type: Date, required: false, index: true },
+
+    returns: [
+      {
+        returnedAt: { type: Date, required: true },
+        returnedByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: false,
+        },
+        quantity: { type: Number, required: true, min: 1 },
+        unitRefundPrice: { type: Number, required: true, min: 0 },
+        refundTotal: { type: Number, required: true, min: 0 },
+        /** How the store receives/pays the refund (mirrors original purchase treasuries). */
+        refundTreasurySplits: { type: [purchaseTreasurySplitSchema], default: undefined },
+        /** drawer = physical cash in drawer; treasury = non-cash purchase treasury for cash portion. */
+        cashRefundVia: {
+          type: String,
+          enum: ['drawer', 'treasury'],
+          default: 'drawer',
+          trim: true,
+        },
+        /** Deferred portion reversed on vendor/client ledger. */
+        deferredAdjustmentAmount: { type: Number, default: 0, min: 0 },
+        /** Product ids removed from stock (multi-code purchases). */
+        returnedProductIds: {
+          type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+          default: undefined,
+        },
+        note: { type: String, default: '', trim: true },
+      },
+    ],
 
     branch: {
       type: mongoose.Schema.Types.ObjectId,

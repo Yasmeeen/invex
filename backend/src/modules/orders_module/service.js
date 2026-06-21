@@ -4,13 +4,19 @@ import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Client from "../../DB/models/client.model.js";
 import Vendor from '../../DB/models/vendor.model.js';
+import User from '../../DB/models/user.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import { auditLog } from '../audit_module/audit.service.js';
 import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
 import { recordExchangeSettlement } from '../../utils/exchange-settlement.js';
+import {
+  processFullOrderRestore,
+  processOrderReturn,
+} from '../../utils/order-return.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -87,14 +93,31 @@ export const getOrders = async (req, res) => {
     const {
       page = 1,
       limit = 10,
+      perPage,
       search = '',
       searchBranch = '',
       status,
       paymentMethod,
+      from,
+      to,
     } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const pageLimit = Math.max(1, Number(limit) || Number(perPage) || 10);
+    const skip = (Number(page) - 1) * pageLimit;
 
     const query = {};
+
+    // ✅ 0. Optional createdAt date range (Cairo business days)
+    if (from || to) {
+      const timezone = 'Africa/Cairo';
+      const createdAt = {};
+      if (from) {
+        createdAt.$gte = moment.tz(String(from).trim(), 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
+      }
+      if (to) {
+        createdAt.$lte = moment.tz(String(to).trim(), 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
+      }
+      query.createdAt = createdAt;
+    }
 
     // ✅ 1. Optional status filter
     if (status && status.trim() !== '') {
@@ -142,17 +165,17 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt branch products'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.invoiceAttributes'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(pageLimit),
 
       Order.countDocuments(query),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / pageLimit);
 
     // ✅ 5. Respond
     res.json({
@@ -506,6 +529,12 @@ export const createOrder = async (req, res) => {
         ? 'partial'
         : 'unpaid';
 
+    let resolvedSellerName = String(sellerName || '').trim();
+    if (!resolvedSellerName && userId && mongoose.Types.ObjectId.isValid(String(userId))) {
+      const sellerUser = await User.findById(userId).select('name').session(session).lean();
+      resolvedSellerName = String(sellerUser?.name || '').trim();
+    }
+
     // ======================
     // 3️⃣ GENERATE ORDER NUMBER
     // ======================
@@ -525,7 +554,7 @@ export const createOrder = async (req, res) => {
           clientName: saleClientName,
           clientPhoneNumber: saleClientPhone,
           clientAddress: saleClientAddress,
-          sellerName,
+          sellerName: resolvedSellerName,
           paymentMethod: resolvedPaymentMethod,
           branch,
           products: orderProducts,
@@ -856,74 +885,65 @@ export const updateOrder = async (req, res) => {
 export const restoreOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const actorUserId = req.body?.userId || req.query?.userId;
+    const body = req.body || {};
+    const actorUserId = body.userId || req.query?.userId;
 
-    // ✅ Get order directly (no populate)
     const order = await Order.findById(orderId);
-
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (order.status === 'restored') {
-      return res.status(400).json({ error: 'Order is already restored' });
+    const hasPartialPayload =
+      body.returnAll === true ||
+      body.returnAll === 'true' ||
+      (Array.isArray(body.items) && body.items.length > 0);
+
+    let result;
+    if (hasPartialPayload) {
+      result = await processOrderReturn(order, {
+        returnAll: body.returnAll === true || body.returnAll === 'true',
+        items: body.items,
+        userId: actorUserId,
+        branchId: body.branchId,
+        note: body.note,
+        cashRefundVia: body.cashRefundVia,
+        cashTreasuryKey: body.cashTreasuryKey,
+        cashTreasuryLabel: body.cashTreasuryLabel,
+      });
+    } else {
+      result = await processFullOrderRestore(order, {
+        userId: actorUserId,
+        note: body.note,
+      });
     }
 
-    // ✅ Restore stock for each product
-    for (const item of order.products) {
-      if (!item.productId) continue; // skip malformed data
-
-      const product = await Product.findById(item.productId);
-      if (product) {
-        product.stock += item.quantity;
-        await product.save();
-
-        try {
-          await StockMovement.create({
-            movementType: 'return',
-            productId: product._id,
-            productName: product.name,
-            branchId: order.branch || null,
-            fromBranchId: null,
-            toBranchId: order.branch || null,
-            quantity: Number(item.quantity || 0),
-            unitPrice: Number(item.price || 0),
-            totalValue: Number(item.price || 0) * Number(item.quantity || 0),
-            referenceType: 'order',
-            referenceId: order._id,
-            notes: `Restore order #${order.orderNumber}`,
-          });
-        } catch (movementError) {
-          console.error('⚠️ Failed to log return stock movement:', movementError.message);
-        }
-
-        console.log(`✅ Restored ${item.quantity} to ${product.name} (new stock: ${product.stock})`);
-      } else {
-        console.warn(`⚠️ Product not found for ID: ${item.productId}`);
-      }
-    }
-
-    // ✅ Update order status
-    order.status = 'restored';
-    order.restoredAt = new Date();
-    await order.save();
+    const updated = result.order;
 
     await auditLog(req, {
       action: 'restore',
       module: 'orders',
       entityType: 'Order',
-      entityId: order?._id,
-      message: `Order restored #${order?.orderNumber ?? ''}`.trim(),
-      metadata: { orderNumber: order?.orderNumber, branch: order?.branch, status: order?.status, actorUserId },
+      entityId: updated?._id,
+      message: `Order return #${updated?.orderNumber ?? ''}`.trim(),
+      metadata: {
+        orderNumber: updated?.orderNumber,
+        branch: updated?.branch,
+        status: updated?.status,
+        refundTotal: result.returnRecord?.refundTotal,
+        actorUserId,
+      },
     });
 
     res.json({
-      message: '✅ Order restored successfully',
-      restoredOrder: order,
+      message: '✅ Order return processed successfully',
+      restoredOrder: updated,
+      returnRecord: result.returnRecord,
     });
   } catch (error) {
     console.error('❌ Error restoring order:', error);
-    res.status(500).json({ error: 'Server error restoring order', details: error.message });
+    const msg = error?.message || 'Server error restoring order';
+    const status = msg.includes('not found') ? 404 : msg.includes('already') ? 400 : 500;
+    res.status(status).json({ error: msg, details: error.message });
   }
 };
 

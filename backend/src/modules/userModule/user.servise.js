@@ -4,10 +4,10 @@ import { auditLog } from '../audit_module/audit.service.js';
 
 import bcrypt from 'bcryptjs';
 
-const GLOBAL_ADMIN_ROLES = ['Super Admin', 'Co Admin'];
+const BRANCHLESS_ROLES = ['Super Admin', 'Co Admin', 'Moderator'];
 
-function isGlobalAdminRole(role) {
-  return GLOBAL_ADMIN_ROLES.includes(String(role || '').trim());
+function isBranchlessRole(role) {
+  return BRANCHLESS_ROLES.includes(String(role || '').trim());
 }
 
 // Get all users (with pagination and optional search)
@@ -84,7 +84,7 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (!isGlobalAdminRole(role) && !branchId) {
+    if (!isBranchlessRole(role) && !branchId) {
       return res.status(400).json({ error: 'Branch is required for this role' });
     }
 
@@ -94,7 +94,7 @@ export const createUser = async (req, res) => {
     }
 
     let branchRef = null;
-    if (!isGlobalAdminRole(role)) {
+    if (!isBranchlessRole(role)) {
       const branch = await Branch.findById(branchId);
       if (!branch) {
         return res.status(404).json({ error: 'Branch not found' });
@@ -138,7 +138,7 @@ export const updateUser = async (req, res) => {
       updates.mustChangePassword = true;
     }
 
-    if (isGlobalAdminRole(role)) {
+    if (isBranchlessRole(role)) {
       updates.branch = null;
     } else if (branchId) {
       const branch = await Branch.findById(branchId);

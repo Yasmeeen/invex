@@ -73,6 +73,7 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
   cashRefundVia: CashRefundVia = 'drawer';
   cashTreasuryKey = '';
   treasuryMethodOptions: { key: string; label: string }[] = [];
+  alternateTreasuryOptions: { key: string; label: string }[] = [];
   showAgeWarning = false;
   invoiceAgeDays = 0;
 
@@ -155,10 +156,6 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
 
   get showCashChoice(): boolean {
     return this.cashPortionAmount > 0.005;
-  }
-
-  get alternateTreasuryOptions(): { key: string; label: string }[] {
-    return this.treasuryMethodOptions.filter((o) => o.key !== 'cash');
   }
 
   get displayRefundPreview(): RefundAllocationRow[] {
@@ -292,6 +289,10 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
     }
   }
 
+  onCashTreasuryChange(key: string): void {
+    this.cashTreasuryKey = String(key || '').trim().toLowerCase();
+  }
+
   toggleUnitCode(id: string): void {
     if (this.selectedUnitCodes.has(id)) {
       this.selectedUnitCodes.delete(id);
@@ -311,6 +312,7 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
         label: String(x.label || x.key || '').trim(),
       }))
       .filter((o) => o.key && o.key !== 'deferred');
+    this.alternateTreasuryOptions = this.treasuryMethodOptions.filter((o) => o.key !== 'cash');
 
     if (!this.cashTreasuryKey || !this.alternateTreasuryOptions.some((o) => o.key === this.cashTreasuryKey)) {
       this.cashTreasuryKey = this.alternateTreasuryOptions[0]?.key || '';

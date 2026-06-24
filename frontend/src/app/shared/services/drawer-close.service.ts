@@ -31,6 +31,8 @@ export interface DrawerClosePreview {
   periodNetCashMovements: number;
   paymentsReceivedByMethod: Record<string, number>;
   refundsByMethod: Record<string, number>;
+  /** Sales returns where cash was refunded via purchase treasury (not drawer cash). */
+  salesReturnRefundsByTreasury?: DeskPurchaseTreasuryLine[];
   restoredInvoiceCount: number;
   invoiceCount: number;
   dailyExpenseTotal: number;

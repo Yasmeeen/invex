@@ -98,7 +98,7 @@
                         </ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
-                      <p class="size-small steel mt-2 mb-0" *ngIf="isGlobalAdminRole(roleNg.value)">
+                      <p class="size-small steel mt-2 mb-0" *ngIf="roleNg.value && !showBranchField(roleNg.value)">
                         {{ 'tr_user_all_branches_access_hint' | translate }}
                       </p>
 

@@ -334,9 +334,9 @@ body {
 }
 
 .filters-card {
-  ::ng-deep .products-filter-ng-select.ng-select.ng-select-multiple .ng-select-container {
-    min-height: 2.375rem;
-  }
+  // ::ng-deep .products-filter-ng-select.ng-select.ng-select-multiple .ng-select-container {
+  //   min-height: 2.375rem;
+  // }
 
   ::ng-deep .input-icon {
     pointer-events: none;

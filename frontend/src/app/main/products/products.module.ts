@@ -13,6 +13,7 @@ import { ImportProductsDialogComponent } from './import-products-dialog/import-p
 import { TransferProductBranchDialogComponent } from './transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { PendingBranchTransfersDialogComponent } from './pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
+import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 
 
 @NgModule({
@@ -24,6 +25,7 @@ import { ProductHistoryDialogComponent } from './product-history-dialog/product-
     TransferProductBranchDialogComponent,
     PendingBranchTransfersDialogComponent,
     ProductHistoryDialogComponent,
+    ProductInventoryAuditDialogComponent,
   ],
   imports: [
     CommonModule,

@@ -10,6 +10,7 @@ import { NgForm } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
 import { User } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
+import { isBranchlessUserRole } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-create-edit-user',
@@ -33,19 +34,13 @@ export class CreateEditUserComponent implements OnInit {
     'Moderator',
   ];
 
-  /** Super Admin / Co Admin — no single branch; API stores branch = null. */
-  isGlobalAdminRole(role: string | null | undefined): boolean {
-    const r = String(role || '').trim();
-    return r === 'Super Admin' || r === 'Co Admin';
-  }
-
   /** Show branch picker only when the role is tied to one branch. */
   showBranchField(role: string | null | undefined): boolean {
-    return !!role && !this.isGlobalAdminRole(role);
+    return !!role && !isBranchlessUserRole(role);
   }
 
   onRoleChange(role: string): void {
-    if (this.isGlobalAdminRole(role) && this.basicInfoForm?.form) {
+    if (isBranchlessUserRole(role) && this.basicInfoForm?.form) {
       this.basicInfoForm.form.patchValue({ branchId: null });
     }
   }
@@ -117,7 +112,7 @@ export class CreateEditUserComponent implements OnInit {
       return;
     }
     const payload: any = { ...this.user };
-    if (this.isGlobalAdminRole(payload.role)) {
+    if (isBranchlessUserRole(payload.role)) {
       delete payload.branchId;
     }
 
@@ -140,7 +135,7 @@ export class CreateEditUserComponent implements OnInit {
     if (p == null || String(p).trim() === '') {
       delete (this.user as any).password;
     }
-    if (this.isGlobalAdminRole((this.user as any).role)) {
+    if (isBranchlessUserRole((this.user as any).role)) {
       delete (this.user as any).branchId;
     }
 

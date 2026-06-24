@@ -19,12 +19,14 @@ import {
     listBranchTransfers,
     getPendingBranchTransferCount,
     getProductHistory,
+    getProductsInventoryAudit,
   } from './service.js';
   
 
 router.get('/', getProducts);   
 router.get('/getProductsStats', getProductStats);             // GET all with pagination/search
 router.get('/import-metadata', getProductsImportMetadata);
+router.get('/inventory-audit', getProductsInventoryAudit);
 router.get('/branch-transfers/pending-count', getPendingBranchTransferCount);
 router.get('/branch-transfers', listBranchTransfers);
 router.get("/barcode-pdf", generateBarcodePDF);

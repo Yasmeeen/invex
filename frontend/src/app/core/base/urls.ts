@@ -28,6 +28,7 @@ export const PRODUCT_DELETE_PRODUCT_URL = PRODUCTS_URL + '/deleteProduct';
 export const PRODUCT_STATS =  PRODUCTS_URL +'/getProductsStats'
 export const PRODUCTS_IMPORT_METADATA_URL = PRODUCTS_URL + '/import-metadata';
 export const PRODUCTS_IMPORT_EXCEL_URL = PRODUCTS_URL + '/import-excel';
+export const PRODUCTS_INVENTORY_AUDIT_URL = PRODUCTS_URL + '/inventory-audit';
 
 export const CATEGORYS_URL = BASE_URL + '/categories';
 export const CATEGORY_CREATE_CATEGORY_URL = CATEGORYS_URL+ '/createCategory';

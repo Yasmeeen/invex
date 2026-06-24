@@ -291,6 +291,11 @@ const parseOidCsvList = (raw) => {
     .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
 };
 
+const toObjectIds = (ids) =>
+  (ids || []).map((id) =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id))
+  );
+
 export const getProductsImportMetadata = async (_req, res) => {
   try {
     const [branches, categories] = await Promise.all([
@@ -851,79 +856,84 @@ export const generateBarcodeImage = async (req, res) => {
 
 
 
+/** Shared list filters for GET /products and inventory audit. */
+function buildProductsListQuery(queryParams = {}) {
+  const {
+    search = '',
+    branchId,
+    warehouseOnly,
+    excludeWarehouse,
+    booked,
+    categoryId,
+    attrKey,
+    attrValue,
+  } = queryParams;
+
+  const query = {};
+  const andParts = [];
+
+  if (booked === 'true' || booked === true) {
+    query.bookingStatus = 'active';
+  } else if (booked === 'false' || booked === false) {
+    andParts.push({
+      $or: [
+        { bookingStatus: { $ne: 'active' } },
+        { bookingStatus: { $exists: false } },
+      ],
+    });
+  }
+
+  if (search) {
+    andParts.push({
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { code: { $regex: search, $options: 'i' } },
+      ],
+    });
+  }
+
+  if (warehouseOnly === 'true' || warehouseOnly === true) {
+    query.inWarehouse = true;
+  } else if (excludeWarehouse === 'true' || excludeWarehouse === true) {
+    query.inWarehouse = { $ne: true };
+  }
+
+  const categoryIds = toObjectIds(parseOidCsvList(categoryId));
+  if (categoryIds.length === 1) {
+    query.category = categoryIds[0];
+  } else if (categoryIds.length > 1) {
+    query.category = { $in: categoryIds };
+  }
+
+  const branchIds = toObjectIds(parseOidCsvList(branchId));
+  if (branchIds.length === 1) {
+    query.branch = branchIds[0];
+  } else if (branchIds.length > 1) {
+    query.branch = { $in: branchIds };
+  }
+
+  if (attrKey && attrValue) {
+    const k = String(attrKey).trim().toLowerCase().replace(/\s+/g, '_');
+    const v = String(attrValue).trim();
+    if (k && v) {
+      andParts.push({
+        [`attributes.${k}`]: { $regex: v, $options: 'i' },
+      });
+    }
+  }
+
+  if (andParts.length) {
+    query.$and = andParts;
+  }
+
+  return query;
+}
+
 export const getProducts = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search = '',
-      branchId,
-      warehouseOnly,
-      excludeWarehouse,
-      booked,
-      categoryId,
-      attrKey,
-      attrValue,
-    } = req.query;
+    const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-
-    // Build query
-    const query = {};
-    const andParts = [];
-
-    if (booked === 'true' || booked === true) {
-      query.bookingStatus = 'active';
-    } else if (booked === 'false' || booked === false) {
-      andParts.push({
-        $or: [
-          { bookingStatus: { $ne: 'active' } },
-          { bookingStatus: { $exists: false } },
-        ],
-      });
-    }
-
-    if (search) {
-      andParts.push({
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { code: { $regex: search, $options: 'i' } },
-        ],
-      });
-    }
-
-    if (warehouseOnly === 'true' || warehouseOnly === true) {
-      query.inWarehouse = true;
-    } else if (excludeWarehouse === 'true' || excludeWarehouse === true) {
-      query.inWarehouse = { $ne: true };
-    }
-
-    const categoryIds = parseOidCsvList(categoryId);
-    if (categoryIds.length === 1) {
-      query.category = categoryIds[0];
-    } else if (categoryIds.length > 1) {
-      query.category = { $in: categoryIds };
-    }
-
-    const branchIds = parseOidCsvList(branchId);
-    if (branchIds.length === 1) {
-      query.branch = branchIds[0];
-    } else if (branchIds.length > 1) {
-      query.branch = { $in: branchIds };
-    }
-
-    if (attrKey && attrValue) {
-      const k = String(attrKey).trim().toLowerCase().replace(/\s+/g, '_');
-      const v = String(attrValue).trim();
-      if (k && v) {
-        andParts.push({
-          [`attributes.${k}`]: { $regex: v, $options: 'i' },
-        });
-      }
-    }
-
-    if (andParts.length) {
-      query.$and = andParts;
-    }
+    const query = buildProductsListQuery(req.query);
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -2144,6 +2154,111 @@ export const transferProductStock = async (req, res) => {
     session.endSession();
     console.error("❌ Error transferring stock:", error.message);
     return res.status(500).json({ error: "Failed to transfer stock" });
+  }
+};
+
+/** GET /products/inventory-audit — stock totals for current list filters, grouped by location. */
+export const getProductsInventoryAudit = async (req, res) => {
+  try {
+    const query = buildProductsListQuery(req.query);
+    const search = String(req.query.search || '').trim();
+
+    const [totalsAgg, byLocationRaw] = await Promise.all([
+      Product.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            productsCount: { $sum: 1 },
+            totalStock: { $sum: { $ifNull: ['$stock', 0] } },
+            totalBooked: { $sum: { $ifNull: ['$bookedQuantity', 0] } },
+            totalTransferReserved: { $sum: { $ifNull: ['$transferReservedQuantity', 0] } },
+          },
+        },
+      ]),
+      Product.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: {
+              inWarehouse: { $ifNull: ['$inWarehouse', false] },
+              branch: '$branch',
+            },
+            productsCount: { $sum: 1 },
+            totalStock: { $sum: { $ifNull: ['$stock', 0] } },
+            totalBooked: { $sum: { $ifNull: ['$bookedQuantity', 0] } },
+            totalTransferReserved: { $sum: { $ifNull: ['$transferReservedQuantity', 0] } },
+          },
+        },
+        {
+          $lookup: {
+            from: 'branches',
+            localField: '_id.branch',
+            foreignField: '_id',
+            as: 'branchDoc',
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            inWarehouse: '$_id.inWarehouse',
+            branchId: '$_id.branch',
+            branchName: {
+              $cond: [
+                { $eq: ['$_id.inWarehouse', true] },
+                null,
+                { $ifNull: [{ $arrayElemAt: ['$branchDoc.name', 0] }, 'N/A'] },
+              ],
+            },
+            productsCount: 1,
+            totalStock: 1,
+            totalBooked: 1,
+            totalTransferReserved: 1,
+          },
+        },
+        {
+          $sort: {
+            inWarehouse: 1,
+            branchName: 1,
+          },
+        },
+      ]),
+    ]);
+
+    const totals = totalsAgg[0] || {
+      productsCount: 0,
+      totalStock: 0,
+      totalBooked: 0,
+      totalTransferReserved: 0,
+    };
+
+    const byLocation = (byLocationRaw || []).map((row) => ({
+      ...row,
+      totalAvailable: Math.max(
+        0,
+        (row.totalStock || 0) - (row.totalBooked || 0) - (row.totalTransferReserved || 0)
+      ),
+    }));
+
+    res.json({
+      search: search || null,
+      totals: {
+        productsCount: totals.productsCount || 0,
+        totalStock: totals.totalStock || 0,
+        totalBooked: totals.totalBooked || 0,
+        totalTransferReserved: totals.totalTransferReserved || 0,
+        totalAvailable: Math.max(
+          0,
+          (totals.totalStock || 0) -
+            (totals.totalBooked || 0) -
+            (totals.totalTransferReserved || 0)
+        ),
+      },
+      byLocation,
+    });
+  } catch (error) {
+    console.error('getProductsInventoryAudit:', error);
+    res.status(500).json({ error: 'Failed to generate products inventory audit' });
   }
 };
 

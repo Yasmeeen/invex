@@ -14,6 +14,21 @@
     0 4px 6px rgba(0, 0, 0, 0.06),
     0 18px 40px rgba(15, 23, 42, 0.14);
 
+  .input-with-icon {
+    ng-select.ng-select {
+      position: relative;
+      z-index: 3;
+    }
+
+    ng-select.ng-select .ng-select-container {
+      position: relative !important;
+    }
+
+    .input-icon {
+      pointer-events: none;
+    }
+  }
+
   &__title {
     flex-shrink: 0;
     margin: 0;

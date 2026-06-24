@@ -29,6 +29,7 @@ import { ProductsImportMetadata } from '@shared/services/products.service';
 import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { PendingBranchTransfersDialogComponent } from '../pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
+import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 
 @Component({
   selector: 'app-products-list',
@@ -220,6 +221,50 @@ export class ProductsListComponent implements OnInit {
     });
   }
 
+  /** Build API filter params shared by list + inventory audit. */
+  buildProductsFilterParams(): Record<string, string | boolean> {
+    const filterParams: Record<string, string | boolean> = {};
+    if (this.selectedCategories?.length) {
+      filterParams['categoryId'] = this.selectedCategories.filter(Boolean).join(',');
+    }
+    if (this.selectedAttributeKey && this.selectedAttributeValue) {
+      filterParams['attrKey'] = this.selectedAttributeKey;
+      filterParams['attrValue'] = this.selectedAttributeValue;
+    }
+    if (this.bookingFilter === 'with_bookings') {
+      filterParams['booked'] = 'true';
+    } else if (this.bookingFilter === 'without_bookings') {
+      filterParams['booked'] = 'false';
+    }
+    if (this.locationFilter === 'warehouse') {
+      filterParams['warehouseOnly'] = true;
+    } else if (this.locationFilter === 'branches') {
+      filterParams['excludeWarehouse'] = true;
+      if (this.selectedBranches?.length) {
+        filterParams['branchId'] = this.selectedBranches.filter(Boolean).join(',');
+      }
+    } else if (this.selectedBranches?.length) {
+      filterParams['branchId'] = this.selectedBranches.filter(Boolean).join(',');
+    }
+    const search = String(this.nameSearchTerm || this.params['search'] || '').trim();
+    if (search) {
+      filterParams['search'] = search;
+    }
+    return filterParams;
+  }
+
+  openProductsInventoryAudit(): void {
+    clearTimeout(this.searchTimeout);
+    clearTimeout(this.attributeSearchTimeout);
+    const filterParams = this.buildProductsFilterParams();
+    const searchLabel = String(this.nameSearchTerm || this.params['search'] || '').trim();
+    this.dialog.open(ProductInventoryAuditDialogComponent, {
+      width: '820px',
+      maxWidth: '96vw',
+      data: { filterParams, searchLabel },
+    });
+  }
+
   bookedQty(product: Product): number {
     return Math.max(0, Math.floor(Number(product.bookedQuantity) || 0));
   }
@@ -368,32 +413,9 @@ export class ProductsListComponent implements OnInit {
     delete this.params['categoryId'];
     delete this.params['attrKey'];
     delete this.params['attrValue'];
-    if (this.selectedCategories?.length) {
-      this.params['categoryId'] = this.selectedCategories.filter(Boolean).join(',');
-    }
-    if (this.selectedAttributeKey && this.selectedAttributeValue) {
-      this.params['attrKey'] = this.selectedAttributeKey;
-      this.params['attrValue'] = this.selectedAttributeValue;
-    }
-
-    if (this.bookingFilter === 'with_bookings') {
-      this.params['booked'] = 'true';
-    } else if (this.bookingFilter === 'without_bookings') {
-      this.params['booked'] = 'false';
-    }
-
-    if (this.locationFilter === 'warehouse') {
-      this.params['warehouseOnly'] = true;
-    } else if (this.locationFilter === 'branches') {
-      this.params['excludeWarehouse'] = true;
-      if (this.selectedBranches?.length) {
-        this.params['branchId'] = this.selectedBranches.filter(Boolean).join(',');
-      }
-    } else {
-      if (this.selectedBranches?.length) {
-        this.params['branchId'] = this.selectedBranches.filter(Boolean).join(',');
-      }
-    }
+    delete this.params['search'];
+    const filterParams = this.buildProductsFilterParams();
+    Object.assign(this.params, filterParams);
 
     this.subscriptions.push(this.productsService.getProducts(this.params).subscribe((response: any) => {
       this.productsList = response.products

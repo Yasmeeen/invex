@@ -1,4 +1,4 @@
-<div class="invoice-return-dialog">
+<div class="invoice-return-dialog" id="invoice-return-dialog-root">
   <h2 mat-dialog-title class="invoice-return-dialog__title">
     {{ (mode === 'sales' ? 'tr_invoice_return_sales_title' : 'tr_invoice_return_purchase_title') | translate }}
   </h2>
@@ -173,7 +173,12 @@
               bindLabel="label"
               bindValue="key"
               [clearable]="false"
+              [searchable]="true"
+              appendTo="body"
+              name="returnCashTreasury"
+              [ngModelOptions]="{ standalone: true }"
               [(ngModel)]="cashTreasuryKey"
+              (ngModelChange)="onCashTreasuryChange($event)"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>

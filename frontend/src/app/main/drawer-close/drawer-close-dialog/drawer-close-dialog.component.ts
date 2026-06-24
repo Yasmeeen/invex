@@ -13,6 +13,8 @@ import {
   DrawerClosePreview,
   DrawerCloseService,
 } from '@shared/services/drawer-close.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 
 export interface DrawerCloseDialogData {
   userId: string;
@@ -57,7 +59,8 @@ export class DrawerCloseDialogComponent implements OnInit {
     private drawerClose: DrawerCloseService,
     private branchesService: BranchesServce,
     private notify: AppNotificationService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private storeSettings: StoreSettingsService
   ) {
     const actor = this.auth.getUserFromLocalStorage();
     const forced = data.forcedBranchId ? String(data.forcedBranchId).trim() : '';
@@ -182,10 +185,11 @@ export class DrawerCloseDialogComponent implements OnInit {
   }
 
   payMethodLabel(method: string): string {
-    const m = String(method || '').toLowerCase();
-    const key = `tr_pay_${m}`;
-    const t = this.translate.instant(key);
-    return t !== key ? t : method;
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
   }
 
   deskCashDrawerAmount(p: DrawerClosePreview | null): number {

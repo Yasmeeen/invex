@@ -20,6 +20,11 @@ export function isModerator(role: string | undefined | null): boolean {
   return role === 'Moderator';
 }
 
+/** Roles stored without a fixed branch — see data across all branches. */
+export function isBranchlessUserRole(role: string | undefined | null): boolean {
+  return canPickBranchRole(role) || isModerator(role);
+}
+
 /** Book/reserve on any product (all branches + warehouse). */
 export function canBookAnyProduct(role: string | undefined | null): boolean {
   return canPickBranchRole(role) || isWarehouse(role) || isModerator(role);

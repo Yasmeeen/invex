@@ -15,7 +15,7 @@ import {
 import { sumVendorCashDrawerOutflows } from '../../utils/vendor-cash-drawer.js';
 import { sumVendorCashDrawerInflows } from '../../utils/vendor-cash-drawer-inflow.js';
 import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
-import { refundAllocationFromReturnRecord } from '../../utils/order-return.js';
+import { refundAllocationFromReturnRecord, salesReturnTreasuryRefundLines } from '../../utils/order-return.js';
 import { refundTreasuryCashFromReturnRecord } from '../../utils/purchase-return.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
@@ -379,6 +379,33 @@ async function refundsByMethod(branchOid, start, end) {
   return { merged, count };
 }
 
+/** Sales returns refunded via purchase treasury (informational — does not reduce drawer cash). */
+async function salesReturnRefundsByTreasury(branchOid, start, end) {
+  const orders = await Order.find({
+    branch: branchOid,
+    'returns.returnedAt': { $gte: start, $lte: end },
+  })
+    .select('returns')
+    .lean();
+
+  const byKey = {};
+  for (const o of orders) {
+    for (const ret of o.returns || []) {
+      const t = ret.returnedAt ? new Date(ret.returnedAt).getTime() : NaN;
+      if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      for (const line of salesReturnTreasuryRefundLines(ret)) {
+        if (!byKey[line.key]) {
+          byKey[line.key] = { key: line.key, label: line.label, total: 0, count: 0 };
+        }
+        byKey[line.key].total = round2(byKey[line.key].total + line.amount);
+        byKey[line.key].count += 1;
+      }
+    }
+  }
+
+  return Object.values(byKey).sort((a, b) => String(a.key).localeCompare(String(b.key)));
+}
+
 async function sumPurchaseReturnCashDrawerInflow(branchOid, start, end) {
   const rows = await ProductPurchaseRequest.find({
     branch: branchOid,
@@ -490,6 +517,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
   const [
     paymentsIn,
     refundInfo,
+    salesTreasuryRefunds,
     invoices,
     expenseTotal,
     deskInfo,
@@ -501,6 +529,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
+    salesReturnRefundsByTreasury(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
     sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
@@ -533,6 +562,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
   return {
     paymentsReceivedByMethod: paymentsIn,
     refundsByMethod: refundInfo.merged,
+    salesReturnRefundsByTreasury: salesTreasuryRefunds,
     restoredInvoiceCount: refundInfo.count,
     invoiceCount: invoices,
     dailyExpenseTotal: expenseTotal,
@@ -601,6 +631,7 @@ export const previewDrawerClose = async (req, res) => {
         expectedCashInDrawer: 0,
         paymentsReceivedByMethod: {},
         refundsByMethod: {},
+        salesReturnRefundsByTreasury: [],
         restoredInvoiceCount: 0,
         invoiceCount: 0,
         dailyExpenseTotal: 0,

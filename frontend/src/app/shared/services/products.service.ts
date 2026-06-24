@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
+import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_INVENTORY_AUDIT_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
 import { Category, Product, ProductHistoryResponse } from '@core/models/products.model';
 import { Observable } from 'rxjs';
@@ -28,6 +28,29 @@ export type ProductsImportResult = {
   createdCount: number;
   failedCount: number;
   errors: ProductsImportError[];
+};
+
+export type ProductsInventoryAuditLocation = {
+  inWarehouse: boolean;
+  branchId?: string;
+  branchName?: string | null;
+  productsCount: number;
+  totalStock: number;
+  totalBooked: number;
+  totalTransferReserved: number;
+  totalAvailable: number;
+};
+
+export type ProductsInventoryAuditResponse = {
+  search: string | null;
+  totals: {
+    productsCount: number;
+    totalStock: number;
+    totalBooked: number;
+    totalTransferReserved: number;
+    totalAvailable: number;
+  };
+  byLocation: ProductsInventoryAuditLocation[];
 };
 
 export type BranchTransferItem = {
@@ -203,6 +226,10 @@ getProductsStats(branchId?: any) {
 
 getProductHistory(productId: string): Observable<ProductHistoryResponse> {
   return this.http.get<ProductHistoryResponse>(`${PRODUCTS_URL}/${productId}/history`);
+}
+
+getProductsInventoryAudit(params: any): Observable<ProductsInventoryAuditResponse> {
+  return this.http.get<ProductsInventoryAuditResponse>(PRODUCTS_INVENTORY_AUDIT_URL, { params });
 }
 
 

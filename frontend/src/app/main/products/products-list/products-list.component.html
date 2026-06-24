@@ -48,6 +48,14 @@
         <i class="fa fa-filter text-primary" aria-hidden="false"></i>
       </button>
       <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="openProductsInventoryAudit()"
+      >
+        <i class="fa fa-clipboard text-primary" aria-hidden="true"></i>
+        {{ 'tr_products_inventory_audit' | translate }}
+      </button>
+      <button
         *ngIf="shouldShowPendingTransfersToolbar"
         type="button"
         class="s-btn btn-secondary size-body pending-transfers-btn"

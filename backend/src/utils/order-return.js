@@ -325,6 +325,28 @@ export function refundAllocationFromReturnRecord(returnRecord) {
   return map;
 }
 
+/** Treasury lines for sales returns where cash portion was refunded via purchase treasury (not drawer). */
+export function salesReturnTreasuryRefundLines(returnRecord) {
+  if (String(returnRecord?.cashRefundVia || 'drawer').toLowerCase() !== 'treasury') {
+    return [];
+  }
+  const lines = [];
+  for (const s of returnRecord?.refundTreasurySplits || []) {
+    const key = String(s?.key || '')
+      .trim()
+      .toLowerCase();
+    if (!key || key === 'cash' || key === 'deferred') continue;
+    const amount = round2(Number(s.amount || 0));
+    if (amount <= 0) continue;
+    lines.push({
+      key,
+      label: String(s.label || key).trim() || key,
+      amount,
+    });
+  }
+  return lines;
+}
+
 /** Legacy full restore — all remaining items at line price, proportional refund split. */
 export async function processFullOrderRestore(order, { userId, note } = {}) {
   return processOrderReturn(order, {

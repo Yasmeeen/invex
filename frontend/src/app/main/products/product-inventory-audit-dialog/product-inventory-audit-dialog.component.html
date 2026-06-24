@@ -1,0 +1,82 @@
+<div class="product-inventory-audit-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0">{{ 'tr_products_inventory_audit_title' | translate }}</h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
+
+  <ng-container *ngIf="!loading && audit">
+    <div class="audit-search-summary mb-3">
+      <span class="audit-search-summary__label">{{ 'tr_search' | translate }}:</span>
+      <strong>{{ searchSummary() }}</strong>
+    </div>
+
+    <div class="audit-totals row mb-4">
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_products_inventory_audit_total_products' | translate }}</span>
+        <strong>{{ audit.totals.productsCount }}</strong>
+      </div>
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_stock' | translate }}</span>
+        <strong>{{ audit.totals.totalStock }}</strong>
+      </div>
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_booked' | translate }}</span>
+        <strong>{{ audit.totals.totalBooked }}</strong>
+      </div>
+      <div class="col-md-3 col-6">
+        <span class="meta-label">{{ 'tr_available' | translate }}</span>
+        <strong>{{ audit.totals.totalAvailable }}</strong>
+      </div>
+    </div>
+
+    <h4 class="audit-section-title">{{ 'tr_products_inventory_audit_by_location' | translate }}</h4>
+
+    <div
+      class="empty-state-here text-center ptb-6"
+      *ngIf="!audit.byLocation?.length"
+    >
+      <i class="fa fa-folder-open empty-icon text-primary"></i>
+      <p>{{ 'tr_empty_state' | translate }}</p>
+    </div>
+
+    <div class="table-container" *ngIf="audit.byLocation?.length">
+      <table class="s-table table layout-fixed product-inventory-audit-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_location' | translate }}</th>
+            <th>{{ 'tr_products_inventory_audit_products_count' | translate }}</th>
+            <th>{{ 'tr_stock' | translate }}</th>
+            <th>{{ 'tr_booked' | translate }}</th>
+            <th>{{ 'tr_available' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of audit.byLocation">
+            <td>
+              <span
+                *ngIf="row.inWarehouse"
+                class="location-badge location-badge--warehouse"
+              >{{ locationLabel(row) }}</span>
+              <span *ngIf="!row.inWarehouse">{{ locationLabel(row) }}</span>
+            </td>
+            <td>{{ row.productsCount }}</td>
+            <td>{{ row.totalStock }}</td>
+            <td>{{ row.totalBooked }}</td>
+            <td>{{ row.totalAvailable }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="audit-table-total">
+            <td><strong>{{ 'tr_total' | translate }}</strong></td>
+            <td><strong>{{ audit.totals.productsCount }}</strong></td>
+            <td><strong>{{ audit.totals.totalStock }}</strong></td>
+            <td><strong>{{ audit.totals.totalBooked }}</strong></td>
+            <td><strong>{{ audit.totals.totalAvailable }}</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </ng-container>
+</div>

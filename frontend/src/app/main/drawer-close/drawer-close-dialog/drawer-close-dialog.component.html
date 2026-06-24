@@ -100,7 +100,22 @@
           <span>{{ payMethodLabel(row[0]) }}</span>
           <span>−{{ row[1] | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
         </div>
-        <div class="drawer-close-dialog__muted" *ngIf="methodEntries(preview.refundsByMethod).length === 0">
+        <ng-container *ngIf="preview.salesReturnRefundsByTreasury?.length">
+          <div class="drawer-close-dialog__muted size-small mb-1 mt-1">
+            {{ 'tr_drawer_close_sales_return_by_treasury' | translate }}
+          </div>
+          <div
+            class="drawer-close-dialog__row drawer-close-dialog__row--sub"
+            *ngFor="let row of preview.salesReturnRefundsByTreasury"
+          >
+            <span>{{ row.label }} <span class="drawer-close-dialog__hint">({{ row.key }}) · {{ row.count }}</span></span>
+            <span>−{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+          </div>
+        </ng-container>
+        <div
+          class="drawer-close-dialog__muted"
+          *ngIf="methodEntries(preview.refundsByMethod).length === 0 && !preview.salesReturnRefundsByTreasury?.length"
+        >
           {{ 'tr_drawer_close_none' | translate }}
         </div>
 

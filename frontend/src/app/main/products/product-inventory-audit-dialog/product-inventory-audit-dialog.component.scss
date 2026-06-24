@@ -1,0 +1,37 @@
+.product-inventory-audit-dialog {
+  max-height: 90vh;
+  overflow-y: auto;
+  min-width: min(760px, 95vw);
+}
+
+.audit-search-summary {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f3f4f6;
+
+  &__label {
+    color: #6b7280;
+    margin-inline-end: 6px;
+  }
+}
+
+.audit-totals {
+  .meta-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 2px;
+  }
+}
+
+.audit-section-title {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+.product-inventory-audit-table {
+  tfoot .audit-table-total td {
+    border-top: 2px solid #e5e7eb;
+    background: #f9fafb;
+  }
+}

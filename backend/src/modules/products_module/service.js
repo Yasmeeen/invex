@@ -155,8 +155,9 @@ export async function validateProductCodeForCategory(categoryId, productCode) {
 
 /**
  * Reserve `count` sequential codes PREFIX-NNN for a category (based on existing products in that category).
+ * Optional `startFrom` ensures the first suffix is at least that number (e.g. already-assigned draft codes).
  */
-export async function allocateSequentialProductCodes(categoryId, count) {
+export async function allocateSequentialProductCodes(categoryId, count, startFrom = null) {
   const n = Math.min(500, Math.max(1, Math.floor(Number(count)) || 1));
   const cat = await Category.findById(categoryId).lean();
   if (!cat) {
@@ -183,7 +184,10 @@ export async function allocateSequentialProductCodes(categoryId, count) {
       max = Math.max(max, parseInt(m[1], 10));
     }
   }
-  const next = max + 1;
+  let next = max + 1;
+  if (startFrom != null && Number.isFinite(Number(startFrom))) {
+    next = Math.max(next, Math.floor(Number(startFrom)));
+  }
   const codes = [];
   for (let i = 0; i < n; i++) {
     codes.push(`${base}-${String(next + i).padStart(3, '0')}`);
@@ -717,8 +721,11 @@ export const generateBarcode = async (req, res) => {
 
     const countRaw = req.query.count != null ? Number(req.query.count) : 1;
     const count = Math.min(500, Math.max(1, Math.floor(Number.isFinite(countRaw) ? countRaw : 1)));
+    const startFromRaw = req.query.startFrom != null ? Number(req.query.startFrom) : null;
+    const startFrom =
+      startFromRaw != null && Number.isFinite(startFromRaw) ? Math.floor(startFromRaw) : null;
 
-    const codes = await allocateSequentialProductCodes(categoryId, count);
+    const codes = await allocateSequentialProductCodes(categoryId, count, startFrom);
     if (count === 1) {
       return res.json({ code: codes[0] });
     }

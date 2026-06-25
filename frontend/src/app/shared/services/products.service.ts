@@ -97,10 +97,17 @@ getProducts(params: any) {
    * Next suggested code(s) for the category (e.g. ELEC-001).
    * With count > 1 returns `{ codes }`; otherwise `{ code }`.
    */
-  generateBarcode(categoryId: string, count?: number): Observable<{ code?: string; codes?: string[] }> {
+  generateBarcode(
+    categoryId: string,
+    count?: number,
+    startFrom?: number
+  ): Observable<{ code?: string; codes?: string[] }> {
     let params = new HttpParams().set('categoryId', categoryId);
     if (count != null && count > 1) {
       params = params.set('count', String(count));
+    }
+    if (startFrom != null && Number.isFinite(startFrom) && startFrom > 0) {
+      params = params.set('startFrom', String(Math.floor(startFrom)));
     }
     return this.http.get<{ code?: string; codes?: string[] }>(`${PRODUCTS_URL}/generate-barcode`, {
       params,

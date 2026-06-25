@@ -76,6 +76,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   showPriceOnBarcode = true;
   /** When category.multiCodePerPiece and quantity > 1: one editable code per unit (new product only). */
   multiUnitCodes: string[] = [];
+  /** Ignore stale barcode API responses when stock quantity changes quickly. */
+  private multiUnitCodesGenId = 0;
+  private stockQtyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
@@ -341,8 +344,35 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     this.basicInfoForm?.form?.patchValue({ code: first });
   }
 
-  /** When quantity changes: shrink array, or append auto-generated codes for new slots only. */
+  /** When quantity changes: shrink array, or regenerate a full unique block for the new quantity. */
   onStockQuantityChanged(): void {
+    if (this.stockQtyDebounceTimer) {
+      clearTimeout(this.stockQtyDebounceTimer);
+    }
+    this.stockQtyDebounceTimer = setTimeout(() => this.applyStockQuantityToMultiUnitCodes(), 350);
+  }
+
+  private getMaxCodeSuffix(codes: string[], categoryCode: string): number {
+    const base = String(categoryCode || '')
+      .trim()
+      .replace(/-+$/g, '')
+      .toUpperCase();
+    if (!base) {
+      return 0;
+    }
+    const re = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`, 'i');
+    let max = 0;
+    for (const c of codes) {
+      const m = String(c ?? '').trim().match(re);
+      if (m) {
+        max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    return max;
+  }
+
+  private applyStockQuantityToMultiUnitCodes(): void {
+    this.stockQtyDebounceTimer = null;
     if (this.isEdit || !this.isMultiCodeCategory) {
       this.multiUnitCodes = [];
       return;
@@ -360,28 +390,38 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     }
 
     if (this.multiUnitCodes.length < q) {
-      const keep = [...this.multiUnitCodes];
-      const need = q - keep.length;
-      this.multiUnitCodes = [...keep, ...Array.from({ length: need }, () => '')];
-
       const cat = this.selectedCategory;
       if (!cat?._id || !this.hasCategoryCode(cat)) {
         return;
       }
-      this.productsSerivce.generateBarcode(String(cat._id), need).subscribe({
-        next: (res: { code?: string; codes?: string[] }) => {
-          const add = res.codes?.length ? res.codes : res.code ? [res.code] : [];
-          this.multiUnitCodes = [...keep, ...add].slice(0, q);
-          this.syncPrimaryCodeFromMultiUnits();
-          this.isCodeGenerated = true;
-        },
-        error: (err: any) => {
-          const msg =
-            err?.error?.error ||
-            this.translateService.instant('tr_barcode_generate_failed');
-          this.appNotificationService.push(msg, 'error');
-        },
-      });
+      const genId = ++this.multiUnitCodesGenId;
+      const startFrom = this.getMaxCodeSuffix(this.multiUnitCodes, String(cat.code || '')) + 1;
+      this.productsSerivce
+        .generateBarcode(String(cat._id), q, startFrom > 1 ? startFrom : undefined)
+        .subscribe({
+          next: (res: { code?: string; codes?: string[] }) => {
+            if (genId !== this.multiUnitCodesGenId) {
+              return;
+            }
+            const codes = res.codes?.length ? res.codes : res.code ? [res.code] : [];
+            const targetQ = this.getStockQty();
+            this.multiUnitCodes = codes.slice(0, targetQ);
+            while (this.multiUnitCodes.length < targetQ) {
+              this.multiUnitCodes.push('');
+            }
+            this.syncPrimaryCodeFromMultiUnits();
+            this.isCodeGenerated = true;
+          },
+          error: (err: any) => {
+            if (genId !== this.multiUnitCodesGenId) {
+              return;
+            }
+            const msg =
+              err?.error?.error ||
+              this.translateService.instant('tr_barcode_generate_failed');
+            this.appNotificationService.push(msg, 'error');
+          },
+        });
       return;
     }
 
@@ -396,11 +436,16 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.multiUnitCodes = [];
       return;
     }
+    const genId = ++this.multiUnitCodesGenId;
     this.productsSerivce.generateBarcode(String(cat._id), q).subscribe({
       next: (res: { code?: string; codes?: string[] }) => {
+        if (genId !== this.multiUnitCodesGenId) {
+          return;
+        }
         const codes = res.codes?.length ? res.codes : res.code ? [res.code] : [];
-        this.multiUnitCodes = codes.slice(0, q);
-        while (this.multiUnitCodes.length < q) {
+        const targetQ = this.getStockQty();
+        this.multiUnitCodes = codes.slice(0, targetQ);
+        while (this.multiUnitCodes.length < targetQ) {
           this.multiUnitCodes.push('');
         }
         this.syncPrimaryCodeFromMultiUnits();
@@ -413,6 +458,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         }
       },
       error: (err: any) => {
+        if (genId !== this.multiUnitCodesGenId) {
+          return;
+        }
         const msg =
           err?.error?.error ||
           this.translateService.instant('tr_barcode_generate_failed');
@@ -1621,6 +1669,9 @@ updateProduct() {
   }
 
   ngOnDestroy() {
+    if (this.stockQtyDebounceTimer) {
+      clearTimeout(this.stockQtyDebounceTimer);
+    }
     this.codeReader.decodeOnceFromVideoDevice();
     this.subscriptions.forEach(s => s.unsubscribe());
   }

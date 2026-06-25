@@ -622,6 +622,7 @@
   "tr_branch_invoices": "Factures de la succursale",
   "tr_expenses": "Dépenses",
   "tr_sell_price": "Prix de vente",
+  "tr_product_show_price_on_barcode": "Afficher le prix de vente sur le code-barres",
   "tr_net_price": "Prix net",
   "tr_net_price_optional": "(facultatif — si vide : prix − remise)",
   "tr_net_price_invalid": "Le prix net doit être ≥ 0",

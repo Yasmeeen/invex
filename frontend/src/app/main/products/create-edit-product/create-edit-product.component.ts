@@ -72,6 +72,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false;
+  /** When true (default), sale price is printed on barcode stickers after create. */
+  showPriceOnBarcode = true;
   /** When category.multiCodePerPiece and quantity > 1: one editable code per unit (new product only). */
   multiUnitCodes: string[] = [];
   /** Saved Cloudinary (or other HTTPS) URL */
@@ -531,14 +533,30 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return `<!DOCTYPE html><html class="sticker-stack-print-root"><head><meta charset="utf-8"/><style>${baseStyle}\n${stackOverrides}</style></head><body class="sticker-stack-print">${inner}</body></html>`;
   }
 
-  private printBarcodeStickers(productName: string, codes: string[], bv: string[], onDone?: () => void): void {
+  private getBarcodePrintPrice(): number | undefined {
+    if (!this.showPriceOnBarcode) {
+      return undefined;
+    }
+    const raw = this.basicInfoForm?.value?.price;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  private printBarcodeStickers(
+    productName: string,
+    codes: string[],
+    bv: string[],
+    onDone?: () => void,
+    price?: number
+  ): void {
     const cleanCodes = (codes || []).map((c) => String(c ?? '').trim()).filter(Boolean);
     if (!cleanCodes.length) {
       onDone?.();
       return;
     }
+    const printPrice = price !== undefined ? price : this.getBarcodePrintPrice();
     const reqs: Observable<string>[] = cleanCodes.map((c) =>
-      this.productsSerivce.getBarcodeImage(c, productName, bv) as Observable<string>
+      this.productsSerivce.getBarcodeImage(c, productName, bv, printPrice) as Observable<string>
     );
     forkJoin(reqs).subscribe({
       next: (parts: string[]) => {
@@ -1263,12 +1281,12 @@ private submitDeskPurchaseRequest(): void {
 
         if (Array.isArray(createdProducts) && createdProducts.length > 1) {
           const codes = createdProducts.map((p: any) => String(p?.code || '').trim()).filter(Boolean);
-          this.printBarcodeStickers(nameStr, codes, bv, finish);
+          this.printBarcodeStickers(nameStr, codes, bv, finish, this.getBarcodePrintPrice());
           return;
         }
         const single = res?.createdProduct?.code ? String(res.createdProduct.code).trim() : '';
         if (single) {
-          this.productsSerivce.getBarcodeImage(single, nameStr, bv).subscribe({
+          this.productsSerivce.getBarcodeImage(single, nameStr, bv, this.getBarcodePrintPrice()).subscribe({
             next: (html: any) => {
               this.printHtml(html);
               finish();
@@ -1382,10 +1400,11 @@ createProduct() {
             ? [String(res.createdProduct.code).trim()]
             : [];
 
+      const printPrice = this.getBarcodePrintPrice();
       if (codes.length > 1) {
-        this.printBarcodeStickers(names, codes, bv, () => this.closeModal());
+        this.printBarcodeStickers(names, codes, bv, () => this.closeModal(), printPrice);
       } else if (codes.length === 1) {
-        this.productsSerivce.getBarcodeImage(codes[0], names, bv).subscribe({
+        this.productsSerivce.getBarcodeImage(codes[0], names, bv, printPrice).subscribe({
           next: (html: any) => {
             this.printHtml(html);
             this.closeModal();

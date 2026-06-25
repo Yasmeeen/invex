@@ -699,6 +699,7 @@
   "tr_branch_invoices": "فواتير الفرع",
   "tr_expenses": "المصروفات",
   "tr_sell_price": "سعر البيع",
+  "tr_product_show_price_on_barcode": "إضافة سعر البيع على الباركود",
   "tr_net_price": "سعر الشراء",
   "tr_net_price_optional": "(اختياري — يُحسب تلقائيًا من السعر − نسبة الخصم)",
   "tr_net_price_invalid": "سعر الشراء  يجب أن يكون 0 أو أكثر",

@@ -753,6 +753,15 @@ export const generateBarcodeImage = async (req, res) => {
       ? `<div class="barcode-attr-line">${escapeHtml(barcodeAttrLine)}</div>`
       : '';
 
+    const priceRaw = req.query.price;
+    let barcodePriceHtml = '';
+    if (priceRaw != null && String(priceRaw).trim() !== '') {
+      const priceNum = Number(priceRaw);
+      if (Number.isFinite(priceNum)) {
+        barcodePriceHtml = `<div class="barcode-price">${escapeHtml(String(priceNum))} EGP</div>`;
+      }
+    }
+
     bwipjs.toBuffer(
       {
         bcid: 'code128',
@@ -832,6 +841,15 @@ export const generateBarcodeImage = async (req, res) => {
         word-break: break-word;
       }
 
+      .barcode-price {
+        font-size: 8px;
+        font-weight: bold;
+        line-height: 1.1;
+        margin-bottom: 0.5mm;
+        max-width: 95%;
+        text-align: center;
+      }
+
 </style>
 
             </head>
@@ -839,6 +857,7 @@ export const generateBarcodeImage = async (req, res) => {
             <body>
             <div class="sticker-name">
                <div class="product-name">${name || ''}</div>
+               ${barcodePriceHtml}
                ${barcodeAttrHtml}
                <img src="data:image/png;base64,${png.toString('base64')}" alt="${escapeHtml(code)}" />
             </div>

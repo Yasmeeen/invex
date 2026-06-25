@@ -622,6 +622,7 @@
   "tr_branch_invoices": "Filialrechnungen",
   "tr_expenses": "Ausgaben",
   "tr_sell_price": "Verkaufspreis",
+  "tr_product_show_price_on_barcode": "Verkaufspreis auf Barcode anzeigen",
   "tr_net_price": "Nettopreis",
   "tr_net_price_optional": "(optional — wenn leer: Preis − Rabatt)",
   "tr_net_price_invalid": "Nettopreis muss ≥ 0 sein",

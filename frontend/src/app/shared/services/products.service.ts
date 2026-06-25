@@ -107,7 +107,7 @@ getProducts(params: any) {
     });
   }
 
-  getBarcodeImage(code: string, productName: string, barcodeValues?: string[]) {
+  getBarcodeImage(code: string, productName: string, barcodeValues?: string[], price?: number) {
     let params = new HttpParams().set('name', productName);
     const parts = (barcodeValues || [])
       .map((v) => String(v ?? '').trim())
@@ -116,6 +116,9 @@ getProducts(params: any) {
     const line = parts.join('\u060c ');
     if (line) {
       params = params.set('bv', line);
+    }
+    if (price != null && Number.isFinite(price)) {
+      params = params.set('price', String(price));
     }
     return this.http.get(`${PRODUCTS_URL}/barcode/${encodeURIComponent(code)}`, {
       params,

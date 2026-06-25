@@ -276,6 +276,19 @@
                     </div>
                   </div>
 
+                  <div class="col-md-6" *ngIf="!isEdit">
+                    <div class="form-group">
+                      <label class="checkbox-row m-0 mt-4 pt-2">
+                        <input
+                          type="checkbox"
+                          name="showPriceOnBarcode"
+                          [(ngModel)]="showPriceOnBarcode"
+                        />
+                        <span>{{ 'tr_product_show_price_on_barcode' | translate }}</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div class="col-md-6">
                     <div
                       class="form-group"

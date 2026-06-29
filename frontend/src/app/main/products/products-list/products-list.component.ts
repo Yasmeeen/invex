@@ -90,7 +90,7 @@ export class ProductsListComponent implements OnInit {
   };
   categorysParams: any = {
     page: 1,
-    per_page: 10,
+    limit: 1000,
   };
   paginationData: PaginationData
   categorysPagination: PaginationData

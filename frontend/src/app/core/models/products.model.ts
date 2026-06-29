@@ -94,6 +94,11 @@ export interface Category {
   totalItems: number;
 }
 
+export interface BranchSalesperson {
+  name: string;
+  active?: boolean;
+}
+
 export interface Branch {
   _id: string;
   name: string;
@@ -102,6 +107,7 @@ export interface Branch {
   employeesSalary: number;
   branchInvoices: number;
   expenses: number;
+  salespeople?: BranchSalesperson[];
 }
 
 /** Snapshot line item on a saved order (API shape; not a full Product). */

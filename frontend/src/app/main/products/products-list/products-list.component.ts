@@ -587,8 +587,12 @@ export class ProductsListComponent implements OnInit {
       product.category,
       product.attributes
     );
+    const printPrice =
+      product.price != null && Number.isFinite(Number(product.price))
+        ? Number(product.price)
+        : undefined;
     this.productsService
-      .getBarcodeImage(product.code, product.name, bv)
+      .getBarcodeImage(product.code, product.name, bv, printPrice)
       .subscribe((html: any) => {
         this.printHtml(html);
       });

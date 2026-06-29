@@ -26,6 +26,8 @@ export const getStoreSettings = async (req, res) => {
       receiptLanguage: doc.receiptLanguage || 'en',
       purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
       paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
+      returnExchangePolicy: doc.returnExchangePolicy || '',
+      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
     });
   } catch (error) {
     console.error('getStoreSettings:', error);
@@ -42,6 +44,8 @@ export const updateStoreSettings = async (req, res) => {
       receiptLanguage,
       purchaseTreasuryMethods,
       paymentAppFeePercents,
+      returnExchangePolicy,
+      showReturnExchangePolicyOnReceipt,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
@@ -94,6 +98,16 @@ export const updateStoreSettings = async (req, res) => {
       feesNormalized = normalizePaymentAppFeePercents(paymentAppFeePercents);
     }
 
+    if (returnExchangePolicy !== undefined && typeof returnExchangePolicy !== 'string') {
+      return res.status(400).json({ error: 'returnExchangePolicy must be a string' });
+    }
+    if (
+      showReturnExchangePolicyOnReceipt !== undefined &&
+      typeof showReturnExchangePolicyOnReceipt !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'showReturnExchangePolicyOnReceipt must be a boolean' });
+    }
+
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
     if (storePhoneNumber !== undefined) update.storePhoneNumber = storePhoneNumber.trim().slice(0, 50);
@@ -101,6 +115,12 @@ export const updateStoreSettings = async (req, res) => {
     if (receiptLanguage !== undefined) update.receiptLanguage = receiptLangNormalized;
     if (treasuryNormalized !== undefined) update.purchaseTreasuryMethods = treasuryNormalized;
     if (feesNormalized !== undefined) update.paymentAppFeePercents = feesNormalized;
+    if (returnExchangePolicy !== undefined) {
+      update.returnExchangePolicy = returnExchangePolicy.trim().slice(0, 2000);
+    }
+    if (showReturnExchangePolicyOnReceipt !== undefined) {
+      update.showReturnExchangePolicyOnReceipt = showReturnExchangePolicyOnReceipt;
+    }
 
     const existing = await getLatestSettingsDoc();
     const filter = existing ? { _id: existing._id } : {};
@@ -123,6 +143,8 @@ export const updateStoreSettings = async (req, res) => {
       receiptLanguage: doc.receiptLanguage || 'en',
       purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
       paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
+      returnExchangePolicy: doc.returnExchangePolicy || '',
+      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
     });
   } catch (error) {
     console.error('updateStoreSettings:', error);

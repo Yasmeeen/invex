@@ -147,6 +147,26 @@
     font-size: 9px;
   }
 
+  .invoice-return-policy {
+    margin: 8px 0 10px;
+    padding: 4px 2px 6px;
+    border-top: 1px dashed #000;
+    border-bottom: 1px dashed #000;
+    font-size: 8px;
+    line-height: 1.4;
+    text-align: center;
+
+    &__title {
+      font-size: 9px;
+      margin-bottom: 4px;
+    }
+
+    &__text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+
   .invoice-qr {
     margin-top: 10px;
     padding: 4px 3mm 0;

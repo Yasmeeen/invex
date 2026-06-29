@@ -48,6 +48,10 @@ const storeSettingsSchema = new mongoose.Schema(
       type: [paymentAppFeePercentEntry],
       default: [],
     },
+    /** Free-text return & exchange policy (shown on receipt when enabled). */
+    returnExchangePolicy: { type: String, default: '', trim: true, maxlength: 2000 },
+    /** When true and policy text is set, print it on sale invoices/receipts. */
+    showReturnExchangePolicyOnReceipt: { type: Boolean, default: false },
   },
   { timestamps: true, collection: 'storesettings' }
 );

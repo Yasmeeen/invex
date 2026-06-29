@@ -122,6 +122,44 @@
                       </div>
                     </div>
                   </div>
+
+                  <div class="row mt-4">
+                    <div class="col-12">
+                      <label class="weight-medium">{{ 'tr_branch_salespeople' | translate }}</label>
+                      <p class="size-small text-muted mb-2">{{ 'tr_branch_salespeople_hint' | translate }}</p>
+                    </div>
+                    <div class="col-12" *ngFor="let sp of salespeople; let i = index">
+                      <div class="row align-items-end mb-2">
+                        <div class="col-md-8">
+                          <div class="form-group mb-0">
+                            <label *ngIf="i === 0">{{ 'tr_seller_name' | translate }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="sp.name"
+                              [name]="'salesperson_' + i"
+                              [placeholder]="'tr_seller_name' | translate"
+                            />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <button
+                            type="button"
+                            class="s-btn btn-danger btn-sm"
+                            (click)="removeSalesperson(i)"
+                            [attr.title]="'tr_delete' | translate"
+                          >
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12 mt-2">
+                      <button type="button" class="s-btn btn-secondary btn-sm" (click)="addSalesperson()">
+                        <i class="fa fa-plus mr-1"></i> {{ 'tr_add_salesperson' | translate }}
+                      </button>
+                    </div>
+                  </div>
                 </form>
                 
   

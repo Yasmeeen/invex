@@ -101,12 +101,12 @@ export class ClientListComponent implements OnInit {
     });
   }
 
-  createClient(): void {
+  createOrEditClient(isEdit: boolean, client?: Client): void {
     this.dialog
       .open(CreateEditClientComponent, {
         width: '640px',
         maxWidth: '96vw',
-        data: {},
+        data: { isEdit, client, clientId: client?._id },
         disableClose: true,
       })
       .afterClosed()
@@ -115,6 +115,10 @@ export class ClientListComponent implements OnInit {
           this.getClients();
         }
       });
+  }
+
+  createClient(): void {
+    this.createOrEditClient(false);
   }
 
   openClientDeposit(client: Client): void {

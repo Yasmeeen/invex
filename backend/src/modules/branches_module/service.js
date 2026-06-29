@@ -1,5 +1,20 @@
 import Branch from '../../DB/models/branch.model.js';
 
+const normalizeSalespeople = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        const name = item.trim();
+        return name ? { name, active: true } : null;
+      }
+      const name = String(item?.name || '').trim();
+      if (!name) return null;
+      return { name, active: item?.active !== false };
+    })
+    .filter(Boolean);
+};
+
 export const getBranches = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
@@ -53,6 +68,7 @@ export const createBranch = async (req, res) => {
       employeesSalary,
       branchInvoices,
       expenses,
+      salespeople,
     } = req.body;
 
     // ✅ Required validation
@@ -70,6 +86,7 @@ export const createBranch = async (req, res) => {
       employeesSalary: Number(employeesSalary) || 0,
       branchInvoices: Number(branchInvoices) || 0,
       expenses: Number(expenses) || 0,
+      salespeople: normalizeSalespeople(salespeople),
     };
 
     const newBranch = await Branch.create(newBranchData);
@@ -92,7 +109,8 @@ export const updateBranch = async (req, res) => {
       rent,
       employeesSalary,
       branchInvoices,
-      expenses, } = req.body;
+      expenses,
+      salespeople, } = req.body;
 
     const updatedBranch = await Branch.findByIdAndUpdate(
       req.params.id,
@@ -103,6 +121,7 @@ export const updateBranch = async (req, res) => {
         employeesSalary: Number(employeesSalary) || 0,
         branchInvoices: Number(branchInvoices) || 0,
         expenses: Number(expenses) || 0,
+        salespeople: normalizeSalespeople(salespeople),
       },
       { new: true }
     );

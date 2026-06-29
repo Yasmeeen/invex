@@ -56,6 +56,32 @@
     </div>
 
     <div class="store-settings-card__field">
+      <div class="store-settings-card__policy-head">
+        <label class="store-settings-card__label" for="returnExchangePolicy">
+          {{ 'tr_return_exchange_policy' | translate }}
+        </label>
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input
+            type="checkbox"
+            name="showReturnExchangePolicyOnReceipt"
+            [(ngModel)]="form.showReturnExchangePolicyOnReceipt"
+          />
+          <span>{{ 'tr_show_return_exchange_policy_on_receipt' | translate }}</span>
+        </label>
+      </div>
+      <p class="store-settings-card__hint">{{ 'tr_return_exchange_policy_hint' | translate }}</p>
+      <textarea
+        id="returnExchangePolicy"
+        class="s-control store-settings-card__policy-text"
+        name="returnExchangePolicy"
+        [(ngModel)]="form.returnExchangePolicy"
+        rows="4"
+        maxlength="2000"
+        [placeholder]="'tr_return_exchange_policy_placeholder' | translate"
+      ></textarea>
+    </div>
+
+    <div class="store-settings-card__field">
       <label class="store-settings-card__label">{{ 'tr_store_logo' | translate }}</label>
       <p class="store-settings-card__hint">{{ 'tr_logo_hint' | translate }}</p>
       <div class="store-settings-card__logo-row">

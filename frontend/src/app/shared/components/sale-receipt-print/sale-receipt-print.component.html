@@ -181,6 +181,16 @@
 
     <div class="separator double-border"></div>
 
+    <div
+      class="invoice-return-policy center"
+      *ngIf="st.showReturnExchangePolicyOnReceipt && st.returnExchangePolicy?.trim()"
+    >
+      <div class="invoice-return-policy__title bold">
+        {{ 'tr_return_exchange_policy' | receiptTranslate: st.receiptLanguage }}
+      </div>
+      <div class="invoice-return-policy__text">{{ st.returnExchangePolicy }}</div>
+    </div>
+
     <div class="footer center">
       <div class="bold">{{ st.storeName }}</div>
       <div>{{ st.storePhoneNumber }}</div>

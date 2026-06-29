@@ -67,6 +67,21 @@
     text-align: center;
   }
 
+  .invoice-return-policy {
+    margin: 8px 0;
+    padding: 4px 0 6px;
+    border-top: 1px dashed black;
+    border-bottom: 1px dashed black;
+    font-size: 9px;
+    line-height: 1.35;
+    text-align: center;
+
+    &__text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+
   #print-container {
     display: none;
   }

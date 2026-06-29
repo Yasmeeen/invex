@@ -82,6 +82,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string
+  branchSalespeople: string[] = [];
+  selectedSellerName: string | null = null;
+  sellerFieldTouched = false;
 
   /** Cash left in drawer from the last close (opening balance for today). */
   drawerOpeningBalance = 0;
@@ -136,6 +139,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.getBranches(); // loadProducts runs after a branch is selected
     } else {
       this.loadProducts();
+      this.loadBranchSalespeople();
     }
     this.initClientForm();
   }
@@ -181,10 +185,19 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   clientInfoPreview(): string {
     const phone = String(this.clientForm.get('phone')?.value ?? '').trim();
     const name = String(this.clientForm.get('name')?.value ?? '').trim();
+    const parts: string[] = [];
     if (phone && name) {
-      return `${phone} · ${name}`;
+      parts.push(`${phone} · ${name}`);
+    } else {
+      const primary = phone || name;
+      if (primary) {
+        parts.push(primary);
+      }
     }
-    return phone || name;
+    if (this.selectedSellerName) {
+      parts.push(this.selectedSellerName);
+    }
+    return parts.join(' · ');
   }
 
   openPaymentSplitsDialog(autoCheckout = false): void {
@@ -500,7 +513,54 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.branches = response.branches
       this.adminSelectedBranchId = this.branches[0]._id
       this.loadProducts();
+      this.loadBranchSalespeople();
    })
+  }
+
+  onAdminBranchChange(): void {
+    this.loadProducts();
+    this.loadBranchSalespeople();
+  }
+
+  private resolveCashierBranchId(): string | null {
+    if (canPickBranchRole(this.curentUser?.role)) {
+      return this.adminSelectedBranchId || null;
+    }
+    const branch = this.globals.currentUser?.branch as { _id?: string } | string | undefined;
+    if (typeof branch === 'string') {
+      return branch;
+    }
+    return branch?._id ? String(branch._id) : null;
+  }
+
+  loadBranchSalespeople(branchId?: string): void {
+    const id = branchId || this.resolveCashierBranchId();
+    if (!id) {
+      this.branchSalespeople = [];
+      this.selectedSellerName = null;
+      return;
+    }
+
+    this.branchesServce.getBranch(id).subscribe({
+      next: (branch: any) => {
+        this.branchSalespeople = (branch?.salespeople || [])
+          .filter((sp: { active?: boolean; name?: string }) => sp.active !== false && String(sp.name || '').trim())
+          .map((sp: { name: string }) => String(sp.name).trim());
+
+        if (this.branchSalespeople.length === 1) {
+          this.selectedSellerName = this.branchSalespeople[0];
+        } else if (
+          !this.selectedSellerName ||
+          !this.branchSalespeople.includes(this.selectedSellerName)
+        ) {
+          this.selectedSellerName = null;
+        }
+      },
+      error: () => {
+        this.branchSalespeople = [];
+        this.selectedSellerName = null;
+      },
+    });
   }
 
   private initClientForm() {
@@ -786,6 +846,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private clearClientInformationAfterCheckout(): void {
     this.isClientInfoOpen = false;
     this.resetClientFormFields();
+    this.resetSellerNameAfterCheckout();
+  }
+
+  private resetSellerNameAfterCheckout(): void {
+    this.sellerFieldTouched = false;
+    if (this.branchSalespeople.length === 1) {
+      this.selectedSellerName = this.branchSalespeople[0];
+      return;
+    }
+    this.selectedSellerName = null;
   }
 
   private resetPaymentLinesAfterCheckout(): void {
@@ -1090,6 +1160,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    if (this.branchSalespeople.length && !this.selectedSellerName) {
+      this.isClientInfoOpen = true;
+      this.sellerFieldTouched = true;
+      this.appNotificationService.push(
+        this.translate.instant('tr_cashier_seller_required'),
+        'error'
+      );
+      return;
+    }
+
     if (this.exchangeTradeInPurchase) {
       const storeOwes = this.exchangeStoreOwesCustomer();
       if (storeOwes > 0.01) {
@@ -1236,6 +1316,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       userId: this.curentUser._id,
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
     };
+
+    if (this.selectedSellerName) {
+      orderData.sellerName = this.selectedSellerName;
+    }
 
     if (clientDetails.clientId) {
       orderData.clientId = clientDetails.clientId;

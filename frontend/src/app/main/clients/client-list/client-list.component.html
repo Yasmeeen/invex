@@ -77,20 +77,21 @@
               <td>{{ client.numberOfOrders }}</td>
               <td>{{ client.totalOrdersPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>
-                <button
-                  type="button"
-                  class="s-btn btn-secondary size-small mr-1"
-                  (click)="openClientHistory(client)"
-                >
-                  {{ 'tr_client_history' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="s-btn btn-primary size-small"
-                  (click)="openClientDeposit(client)"
-                >
-                  {{ 'tr_client_add_deposit' | translate }}
-                </button>
+                <span class="options-menu">
+                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                  <div class="options-menu-container p-0">
+                    <div class="border-bottom"></div>
+                    <div class="single-option" (click)="openClientHistory(client)">
+                      {{ 'tr_client_history' | translate }}
+                    </div>
+                    <div class="single-option" (click)="openClientDeposit(client)">
+                      {{ 'tr_client_add_deposit' | translate }}
+                    </div>
+                    <div class="single-option" (click)="createOrEditClient(true, client)">
+                      {{ 'tr_action.edit' | translate }}
+                    </div>
+                  </div>
+                </span>
               </td>
             </tr>
           </tbody>
@@ -111,6 +112,21 @@
                 <span *ngIf="client.address">{{ client.address }}</span>
               </div>
             </div>
+            <span class="options-menu">
+              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+              <div class="options-menu-container p-0">
+                <div class="border-bottom"></div>
+                <div class="single-option" (click)="openClientHistory(client)">
+                  {{ 'tr_client_history' | translate }}
+                </div>
+                <div class="single-option" (click)="openClientDeposit(client)">
+                  {{ 'tr_client_add_deposit' | translate }}
+                </div>
+                <div class="single-option" (click)="createOrEditClient(true, client)">
+                  {{ 'tr_action.edit' | translate }}
+                </div>
+              </div>
+            </span>
           </div>
 
           <div class="client-card__stats">
@@ -135,23 +151,6 @@
                 </span>
               </div>
             </div>
-          </div>
-
-          <div class="client-card__actions">
-            <button
-              type="button"
-              class="s-btn btn-secondary size-small width-100 mb-2"
-              (click)="openClientHistory(client)"
-            >
-              {{ 'tr_client_history' | translate }}
-            </button>
-            <button
-              type="button"
-              class="s-btn btn-primary size-small width-100"
-              (click)="openClientDeposit(client)"
-            >
-              {{ 'tr_client_add_deposit' | translate }}
-            </button>
           </div>
         </div>
       </div>

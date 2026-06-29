@@ -24,6 +24,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     receiptLanguage: 'en',
     purchaseTreasuryMethods: [],
     paymentAppFeePercents: [],
+    returnExchangePolicy: '',
+    showReturnExchangePolicyOnReceipt: false,
   };
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
@@ -53,6 +55,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         receiptLanguage: v.receiptLanguage || 'en',
         purchaseTreasuryMethods: v.purchaseTreasuryMethods || [],
         paymentAppFeePercents: v.paymentAppFeePercents || [],
+        returnExchangePolicy: v.returnExchangePolicy || '',
+        showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
       };
       this.logoPreview = this.form.logoUrl || '';
     });
@@ -117,6 +121,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         storePhoneNumber: this.form.storePhoneNumber?.trim() || '',
         logoUrl: this.form.logoUrl || '',
         receiptLanguage: this.form.receiptLanguage || 'en',
+        returnExchangePolicy: this.form.returnExchangePolicy?.trim() || '',
+        showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
       })
       .subscribe({
         next: () => {

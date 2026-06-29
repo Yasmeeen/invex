@@ -57,6 +57,19 @@
         autocomplete="tel"
       />
     </div>
+    <div class="col-md-2 mt-4" *ngIf="reportType === 'sales' || reportType === 'profit'">
+      <label>{{ 'tr_report_filter_seller' | translate }}</label>
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_report_all_sellers' | translate"
+        [items]="salespeople"
+        [(ngModel)]="filters.seller_name"
+        name="reportSeller"
+        [clearable]="true"
+        [searchable]="true"
+      >
+      </ng-select>
+    </div>
     <div class="col-md-2 mt-4" *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_group' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.groupBy">

@@ -18,13 +18,14 @@
               [(ngModel)]="adminSelectedBranchId"
               #branch="ngModel"
               name="branchId"
-              (change)="loadProducts()"
+              (change)="onAdminBranchChange()"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
           </div>
         </div>
       </div>
+
     </div>
 
     <div class="cashier-header__actions flex flex-middle">
@@ -214,6 +215,34 @@
                   >
                     <label>{{ 'tr_legal_name' | translate }}</label>
                     <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
+                  </div>
+                  <div
+                    class="cashier-client-fields__item"
+                    *ngIf="branchSalespeople.length"
+                    [class.has-error]="sellerFieldTouched && !selectedSellerName"
+                  >
+                    <label>{{ 'tr_seller_name' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <ng-select
+                        class="s-control s-select"
+                        [items]="branchSalespeople"
+                        [clearable]="false"
+                        [searchable]="true"
+                        [placeholder]="'tr_cashier_select_seller' | translate"
+                        [(ngModel)]="selectedSellerName"
+                        [ngModelOptions]="{ standalone: true }"
+                        name="sellerName"
+                        (change)="sellerFieldTouched = false"
+                      >
+                      </ng-select>
+                      <i class="fa fa-caret-down input-icon"></i>
+                    </div>
+                    <span
+                      class="text-error size-small validator"
+                      *ngIf="sellerFieldTouched && !selectedSellerName"
+                    >
+                      {{ 'tr_seller_name_required' | translate }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -605,6 +634,16 @@
     </div>
 
     <div class="separator double-border"></div>
+
+    <div
+      class="invoice-return-policy center"
+      *ngIf="st.showReturnExchangePolicyOnReceipt && st.returnExchangePolicy?.trim()"
+    >
+      <div class="invoice-return-policy__title bold">
+        {{ 'tr_return_exchange_policy' | receiptTranslate: st.receiptLanguage }}
+      </div>
+      <div class="invoice-return-policy__text">{{ st.returnExchangePolicy }}</div>
+    </div>
 
     <div class="footer center">
       <div class="bold">{{ st.storeName }}</div>

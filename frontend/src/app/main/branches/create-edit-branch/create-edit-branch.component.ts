@@ -15,6 +15,7 @@ export class CreateEditBranchComponent implements OnInit {
   branch: Branch ;
   branchId: string;
   isEdit: boolean;
+  salespeople: { name: string }[] = [{ name: '' }];
   @ViewChild('branchForm') branchForm: NgForm;
 
   constructor(
@@ -44,11 +45,39 @@ export class CreateEditBranchComponent implements OnInit {
     this.branchesService.getBranch(this.branchId).subscribe((response:any)=> {
       this.branchId = response._id
       this.branchForm.form.patchValue(response);
+      const list = Array.isArray(response.salespeople) ? response.salespeople : [];
+      this.salespeople = list.length
+        ? list
+            .filter((sp: { active?: boolean; name?: string }) => sp.active !== false)
+            .map((sp: { name?: string }) => ({ name: sp.name || '' }))
+        : [{ name: '' }];
     })
   }
 
+  addSalesperson(): void {
+    this.salespeople.push({ name: '' });
+  }
+
+  removeSalesperson(index: number): void {
+    if (this.salespeople.length <= 1) {
+      this.salespeople[0].name = '';
+      return;
+    }
+    this.salespeople.splice(index, 1);
+  }
+
+  private buildBranchPayload(): Branch {
+    const formValue = this.branchForm.value;
+    return {
+      ...formValue,
+      salespeople: this.salespeople
+        .map((sp) => ({ name: String(sp.name || '').trim(), active: true }))
+        .filter((sp) => sp.name.length > 0),
+    };
+  }
+
   createBranch(){
-    this.branch = this.branchForm.value;
+    this.branch = this.buildBranchPayload();
     if (!this.branchForm.valid) {
       this.appNotificationService.push('Branch data is required.', 'error');
       return;
@@ -67,7 +96,7 @@ export class CreateEditBranchComponent implements OnInit {
     });
   }
   updateBranch(){
-    this.branch = this.branchForm.value;
+    this.branch = this.buildBranchPayload();
     if (!this.branchForm.valid) {
       this.appNotificationService.push('Branch data is required.', 'error');
       return;

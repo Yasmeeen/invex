@@ -14,7 +14,7 @@
 
 .client-card__top {
   display: grid;
-  grid-template-columns: 48px 1fr;
+  grid-template-columns: 48px 1fr auto;
   gap: 0.75rem;
   align-items: start;
 }

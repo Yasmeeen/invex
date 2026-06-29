@@ -7,6 +7,12 @@ const branchSchema = new mongoose.Schema({
   employeesSalary: { type: Number, default: 0 },
   branchInvoices: {type: Number, default: 0 },
   expenses: {type: Number, default: 0 },
+  salespeople: [
+    {
+      name: { type: String, required: true, trim: true },
+      active: { type: Boolean, default: true },
+    },
+  ],
 }, { timestamps: true });
 
 

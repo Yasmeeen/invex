@@ -207,8 +207,9 @@ export const getClientById = async (req, res) => {
       {
         $project: {
           name: 1,
+          phoneNumber: 1,
           address: 1,
-          branchs: 1,
+          branches: 1,
           createdAt: 1,
           numberOfOrders: 1,
           totalOrdersPrice: 1,
@@ -279,13 +280,48 @@ export const createClient = async (req, res) => {
  */
 export const updateClient = async (req, res) => {
   try {
-    const { name, address, branchs } = req.body;
+    const { name, address, phoneNumber, phone, branches, branchs } = req.body;
 
-    const updatedClient = await Client.findByIdAndUpdate(
-      req.params.id,
-      { name, address, branchs },
-      { new: true }
-    );
+    const branchIds = Array.isArray(branches)
+      ? branches
+      : Array.isArray(branchs)
+        ? branchs
+        : branchs !== undefined
+          ? branchs
+            ? [branchs]
+            : []
+          : undefined;
+
+    const update = {};
+    if (name !== undefined) update.name = String(name).trim();
+    if (address !== undefined) update.address = String(address || "").trim();
+    if (phoneNumber !== undefined || phone !== undefined) {
+      const phoneRaw = String(phoneNumber || phone || "").trim();
+      if (!phoneRaw) {
+        return res.status(400).json({ error: "Client phone number is required" });
+      }
+      const duplicate = await Client.findOne({
+        phoneNumber: phoneRaw,
+        _id: { $ne: req.params.id },
+      });
+      if (duplicate) {
+        return res.status(409).json({ error: "Phone number already in use" });
+      }
+      update.phoneNumber = phoneRaw;
+    }
+    if (branchIds !== undefined) {
+      if (branchIds.length) {
+        const count = await Branch.countDocuments({ _id: { $in: branchIds } });
+        if (count !== branchIds.length) {
+          return res.status(404).json({ error: "One or more branches not found" });
+        }
+      }
+      update.branches = branchIds;
+    }
+
+    const updatedClient = await Client.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+    });
 
     if (!updatedClient) {
       return res.status(404).json({ error: "Client not found" });
@@ -296,6 +332,9 @@ export const updateClient = async (req, res) => {
       client: updatedClient,
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ error: "Phone number already in use" });
+    }
     console.error("❌ Error updating client:", error.message);
     res.status(500).json({ error: "Failed to update client" });
   }

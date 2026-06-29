@@ -31,6 +31,10 @@ export interface StoreSettings {
   purchaseTreasuryMethods: PurchaseTreasuryMethod[];
   /** Cashier: customer gross payment → invoice net (percent on top of net). */
   paymentAppFeePercents: PaymentAppFeePercent[];
+  /** Return & exchange policy text (optional). */
+  returnExchangePolicy: string;
+  /** Print returnExchangePolicy on sale receipts when true. */
+  showReturnExchangePolicyOnReceipt: boolean;
 }
 
 const DEFAULTS: StoreSettings = {
@@ -40,6 +44,8 @@ const DEFAULTS: StoreSettings = {
   receiptLanguage: 'en',
   purchaseTreasuryMethods: [{ key: 'cash', label: 'Cash' }],
   paymentAppFeePercents: [],
+  returnExchangePolicy: '',
+  showReturnExchangePolicyOnReceipt: false,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -106,6 +112,8 @@ export class StoreSettingsService {
           receiptLanguage,
           purchaseTreasuryMethods: methods.length ? methods : DEFAULTS.purchaseTreasuryMethods,
           paymentAppFeePercents: this.normalizePaymentAppFeePercents(data.paymentAppFeePercents),
+          returnExchangePolicy: data.returnExchangePolicy ?? '',
+          showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
         });
         this.ensureReceiptTranslationPacks();
       },

@@ -20,6 +20,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
   branches: any[] = [];
   products: any[] = [];
   users: { _id: string; name: string }[] = [];
+  salespeople: string[] = [];
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
   branchFilterLocked = false;
 
@@ -29,6 +30,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     branch_id: null as string | null,
     product_id: null as string | null,
     customer_phone: '',
+    seller_name: null as string | null,
     groupBy: 'daily',
     booking_status: 'all',
     booking_confirmed: 'all',
@@ -60,6 +62,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
+      this.loadSalespeople();
     }
   }
 
@@ -80,7 +83,10 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
 
   loadBranches(): void {
     this.branchesServce.getBranchs({ page: 1, limit: 1000 }).subscribe({
-      next: (res: any) => (this.branches = res.branches || []),
+      next: (res: any) => {
+        this.branches = res.branches || [];
+        this.loadSalespeople();
+      },
       error: () => (this.branches = []),
     });
   }
@@ -110,7 +116,46 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
 
   onBranchChange(): void {
     this.filters.product_id = null;
+    this.filters.seller_name = null;
     this.loadProducts();
+    this.loadSalespeople();
+  }
+
+  loadSalespeople(): void {
+    if (this.reportType !== 'sales' && this.reportType !== 'profit') {
+      this.salespeople = [];
+      return;
+    }
+
+    const branchId = this.filters.branch_id;
+    if (branchId) {
+      const branch = this.branches.find((b) => String(b._id) === String(branchId));
+      if (branch?.salespeople?.length) {
+        this.salespeople = branch.salespeople
+          .filter((sp: { active?: boolean; name?: string }) => sp.active !== false && String(sp.name || '').trim())
+          .map((sp: { name: string }) => String(sp.name).trim());
+        return;
+      }
+      this.branchesServce.getBranch(branchId).subscribe({
+        next: (res: any) => {
+          this.salespeople = (res?.salespeople || [])
+            .filter((sp: { active?: boolean; name?: string }) => sp.active !== false && String(sp.name || '').trim())
+            .map((sp: { name: string }) => String(sp.name).trim());
+        },
+        error: () => (this.salespeople = []),
+      });
+      return;
+    }
+
+    const names = new Set<string>();
+    for (const branch of this.branches) {
+      for (const sp of branch.salespeople || []) {
+        if (sp.active !== false && String(sp.name || '').trim()) {
+          names.add(String(sp.name).trim());
+        }
+      }
+    }
+    this.salespeople = Array.from(names).sort((a, b) => a.localeCompare(b));
   }
 
   private normalizeFilterPayload(): Record<string, string> {
@@ -122,6 +167,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       customer_phone: (this.filters.customer_phone || '').trim(),
       groupBy: this.filters.groupBy || 'daily',
     };
+    if (this.reportType === 'sales' || this.reportType === 'profit') {
+      base.seller_name = this.filters.seller_name ? String(this.filters.seller_name) : '';
+    }
     if (this.reportType === 'bookings') {
       base.status = this.filters.booking_status || 'all';
       base.confirmed = this.filters.booking_confirmed || 'all';
@@ -154,6 +202,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     }
     this.filters.product_id = null;
     this.filters.customer_phone = '';
+    this.filters.seller_name = null;
     this.filters.groupBy = 'daily';
     this.filters.booking_status = 'all';
     this.filters.booking_confirmed = 'all';
@@ -161,6 +210,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     this.filters.booking_search = '';
     this.filters.booking_created_by = null;
     this.loadProducts();
+    this.loadSalespeople();
     this.applyFilters();
   }
 }

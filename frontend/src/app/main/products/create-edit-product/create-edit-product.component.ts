@@ -581,13 +581,26 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return `<!DOCTYPE html><html class="sticker-stack-print-root"><head><meta charset="utf-8"/><style>${baseStyle}\n${stackOverrides}</style></head><body class="sticker-stack-print">${inner}</body></html>`;
   }
 
-  private getBarcodePrintPrice(): number | undefined {
+  private getBarcodePrintPrice(explicitPrice?: unknown): number | undefined {
     if (!this.showPriceOnBarcode) {
       return undefined;
     }
-    const raw = this.basicInfoForm?.value?.price;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : undefined;
+    const candidates = [
+      explicitPrice,
+      this.basicInfoForm?.form?.get('price')?.value,
+      this.basicInfoForm?.value?.price,
+      this.product?.price,
+    ];
+    for (const raw of candidates) {
+      if (raw === '' || raw == null) {
+        continue;
+      }
+      const n = Number(raw);
+      if (Number.isFinite(n)) {
+        return n;
+      }
+    }
+    return undefined;
   }
 
   private printBarcodeStickers(
@@ -761,6 +774,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   getProductData() {
     this.productsSerivce.getProduct(this.productId).subscribe((response: any) => {
+      this.product = response;
       this.productId = response._id;
       this.storeInWarehouse = !!response.inWarehouse;
       this.codeValue = response.code;
@@ -1327,14 +1341,16 @@ private submitDeskPurchaseRequest(): void {
         const bv = productBarcodeAttributeValues(this.selectedCategory!, this.buildAttributesPayload());
         const finish = () => this.dialogRef.close({ submitted: true, deskPurchaseResult: res });
 
+        const deskPrintPrice = this.getBarcodePrintPrice(fv.price);
+
         if (Array.isArray(createdProducts) && createdProducts.length > 1) {
           const codes = createdProducts.map((p: any) => String(p?.code || '').trim()).filter(Boolean);
-          this.printBarcodeStickers(nameStr, codes, bv, finish, this.getBarcodePrintPrice());
+          this.printBarcodeStickers(nameStr, codes, bv, finish, deskPrintPrice);
           return;
         }
         const single = res?.createdProduct?.code ? String(res.createdProduct.code).trim() : '';
         if (single) {
-          this.productsSerivce.getBarcodeImage(single, nameStr, bv, this.getBarcodePrintPrice()).subscribe({
+          this.productsSerivce.getBarcodeImage(single, nameStr, bv, deskPrintPrice).subscribe({
             next: (html: any) => {
               this.printHtml(html);
               finish();
@@ -1448,7 +1464,7 @@ createProduct() {
             ? [String(res.createdProduct.code).trim()]
             : [];
 
-      const printPrice = this.getBarcodePrintPrice();
+      const printPrice = this.getBarcodePrintPrice(payload.price);
       if (codes.length > 1) {
         this.printBarcodeStickers(names, codes, bv, () => this.closeModal(), printPrice);
       } else if (codes.length === 1) {
@@ -1551,9 +1567,26 @@ updateProduct() {
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {
       this.appNotificationService.push('✅ المنتج تم تحديثه', 'success');
-      // فتح نافذة الطباعة تلقائيًا لو الكود اتولد تلقائي
-  
-      this.closeModal(true);
+
+      const bv = productBarcodeAttributeValues(
+        this.selectedCategory,
+        payload.attributes
+      );
+      const names = String(payload.name || '').trim();
+      const code = String(this.codeValue || payload.code || '').trim();
+      const printPrice = this.getBarcodePrintPrice(payload.price);
+
+      if (code) {
+        this.productsSerivce.getBarcodeImage(code, names, bv, printPrice).subscribe({
+          next: (html: any) => {
+            this.printHtml(html);
+            this.closeModal(true);
+          },
+          error: () => this.closeModal(true),
+        });
+      } else {
+        this.closeModal(true);
+      }
     },
     (error) => {
       const code = error?.error?.code;

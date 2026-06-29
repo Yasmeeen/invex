@@ -120,6 +120,7 @@ const parseCommonFilters = (query) => {
       ? new mongoose.Types.ObjectId(String(query.customer_id))
       : null,
     customerPhone: parseCustomerPhone(query),
+    sellerName: String(query.seller_name || '').trim(),
     groupBy: String(query.groupBy || 'daily') === 'monthly' ? 'monthly' : 'daily',
     page: Math.max(1, Number(query.page) || 1),
     limit: Math.max(1, Math.min(200, Number(query.limit) || 20)),
@@ -167,6 +168,7 @@ export const getSalesReport = async (req, res) => {
     if (f.branchId) baseMatch.branch = f.branchId;
     appendOrderCustomerFilters(baseMatch, f);
     if (f.productId) baseMatch['products.productId'] = f.productId;
+    if (f.sellerName) baseMatch.sellerName = f.sellerName;
 
     const [summary] = await Order.aggregate([
       { $match: baseMatch },
@@ -248,6 +250,7 @@ export const getProfitReport = async (req, res) => {
     if (f.branchId) match.branch = f.branchId;
     appendOrderCustomerFilters(match, f);
     if (f.productId) match['products.productId'] = f.productId;
+    if (f.sellerName) match.sellerName = f.sellerName;
     const unwindMatch = f.productId ? { 'products.productId': f.productId } : {};
 
     const overhead = await getBranchOverheadForReport(f.branchId);

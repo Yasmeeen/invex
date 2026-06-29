@@ -76,6 +76,10 @@ export class UserSerivce {
     return this.http.post(`${CLIENTS_URL}/${clientId}/settle`, payload);
   }
 
+  getClient(clientId: string): Observable<Client> {
+    return this.http.get<Client>(`${CLIENTS_URL}/${clientId}`);
+  }
+
   createClient(payload: {
     name: string;
     phoneNumber: string;
@@ -83,6 +87,18 @@ export class UserSerivce {
     branches?: string[];
   }): Observable<any> {
     return this.http.post(`${CLIENTS_URL}/create`, payload);
+  }
+
+  updateClient(
+    clientId: string,
+    payload: {
+      name: string;
+      phoneNumber: string;
+      address?: string;
+      branches?: string[];
+    }
+  ): Observable<any> {
+    return this.http.put(`${CLIENTS_URL}/update/${clientId}`, payload);
   }
 
   payClient(

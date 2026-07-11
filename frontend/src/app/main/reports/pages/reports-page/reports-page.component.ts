@@ -7,6 +7,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { isBranchManager } from '@core/utils/role-utils';
 import { ReportsService } from '@shared/services/reports.service';
 import { ReportExportService } from '@shared/services/report-export.service';
+import { formatEgpMoney } from '@shared/utils/money.util';
 import {
   BookingsReportResponse,
   ProductBookingsService,
@@ -22,6 +23,8 @@ type ReportCardVM = {
   trendLabel?: string;
   /** false → red/down pill; true/omit → green/up. */
   trendPositive?: boolean;
+  /** Format value as EGP currency (thousands separators + pound symbol). */
+  money?: boolean;
 };
 
 @Component({
@@ -36,7 +39,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   filters: any = {};
 
   cards: ReportCardVM[] = [];
-  tableColumns: { key: string; labelKey: string }[] = [];
+  tableColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   tableRows: any[] = [];
   /** Null until first successful load so the chart is not initialized with empty options. */
   chartOptions: Highcharts.Options | null = null;
@@ -63,7 +66,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   salesPaymentRows: any[] = [];
 
   /** Products report: inventory capital per branch. */
-  branchCapitalColumns: { key: string; labelKey: string }[] = [];
+  branchCapitalColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   branchCapitalRows: any[] = [];
 
   private lastReportPayload: any = null;
@@ -333,14 +336,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           titleKey: 'tr_report_card_inventory_capital',
           value: s.inventoryCapital ?? 0,
           hintKey: 'tr_report_inventory_capital_hint',
+          money: true,
         },
         {
           titleKey: 'tr_report_card_branches_inventory_capital',
           value: s.branchesInventoryCapital ?? 0,
+          money: true,
         },
         {
           titleKey: 'tr_report_card_warehouse_inventory_capital',
           value: s.warehouseInventoryCapital ?? 0,
+          money: true,
         },
         { titleKey: 'tr_report_card_total_stock', value: s.totalStock || 0 },
         { titleKey: 'tr_report_card_branches_stock', value: s.branchesStock || 0 },
@@ -352,7 +358,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'branchName', labelKey: 'tr_branch' },
         { key: 'productsCount', labelKey: 'tr_report_col_products_count' },
         { key: 'totalStock', labelKey: 'tr_report_col_stock' },
-        { key: 'inventoryCapital', labelKey: 'tr_report_col_inventory_capital' },
+        { key: 'inventoryCapital', labelKey: 'tr_report_col_inventory_capital', format: 'money' },
       ];
       this.branchCapitalRows = perBranch.map((x: any) => ({
         branchName: x.branchName || '—',
@@ -364,7 +370,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.tableColumns = [
         { key: 'productName', labelKey: 'tr_report_col_product' },
         { key: 'soldQty', labelKey: 'tr_report_col_sold_qty' },
-        { key: 'soldAmount', labelKey: 'tr_report_col_sold_amount' },
+        { key: 'soldAmount', labelKey: 'tr_report_col_sold_amount', format: 'money' },
       ];
       this.tableRows = res.topSellingProducts || [];
 
@@ -623,7 +629,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       const t = (key: string) => this.translate.instant(key);
       const summaryRows = this.cards.map((c) => ({
         [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
-        [t('tr_report_col_value')]: c.value,
+        [t('tr_report_col_value')]: c.money ? formatEgpMoney(c.value) : c.value,
       }));
       const capitalRows = this.mapRowsForExport(this.branchCapitalColumns, this.branchCapitalRows);
       const topRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
@@ -647,7 +653,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     const title = this.translate.instant(this.reportTitleKey);
     const summaryRows = this.cards.map((c) => ({
       label: this.translate.instant(c.titleKey, c.titleParams || {}),
-      value: c.value,
+      value: c.money ? formatEgpMoney(c.value) : c.value,
     }));
 
     if (this.reportType === 'products') {
@@ -689,12 +695,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   private mapRowsForExport(
-    columns: { key: string; labelKey: string }[],
+    columns: { key: string; labelKey: string; format?: 'money' }[],
     rows: any[]
   ): Record<string, unknown>[] {
     return (rows || []).map((row) =>
       columns.reduce((acc: Record<string, unknown>, col) => {
-        acc[this.translate.instant(col.labelKey)] = row[col.key];
+        const raw = row[col.key];
+        acc[this.translate.instant(col.labelKey)] =
+          col.format === 'money' ? formatEgpMoney(raw) : raw;
         return acc;
       }, {})
     );

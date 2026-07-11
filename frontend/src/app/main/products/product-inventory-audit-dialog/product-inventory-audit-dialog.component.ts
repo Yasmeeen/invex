@@ -10,6 +10,7 @@ import {
   ProductsSerivce,
 } from '@shared/services/products.service';
 import { ReportExportService } from '@shared/services/report-export.service';
+import { formatEgpMoney } from '@shared/utils/money.util';
 
 export type ProductInventoryAuditDialogData = {
   filterParams: Record<string, string | boolean>;
@@ -95,7 +96,7 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
         [availableCol]: row.totalAvailable,
       };
       if (this.showNetPrice) {
-        out[capitalCol] = row.inventoryCapital ?? 0;
+        out[capitalCol] = formatEgpMoney(row.inventoryCapital ?? 0);
       }
       return out;
     });
@@ -108,7 +109,7 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
       [availableCol]: this.audit.totals.totalAvailable,
     };
     if (this.showNetPrice) {
-      totalRow[capitalCol] = this.audit.totals.inventoryCapital ?? 0;
+      totalRow[capitalCol] = formatEgpMoney(this.audit.totals.inventoryCapital ?? 0);
     }
     rows.push(totalRow);
 
@@ -162,12 +163,15 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
       [this.translate.instant('tr_stock')]: stock,
       [this.translate.instant('tr_booked')]: booked,
       [this.translate.instant('tr_available')]: available,
-      [this.translate.instant('tr_price')]: Number(product.price) || 0,
+      [this.translate.instant('tr_price')]: formatEgpMoney(Number(product.price) || 0),
       [this.translate.instant('tr_discount')]: Number(product.discount) || 0,
     };
 
     if (this.showNetPrice) {
-      row[this.translate.instant('tr_net_price')] = Number(product.netPrice) || 0;
+      row[this.translate.instant('tr_net_price')] = formatEgpMoney(Number(product.netPrice) || 0);
+      row[this.translate.instant('tr_report_col_inventory_capital')] = formatEgpMoney(
+        stock * (Number(product.netPrice) || 0)
+      );
     }
 
     const attrs = product.attributes || {};

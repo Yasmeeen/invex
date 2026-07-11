@@ -17,6 +17,8 @@ export class ReportCardComponent {
   @Input() trendLabel = '';
   /** Green/up when true (default); red/down when false. */
   @Input() trendPositive = true;
+  /** Format value as EGP currency. */
+  @Input() money = false;
 
   get headerIconClass(): string {
     const icons = ['fa-users', 'fa-hand-pointer-o', 'fa-file-text-o', 'fa-bar-chart'];

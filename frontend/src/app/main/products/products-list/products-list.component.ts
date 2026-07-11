@@ -259,8 +259,9 @@ export class ProductsListComponent implements OnInit {
     const filterParams = this.buildProductsFilterParams();
     const searchLabel = String(this.nameSearchTerm || this.params['search'] || '').trim();
     this.dialog.open(ProductInventoryAuditDialogComponent, {
-      width: '820px',
+      width: '1100px',
       maxWidth: '96vw',
+      maxHeight: '92vh',
       data: { filterParams, searchLabel },
     });
   }

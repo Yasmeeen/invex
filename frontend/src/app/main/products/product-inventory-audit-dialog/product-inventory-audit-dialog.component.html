@@ -51,7 +51,7 @@
       </div>
       <div class="col-md-3 col-6" *ngIf="showNetPrice">
         <span class="meta-label">{{ 'tr_report_col_inventory_capital' | translate }}</span>
-        <strong>{{ audit.totals.inventoryCapital ?? 0 }}</strong>
+        <strong>{{ (audit.totals.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</strong>
       </div>
     </div>
 
@@ -90,7 +90,7 @@
             <td>{{ row.totalStock }}</td>
             <td>{{ row.totalBooked }}</td>
             <td>{{ row.totalAvailable }}</td>
-            <td *ngIf="showNetPrice">{{ row.inventoryCapital ?? 0 }}</td>
+            <td *ngIf="showNetPrice">{{ (row.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -100,7 +100,7 @@
             <td><strong>{{ audit.totals.totalStock }}</strong></td>
             <td><strong>{{ audit.totals.totalBooked }}</strong></td>
             <td><strong>{{ audit.totals.totalAvailable }}</strong></td>
-            <td *ngIf="showNetPrice"><strong>{{ audit.totals.inventoryCapital ?? 0 }}</strong></td>
+            <td *ngIf="showNetPrice"><strong>{{ (audit.totals.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</strong></td>
           </tr>
         </tfoot>
       </table>

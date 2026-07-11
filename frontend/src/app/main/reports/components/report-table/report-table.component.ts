@@ -6,7 +6,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   styleUrls: ['./report-table.component.scss'],
 })
 export class ReportTableComponent {
-  @Input() columns: { key: string; labelKey: string }[] = [];
+  @Input() columns: { key: string; labelKey: string; format?: 'money' }[] = [];
   @Input() rows: any[] = [];
   /** Larger padding / row height (used for bookings table). */
   @Input() roomy = false;

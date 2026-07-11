@@ -36,7 +36,12 @@
             </ng-container>
 
             <ng-container *ngSwitchDefault>
-              {{ row[col.key] }}
+              <ng-container *ngIf="col.format === 'money'; else plainCell">
+                {{ row[col.key] | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
+              </ng-container>
+              <ng-template #plainCell>
+                {{ row[col.key] }}
+              </ng-template>
             </ng-container>
           </ng-container>
         </td>

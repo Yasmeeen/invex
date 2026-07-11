@@ -24,38 +24,100 @@ export class ReportExportService {
     return /[\u0600-\u06FF]/.test(String(value ?? ''));
   }
 
-  exportToExcel(filename: string, rows: any[]): void {
-    this.exportToExcelMultiSheet(filename, [{ name: 'Report', rows: rows || [] }]);
+  exportToExcel(filename: string, rows: any[]): Promise<void> {
+    return this.exportToExcelMultiSheet(filename, [{ name: 'Report', rows: rows || [] }]);
   }
 
   /** Multiple sheets (e.g. summary + capital by branch + top products). */
-  exportToExcelMultiSheet(
+  async exportToExcelMultiSheet(
     filename: string,
     sheets: { name: string; rows: Record<string, unknown>[] }[]
-  ): void {
+  ): Promise<void> {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'INVEX';
     workbook.created = new Date();
 
+    const brandIds = await this.addBrandImagesToWorkbook(workbook);
     const usedNames = new Set<string>();
     for (const sheet of sheets || []) {
       const rows = sheet.rows?.length ? sheet.rows : [];
       const name = this.uniqueExcelSheetName(sheet.name || 'Sheet', usedNames);
-      this.addStyledExcelSheet(workbook, name, rows);
+      this.addStyledExcelSheet(workbook, name, rows, brandIds);
     }
 
     if (!workbook.worksheets.length) {
-      this.addStyledExcelSheet(workbook, 'Report', []);
+      this.addStyledExcelSheet(workbook, 'Report', [], brandIds);
     }
 
-    workbook.xlsx.writeBuffer().then((buffer: ExcelJS.Buffer) => {
-      saveAs(
-        new Blob([buffer], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        }),
-        `${filename}.xlsx`
-      );
-    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+      `${filename}.xlsx`
+    );
+  }
+
+  private async addBrandImagesToWorkbook(workbook: ExcelJS.Workbook): Promise<{
+    logoId?: number;
+    qrId?: number;
+  }> {
+    const out: { logoId?: number; qrId?: number } = {};
+
+    try {
+      const blob = await this.http
+        .get('assets/images/new logo.jpeg', { responseType: 'blob' })
+        .toPromise();
+      if (blob && blob.size > 0) {
+        const dataUrl = await this.blobToDataUrl(blob);
+        const parsed =
+          this.parseDataUrlImage(dataUrl) ||
+          (dataUrl.includes('base64,')
+            ? {
+                base64: dataUrl.split('base64,')[1],
+                extension: 'jpeg' as const,
+              }
+            : null);
+        if (parsed) {
+          out.logoId = workbook.addImage({
+            base64: parsed.base64,
+            extension: parsed.extension,
+          });
+        }
+      }
+    } catch {
+      /* optional logo */
+    }
+
+    try {
+      const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
+      const qrDataUrl = await qrToDataUrl(qrUrl, {
+        width: 240,
+        margin: 1,
+        color: { dark: '#1e1b4b', light: '#ffffff' },
+      });
+      const parsed = this.parseDataUrlImage(qrDataUrl);
+      if (parsed) {
+        out.qrId = workbook.addImage({
+          base64: parsed.base64,
+          extension: parsed.extension,
+        });
+      }
+    } catch {
+      /* optional QR */
+    }
+
+    return out;
+  }
+
+  private parseDataUrlImage(
+    dataUrl: string
+  ): { base64: string; extension: 'jpeg' | 'png' | 'gif' } | null {
+    const m = /^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/i.exec(String(dataUrl || '').trim());
+    if (!m) return null;
+    let ext = m[1].toLowerCase();
+    if (ext === 'jpg') ext = 'jpeg';
+    return { base64: m[2], extension: ext as 'jpeg' | 'png' | 'gif' };
   }
 
   private uniqueExcelSheetName(raw: string, usedNames: Set<string>): string {
@@ -78,18 +140,68 @@ export class ReportExportService {
   private addStyledExcelSheet(
     workbook: ExcelJS.Workbook,
     name: string,
-    rows: Record<string, unknown>[]
+    rows: Record<string, unknown>[],
+    brandIds: { logoId?: number; qrId?: number }
   ): void {
     const ws = workbook.addWorksheet(name);
-    const keys =
-      rows.length > 0
-        ? Object.keys(rows[0])
-        : [];
+    const keys = rows.length > 0 ? Object.keys(rows[0]) : [' '];
+    const colCount = Math.max(keys.length, 3);
+    const brandRows = 6;
+    const headerRowIndex = brandRows + 1;
 
-    if (!keys.length) {
-      ws.getColumn(1).width = 40;
-      ws.getRow(1).height = 40;
-      return;
+    for (let c = 1; c <= colCount; c++) {
+      const key = keys[c - 1] || '';
+      let maxLen = String(key).length;
+      for (const row of rows) {
+        const cellLen = String(row?.[key] ?? '').length;
+        if (cellLen > maxLen) maxLen = cellLen;
+      }
+      const nameLike = this.isNameLikeExcelColumn(key);
+      const minW = nameLike ? 36 : 18;
+      const maxW = nameLike ? 72 : 48;
+      const pad = nameLike ? 12 : 6;
+      ws.getColumn(c).width = Math.min(maxW, Math.max(minW, maxLen + pad));
+    }
+
+    // Brand header block (logo left + INVEX text + QR right), same idea as PDF.
+    ws.getRow(1).height = 22;
+    ws.getRow(2).height = 18;
+    ws.getRow(3).height = 16;
+    ws.getRow(4).height = 16;
+    ws.getRow(5).height = 12;
+    ws.getRow(6).height = 10;
+
+    const brandTextCol = brandIds.logoId != null ? 3 : 2;
+    const invexCell = ws.getCell(1, brandTextCol);
+    invexCell.value = 'INVEX';
+    invexCell.font = { bold: true, size: 20, color: { argb: '5B21B6' } };
+    invexCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+    const innovationCell = ws.getCell(2, brandTextCol);
+    innovationCell.value = 'Innovation';
+    innovationCell.font = { size: 12, color: { argb: '64748B' } };
+    innovationCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+    const siteCell = ws.getCell(3, brandTextCol);
+    siteCell.value = 'innovation-tec.com';
+    siteCell.font = { size: 10, color: { argb: '64748B' } };
+    siteCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+    if (brandIds.logoId != null) {
+      ws.getColumn(1).width = Math.max(ws.getColumn(1).width || 12, 14);
+      ws.addImage(brandIds.logoId, {
+        tl: { col: 0, row: 0 },
+        ext: { width: 72, height: 72 },
+      });
+    }
+
+    if (brandIds.qrId != null) {
+      const qrCol = Math.max(colCount - 1, 2);
+      ws.getColumn(qrCol + 1).width = Math.max(ws.getColumn(qrCol + 1).width || 12, 16);
+      ws.addImage(brandIds.qrId, {
+        tl: { col: qrCol, row: 0 },
+        ext: { width: 88, height: 88 },
+      });
     }
 
     const headerFill = {
@@ -104,27 +216,16 @@ export class ReportExportService {
       right: { style: 'thin' as const, color: { argb: 'CBD5E1' } },
     };
 
-    ws.columns = keys.map((key) => {
-      let maxLen = String(key).length;
-      for (const row of rows) {
-        const cellLen = String(row?.[key] ?? '').length;
-        if (cellLen > maxLen) maxLen = cellLen;
-      }
-      const nameLike = this.isNameLikeExcelColumn(key);
-      const minW = nameLike ? 36 : 18;
-      const maxW = nameLike ? 72 : 48;
-      const pad = nameLike ? 12 : 6;
-      return {
-        header: key,
-        key,
-        width: Math.min(maxW, Math.max(minW, maxLen + pad)),
-      };
-    });
+    if (rows.length === 0) {
+      ws.views = [{ state: 'frozen', ySplit: brandRows }];
+      return;
+    }
 
-    const headerRow = ws.getRow(1);
+    const headerRow = ws.getRow(headerRowIndex);
     headerRow.height = 42;
-    headerRow.eachCell((cell, colNumber) => {
-      const key = keys[colNumber - 1] || '';
+    keys.forEach((key, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = key;
       cell.font = { bold: true, size: 16, color: { argb: 'FFFFFF' } };
       cell.fill = headerFill;
       cell.alignment = {
@@ -136,8 +237,7 @@ export class ReportExportService {
     });
 
     for (const rowData of rows) {
-      const values = keys.map((k) => rowData?.[k] ?? '');
-      const row = ws.addRow(values);
+      const row = ws.addRow(keys.map((k) => rowData?.[k] ?? ''));
       row.height = 38;
       row.eachCell((cell, colNumber) => {
         const key = keys[colNumber - 1] || '';
@@ -151,7 +251,7 @@ export class ReportExportService {
       });
     }
 
-    ws.views = [{ state: 'frozen', ySplit: 1 }];
+    ws.views = [{ state: 'frozen', ySplit: headerRowIndex }];
   }
 
   /** Wider columns for name / location / label text fields. */

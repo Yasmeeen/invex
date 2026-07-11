@@ -12,7 +12,12 @@
   </header>
   <div class="report-card__rule" role="presentation"></div>
   <div class="report-card__body">
-    <p class="report-card__value">{{ value }}</p>
+    <p class="report-card__value" *ngIf="money; else plainValue">
+      {{ value | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
+    </p>
+    <ng-template #plainValue>
+      <p class="report-card__value">{{ value }}</p>
+    </ng-template>
     <div class="report-card__footer" *ngIf="showFooter">
       <span
         *ngIf="trendLabel"

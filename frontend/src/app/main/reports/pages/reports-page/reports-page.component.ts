@@ -62,6 +62,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   salesPaymentColumns: { key: string; labelKey: string }[] = [];
   salesPaymentRows: any[] = [];
 
+  /** Products report: inventory capital per branch. */
+  branchCapitalColumns: { key: string; labelKey: string }[] = [];
+  branchCapitalRows: any[] = [];
+
   private lastReportPayload: any = null;
   private langSub?: Subscription;
 
@@ -202,6 +206,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.salesPaymentRows = [];
         this.deskPurchasesDetailColumns = [];
         this.deskPurchasesDetailRows = [];
+        this.branchCapitalColumns = [];
+        this.branchCapitalRows = [];
       }
     );
   }
@@ -214,6 +220,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.salesPaymentRows = [];
     this.deskPurchasesDetailColumns = [];
     this.deskPurchasesDetailRows = [];
+    this.branchCapitalColumns = [];
+    this.branchCapitalRows = [];
     const t = (key: string, params?: object) => this.translate.instant(key, params);
 
     if (this.reportType === 'bookings') {
@@ -319,23 +327,60 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
 
     if (this.reportType === 'products') {
+      const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_card_warehouse_stock', value: res.summary?.stockInWarehouse || 0 },
-        { titleKey: 'tr_report_card_warehouse_products', value: res.summary?.warehouseProductsCount || 0 },
-        { titleKey: 'tr_report_card_low_stock_threshold', value: res.summary?.lowStockThreshold || 0 },
+        {
+          titleKey: 'tr_report_card_inventory_capital',
+          value: s.inventoryCapital ?? 0,
+          hintKey: 'tr_report_inventory_capital_hint',
+        },
+        {
+          titleKey: 'tr_report_card_branches_inventory_capital',
+          value: s.branchesInventoryCapital ?? 0,
+        },
+        {
+          titleKey: 'tr_report_card_warehouse_inventory_capital',
+          value: s.warehouseInventoryCapital ?? 0,
+        },
+        { titleKey: 'tr_report_card_total_stock', value: s.totalStock || 0 },
+        { titleKey: 'tr_report_card_branches_stock', value: s.branchesStock || 0 },
+        { titleKey: 'tr_report_card_warehouse_stock', value: s.stockInWarehouse || 0 },
       ];
+
+      const perBranch = res.stockPerBranch || [];
+      this.branchCapitalColumns = [
+        { key: 'branchName', labelKey: 'tr_branch' },
+        { key: 'productsCount', labelKey: 'tr_report_col_products_count' },
+        { key: 'totalStock', labelKey: 'tr_report_col_stock' },
+        { key: 'inventoryCapital', labelKey: 'tr_report_col_inventory_capital' },
+      ];
+      this.branchCapitalRows = perBranch.map((x: any) => ({
+        branchName: x.branchName || '—',
+        productsCount: x.productsCount || 0,
+        totalStock: x.totalStock || 0,
+        inventoryCapital: x.inventoryCapital ?? 0,
+      }));
+
       this.tableColumns = [
         { key: 'productName', labelKey: 'tr_report_col_product' },
         { key: 'soldQty', labelKey: 'tr_report_col_sold_qty' },
         { key: 'soldAmount', labelKey: 'tr_report_col_sold_amount' },
       ];
       this.tableRows = res.topSellingProducts || [];
-      const barTitle = t('tr_report_chart_top_products');
-      this.chartOptions = this.barChart(
-        barTitle,
-        (res.topSellingProducts || []).map((x: any) => x.productName),
-        (res.topSellingProducts || []).map((x: any) => Number(x.soldQty || 0))
-      );
+
+      if (perBranch.length > 0) {
+        this.chartOptions = this.barChart(
+          t('tr_report_chart_capital_by_branch'),
+          perBranch.map((x: any) => x.branchName || '—'),
+          perBranch.map((x: any) => Number(x.inventoryCapital || 0))
+        );
+      } else {
+        this.chartOptions = this.barChart(
+          t('tr_report_chart_top_products'),
+          (res.topSellingProducts || []).map((x: any) => x.productName),
+          (res.topSellingProducts || []).map((x: any) => Number(x.soldQty || 0))
+        );
+      }
       return;
     }
 
@@ -573,6 +618,28 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       .instant(this.reportTitleKey)
       .replace(/\s+/g, '_')
       .toLowerCase();
+
+    if (this.reportType === 'products') {
+      const t = (key: string) => this.translate.instant(key);
+      const summaryRows = this.cards.map((c) => ({
+        [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+        [t('tr_report_col_value')]: c.value,
+      }));
+      const capitalRows = this.mapRowsForExport(this.branchCapitalColumns, this.branchCapitalRows);
+      const topRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
+      const sheets: { name: string; rows: Record<string, unknown>[] }[] = [
+        { name: t('tr_report_sheet_summary'), rows: summaryRows },
+      ];
+      if (capitalRows.length > 0) {
+        sheets.push({ name: t('tr_report_capital_by_branch'), rows: capitalRows });
+      }
+      if (topRows.length > 0) {
+        sheets.push({ name: t('tr_report_chart_top_products'), rows: topRows });
+      }
+      this.exportService.exportToExcelMultiSheet(filename, sheets);
+      return;
+    }
+
     this.exportService.exportToExcel(filename, this.tableRows);
   }
 
@@ -582,14 +649,55 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       label: this.translate.instant(c.titleKey, c.titleParams || {}),
       value: c.value,
     }));
+
+    if (this.reportType === 'products') {
+      const sections = [];
+      if (this.branchCapitalRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_capital_by_branch'),
+          columns: this.branchCapitalColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.branchCapitalColumns, this.branchCapitalRows),
+        });
+      }
+      if (this.tableRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_chart_top_products'),
+          columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        });
+      }
+      if (sections.length === 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_sheet_summary'),
+          columns: [
+            this.translate.instant('tr_report_col_label'),
+            this.translate.instant('tr_report_col_value'),
+          ],
+          rows: summaryRows.map((r) => ({
+            [this.translate.instant('tr_report_col_label')]: r.label,
+            [this.translate.instant('tr_report_col_value')]: r.value,
+          })),
+        });
+      }
+      await this.exportService.exportMultiSectionPdf(title, summaryRows, sections);
+      return;
+    }
+
     const colLabels = this.tableColumns.map((c) => this.translate.instant(c.labelKey));
-    const pdfRows = this.tableRows.map((row) =>
-      this.tableColumns.reduce((acc: Record<string, unknown>, col) => {
+    const pdfRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
+    await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
+  }
+
+  private mapRowsForExport(
+    columns: { key: string; labelKey: string }[],
+    rows: any[]
+  ): Record<string, unknown>[] {
+    return (rows || []).map((row) =>
+      columns.reduce((acc: Record<string, unknown>, col) => {
         acc[this.translate.instant(col.labelKey)] = row[col.key];
         return acc;
       }, {})
     );
-    await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
   }
 
   printReport(): void {

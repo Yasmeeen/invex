@@ -398,19 +398,93 @@ export const getProductsReport = async (req, res) => {
       .limit(100)
       .lean();
 
+    const stockValueExpr = {
+      $multiply: [{ $ifNull: ['$stock', 0] }, { $ifNull: ['$netPrice', 0] }],
+    };
+
     const stockPerBranch = await Product.aggregate([
       { $match: { ...productMatch, inWarehouse: { $ne: true }, branch: { $ne: null } } },
-      { $group: { _id: '$branch', totalStock: { $sum: '$stock' }, productsCount: { $sum: 1 } } },
+      {
+        $group: {
+          _id: '$branch',
+          totalStock: { $sum: '$stock' },
+          productsCount: { $sum: 1 },
+          inventoryCapital: { $sum: stockValueExpr },
+        },
+      },
       { $lookup: { from: 'branches', localField: '_id', foreignField: '_id', as: 'branch' } },
       { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
-      { $project: { _id: 0, branchId: '$_id', branchName: { $ifNull: ['$branch.name', 'N/A'] }, totalStock: 1, productsCount: 1 } },
+      {
+        $project: {
+          _id: 0,
+          branchId: '$_id',
+          branchName: { $ifNull: ['$branch.name', 'N/A'] },
+          totalStock: 1,
+          productsCount: 1,
+          inventoryCapital: { $round: ['$inventoryCapital', 2] },
+        },
+      },
       { $sort: { branchName: 1 } },
     ]);
 
     const [warehouseStats] = await Product.aggregate([
       { $match: { ...productMatch, inWarehouse: true } },
-      { $group: { _id: null, stockInWarehouse: { $sum: '$stock' }, productsCount: { $sum: 1 } } },
-      { $project: { _id: 0, stockInWarehouse: 1, productsCount: 1 } },
+      {
+        $group: {
+          _id: null,
+          stockInWarehouse: { $sum: '$stock' },
+          productsCount: { $sum: 1 },
+          inventoryCapital: { $sum: stockValueExpr },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          stockInWarehouse: 1,
+          productsCount: 1,
+          inventoryCapital: { $round: ['$inventoryCapital', 2] },
+        },
+      },
+    ]);
+
+    const [inventoryCapitalStats] = await Product.aggregate([
+      { $match: productMatch },
+      {
+        $group: {
+          _id: null,
+          totalStock: { $sum: { $ifNull: ['$stock', 0] } },
+          productsCount: { $sum: 1 },
+          inventoryCapital: { $sum: stockValueExpr },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalStock: 1,
+          productsCount: 1,
+          inventoryCapital: { $round: ['$inventoryCapital', 2] },
+        },
+      },
+    ]);
+
+    const [branchesCapitalStats] = await Product.aggregate([
+      { $match: { ...productMatch, inWarehouse: { $ne: true }, branch: { $ne: null } } },
+      {
+        $group: {
+          _id: null,
+          totalStock: { $sum: { $ifNull: ['$stock', 0] } },
+          productsCount: { $sum: 1 },
+          inventoryCapital: { $sum: stockValueExpr },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalStock: 1,
+          productsCount: 1,
+          inventoryCapital: { $round: ['$inventoryCapital', 2] },
+        },
+      },
     ]);
 
     return res.json({
@@ -419,6 +493,13 @@ export const getProductsReport = async (req, res) => {
         lowStockThreshold,
         stockInWarehouse: warehouseStats?.stockInWarehouse || 0,
         warehouseProductsCount: warehouseStats?.productsCount || 0,
+        warehouseInventoryCapital: warehouseStats?.inventoryCapital || 0,
+        branchesStock: branchesCapitalStats?.totalStock || 0,
+        branchesProductsCount: branchesCapitalStats?.productsCount || 0,
+        branchesInventoryCapital: branchesCapitalStats?.inventoryCapital || 0,
+        totalStock: inventoryCapitalStats?.totalStock || 0,
+        productsCount: inventoryCapitalStats?.productsCount || 0,
+        inventoryCapital: inventoryCapitalStats?.inventoryCapital || 0,
       },
       topSellingProducts,
       lowStockProducts,

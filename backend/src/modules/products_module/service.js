@@ -2189,6 +2189,10 @@ export const getProductsInventoryAudit = async (req, res) => {
     const query = buildProductsListQuery(req.query);
     const search = String(req.query.search || '').trim();
 
+    const stockValueExpr = {
+      $multiply: [{ $ifNull: ['$stock', 0] }, { $ifNull: ['$netPrice', 0] }],
+    };
+
     const [totalsAgg, byLocationRaw] = await Promise.all([
       Product.aggregate([
         { $match: query },
@@ -2199,6 +2203,17 @@ export const getProductsInventoryAudit = async (req, res) => {
             totalStock: { $sum: { $ifNull: ['$stock', 0] } },
             totalBooked: { $sum: { $ifNull: ['$bookedQuantity', 0] } },
             totalTransferReserved: { $sum: { $ifNull: ['$transferReservedQuantity', 0] } },
+            inventoryCapital: { $sum: stockValueExpr },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            productsCount: 1,
+            totalStock: 1,
+            totalBooked: 1,
+            totalTransferReserved: 1,
+            inventoryCapital: { $round: ['$inventoryCapital', 2] },
           },
         },
       ]),
@@ -2214,6 +2229,7 @@ export const getProductsInventoryAudit = async (req, res) => {
             totalStock: { $sum: { $ifNull: ['$stock', 0] } },
             totalBooked: { $sum: { $ifNull: ['$bookedQuantity', 0] } },
             totalTransferReserved: { $sum: { $ifNull: ['$transferReservedQuantity', 0] } },
+            inventoryCapital: { $sum: stockValueExpr },
           },
         },
         {
@@ -2240,6 +2256,7 @@ export const getProductsInventoryAudit = async (req, res) => {
             totalStock: 1,
             totalBooked: 1,
             totalTransferReserved: 1,
+            inventoryCapital: { $round: ['$inventoryCapital', 2] },
           },
         },
         {
@@ -2256,10 +2273,12 @@ export const getProductsInventoryAudit = async (req, res) => {
       totalStock: 0,
       totalBooked: 0,
       totalTransferReserved: 0,
+      inventoryCapital: 0,
     };
 
     const byLocation = (byLocationRaw || []).map((row) => ({
       ...row,
+      inventoryCapital: row.inventoryCapital ?? 0,
       totalAvailable: Math.max(
         0,
         (row.totalStock || 0) - (row.totalBooked || 0) - (row.totalTransferReserved || 0)
@@ -2273,6 +2292,7 @@ export const getProductsInventoryAudit = async (req, res) => {
         totalStock: totals.totalStock || 0,
         totalBooked: totals.totalBooked || 0,
         totalTransferReserved: totals.totalTransferReserved || 0,
+        inventoryCapital: totals.inventoryCapital || 0,
         totalAvailable: Math.max(
           0,
           (totals.totalStock || 0) -

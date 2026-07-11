@@ -39,6 +39,7 @@ export type ProductsInventoryAuditLocation = {
   totalBooked: number;
   totalTransferReserved: number;
   totalAvailable: number;
+  inventoryCapital?: number;
 };
 
 export type ProductsInventoryAuditResponse = {
@@ -49,6 +50,7 @@ export type ProductsInventoryAuditResponse = {
     totalBooked: number;
     totalTransferReserved: number;
     totalAvailable: number;
+    inventoryCapital?: number;
   };
   byLocation: ProductsInventoryAuditLocation[];
 };

@@ -1,7 +1,27 @@
 <div class="product-inventory-audit-dialog bg-white plr-4 ptb-4">
   <div class="flex flex-space-between flex-middle mb-3">
     <h3 class="m-0">{{ 'tr_products_inventory_audit_title' | translate }}</h3>
-    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+    <div class="audit-header-actions flex flex-middle">
+      <span class="options-menu audit-export-menu" *ngIf="!loading && audit">
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body"
+          [disabled]="exporting"
+        >
+          <i class="fa fa-file-excel-o text-primary" aria-hidden="true"></i>
+          {{ exporting ? ('tr_loading' | translate) : ('tr_report_export_excel' | translate) }}
+        </button>
+        <div class="options-menu-container p-0">
+          <div class="single-option" (click)="exportSummaryExcel()">
+            {{ 'tr_products_inventory_audit_export_summary' | translate }}
+          </div>
+          <div class="single-option" (click)="exportProductsExcel()">
+            {{ 'tr_products_inventory_audit_export_products' | translate }}
+          </div>
+        </div>
+      </span>
+      <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+    </div>
   </div>
 
   <app-ghost-line *ngIf="loading" [length]="6" [type]="'table'"></app-ghost-line>
@@ -29,6 +49,10 @@
         <span class="meta-label">{{ 'tr_available' | translate }}</span>
         <strong>{{ audit.totals.totalAvailable }}</strong>
       </div>
+      <div class="col-md-3 col-6" *ngIf="showNetPrice">
+        <span class="meta-label">{{ 'tr_report_col_inventory_capital' | translate }}</span>
+        <strong>{{ audit.totals.inventoryCapital ?? 0 }}</strong>
+      </div>
     </div>
 
     <h4 class="audit-section-title">{{ 'tr_products_inventory_audit_by_location' | translate }}</h4>
@@ -50,6 +74,7 @@
             <th>{{ 'tr_stock' | translate }}</th>
             <th>{{ 'tr_booked' | translate }}</th>
             <th>{{ 'tr_available' | translate }}</th>
+            <th *ngIf="showNetPrice">{{ 'tr_report_col_inventory_capital' | translate }}</th>
           </tr>
         </thead>
         <tbody>
@@ -65,6 +90,7 @@
             <td>{{ row.totalStock }}</td>
             <td>{{ row.totalBooked }}</td>
             <td>{{ row.totalAvailable }}</td>
+            <td *ngIf="showNetPrice">{{ row.inventoryCapital ?? 0 }}</td>
           </tr>
         </tbody>
         <tfoot>
@@ -74,6 +100,7 @@
             <td><strong>{{ audit.totals.totalStock }}</strong></td>
             <td><strong>{{ audit.totals.totalBooked }}</strong></td>
             <td><strong>{{ audit.totals.totalAvailable }}</strong></td>
+            <td *ngIf="showNetPrice"><strong>{{ audit.totals.inventoryCapital ?? 0 }}</strong></td>
           </tr>
         </tfoot>
       </table>

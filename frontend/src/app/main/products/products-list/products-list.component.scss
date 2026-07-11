@@ -45,12 +45,15 @@
     width: 7rem;
 }
 &:nth-child(11){
-  width: 5rem;
+  width: 6rem;
 }
 &:nth-child(12){
-  width: 7rem;
+  width: 7ch;
 }
-      &:nth-child(13){
+&:nth-child(13){
+  width: 10rem;
+}
+      &:nth-child(14){
         width: 2rem;
     }
    }

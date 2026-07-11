@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -25,11 +25,153 @@ export class ReportExportService {
   }
 
   exportToExcel(filename: string, rows: any[]): void {
-    const worksheet = XLSX.utils.json_to_sheet(rows || []);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
-    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    saveAs(new Blob([buffer], { type: 'application/octet-stream' }), `${filename}.xlsx`);
+    this.exportToExcelMultiSheet(filename, [{ name: 'Report', rows: rows || [] }]);
+  }
+
+  /** Multiple sheets (e.g. summary + capital by branch + top products). */
+  exportToExcelMultiSheet(
+    filename: string,
+    sheets: { name: string; rows: Record<string, unknown>[] }[]
+  ): void {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'INVEX';
+    workbook.created = new Date();
+
+    const usedNames = new Set<string>();
+    for (const sheet of sheets || []) {
+      const rows = sheet.rows?.length ? sheet.rows : [];
+      const name = this.uniqueExcelSheetName(sheet.name || 'Sheet', usedNames);
+      this.addStyledExcelSheet(workbook, name, rows);
+    }
+
+    if (!workbook.worksheets.length) {
+      this.addStyledExcelSheet(workbook, 'Report', []);
+    }
+
+    workbook.xlsx.writeBuffer().then((buffer: ExcelJS.Buffer) => {
+      saveAs(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `${filename}.xlsx`
+      );
+    });
+  }
+
+  private uniqueExcelSheetName(raw: string, usedNames: Set<string>): string {
+    let name = String(raw || 'Sheet')
+      .replace(/[\\/?*[\]]/g, ' ')
+      .trim()
+      .slice(0, 31);
+    if (!name) name = 'Sheet';
+    let unique = name;
+    let i = 2;
+    while (usedNames.has(unique)) {
+      const suffix = ` (${i})`;
+      unique = `${name.slice(0, Math.max(1, 31 - suffix.length))}${suffix}`;
+      i += 1;
+    }
+    usedNames.add(unique);
+    return unique;
+  }
+
+  private addStyledExcelSheet(
+    workbook: ExcelJS.Workbook,
+    name: string,
+    rows: Record<string, unknown>[]
+  ): void {
+    const ws = workbook.addWorksheet(name);
+    const keys =
+      rows.length > 0
+        ? Object.keys(rows[0])
+        : [];
+
+    if (!keys.length) {
+      ws.getColumn(1).width = 40;
+      ws.getRow(1).height = 40;
+      return;
+    }
+
+    const headerFill = {
+      type: 'pattern' as const,
+      pattern: 'solid' as const,
+      fgColor: { argb: '5B21B6' },
+    };
+    const thinBorder = {
+      top: { style: 'thin' as const, color: { argb: 'CBD5E1' } },
+      left: { style: 'thin' as const, color: { argb: 'CBD5E1' } },
+      bottom: { style: 'thin' as const, color: { argb: 'CBD5E1' } },
+      right: { style: 'thin' as const, color: { argb: 'CBD5E1' } },
+    };
+
+    ws.columns = keys.map((key) => {
+      let maxLen = String(key).length;
+      for (const row of rows) {
+        const cellLen = String(row?.[key] ?? '').length;
+        if (cellLen > maxLen) maxLen = cellLen;
+      }
+      const nameLike = this.isNameLikeExcelColumn(key);
+      const minW = nameLike ? 36 : 18;
+      const maxW = nameLike ? 72 : 48;
+      const pad = nameLike ? 12 : 6;
+      return {
+        header: key,
+        key,
+        width: Math.min(maxW, Math.max(minW, maxLen + pad)),
+      };
+    });
+
+    const headerRow = ws.getRow(1);
+    headerRow.height = 42;
+    headerRow.eachCell((cell, colNumber) => {
+      const key = keys[colNumber - 1] || '';
+      cell.font = { bold: true, size: 16, color: { argb: 'FFFFFF' } };
+      cell.fill = headerFill;
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: this.isNameLikeExcelColumn(key) ? 'left' : 'center',
+        wrapText: true,
+      };
+      cell.border = thinBorder;
+    });
+
+    for (const rowData of rows) {
+      const values = keys.map((k) => rowData?.[k] ?? '');
+      const row = ws.addRow(values);
+      row.height = 38;
+      row.eachCell((cell, colNumber) => {
+        const key = keys[colNumber - 1] || '';
+        cell.font = { size: 16 };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: this.isNameLikeExcelColumn(key) ? 'left' : 'center',
+          wrapText: true,
+        };
+        cell.border = thinBorder;
+      });
+    }
+
+    ws.views = [{ state: 'frozen', ySplit: 1 }];
+  }
+
+  /** Wider columns for name / location / label text fields. */
+  private isNameLikeExcelColumn(key: string): boolean {
+    const k = String(key || '').trim().toLowerCase();
+    if (!k) return false;
+    return (
+      k === 'name' ||
+      k.includes('name') ||
+      k.includes('اسم') ||
+      k.includes('فرع') ||
+      k.includes('موقع') ||
+      k.includes('location') ||
+      k.includes('branch') ||
+      k.includes('product') ||
+      k.includes('منتج') ||
+      k.includes('بند') ||
+      k.includes('label') ||
+      k.includes('item')
+    );
   }
 
   async exportToPdf(

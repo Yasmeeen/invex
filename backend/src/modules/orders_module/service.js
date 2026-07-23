@@ -165,7 +165,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.invoiceAttributes'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -346,6 +346,8 @@ export const createOrder = async (req, res) => {
     let numberOfProducts = 0;
     const orderProducts = [];
     const categoryById = new Map();
+    /** Products removed because category.deleteProductWhenOutOfStock (audit after commit). */
+    const autoDeletedProducts = [];
 
     const getCategoryCached = async (categoryId) => {
       if (!categoryId) return null;
@@ -384,6 +386,11 @@ export const createOrder = async (req, res) => {
 
       const categoryDoc = await getCategoryCached(productDoc.category);
       const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
+      // Category default is true; missing field on legacy categories → show code
+      const showProductCodeOnInvoice =
+        categoryDoc?.showProductCodeOnInvoice == null
+          ? true
+          : !!categoryDoc.showProductCodeOnInvoice;
 
       orderProducts.push({
         productId: selected._id,
@@ -393,8 +400,26 @@ export const createOrder = async (req, res) => {
         price,
         cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
+        showProductCodeOnInvoice,
         ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
       });
+
+      // Category setting: remove product entirely once stock is exhausted
+      if (
+        Number(productDoc.stock) <= 0 &&
+        categoryDoc?.deleteProductWhenOutOfStock
+      ) {
+        autoDeletedProducts.push({
+          _id: productDoc._id,
+          code: productDoc.code,
+          name: productDoc.name,
+          stock: productDoc.stock,
+          branch: productDoc.branch,
+          inWarehouse: productDoc.inWarehouse,
+          addedBy: productDoc.addedBy,
+        });
+        await Product.findByIdAndDelete(productDoc._id).session(session);
+      }
     }
 
     const subtotalPrice = Math.round(totalPrice * 100) / 100;
@@ -652,6 +677,29 @@ export const createOrder = async (req, res) => {
         status: newOrder?.status,
       },
     });
+
+    for (const removed of autoDeletedProducts) {
+      await auditLog(req, {
+        action: 'delete',
+        module: 'products',
+        entityType: 'Product',
+        entityId: removed._id,
+        message: `Product removed from stock after sale ${removed.code || ''}`.trim(),
+        before: {
+          code: removed.code,
+          name: removed.name,
+          stock: removed.stock,
+          branch: removed.branch,
+          inWarehouse: removed.inWarehouse,
+          addedBy: removed.addedBy,
+        },
+        metadata: {
+          reason: 'deleteProductWhenOutOfStock',
+          orderId: newOrder?._id,
+          orderNumber: newOrder?.orderNumber,
+        },
+      });
+    }
 
     const newOrderPlain =
       typeof newOrder?.toObject === 'function' ? newOrder.toObject() : newOrder;

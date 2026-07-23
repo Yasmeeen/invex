@@ -169,6 +169,11 @@ const orderSchema = new mongoose.Schema(
         /** Snapshot item cost at time of sale (for profit reports). */
         cost: { type: Number, required: false, default: 0, min: 0 },
         isApplyDiscount: { type: Boolean, default: false },
+        /**
+         * Snapshot: category.showProductCodeOnInvoice at sale time.
+         * When true, product code is printed under the name on the customer receipt.
+         */
+        showProductCodeOnInvoice: { type: Boolean, required: false },
         /** Snapshot: category attributes flagged showOnInvoice (label + value). */
         invoiceAttributes: {
           type: [

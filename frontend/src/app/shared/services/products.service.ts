@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_INVENTORY_AUDIT_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import { Category, Product, ProductHistoryResponse } from '@core/models/products.model';
+import { Category, Product, ProductHistoryResponse, ProductSerialTrackResponse } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -200,12 +200,48 @@ requestBranchTransfer(payload: {
   );
 }
 
-listBranchTransfers(params: { userId: string; status?: string }) {
+listBranchTransfers(params: {
+  userId: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+  fromBranchId?: string;
+  toBranchId?: string;
+  categoryId?: string;
+  search?: string;
+}) {
   let hp = new HttpParams().set('userId', params.userId);
   if (params.status) {
     hp = hp.set('status', params.status);
   }
-  return this.http.get<{ transfers: BranchTransferItem[] }>(`${PRODUCTS_URL}/branch-transfers`, {
+  if (params.page != null) {
+    hp = hp.set('page', String(params.page));
+  }
+  if (params.limit != null) {
+    hp = hp.set('limit', String(params.limit));
+  }
+  if (params.fromBranchId) {
+    hp = hp.set('fromBranchId', params.fromBranchId);
+  }
+  if (params.toBranchId) {
+    hp = hp.set('toBranchId', params.toBranchId);
+  }
+  if (params.categoryId) {
+    hp = hp.set('categoryId', params.categoryId);
+  }
+  if (params.search) {
+    hp = hp.set('search', params.search);
+  }
+  return this.http.get<{
+    transfers: BranchTransferItem[];
+    meta?: {
+      currentPage: number;
+      totalCount: number;
+      totalPages: number;
+      nextPage: number | null;
+      prevPage: number | null;
+    };
+  }>(`${PRODUCTS_URL}/branch-transfers`, {
     params: hp,
   });
 }
@@ -238,6 +274,12 @@ getProductsStats(branchId?: any) {
 
 getProductHistory(productId: string): Observable<ProductHistoryResponse> {
   return this.http.get<ProductHistoryResponse>(`${PRODUCTS_URL}/${productId}/history`);
+}
+
+trackProductSerial(code: string): Observable<ProductSerialTrackResponse> {
+  return this.http.get<ProductSerialTrackResponse>(`${PRODUCTS_URL}/serial-track`, {
+    params: { code: String(code || '').trim() },
+  });
 }
 
 getProductsInventoryAudit(params: any): Observable<ProductsInventoryAuditResponse> {

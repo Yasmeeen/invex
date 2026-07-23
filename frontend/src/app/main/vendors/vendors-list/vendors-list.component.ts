@@ -32,6 +32,12 @@ export class VendorsListComponent implements OnInit {
   iscategoryNotAuthorized: boolean = false;
   selectedBranch: string ;
   totalNumberOfVendors: number;
+  balanceSideFilter: 'all' | 'debit' | 'credit' = 'all';
+  balanceSideOptions = [
+    { value: 'all', labelKey: 'tr_balance_filter_all' },
+    { value: 'debit', labelKey: 'tr_balance_filter_debit' },
+    { value: 'credit', labelKey: 'tr_balance_filter_credit' },
+  ];
 
   currentOrder: any = {
     name: '',
@@ -106,6 +112,32 @@ export class VendorsListComponent implements OnInit {
       this.getVendors();
     }, 500);
   }
+
+  onBalanceSideFilterChange(value: 'all' | 'debit' | 'credit' | null): void {
+    this.balanceSideFilter = value || 'all';
+    if (this.balanceSideFilter === 'debit' || this.balanceSideFilter === 'credit') {
+      this.params.balanceSide = this.balanceSideFilter;
+    } else {
+      delete this.params.balanceSide;
+    }
+    this.params.page = 1;
+    this.getVendors();
+  }
+
+  vendorNetBalanceText(vendor: Vendor): string {
+    const net = vendor?.netBalanceMessage;
+    if (!net) {
+      return this.translateService.instant('tr_balance_none');
+    }
+    if (net.who === 'even') {
+      return this.translateService.instant('tr_vendor_balance_even');
+    }
+    if (net.who === 'supplier') {
+      return this.translateService.instant('tr_vendor_owes_us_net', { amount: net.amount });
+    }
+    return this.translateService.instant('tr_we_owe_vendor_net', { amount: net.amount });
+  }
+
   paginationUpdate(page: number) {
     this.params.page = page;
     this.getVendors();
@@ -184,4 +216,3 @@ export class VendorsListComponent implements OnInit {
   }
 
 }
-

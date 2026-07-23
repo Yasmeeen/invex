@@ -44,6 +44,32 @@
             </div>
           </div>
         </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_balance_filter' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <ng-select
+                class="s-control s-select"
+                [items]="balanceSideOptions"
+                bindLabel="labelKey"
+                bindValue="value"
+                [clearable]="false"
+                [searchable]="false"
+                [(ngModel)]="balanceSideFilter"
+                (ngModelChange)="onBalanceSideFilterChange($event)"
+                placeholder="{{ 'tr_balance_filter_all' | translate }}"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   
@@ -62,6 +88,9 @@
               <th>{{ 'tr_branch' | translate }}</th>
               <th>{{ 'tr_number_of_orders' | translate }}</th>
               <th>{{ 'tr_total_orders_price' | translate }}</th>
+              <th>{{ 'tr_balance_debit_short' | translate }}</th>
+              <th>{{ 'tr_balance_credit_short' | translate }}</th>
+              <th>{{ 'tr_balance_net_short' | translate }}</th>
               <th>{{ 'tr_actions' | translate }}</th>
             </tr>
           </thead>
@@ -76,6 +105,18 @@
               </div></td>
               <td>{{ client.numberOfOrders }}</td>
               <td>{{ client.totalOrdersPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td class="text-debit">{{ (client.clientOwesUs || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td class="text-credit">{{ (client.weOweClient || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <span
+                  class="balance-net-badge"
+                  [class.balance-net-badge--debit]="client.balanceSide === 'debit'"
+                  [class.balance-net-badge--credit]="client.balanceSide === 'credit'"
+                  [class.balance-net-badge--even]="client.balanceSide === 'even' || client.balanceSide === 'none'"
+                >
+                  {{ clientNetBalanceText(client) }}
+                </span>
+              </td>
               <td>
                 <span class="options-menu">
                   <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
@@ -129,6 +170,31 @@
             </span>
           </div>
 
+          <div class="client-card__balances">
+            <div class="balance-pill balance-pill--debit">
+              <div class="balance-pill__label">{{ 'tr_balance_debit_short' | translate }}</div>
+              <div class="balance-pill__value">
+                {{ (client.clientOwesUs || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+            <div class="balance-pill balance-pill--credit">
+              <div class="balance-pill__label">{{ 'tr_balance_credit_short' | translate }}</div>
+              <div class="balance-pill__value">
+                {{ (client.weOweClient || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+            </div>
+            <div
+              class="balance-pill balance-pill--net"
+              [class.balance-pill--net-debit]="client.balanceSide === 'debit'"
+              [class.balance-pill--net-credit]="client.balanceSide === 'credit'"
+            >
+              <div class="balance-pill__label">{{ 'tr_balance_net_short' | translate }}</div>
+              <div class="balance-pill__value balance-pill__value--net">
+                {{ clientNetBalanceText(client) }}
+              </div>
+            </div>
+          </div>
+
           <div class="client-card__stats">
             <div class="stat">
               <div class="stat__label">{{ 'tr_number_of_orders' | translate }}</div>
@@ -173,4 +239,3 @@
       <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
     </div>
   </div>
-  

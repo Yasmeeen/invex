@@ -47,6 +47,11 @@ const toCategoryResponse = (doc, extra = {}) => {
   return {
     ...o,
     code,
+    multiCodePerPiece: !!o.multiCodePerPiece,
+    deleteProductWhenOutOfStock: !!o.deleteProductWhenOutOfStock,
+    // Legacy categories without the field → default true
+    showProductCodeOnInvoice:
+      o.showProductCodeOnInvoice == null ? true : !!o.showProductCodeOnInvoice,
     ...extra,
   };
 };
@@ -123,7 +128,14 @@ const parseBool = (v) => v === true || v === 'true' || String(v).toLowerCase() =
 // Create category
 export const createCategory = async (req, res) => {
   try {
-    const { name, code, attributeDefs, multiCodePerPiece } = req.body;
+    const {
+      name,
+      code,
+      attributeDefs,
+      multiCodePerPiece,
+      deleteProductWhenOutOfStock,
+      showProductCodeOnInvoice,
+    } = req.body;
     const codeNorm = normalizeCategoryCode(code);
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Name is required' });
@@ -152,6 +164,10 @@ export const createCategory = async (req, res) => {
       code: codeNorm,
       attributeDefs: attr,
       multiCodePerPiece: parseBool(multiCodePerPiece),
+      deleteProductWhenOutOfStock: parseBool(deleteProductWhenOutOfStock),
+      // Default true when omitted (schema default + product intent)
+      showProductCodeOnInvoice:
+        showProductCodeOnInvoice == null ? true : parseBool(showProductCodeOnInvoice),
     });
 
     res.status(201).json({
@@ -170,7 +186,14 @@ export const createCategory = async (req, res) => {
 // Update category
 export const updateCategory = async (req, res) => {
   try {
-    const { name, code, attributeDefs, multiCodePerPiece } = req.body;
+    const {
+      name,
+      code,
+      attributeDefs,
+      multiCodePerPiece,
+      deleteProductWhenOutOfStock,
+      showProductCodeOnInvoice,
+    } = req.body;
     const updates = {};
 
     if (name != null && String(name).trim() !== '') {
@@ -204,6 +227,14 @@ export const updateCategory = async (req, res) => {
 
     if (multiCodePerPiece !== undefined) {
       updates.multiCodePerPiece = parseBool(multiCodePerPiece);
+    }
+
+    if (deleteProductWhenOutOfStock !== undefined) {
+      updates.deleteProductWhenOutOfStock = parseBool(deleteProductWhenOutOfStock);
+    }
+
+    if (showProductCodeOnInvoice !== undefined) {
+      updates.showProductCodeOnInvoice = parseBool(showProductCodeOnInvoice);
     }
 
     if (Object.keys(updates).length === 0) {

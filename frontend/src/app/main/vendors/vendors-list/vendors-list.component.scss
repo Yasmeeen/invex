@@ -58,6 +58,72 @@
   color: #9ca3af;
 }
 
+.vendor-card__balances {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.balance-pill {
+  border-radius: 12px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+}
+
+.balance-pill--debit {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.14);
+}
+
+.balance-pill--credit {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.14);
+}
+
+.balance-pill--net {
+  grid-column: 1 / -1;
+  background: rgba(108, 92, 231, 0.06);
+  border-color: rgba(108, 92, 231, 0.14);
+}
+
+.balance-pill--net-debit {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.balance-pill--net-credit {
+  background: rgba(5, 150, 105, 0.08);
+  border-color: rgba(5, 150, 105, 0.18);
+}
+
+.balance-pill__label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.balance-pill__value {
+  font-weight: 900;
+  font-size: 0.92rem;
+  color: #111827;
+  margin-top: 0.12rem;
+}
+
+.balance-pill--debit .balance-pill__value {
+  color: #b91c1c;
+}
+
+.balance-pill--credit .balance-pill__value {
+  color: #047857;
+}
+
+.balance-pill__value--net {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .vendor-card__details {
   margin-top: 0.65rem;
   display: grid;
@@ -67,6 +133,43 @@
 
 .vendor-card__categories {
   margin-top: 0.15rem;
+}
+
+.text-debit {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.text-credit {
+  color: #047857;
+  font-weight: 700;
+}
+
+.balance-net-badge {
+  display: inline-block;
+  max-width: 14rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.3;
+  background: rgba(107, 114, 128, 0.1);
+  color: #374151;
+}
+
+.balance-net-badge--debit {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.balance-net-badge--credit {
+  background: rgba(5, 150, 105, 0.1);
+  color: #047857;
+}
+
+.balance-net-badge--even {
+  background: rgba(107, 114, 128, 0.1);
+  color: #4b5563;
 }
 
 .vendors-list{
@@ -95,12 +198,15 @@
         &:nth-child(8){
           width: 7rem;
       }
-      &:nth-child(9){
+      &:nth-child(9),
+      &:nth-child(10){
+        width: 7rem;
+    }
+      &:nth-child(11){
+        width: 10rem;
+    }
+      &:nth-child(12){
         width: 2rem;
-    } 
-    
- 
+    }
      }
   }
-
-  

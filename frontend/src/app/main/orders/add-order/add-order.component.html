@@ -267,6 +267,9 @@
             <td>{{ formatReceiptAmount(item.unitPrice) }}</td>
             <td>
               {{ item.name }}
+              <div class="receipt-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
+                {{ item.code }}
+              </div>
               <div class="receipt-item-attrs" *ngIf="item.invoiceAttributes?.length">
                 <span class="receipt-item-attr" *ngFor="let ia of item.invoiceAttributes">
                   {{ ia.label }}: {{ ia.value }}

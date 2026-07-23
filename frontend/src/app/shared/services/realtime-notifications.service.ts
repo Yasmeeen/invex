@@ -9,7 +9,7 @@ import { NotificationsService, NotificationItem } from './notifications.service'
 import { BASE_URL } from '@core/base/urls';
 
 function socketBaseUrl(apiBaseUrl: string): string {
-  // apiBaseUrl = http://host:3000/api -> socket server = http://host:3000
+  // apiBaseUrl = http://host:3001/api -> socket server = http://host:3001
   return apiBaseUrl.replace(/\/api\/?$/, '');
 }
 

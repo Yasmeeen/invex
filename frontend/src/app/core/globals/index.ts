@@ -16,6 +16,8 @@ export class Globals {
   siteMessageType: string = '';
   componentLoader: boolean = false;
   unseenNotificationsCount = 0;
+  /** Incoming pending branch transfers (sidebar badge). */
+  pendingBranchTransferCount = 0;
   notificationsLoaded = false;
   unreadMessagesCount = 0;
   timezone: any = '' ;

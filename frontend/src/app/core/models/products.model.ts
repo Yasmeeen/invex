@@ -79,6 +79,10 @@ export interface Category {
   code?: string;
   /** Each unit gets its own SKU/code when quantity > 1 */
   multiCodePerPiece?: boolean;
+  /** When true, products are deleted once stock reaches 0 */
+  deleteProductWhenOutOfStock?: boolean;
+  /** When true, product code is shown under the name on the customer invoice (default true). */
+  showProductCodeOnInvoice?: boolean;
   /** Dynamic attributes definition (new format: string keys; legacy: objects with key/label). */
   attributeDefs?:
     | string[]
@@ -120,6 +124,8 @@ export interface OrderProductLine {
   price?: number;
   cost?: number;
   isApplyDiscount?: boolean;
+  /** Snapshot from category at sale time; when true, print code under product name. */
+  showProductCodeOnInvoice?: boolean;
   invoiceAttributes?: Array<{ label: string; value: string }>;
 }
 
@@ -228,6 +234,12 @@ export interface Vendor {
   ledgerEntries?: VendorLedgerEntry[];
   createdAt?: string;
   updatedAt?: string;
+  /** Debit — supplier owes us. */
+  supplierOwesUs?: number;
+  /** Credit — we owe supplier. */
+  weOweSupplier?: number;
+  balanceSide?: 'debit' | 'credit' | 'even' | 'none';
+  netBalanceMessage?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
 }
 
 export interface VendorPurchasingInstallmentRow {
@@ -277,6 +289,24 @@ export interface ProductHistoryResponse {
     updatedAt?: string;
   };
   events: ProductHistoryEvent[];
+}
+
+/** Lookup by unit/serial code — includes hard-deleted (sold-out) products. */
+export type ProductSerialTrackStatus =
+  | 'in_stock'
+  | 'out_of_stock'
+  | 'removed_from_stock';
+
+export interface ProductSerialTrackResponse extends ProductHistoryResponse {
+  exists: boolean;
+  status: ProductSerialTrackStatus;
+  product: ProductHistoryResponse['product'] & {
+    removedFromStock?: boolean;
+    price?: number;
+    netPrice?: number;
+    attributes?: Record<string, string>;
+    acquiredFrom?: ProductAcquiredFrom | null;
+  };
 }
 
 export interface VendorHistoryResponse {

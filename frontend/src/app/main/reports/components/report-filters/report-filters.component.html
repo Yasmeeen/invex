@@ -28,7 +28,23 @@
       <label>{{ 'tr_branches' | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
-    <div class="col-md-3" *ngIf="reportType !== 'deskPurchases'">
+    <div class="col-md-3" *ngIf="reportType === 'products'">
+      <label>{{ 'tr_report_filter_category_id' | translate }}</label>
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_report_all_categories' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="categories"
+        [(ngModel)]="filters.category_id"
+        name="reportCategory"
+        [clearable]="true"
+        [searchable]="true"
+        (change)="onCategoryChange()"
+      >
+      </ng-select>
+    </div>
+    <div class="col-md-3 mt-4" *ngIf="reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -47,7 +63,7 @@
         </ng-template>
       </ng-select>
     </div>
-    <div class="col-md-2" *ngIf="reportType !== 'deskPurchases'">
+    <div class="col-md-2 mt-4" *ngIf="reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
       <input
         class="s-control"

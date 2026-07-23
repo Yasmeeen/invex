@@ -27,9 +27,9 @@ import { ViewProductBookingDialogComponent } from '../view-product-booking-dialo
 import { ImportProductsDialogComponent } from '../import-products-dialog/import-products-dialog.component';
 import { ProductsImportMetadata } from '@shared/services/products.service';
 import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
-import { PendingBranchTransfersDialogComponent } from '../pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-products-list',
@@ -59,9 +59,6 @@ export class ProductsListComponent implements OnInit {
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   /** all | with_bookings | without_bookings — maps to API `booked` */
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
-
-  /** Toolbar badge: incoming pending branch transfers */
-  pendingTransferCount = 0;
 
   readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
     { id: 'all', labelKey: 'tr_location_all' },
@@ -109,7 +106,8 @@ export class ProductsListComponent implements OnInit {
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
     private branchesServce: BranchesServce,
-    private globals: Globals
+    private globals: Globals,
+    private router: Router
   ) { }
 
   /** Moderator: never create/edit/delete/print products. */
@@ -120,11 +118,6 @@ export class ProductsListComponent implements OnInit {
   /** Moderator: net price must not be visible in the products list. */
   get showNetPrice(): boolean {
     return !isModerator(this.globals.currentUser?.role);
-  }
-
-  get shouldShowPendingTransfersToolbar(): boolean {
-    const role = this.globals.currentUser?.role as string | undefined;
-    return canPickBranchRole(role) || isBranchManager(role);
   }
 
   /** Super Admin / Co Admin / Admin / Branch Manager (own branch only); not warehouse products. */
@@ -282,41 +275,19 @@ export class ProductsListComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.globals.currentUser?.role === 'Cashier') {
+      this.router.navigate(['/products/serial-track']);
+      return;
+    }
     const saved = localStorage.getItem('products.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
     this.getproducts();
     this.getcategorys();
     this.getBranches();
-    this.refreshPendingTransferCount();
   }
 
-  refreshPendingTransferCount(): void {
-    const uid = this.globals.currentUser?._id;
-    if (!uid || !this.shouldShowPendingTransfersToolbar) {
-      this.pendingTransferCount = 0;
-      return;
-    }
-    this.productsService.getPendingBranchTransferCount(String(uid)).subscribe({
-      next: (r) => (this.pendingTransferCount = Number(r?.count) || 0),
-      error: () => {},
-    });
-  }
-
-  openPendingTransfers(): void {
-    if (!this.shouldShowPendingTransfersToolbar) {
-      return;
-    }
-    this.dialog.open(PendingBranchTransfersDialogComponent, {
-      width: '920px',
-      maxWidth: '95vw',
-      data: {
-        onChanged: () => {
-          this.refreshPendingTransferCount();
-          this.getproducts();
-        },
-      },
-      disableClose: false,
-    });
+  openSerialTrack(): void {
+    this.router.navigate(['/products/serial-track']);
   }
 
   openTransferProduct(product: Product): void {
@@ -356,10 +327,23 @@ export class ProductsListComponent implements OnInit {
       .afterClosed()
       .subscribe((ok) => {
         if (ok) {
-          this.refreshPendingTransferCount();
+          this.refreshSidebarPendingCount();
           this.getproducts();
         }
       });
+  }
+
+  private refreshSidebarPendingCount(): void {
+    const uid = this.globals.currentUser?._id;
+    if (!uid) {
+      return;
+    }
+    this.productsService.getPendingBranchTransferCount(String(uid)).subscribe({
+      next: (r) => {
+        this.globals.pendingBranchTransferCount = Number(r?.count) || 0;
+      },
+      error: () => {},
+    });
   }
 
   openImportDialog(): void {

@@ -19,6 +19,10 @@ import {
   CashierPaymentMethod,
   paymentMethodDisplayLabel,
 } from '@shared/utils/cashier-payment-methods.util';
+import {
+  findProductByScannedCode,
+  productMatchesSearchTerm,
+} from '@shared/utils/product-code-match.util';
 import { Branch, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -118,6 +122,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   paymentMethods: CashierPaymentMethod[] = [];
 
   private settingsSub?: Subscription;
+  /** Debounce barcode scanner input so product adds without pressing Enter. */
+  private barcodeScanTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private productsSerivce: ProductsSerivce, 
@@ -152,6 +158,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy(): void {
     this.settingsSub?.unsubscribe();
+    if (this.barcodeScanTimer != null) {
+      clearTimeout(this.barcodeScanTimer);
+      this.barcodeScanTimer = null;
+    }
   }
 
   private rebuildPaymentMethods(): void {
@@ -910,7 +920,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const inStock = this.products.filter((p: Product) => Number(p.stock ?? 0) > 0);
     if (!this.searchTerm) return inStock;
     return inStock.filter((p: Product) =>
-      p.name.toLowerCase().includes(this.searchTerm.toLowerCase())
+      productMatchesSearchTerm(p, this.searchTerm)
     );
   }
 
@@ -993,9 +1003,32 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.refreshExchangePaymentDefaults();
   }
 
-  scanProduct(code: string) {
+  /**
+   * Auto-add when scanner/type finishes (no Enter needed).
+   * Scanners dump chars quickly then pause; debounce waits for that pause.
+   */
+  onBarcodeInput(): void {
+    if (this.barcodeScanTimer != null) {
+      clearTimeout(this.barcodeScanTimer);
+    }
+    const code = (this.barcode || '').trim();
     if (!code) return;
-    const product = this.products.find(p => p.code === code);
+
+    this.barcodeScanTimer = setTimeout(() => {
+      this.barcodeScanTimer = null;
+      if (findProductByScannedCode(this.products, code)) {
+        this.scanProduct(code);
+      }
+    }, 180);
+  }
+
+  scanProduct(code: string) {
+    if (this.barcodeScanTimer != null) {
+      clearTimeout(this.barcodeScanTimer);
+      this.barcodeScanTimer = null;
+    }
+    if (!code) return;
+    const product = findProductByScannedCode(this.products, code);
     if (product) this.addProduct(product);
     this.barcode = '';
   }

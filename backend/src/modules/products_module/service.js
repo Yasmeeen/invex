@@ -14,6 +14,7 @@ import {
   shouldClearAcquiredFrom,
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
+import { trackProductByCode } from '../../utils/product-serial-track.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -963,7 +964,7 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name code attributeDefs multiCodePerPiece')
+        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
         .populate('branch', 'name')
         .skip(skip)
         .limit(Number(limit)),
@@ -993,7 +994,7 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name code attributeDefs multiCodePerPiece')
+      .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
       .populate('branch', 'name');
 
     if (!product) {
@@ -1969,48 +1970,129 @@ export const rejectBranchTransfer = async (req, res) => {
   }
 };
 
-/** Query: userId (required), status=pending|approved|rejected|all */
+/**
+ * Query: userId (required), status=pending|approved|rejected|all,
+ * page, limit, branchId (csv), categoryId (csv), search (product name/code)
+ */
 export const listBranchTransfers = async (req, res) => {
   try {
     const userId = req.query.userId || req.query.user_id;
-    const user = await loadUserForBranchTransfer(userId);
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       return res.status(400).json({ error: 'userId is required' });
     }
+    const user = await loadUserForBranchTransfer(userId);
     if (!user) {
-      return res.status(400).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'User not found' });
     }
 
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
     const rawStatus = String(req.query.status || 'pending').trim().toLowerCase();
-    const q = {};
+    const andParts = [];
+
     if (rawStatus === 'all') {
       // no status filter
     } else if (['pending', 'approved', 'rejected'].includes(rawStatus)) {
-      q.status = rawStatus;
+      andParts.push({ status: rawStatus });
     } else {
-      q.status = 'pending';
+      andParts.push({ status: 'pending' });
     }
 
     if (!TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
       if (user.role === 'Branch Manager' && user.branch) {
         const bid = user.branch;
-        q.$or = [{ toBranch: bid }, { fromBranch: bid }];
+        andParts.push({ $or: [{ toBranch: bid }, { fromBranch: bid }] });
       } else {
-        return res.json({ transfers: [] });
+        return res.json({
+          transfers: [],
+          meta: {
+            currentPage: page,
+            totalCount: 0,
+            totalPages: 0,
+            nextPage: null,
+            prevPage: null,
+          },
+        });
       }
     }
 
-    const transfers = await ProductBranchTransfer.find(q)
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .populate('product', 'name code stock branch inWarehouse transferReservedQuantity')
-      .populate('fromBranch', 'name')
-      .populate('toBranch', 'name')
-      .populate('initiatedBy', 'name')
-      .populate('resolvedBy', 'name')
-      .lean();
+    const fromBranchIds = toObjectIds(parseOidCsvList(req.query.fromBranchId));
+    if (fromBranchIds.length) {
+      andParts.push({ fromBranch: { $in: fromBranchIds } });
+    }
 
-    return res.json({ transfers });
+    const toBranchIds = toObjectIds(parseOidCsvList(req.query.toBranchId));
+    if (toBranchIds.length) {
+      andParts.push({ toBranch: { $in: toBranchIds } });
+    }
+
+    const categoryIds = toObjectIds(parseOidCsvList(req.query.categoryId));
+    const search = String(req.query.search || '').trim();
+    if (categoryIds.length || search) {
+      const productQuery = {};
+      if (categoryIds.length === 1) {
+        productQuery.category = categoryIds[0];
+      } else if (categoryIds.length > 1) {
+        productQuery.category = { $in: categoryIds };
+      }
+      if (search) {
+        productQuery.$or = [
+          { name: { $regex: escapeRegex(search), $options: 'i' } },
+          { code: { $regex: escapeRegex(search), $options: 'i' } },
+        ];
+      }
+      const matchingProducts = await Product.find(productQuery).select('_id').lean();
+      const productIds = (matchingProducts || []).map((p) => p._id);
+      if (!productIds.length) {
+        return res.json({
+          transfers: [],
+          meta: {
+            currentPage: page,
+            totalCount: 0,
+            totalPages: 0,
+            nextPage: null,
+            prevPage: null,
+          },
+        });
+      }
+      andParts.push({ product: { $in: productIds } });
+    }
+
+    const q =
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? andParts[0]
+          : { $and: andParts };
+
+    const [totalCount, transfers] = await Promise.all([
+      ProductBranchTransfer.countDocuments(q),
+      ProductBranchTransfer.find(q)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('product', 'name code stock branch inWarehouse transferReservedQuantity category')
+        .populate('fromBranch', 'name')
+        .populate('toBranch', 'name')
+        .populate('initiatedBy', 'name')
+        .populate('resolvedBy', 'name')
+        .lean(),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit) || 0;
+
+    return res.json({
+      transfers,
+      meta: {
+        currentPage: page,
+        totalCount,
+        totalPages,
+        nextPage: page < totalPages ? page + 1 : null,
+        prevPage: page > 1 ? page - 1 : null,
+      },
+    });
   } catch (e) {
     console.error('listBranchTransfers:', e);
     return res.status(500).json({ error: 'Failed to list transfers' });
@@ -2021,12 +2103,12 @@ export const listBranchTransfers = async (req, res) => {
 export const getPendingBranchTransferCount = async (req, res) => {
   try {
     const userId = req.query.userId || req.query.user_id;
-    const user = await loadUserForBranchTransfer(userId);
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       return res.status(400).json({ error: 'userId is required' });
     }
+    const user = await loadUserForBranchTransfer(userId);
     if (!user) {
-      return res.status(400).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'User not found' });
     }
 
     let count = 0;
@@ -2368,5 +2450,28 @@ export const getProductHistory = async (req, res) => {
   } catch (error) {
     console.error('getProductHistory:', error);
     res.status(500).json({ error: 'Failed to fetch product history' });
+  }
+};
+
+/**
+ * GET /api/products/serial-track?code=XXX
+ * Lookup unit/serial by code — includes deleted (out-of-stock removed) products.
+ */
+export const getProductSerialTrack = async (req, res) => {
+  try {
+    const code = req.query?.code ?? req.query?.serial ?? '';
+    const result = await trackProductByCode(code);
+    if (!result.ok) {
+      return res.status(result.statusCode || 404).json({ error: result.error });
+    }
+    return res.json({
+      exists: result.exists,
+      status: result.status,
+      product: result.product,
+      events: result.events,
+    });
+  } catch (error) {
+    console.error('getProductSerialTrack:', error);
+    res.status(500).json({ error: 'Failed to track product serial' });
   }
 };

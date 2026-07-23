@@ -56,13 +56,12 @@
         {{ 'tr_products_inventory_audit' | translate }}
       </button>
       <button
-        *ngIf="shouldShowPendingTransfersToolbar"
         type="button"
-        class="s-btn btn-secondary size-body pending-transfers-btn"
-        (click)="openPendingTransfers()"
+        class="s-btn btn-secondary size-body"
+        (click)="openSerialTrack()"
       >
-        {{ 'tr_branch_transfers_pending' | translate }}
-        <span class="pending-transfers-badge" *ngIf="pendingTransferCount > 0">{{ pendingTransferCount }}</span>
+        <i class="fa fa-barcode text-primary" aria-hidden="true"></i>
+        {{ 'tr_serial_track' | translate }}
       </button>
     </div>
   </h2>

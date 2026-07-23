@@ -68,6 +68,9 @@
       <tr *ngFor="let item of order?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
+            {{ item.code }}
+          </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
               {{ ia.label }}: {{ ia.value }}

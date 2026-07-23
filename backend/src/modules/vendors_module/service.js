@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
 import {
   computeSupplierOwesFromOrders,
+  computeSupplierOwesFromOrdersByVendorIds,
   computeSupplierOwesUs,
   orderAmountRemaining,
 } from "../../utils/vendor-balance-utils.js";
@@ -17,6 +18,7 @@ import {
 import {
   applyPurchasePayableSettlement,
   computePurchasePayableBreakdown,
+  computePurchasePayablesByVendorIds,
   deferredPurchaseRemaining,
   recordVendorDeferredPayment,
   recordVendorInstallmentPaymentWithTreasury,
@@ -89,11 +91,30 @@ export const createVendor = async (req, res) => {
   }
 };
 
-// 📌 Get Vendors (with pagination + search)
+function vendorBalanceSide(supplierOwesUs, weOweSupplier) {
+  const debit = Math.round((Number(supplierOwesUs) || 0) * 100) / 100;
+  const credit = Math.round((Number(weOweSupplier) || 0) * 100) / 100;
+  if (debit <= 0 && credit <= 0) return 'none';
+  const net = Math.round((debit - credit) * 100) / 100;
+  if (Math.abs(net) < 0.001) return 'even';
+  return net > 0 ? 'debit' : 'credit';
+}
+
+// 📌 Get Vendors (with pagination + search + balances)
+// Query: balanceSide=debit|credit — net مدين (supplier) or دائن (we owe supplier)
 export const getVendors = async (req, res) => {
     try {
-      const { page = 1, limit = 10, search = '' } = req.query;
-  
+      const {
+        page = 1,
+        limit: limitQ,
+        perPage,
+        search = '',
+        balanceSide = '',
+      } = req.query;
+      const limit = parseInt(limitQ || perPage || 10, 10) || 10;
+      const currentPage = parseInt(page, 10) || 1;
+      const sideFilter = String(balanceSide || '').trim().toLowerCase();
+
       const query = search
         ? {
             $or: [
@@ -103,19 +124,64 @@ export const getVendors = async (req, res) => {
             ],
           }
         : {};
-  
-      const totalCount = await Vendor.countDocuments(query);
-      const totalPages = Math.ceil(totalCount / limit);
-      const currentPage = parseInt(page);
+
+      const allVendors = await Vendor.find(query)
+        .populate('categories', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      const vendorIds = allVendors.map((v) => v._id);
+      const [owesFromSalesMap, purchasePayableMap] = await Promise.all([
+        computeSupplierOwesFromOrdersByVendorIds(vendorIds),
+        computePurchasePayablesByVendorIds(vendorIds),
+      ]);
+
+      let vendorsWithBalance = allVendors.map((vendor) => {
+        const id = String(vendor._id);
+        const owesFromSales = owesFromSalesMap.get(id) || 0;
+        const openingDebit =
+          Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+        const supplierOwesUs =
+          Math.round((owesFromSales + openingDebit) * 100) / 100;
+        const prepaidBalance =
+          Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
+        const buyerPrepaidBalance =
+          Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
+        const purchasePayable = purchasePayableMap.get(id) || 0;
+        const weOweSupplier = computeTotalCreditOwed(
+          prepaidBalance,
+          purchasePayable,
+          buyerPrepaidBalance
+        );
+        const netBalanceMessage = buildNetBalanceMessage(
+          supplierOwesUs,
+          weOweSupplier
+        );
+        const side = vendorBalanceSide(supplierOwesUs, weOweSupplier);
+        return {
+          ...vendor,
+          supplierOwesUs,
+          weOweSupplier,
+          balanceSide: side,
+          netBalanceMessage,
+        };
+      });
+
+      if (sideFilter === 'debit' || sideFilter === 'credit') {
+        vendorsWithBalance = vendorsWithBalance.filter(
+          (v) => v.balanceSide === sideFilter
+        );
+      }
+
+      const totalCount = vendorsWithBalance.length;
+      const totalPages = Math.ceil(totalCount / limit) || 0;
       const nextPage = currentPage < totalPages ? currentPage + 1 : null;
       const prevPage = currentPage > 1 ? currentPage - 1 : null;
-  
-      const vendors = await Vendor.find(query)
-        .populate('categories', 'name')
-        .skip((currentPage - 1) * limit)
-        .limit(parseInt(limit))
-        .sort({ createdAt: -1 });
-  
+      const vendors = vendorsWithBalance.slice(
+        (currentPage - 1) * limit,
+        currentPage * limit
+      );
+
       res.json({
         vendors,
         meta: {

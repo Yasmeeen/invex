@@ -16,6 +16,7 @@ import { AuthenticationService } from "@core/services/authentication.service";
 import { ProductsSerivce } from "@shared/services/products.service";
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { canPickBranchRole } from '@core/utils/role-utils';
+import { findProductByScannedCode } from '@shared/utils/product-code-match.util';
 
 @Component({
   selector: "app-add-order",
@@ -203,7 +204,7 @@ export class AddOrderComponent implements OnInit {
   onProductScanned(code: string) {
     if (!code) return;
   
-    const foundProduct = this.products.find(p => p.code === code);
+    const foundProduct = findProductByScannedCode(this.products, code);
     if (!foundProduct) {
       this.appNotificationService.push('Product not found', 'error');
       return;
@@ -240,6 +241,8 @@ export class AddOrderComponent implements OnInit {
     discountPct: number;
     unitPrice: number;
     name: string;
+    code: string;
+    showProductCodeOnInvoice: boolean;
     invoiceAttributes: Array<{ label: string; value: string }>;
   }> {
     const saved = this.createdOrder?.products as any[] | undefined;
@@ -250,6 +253,8 @@ export class AddOrderComponent implements OnInit {
         discountPct: 0,
         unitPrice: Number(p.price || 0),
         name: String(p.name || ''),
+        code: String(p.code || ''),
+        showProductCodeOnInvoice: !!p.showProductCodeOnInvoice,
         invoiceAttributes: Array.isArray(p.invoiceAttributes) ? p.invoiceAttributes : [],
       }));
     }
@@ -262,12 +267,16 @@ export class AddOrderComponent implements OnInit {
         (sp.isApplyDiscount && sp.discount > 0
           ? (unit - (unit * Number(sp.discount)) / 100) * qty
           : unit * qty);
+      const catFlag = sp?.category?.showProductCodeOnInvoice;
       return {
         totalPrice: Math.round(totalFromRow * 100) / 100,
         quantity: qty,
         discountPct: sp.isApplyDiscount ? Number(sp.discount) || 0 : 0,
         unitPrice: unit,
         name: String(sp.name || ''),
+        code: String(sp.code || ''),
+        // Category default is true; missing → show
+        showProductCodeOnInvoice: catFlag == null ? true : !!catFlag,
         invoiceAttributes: this.invoiceAttrsFromProductDraft(sp),
       };
     });

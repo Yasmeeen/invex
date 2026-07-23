@@ -194,6 +194,32 @@ $shell-icon-active: darken($shell-icon, 6%);
                         text-align: center;
                         color: $shell-icon;
                         font-size: 1.05rem;
+                        position: relative;
+                    }
+
+                    .sidebar-pending-badge {
+                        flex-shrink: 0;
+                        min-width: 1.25rem;
+                        padding: 0 6px;
+                        border-radius: 999px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        line-height: 1.35;
+                        color: #fff;
+                        background: #c62828;
+                        text-align: center;
+                    }
+
+                    .sidebar-pending-badge--on-icon {
+                        display: none;
+                        position: absolute;
+                        top: -6px;
+                        inset-inline-end: -10px;
+                        min-width: 1rem;
+                        padding: 0 4px;
+                        font-size: 10px;
+                        line-height: 1.2;
+                        border: 2px solid #fff;
                     }
 
                     .icon {
@@ -357,6 +383,14 @@ $shell-icon-active: darken($shell-icon, 6%);
 
     .main-icon-text {
         display: none;
+    }
+
+    .sidebar-pending-badge:not(.sidebar-pending-badge--on-icon) {
+        display: none;
+    }
+
+    .sidebar-pending-badge--on-icon {
+        display: inline-block !important;
     }
 
     .children-arrow {

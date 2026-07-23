@@ -1,16 +1,9 @@
-.pending-transfers-modal .modal-content {
-  max-width: 920px;
-}
-
-.pending-transfers-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
 .pending-transfers-table {
   font-size: 0.9rem;
+}
+
+.filters-actions {
+  margin-top: 1rem;
 }
 
 .pending-transfers-actions {
@@ -32,4 +25,8 @@
 
 .d-flex {
   display: flex;
+}
+
+.d-block {
+  display: block;
 }

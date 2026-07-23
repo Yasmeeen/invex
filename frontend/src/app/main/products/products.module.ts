@@ -11,9 +11,10 @@ import { BookProductDialogComponent } from './book-product-dialog/book-product-d
 import { ViewProductBookingDialogComponent } from './view-product-booking-dialog/view-product-booking-dialog.component';
 import { ImportProductsDialogComponent } from './import-products-dialog/import-products-dialog.component';
 import { TransferProductBranchDialogComponent } from './transfer-product-branch-dialog/transfer-product-branch-dialog.component';
-import { PendingBranchTransfersDialogComponent } from './pending-branch-transfers-dialog/pending-branch-transfers-dialog.component';
+import { PendingBranchTransfersComponent } from './pending-branch-transfers/pending-branch-transfers.component';
 import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
+import { SerialTrackComponent } from './serial-track/serial-track.component';
 
 
 @NgModule({
@@ -23,9 +24,10 @@ import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-
     ViewProductBookingDialogComponent,
     ImportProductsDialogComponent,
     TransferProductBranchDialogComponent,
-    PendingBranchTransfersDialogComponent,
+    PendingBranchTransfersComponent,
     ProductHistoryDialogComponent,
     ProductInventoryAuditDialogComponent,
+    SerialTrackComponent,
   ],
   imports: [
     CommonModule,

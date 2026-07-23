@@ -318,24 +318,6 @@ body {
   font-size: 11px;
 }
 
-.pending-transfers-btn {
-  position: relative;
-}
-
-.pending-transfers-badge {
-  display: inline-block;
-  margin-inline-start: 6px;
-  min-width: 1.25rem;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #fff;
-  background: #c62828;
-  vertical-align: middle;
-}
-
 .filters-card {
   // ::ng-deep .products-filter-ng-select.ng-select.ng-select-multiple .ng-select-container {
   //   min-height: 2.375rem;

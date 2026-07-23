@@ -107,6 +107,8 @@ const parseCommonFilters = (query) => {
   const to = toDate(query.to, now);
   to.setHours(23, 59, 59, 999);
 
+  const categoryRaw = String(query.category_id || query.categoryId || '').trim();
+
   return {
     from,
     to,
@@ -115,6 +117,9 @@ const parseCommonFilters = (query) => {
       : null,
     productId: mongoose.Types.ObjectId.isValid(String(query.product_id || ''))
       ? new mongoose.Types.ObjectId(String(query.product_id))
+      : null,
+    categoryId: mongoose.Types.ObjectId.isValid(categoryRaw)
+      ? new mongoose.Types.ObjectId(categoryRaw)
       : null,
     customerId: mongoose.Types.ObjectId.isValid(String(query.customer_id || ''))
       ? new mongoose.Types.ObjectId(String(query.customer_id))
@@ -368,12 +373,23 @@ export const getProductsReport = async (req, res) => {
     const orderMatch = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) orderMatch.branch = f.branchId;
     appendOrderCustomerFilters(orderMatch, f);
-    if (f.productId) orderMatch['products.productId'] = f.productId;
+    if (f.productId) {
+      orderMatch['products.productId'] = f.productId;
+    } else if (f.categoryId) {
+      const categoryProductIds = await Product.find({ category: f.categoryId }).distinct('_id');
+      orderMatch['products.productId'] = { $in: categoryProductIds };
+    }
+
+    const productLineMatch = f.productId
+      ? { 'products.productId': f.productId }
+      : f.categoryId
+        ? { 'products.productId': orderMatch['products.productId'] }
+        : null;
 
     const topSellingProducts = await Order.aggregate([
       { $match: orderMatch },
       { $unwind: '$products' },
-      ...(f.productId ? [{ $match: { 'products.productId': f.productId } }] : []),
+      ...(productLineMatch ? [{ $match: productLineMatch }] : []),
       {
         $group: {
           _id: '$products.productId',
@@ -390,6 +406,7 @@ export const getProductsReport = async (req, res) => {
     const productMatch = {};
     if (f.branchId) productMatch.branch = f.branchId;
     if (f.productId) productMatch._id = f.productId;
+    if (f.categoryId) productMatch.category = f.categoryId;
 
     const lowStockProducts = await Product.find({ ...productMatch, stock: { $lte: lowStockThreshold } })
       .populate('branch', 'name')

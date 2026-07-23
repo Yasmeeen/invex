@@ -9,6 +9,16 @@ const categorySchema = new mongoose.Schema({
    * When false, one code covers the whole quantity (single product, stock N).
    */
   multiCodePerPiece: { type: Boolean, default: false },
+  /**
+   * When true, products in this category are deleted once stock reaches 0 (e.g. after a sale).
+   * When false, out-of-stock products remain so stock can be topped up later.
+   */
+  deleteProductWhenOutOfStock: { type: Boolean, default: false },
+  /**
+   * When true, product code is printed on the customer invoice/receipt under the product name.
+   * Defaults to true for all categories (including legacy docs missing the field).
+   */
+  showProductCodeOnInvoice: { type: Boolean, default: true },
   /** Dynamic attributes definition for products under this category. */
   attributeDefs: {
     type: [
@@ -47,6 +57,10 @@ function ensureCodeInPlain(_doc, ret) {
     ret.attributeDefs = [];
   }
   ret.multiCodePerPiece = !!ret.multiCodePerPiece;
+  ret.deleteProductWhenOutOfStock = !!ret.deleteProductWhenOutOfStock;
+  // Missing / null → true (legacy categories & schema default)
+  ret.showProductCodeOnInvoice =
+    ret.showProductCodeOnInvoice == null ? true : !!ret.showProductCodeOnInvoice;
   return ret;
 }
 

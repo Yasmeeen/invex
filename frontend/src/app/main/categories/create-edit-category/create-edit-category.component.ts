@@ -24,6 +24,10 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   @ViewChild('categoryForm') categoryForm: NgForm;
   attributeRows: CategoryAttributeRow[] = [];
   loadingCategory = false;
+  /** Default: keep product after stock runs out */
+  deleteProductWhenOutOfStock = false;
+  /** Default: show product code on customer invoice */
+  showProductCodeOnInvoice = true;
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
@@ -82,6 +86,12 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       code: (c as any).code || '',
       multiCodePerPiece: !!(c as any).multiCodePerPiece,
     });
+    this.deleteProductWhenOutOfStock = !!(c as any).deleteProductWhenOutOfStock;
+    // Missing / null → true (legacy categories default to showing product code)
+    this.showProductCodeOnInvoice =
+      (c as any).showProductCodeOnInvoice == null
+        ? true
+        : !!(c as any).showProductCodeOnInvoice;
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
       if (typeof x === 'string') {
@@ -156,6 +166,8 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       code: (this.category as any).code,
       attributeDefs: attrPayload,
       multiCodePerPiece: !!(this.category as any).multiCodePerPiece,
+      deleteProductWhenOutOfStock: !!this.deleteProductWhenOutOfStock,
+      showProductCodeOnInvoice: !!this.showProductCodeOnInvoice,
     };
 
     if (this.isEdit && this.categoryId) {

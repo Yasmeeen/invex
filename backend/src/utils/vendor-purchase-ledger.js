@@ -63,6 +63,30 @@ export async function computePurchasePayableBreakdown(vendorId) {
   };
 }
 
+/** Batch purchase payable totals keyed by vendorId string. */
+export async function computePurchasePayablesByVendorIds(vendorIds) {
+  const ids = (vendorIds || []).filter(Boolean);
+  const map = new Map(ids.map((id) => [String(id), 0]));
+  if (!ids.length) return map;
+
+  const requests = await PurchasingRequest.find({
+    supplier: { $in: ids },
+    paymentStatus: { $in: ['Installments', 'Deferred'] },
+  }).lean();
+
+  for (const r of requests) {
+    const key = String(r.supplier);
+    let add = 0;
+    if (r.paymentStatus === 'Installments') {
+      add = unpaidInstallmentsTotal(r);
+    } else if (r.paymentStatus === 'Deferred') {
+      add = deferredPurchaseRemaining(r);
+    }
+    map.set(key, Math.round(((map.get(key) || 0) + add) * 100) / 100);
+  }
+  return map;
+}
+
 /** Sum of unpaid installment + deferred purchase amounts (we owe supplier). */
 export async function computePurchasePayable(vendorId) {
   const { total } = await computePurchasePayableBreakdown(vendorId);

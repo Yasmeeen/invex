@@ -26,6 +26,12 @@ export class ClientListComponent implements OnInit {
   isNotAuthorized = false;
   searchTerm: string = '';
   nameSearchTerm: string = '';
+  balanceSideFilter: 'all' | 'debit' | 'credit' = 'all';
+  balanceSideOptions = [
+    { value: 'all', labelKey: 'tr_balance_filter_all' },
+    { value: 'debit', labelKey: 'tr_balance_filter_debit' },
+    { value: 'credit', labelKey: 'tr_balance_filter_credit' },
+  ];
   paginationData: PaginationData;
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
@@ -83,6 +89,31 @@ export class ClientListComponent implements OnInit {
       this.params.page = 1;
       this.getClients();
     }, 500);
+  }
+
+  onBalanceSideFilterChange(value: 'all' | 'debit' | 'credit' | null): void {
+    this.balanceSideFilter = value || 'all';
+    if (this.balanceSideFilter === 'debit' || this.balanceSideFilter === 'credit') {
+      this.params.balanceSide = this.balanceSideFilter;
+    } else {
+      delete this.params.balanceSide;
+    }
+    this.params.page = 1;
+    this.getClients();
+  }
+
+  clientNetBalanceText(client: Client): string {
+    const net = client?.netBalanceMessage;
+    if (!net) {
+      return this.translate.instant('tr_balance_none');
+    }
+    if (net.who === 'even') {
+      return this.translate.instant('tr_client_balance_even');
+    }
+    if (net.who === 'client') {
+      return this.translate.instant('tr_client_owes_us_net', { amount: net.amount });
+    }
+    return this.translate.instant('tr_we_owe_client_net', { amount: net.amount });
   }
 
   paginationUpdate(page: number): void {

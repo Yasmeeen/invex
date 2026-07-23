@@ -1,0 +1,177 @@
+<div class="content-shadow bg-white mb-5">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_serial_track' | translate }}</span>
+    <div class="btn-group">
+      <button
+        *ngIf="showProductsLink"
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="goToProducts()"
+      >
+        {{ 'tr_products' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="clear()"
+        [disabled]="loading"
+      >
+        {{ 'tr_serial_track_clear' | translate }}
+      </button>
+    </div>
+  </h2>
+
+  <div class="filters-card bg-secondary plr-4 ptb-3 mb-4">
+    <p class="serial-track-hint mb-3">{{ 'tr_serial_track_hint' | translate }}</p>
+    <div class="row flex-middle">
+      <div class="col-md-6 col-lg-5">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_serial_track_code' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              #codeInput
+              class="s-control"
+              [(ngModel)]="code"
+              (keyup.enter)="search()"
+              [disabled]="loading"
+              autofocus
+              placeholder="{{ 'tr_serial_track_code_placeholder' | translate }}"
+            />
+            <i class="fa fa-barcode input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3 col-lg-2 mt-3 mt-md-0">
+        <label class="d-block">&nbsp;</label>
+        <button
+          type="button"
+          class="s-btn btn-primary width-100"
+          (click)="search()"
+          [disabled]="loading"
+        >
+          <i class="fa fa-search" aria-hidden="true"></i>
+          {{ 'tr_serial_track_search' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4 pb-4">
+    <app-ghost-line *ngIf="loading" [length]="8" [type]="'table'"></app-ghost-line>
+
+    <ng-container *ngIf="!loading && result">
+      <div
+        class="serial-track-status-banner mb-3"
+        [class.is-removed]="isRemoved()"
+        [class.is-in-stock]="result.status === 'in_stock'"
+        [class.is-out]="result.status === 'out_of_stock'"
+      >
+        <i
+          class="fa"
+          [class.fa-check-circle]="result.status === 'in_stock'"
+          [class.fa-exclamation-circle]="result.status === 'out_of_stock'"
+          [class.fa-ban]="isRemoved()"
+          aria-hidden="true"
+        ></i>
+        <strong>{{ statusLabel() }}</strong>
+        <span *ngIf="isRemoved()" class="status-extra">
+          — {{ 'tr_serial_track_removed_detail' | translate }}
+        </span>
+      </div>
+
+      <div class="product-history-meta row mb-3">
+        <div class="col-md-3 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_name' | translate }}</span>
+          <strong>{{ result.product.name || '—' }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_code' | translate }}</span>
+          <strong>{{ result.product.code }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_location' | translate }}</span>
+          <strong>{{ productLocation() }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_stock' | translate }}</span>
+          <strong>{{ isRemoved() ? 0 : result.product.stock }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="result.product.category?.name">
+          <span class="meta-label">{{ 'tr_category' | translate }}</span>
+          <strong>{{ result.product.category?.name }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="result.product.addedBy">
+          <span class="meta-label">{{ 'tr_product_added_by' | translate }}</span>
+          <strong>{{ result.product.addedBy }}</strong>
+        </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="result.product.price != null">
+          <span class="meta-label">{{ 'tr_price' | translate }}</span>
+          <strong>{{ result.product.price }} EGP</strong>
+        </div>
+        <div
+          class="col-md-3 col-6 mb-2"
+          *ngIf="result.product.acquiredFrom?.displayName"
+        >
+          <span class="meta-label">{{ 'tr_product_source_party' | translate }}</span>
+          <strong>{{ result.product.acquiredFrom?.displayName }}</strong>
+        </div>
+      </div>
+
+      <div class="product-history-meta row mb-3" *ngIf="attributeEntries().length">
+        <div
+          class="col-md-3 col-6 mb-2"
+          *ngFor="let attr of attributeEntries()"
+        >
+          <span class="meta-label">{{ attr.key }}</span>
+          <strong>{{ attr.value }}</strong>
+        </div>
+      </div>
+
+      <h3 class="size-body mb-2">{{ 'tr_product_history' | translate }}</h3>
+
+      <div
+        class="empty-state-here text-center ptb-6"
+        *ngIf="!result.events?.length"
+      >
+        <i class="fa fa-history empty-icon text-primary"></i>
+        <p>{{ 'tr_product_history_empty' | translate }}</p>
+      </div>
+
+      <div class="table-container" *ngIf="result.events?.length">
+        <table class="s-table table layout-fixed product-history-table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_date' | translate }}</th>
+              <th>{{ 'tr_product_history_event' | translate }}</th>
+              <th>{{ 'tr_product_history_details' | translate }}</th>
+              <th>{{ 'tr_product_history_by' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let event of result.events">
+              <td class="product-history-table__when">{{ formatWhen(event.occurredAt) }}</td>
+              <td>
+                <span
+                  class="history-type-badge"
+                  [class.badge-removed]="event.type === 'removed_from_stock' || event.type === 'product_delete'"
+                >
+                  {{ eventTypeLabel(event.type) }}
+                </span>
+              </td>
+              <td class="product-history-table__details">{{ eventDetails(event) }}</td>
+              <td>{{ event.actorName || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </ng-container>
+
+    <div
+      class="empty-state-here text-center ptb-6"
+      *ngIf="!loading && searched && !result"
+    >
+      <i class="fa fa-search empty-icon text-primary"></i>
+      <p>{{ 'tr_serial_track_not_found' | translate }}</p>
+    </div>
+  </div>
+</div>

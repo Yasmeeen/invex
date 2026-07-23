@@ -43,8 +43,20 @@
             <div class="link-content">
               <span class="link-content__icon-wrap" aria-hidden="true">
                 <span [class]="link.icon"></span>
+                <span
+                  class="sidebar-pending-badge sidebar-pending-badge--on-icon"
+                  *ngIf="isPendingTransfersLink(link) && globals.pendingBranchTransferCount > 0"
+                >
+                  {{ globals.pendingBranchTransferCount }}
+                </span>
               </span>
               <span class="main-icon-text">{{ link.name | translate }}</span>
+              <span
+                class="sidebar-pending-badge"
+                *ngIf="isPendingTransfersLink(link) && globals.pendingBranchTransferCount > 0"
+              >
+                {{ globals.pendingBranchTransferCount }}
+              </span>
             </div>
           </a>
           <div

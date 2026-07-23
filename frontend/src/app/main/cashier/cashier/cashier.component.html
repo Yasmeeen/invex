@@ -91,7 +91,8 @@
       placeholder="{{ 'tr_cashier.SCAN_PRODUCT' | translate }}"
       [(ngModel)]="barcode"
       #barcodeInput
-      (keyup.enter)="scanProduct(barcode); barcode = ''"
+      (input)="onBarcodeInput()"
+      (keyup.enter)="scanProduct(barcode)"
       autofocus
     />
            <!-- Client Information (collapsible) -->
@@ -519,6 +520,9 @@
       <tr *ngFor="let item of createdOrder?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
+            {{ item.code }}
+          </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
               {{ ia.label }}: {{ ia.value }}

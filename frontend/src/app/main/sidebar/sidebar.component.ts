@@ -1,4 +1,7 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { AuthenticationService } from '@core/services/authentication.service';
 import {
   AdminSidebar,
@@ -8,16 +11,18 @@ import {
   ModeratorSidebar,
   Warehouse,
 } from '@shared/resources';
-import { isModerator, isWarehouse } from '@core/utils/role-utils';
+import { canPickBranchRole, isBranchManager, isModerator, isWarehouse } from '@core/utils/role-utils';
 import { Globals } from 'src/app/core/globals';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { ProductsSerivce } from '@shared/services/products.service';
+import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
 
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.scss']
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnDestroy {
   appSidebar: SidebarItem [];
   actortypr: any;
   currentUserType:any;
@@ -28,10 +33,16 @@ export class SidebarComponent implements OnInit {
   @Output() collapsedChange = new EventEmitter<boolean>();
 
   private readonly collapseStorageKey = 'appSidebarCollapsed';
+  private readonly pendingTransfersLink = '/products/branch-transfers';
+  private subscriptions: Subscription[] = [];
+
   constructor(
       public globals: Globals,
       public storeSettings: StoreSettingsService,
-      private authenticationService: AuthenticationService
+      private authenticationService: AuthenticationService,
+      private productsService: ProductsSerivce,
+      private realtime: RealtimeNotificationsService,
+      private router: Router
   ) {
     globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     const role = globals.currentUser?.role;
@@ -59,6 +70,57 @@ export class SidebarComponent implements OnInit {
       this.isCollapsed = true;
       this.collapsedChange.emit(true);
     }
+
+    this.refreshPendingTransferCount();
+
+    this.subscriptions.push(
+      this.realtime.newNotification$.subscribe((n) => {
+        if (String(n?.type || '').startsWith('branch_transfer')) {
+          this.refreshPendingTransferCount();
+        }
+      })
+    );
+
+    this.subscriptions.push(
+      this.router.events
+        .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+        .subscribe((e) => {
+          if (String(e.urlAfterRedirects || e.url || '').includes(this.pendingTransfersLink)) {
+            this.refreshPendingTransferCount();
+          }
+        })
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach((s) => s.unsubscribe());
+  }
+
+  get showsPendingTransfersBadge(): boolean {
+    const role = this.globals.currentUser?.role as string | undefined;
+    return canPickBranchRole(role) || isBranchManager(role);
+  }
+
+  isPendingTransfersLink(link: SidebarItem): boolean {
+    return link?.routerLink === this.pendingTransfersLink;
+  }
+
+  refreshPendingTransferCount(): void {
+    if (!this.showsPendingTransfersBadge) {
+      this.globals.pendingBranchTransferCount = 0;
+      return;
+    }
+    const uid = this.globals.currentUser?._id;
+    if (!uid) {
+      this.globals.pendingBranchTransferCount = 0;
+      return;
+    }
+    this.productsService.getPendingBranchTransferCount(String(uid)).subscribe({
+      next: (r) => {
+        this.globals.pendingBranchTransferCount = Number(r?.count) || 0;
+      },
+      error: () => {},
+    });
   }
 
   get userDisplayName(): string {

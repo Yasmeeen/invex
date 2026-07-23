@@ -3,6 +3,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
 import { BranchesServce } from '@shared/services/branches.service';
+import { CategoriesServce } from '@shared/services/categories.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { UserSerivce } from '@shared/services/user.service';
 
@@ -19,6 +20,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
 
   branches: any[] = [];
   products: any[] = [];
+  categories: any[] = [];
   users: { _id: string; name: string }[] = [];
   salespeople: string[] = [];
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
@@ -28,6 +30,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
     branch_id: null as string | null,
+    category_id: null as string | null,
     product_id: null as string | null,
     customer_phone: '',
     seller_name: null as string | null,
@@ -41,6 +44,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
 
   constructor(
     private branchesServce: BranchesServce,
+    private categoriesServce: CategoriesServce,
     private productsSerivce: ProductsSerivce,
     private userSerivce: UserSerivce,
     private authenticationService: AuthenticationService,
@@ -54,6 +58,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       this.filters.branch_id = String(u.branch._id);
     }
     this.loadBranches();
+    this.loadCategories();
     this.loadProducts();
     this.ensureBookingUsersLoaded();
     queueMicrotask(() => this.applyFilters());
@@ -63,6 +68,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
       this.loadSalespeople();
+      if (this.reportType === 'products') {
+        this.loadCategories();
+      }
     }
   }
 
@@ -103,10 +111,20 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     });
   }
 
+  loadCategories(): void {
+    this.categoriesServce.getCategorys({ page: 1, limit: 1000 }).subscribe({
+      next: (res: any) => (this.categories = res.categories || []),
+      error: () => (this.categories = []),
+    });
+  }
+
   loadProducts(): void {
     const params: Record<string, string | number> = { page: 1, limit: 2000 };
     if (this.filters.branch_id) {
       params.branchId = String(this.filters.branch_id);
+    }
+    if (this.filters.category_id) {
+      params.categoryId = String(this.filters.category_id);
     }
     this.productsSerivce.getProducts(params).subscribe({
       next: (res: any) => (this.products = res.products || []),
@@ -119,6 +137,11 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     this.filters.seller_name = null;
     this.loadProducts();
     this.loadSalespeople();
+  }
+
+  onCategoryChange(): void {
+    this.filters.product_id = null;
+    this.loadProducts();
   }
 
   loadSalespeople(): void {
@@ -167,6 +190,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       customer_phone: (this.filters.customer_phone || '').trim(),
       groupBy: this.filters.groupBy || 'daily',
     };
+    if (this.reportType === 'products') {
+      base.category_id = this.filters.category_id ? String(this.filters.category_id) : '';
+    }
     if (this.reportType === 'sales' || this.reportType === 'profit') {
       base.seller_name = this.filters.seller_name ? String(this.filters.seller_name) : '';
     }
@@ -200,6 +226,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
         this.filters.branch_id = String(u.branch._id);
       }
     }
+    this.filters.category_id = null;
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.seller_name = null;

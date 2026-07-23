@@ -45,6 +45,7 @@ const routes: Routes = [
             'Branch Manager',
             ...WAREHOUSE,
             'Moderator',
+            'Cashier',
           ],
         },
       },

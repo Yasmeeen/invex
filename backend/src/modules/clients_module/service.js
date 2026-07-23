@@ -83,12 +83,24 @@ export const getClientByPhone = async (req, res) => {
 };
 
 /**
- * GET all clients (pagination + search + order stats)
+ * GET all clients (pagination + search + order stats + balances)
+ * Query: balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
  */
 export const getClients = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", branch_id = "" } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const {
+      page = 1,
+      limit: limitQ,
+      perPage,
+      search = "",
+      branch_id = "",
+      balanceSide = "",
+    } = req.query;
+    const limit = Number(limitQ || perPage || 10) || 10;
+    const skip = (Number(page) - 1) * limit;
+    const sideFilter = String(balanceSide || "")
+      .trim()
+      .toLowerCase();
 
     const matchStage = {};
     if (search) {
@@ -109,7 +121,6 @@ export const getClients = async (req, res) => {
     const pipeline = [
       { $match: matchStage },
 
-      // Join orders
       {
         $lookup: {
           from: "orders",
@@ -119,57 +130,164 @@ export const getClients = async (req, res) => {
         },
       },
 
-      // Calculate stats + last order date
       {
         $addFields: {
           numberOfOrders: { $size: "$orders" },
           totalOrdersPrice: { $sum: "$orders.totalPrice" },
           lastOrderDate: { $max: "$orders.createdAt" },
+          owesFromSales: {
+            $reduce: {
+              input: {
+                $filter: {
+                  input: "$orders",
+                  as: "o",
+                  cond: {
+                    $and: [
+                      {
+                        $eq: [
+                          { $toLower: { $ifNull: ["$$o.paymentMethod", ""] } },
+                          "credit",
+                        ],
+                      },
+                      { $in: ["$$o.paymentStatus", ["unpaid", "partial"]] },
+                      { $ne: ["$$o.status", "restored"] },
+                      {
+                        $in: [
+                          { $ifNull: ["$$o.partyType", null] },
+                          [null, "client"],
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+              initialValue: 0,
+              in: {
+                $add: [
+                  "$$value",
+                  {
+                    $max: [
+                      0,
+                      {
+                        $subtract: [
+                          { $ifNull: ["$$this.totalPrice", 0] },
+                          { $ifNull: ["$$this.amountPaid", 0] },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          prepaidBalance: { $ifNull: ["$creditBalance", 0] },
+          openingDebit: { $ifNull: ["$openingDebitBalance", 0] },
         },
       },
 
-      // Join branches to get branch name
       {
-        $lookup: {
-          from: "branches",          // collection name in DB
-          localField: "branches",    // array of ObjectId in Client
-          foreignField: "_id",
-          as: "branchDetails",       // new field with branch info
+        $addFields: {
+          clientOwesUs: {
+            $round: [{ $add: ["$owesFromSales", "$openingDebit"] }, 2],
+          },
+          weOweClient: { $round: ["$prepaidBalance", 2] },
         },
       },
 
-      // Pagination
-      { $skip: skip },
-      { $limit: Number(limit) },
-
-      // Clean response
       {
-        $project: {
-          name: 1,
-          phoneNumber: 1,
-          address: 1,
-          createdAt: 1,
-          numberOfOrders: 1,
-          totalOrdersPrice: 1,
-          lastOrderDate: 1,
-          branches: "$branchDetails.name", // return only branch names
+        $addFields: {
+          netAmount: {
+            $round: [{ $subtract: ["$clientOwesUs", "$weOweClient"] }, 2],
+          },
+        },
+      },
+
+      {
+        $addFields: {
+          balanceSide: {
+            $switch: {
+              branches: [
+                {
+                  case: {
+                    $and: [
+                      { $lte: ["$clientOwesUs", 0] },
+                      { $lte: ["$weOweClient", 0] },
+                    ],
+                  },
+                  then: "none",
+                },
+                {
+                  case: { $lt: [{ $abs: "$netAmount" }, 0.001] },
+                  then: "even",
+                },
+                {
+                  case: { $gt: ["$netAmount", 0] },
+                  then: "debit",
+                },
+              ],
+              default: "credit",
+            },
+          },
         },
       },
     ];
 
-    const [clients, total] = await Promise.all([
-      Client.aggregate(pipeline),
-      Client.countDocuments(matchStage),
-    ]);
+    if (sideFilter === "debit" || sideFilter === "credit") {
+      pipeline.push({ $match: { balanceSide: sideFilter } });
+    }
 
-    const totalPages = Math.ceil(total / limit);
+    pipeline.push(
+      {
+        $lookup: {
+          from: "branches",
+          localField: "branches",
+          foreignField: "_id",
+          as: "branchDetails",
+        },
+      },
+      {
+        $facet: {
+          meta: [{ $count: "total" }],
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                name: 1,
+                phoneNumber: 1,
+                address: 1,
+                createdAt: 1,
+                numberOfOrders: 1,
+                totalOrdersPrice: 1,
+                lastOrderDate: 1,
+                branches: "$branchDetails.name",
+                clientOwesUs: 1,
+                weOweClient: 1,
+                balanceSide: 1,
+                netAmount: 1,
+              },
+            },
+          ],
+        },
+      }
+    );
+
+    const [facet] = await Client.aggregate(pipeline);
+    const total = facet?.meta?.[0]?.total || 0;
+    const clients = (facet?.data || []).map((c) => {
+      const net = buildClientNetBalanceMessage(c.clientOwesUs, c.weOweClient);
+      const { netAmount, ...rest } = c;
+      return { ...rest, netBalanceMessage: net };
+    });
+    const totalPages = Math.ceil(total / limit) || 0;
+    const currentPage = Number(page);
 
     res.json({
       clients,
       meta: {
-        currentPage: Number(page),
-        nextPage: page < totalPages ? Number(page) + 1 : null,
-        prevPage: page > 1 ? Number(page) - 1 : null,
+        currentPage,
+        nextPage: currentPage < totalPages ? currentPage + 1 : null,
+        prevPage: currentPage > 1 ? currentPage - 1 : null,
         totalCount: total,
         totalPages,
       },

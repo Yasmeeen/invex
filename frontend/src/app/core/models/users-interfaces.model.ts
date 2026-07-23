@@ -30,6 +30,12 @@ export class Client{
   branches?: Branch[];
   creditBalance?: number;
   openingDebitBalance?: number;
+  /** Debit — client owes us. */
+  clientOwesUs?: number;
+  /** Credit — we owe client (prepaid). */
+  weOweClient?: number;
+  balanceSide?: 'debit' | 'credit' | 'even' | 'none';
+  netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
 }
 
 export interface ClientSettlementPreview {

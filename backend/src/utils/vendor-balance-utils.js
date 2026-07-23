@@ -22,6 +22,27 @@ export async function computeSupplierOwesFromOrders(vendorId) {
   return Math.round(total * 100) / 100;
 }
 
+/** Batch unpaid supplier-sale remainings keyed by vendorId string. */
+export async function computeSupplierOwesFromOrdersByVendorIds(vendorIds) {
+  const ids = (vendorIds || []).filter(Boolean);
+  const map = new Map(ids.map((id) => [String(id), 0]));
+  if (!ids.length) return map;
+
+  const orders = await Order.find({
+    partyType: 'supplier',
+    vendorId: { $in: ids },
+    status: { $ne: 'restored' },
+  })
+    .select('vendorId totalPrice amountPaid')
+    .lean();
+
+  for (const o of orders) {
+    const key = String(o.vendorId);
+    map.set(key, Math.round(((map.get(key) || 0) + orderAmountRemaining(o)) * 100) / 100);
+  }
+  return map;
+}
+
 /** Unpaid balances on supplier sales + opening debit (مدين — المورد عليه). */
 export async function computeSupplierOwesUs(vendorId) {
   const owesFromOrders = await computeSupplierOwesFromOrders(vendorId);

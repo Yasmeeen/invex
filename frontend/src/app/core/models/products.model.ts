@@ -54,6 +54,19 @@ export interface ProductActiveBooking {
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   depositAmount: number;
+  /** Deposit payment method splits (cash / apps). */
+  depositPayments?: Array<{ method: string; amount: number }>;
+  depositPaymentFeeAllocations?: Array<{
+    forMethod: string;
+    feeNet: number;
+    paidVia: string;
+    feeGrossOnPaidVia?: number;
+    feePercentSnapshot?: number;
+  }>;
+  /** Unit selling price snapshot at booking time. */
+  productUnitPrice?: number;
+  productNameSnapshot?: string;
+  productCodeSnapshot?: string;
   /** Screenshot / receipt of deposit transfer (URL). */
   depositTransferImageUrl?: string;
   /** Multiple transfer proof images (new bookings). */

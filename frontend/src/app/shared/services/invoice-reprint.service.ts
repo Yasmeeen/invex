@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
+import { BookingReceiptData } from '@shared/components/booking-receipt-print/booking-receipt-print.component';
 
-export type InvoiceReprintMode = 'sale' | 'purchase';
+export type InvoiceReprintMode = 'sale' | 'purchase' | 'booking';
 
 export interface InvoiceReprintRequest {
   mode: InvoiceReprintMode;
@@ -30,6 +31,17 @@ export class InvoiceReprintService {
       mode: 'purchase',
       data: purchase,
       printDate: this.resolvePrintDate(printDate ?? purchase?.createdAt),
+    });
+  }
+
+  printBooking(booking: BookingReceiptData, printDate?: Date | string | null): void {
+    if (!booking) return;
+    this.requests$.next({
+      mode: 'booking',
+      data: booking,
+      printDate: this.resolvePrintDate(
+        printDate ?? booking?.createdAt ?? booking?.bookingDate
+      ),
     });
   }
 

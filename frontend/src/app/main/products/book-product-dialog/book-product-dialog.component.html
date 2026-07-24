@@ -117,10 +117,19 @@
               <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_shipping_address_hint' | translate }}</p>
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-12">
             <div class="form-group">
               <label>{{ 'tr_booking_deposit' | translate }}</label>
-              <input class="s-control width-100" type="number" min="0" step="0.01" formControlName="depositAmount" />
+              <button type="button" class="s-btn btn-secondary btn-sm" (click)="openPaymentSplitsDialog()">
+                {{ 'tr_payment_splits_open' | translate }}
+              </button>
+              <p class="text-muted size-small m-0 mt-2" *ngIf="confirmedPayment">
+                {{ depositSummaryText() }}
+              </p>
+              <p class="text-muted size-small m-0 mt-1" *ngIf="!confirmedPayment">
+                {{ 'tr_booking_deposit_payment_not_set' | translate }}
+              </p>
+              <p class="text-muted size-small m-0 mt-1">{{ 'tr_booking_deposit_payment_hint' | translate }}</p>
             </div>
           </div>
           <div class="col-md-6">
@@ -187,6 +196,12 @@
                 </div>
               </div>
             </div>
+          </div>
+          <div class="col-md-12">
+            <label class="checkbox-row booking-print-receipt-row">
+              <input type="checkbox" [(ngModel)]="printBookingReceipt" [ngModelOptions]="{ standalone: true }" />
+              <span>{{ 'tr_booking_print_receipt' | translate }}</span>
+            </label>
           </div>
         </div>
       </div>

@@ -22,6 +22,7 @@ import { VixaChatComponent } from './components/vixa-chat/vixa-chat.component';
 import { ProductPurchaseApprovalDialogComponent } from './components/product-purchase-approval-dialog/product-purchase-approval-dialog.component';
 import { PurchaseReceiptPrintComponent } from './components/purchase-receipt-print/purchase-receipt-print.component';
 import { SaleReceiptPrintComponent } from './components/sale-receipt-print/sale-receipt-print.component';
+import { BookingReceiptPrintComponent } from './components/booking-receipt-print/booking-receipt-print.component';
 import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/invoice-reprint-host.component';
 
 
@@ -40,6 +41,7 @@ import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/i
     ProductPurchaseApprovalDialogComponent,
     PurchaseReceiptPrintComponent,
     SaleReceiptPrintComponent,
+    BookingReceiptPrintComponent,
     InvoiceReprintHostComponent,
   ],
   imports: [
@@ -72,6 +74,7 @@ import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/i
     ProductPurchaseApprovalDialogComponent,
     PurchaseReceiptPrintComponent,
     SaleReceiptPrintComponent,
+    BookingReceiptPrintComponent,
     InvoiceReprintHostComponent,
   ],
   providers: [VersionCheckService,UpdateService]

@@ -1,0 +1,14 @@
+@import 'variables';
+@import 'color_scheme';
+@import 'invoice-container-print';
+
+.booking-receipt-badge {
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  margin: 0 0 12px;
+  padding: 4px 8px;
+  border: 1.5px dashed #333;
+  display: inline-block;
+  width: auto;
+  min-width: 60%;
+}

@@ -31,6 +31,33 @@ const productBookingSchema = new mongoose.Schema(
     /** Units reserved by this booking (SKU quantity). */
     quantity: { type: Number, required: true, min: 1, default: 1 },
     depositAmount: { type: Number, required: true, min: 0 },
+    /** Deposit payment breakdown (cashier-style methods). */
+    depositPayments: {
+      type: [
+        {
+          method: { type: String, required: true, trim: true, maxlength: 40 },
+          amount: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    /** Optional payment-app fee rows collected with the deposit. */
+    depositPaymentFeeAllocations: {
+      type: [
+        {
+          forMethod: { type: String, trim: true, maxlength: 40 },
+          feeNet: { type: Number, min: 0, default: 0 },
+          paidVia: { type: String, trim: true, maxlength: 40 },
+          feeGrossOnPaidVia: { type: Number, min: 0, default: 0 },
+          feePercentSnapshot: { type: Number, min: 0, default: 0 },
+        },
+      ],
+      default: [],
+    },
+    /** Selling unit price snapshot at booking time (for remaining balance on receipt). */
+    productUnitPrice: { type: Number, default: 0, min: 0 },
+    productNameSnapshot: { type: String, default: '', trim: true },
+    productCodeSnapshot: { type: String, default: '', trim: true },
     /** Proof of deposit transfer (e.g. Cloudinary or local /uploads URL). */
     depositTransferImageUrl: { type: String, default: '', trim: true },
     /** Multiple transfer screenshots / receipts (preferred). */

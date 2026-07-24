@@ -29,7 +29,7 @@ const clientCashDrawerReceiptSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     paymentType: {
       type: String,
-      enum: ['deposit'],
+      enum: ['deposit', 'booking_deposit'],
       required: true,
       default: 'deposit',
     },

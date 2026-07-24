@@ -59,7 +59,16 @@
                     — {{ b.confirmedBy?.name }}</ng-container
                   >
                 </span>
-                <div class="booking-card__actions" *ngIf="canConfirm(b) || canCancel(b)">
+                <div class="booking-card__actions">
+                  <button
+                    type="button"
+                    class="s-btn btn-secondary btn-sm"
+                    (click)="printBookingReceipt(b)"
+                    [attr.title]="'tr_booking_print_receipt' | translate"
+                  >
+                    <i class="fa fa-print" aria-hidden="true"></i>
+                    {{ 'tr_booking_print_receipt' | translate }}
+                  </button>
                   <button
                     *ngIf="canConfirm(b)"
                     type="button"
@@ -93,6 +102,16 @@
                 </ng-container>
                 <dt>{{ 'tr_booking_deposit' | translate }}</dt>
                 <dd>{{ b.depositAmount }}</dd>
+                <ng-container *ngIf="depositPaymentLines(b).length">
+                  <dt>{{ 'tr_booking_receipt_deposit_payments' | translate }}</dt>
+                  <dd>
+                    <div *ngFor="let p of depositPaymentLines(b)">
+                      {{ depositPaymentLabel(p.method) }}: {{ p.amount }}
+                    </div>
+                  </dd>
+                </ng-container>
+                <dt>{{ 'tr_booking_receipt_remaining' | translate }}</dt>
+                <dd>{{ bookingRemaining(b) }}</dd>
                 <ng-container *ngIf="b.transferReferencePhone">
                   <dt>{{ 'tr_booking_transfer_reference_phone' | translate }}</dt>
                   <dd>{{ b.transferReferencePhone }}</dd>

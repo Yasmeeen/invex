@@ -15,6 +15,7 @@ import { PendingBranchTransfersComponent } from './pending-branch-transfers/pend
 import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { SerialTrackComponent } from './serial-track/serial-track.component';
+import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
 
 @NgModule({
@@ -34,6 +35,7 @@ import { SerialTrackComponent } from './serial-track/serial-track.component';
     ProductsRoutingModule,
     SharedModule,
     CreateEditProductModule,
+    PaymentSplitsDialogModule,
     TranslateModule.forChild(),
   ],
   providers: [

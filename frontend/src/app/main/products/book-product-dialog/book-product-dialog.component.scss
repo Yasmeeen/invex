@@ -40,6 +40,15 @@
   }
 }
 
+.booking-print-receipt-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+
 .booking-deposit-thumbs {
   display: flex;
   flex-direction: row;

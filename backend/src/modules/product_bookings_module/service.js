@@ -7,6 +7,15 @@ import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
 import Branch from '../../DB/models/branch.model.js';
 import { auditLog } from '../audit_module/audit.service.js';
+import {
+  buildTreasurySplitsFromPayment,
+  cashAmountFromPaymentSplits,
+  isPhysicalCashMethod,
+  normalizePaymentFeeAllocations,
+  normalizePaymentSplitsRaw,
+  totalNetFromPaymentSplits,
+} from '../../utils/deposit-payment-splits.js';
+import { recordClientCashDrawerReceipt } from '../../utils/client-cash-drawer.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -219,10 +228,14 @@ export const createProductBooking = async (req, res) => {
       shippingAddress,
       registeredAddress,
       depositAmount,
+      paymentSplits,
+      paymentMethodSplits,
+      paymentFeeAllocations,
       depositTransferImageUrl,
       depositTransferImageUrls,
       transferReferencePhone,
       userId,
+      branchId: branchIdBody,
     } = req.body;
 
     if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
@@ -253,10 +266,26 @@ export const createProductBooking = async (req, res) => {
         .status(400)
         .json({ error: 'Shipping address must differ from the registered customer address' });
     }
-    const dep = Number(depositAmount);
-    if (Number.isNaN(dep) || dep < 0) {
-      return res.status(400).json({ error: 'Valid deposit amount is required' });
+
+    const splitsRaw = paymentSplits ?? paymentMethodSplits;
+    let depositPayments = normalizePaymentSplitsRaw(splitsRaw);
+    const feeAllocations = normalizePaymentFeeAllocations(paymentFeeAllocations);
+
+    let dep;
+    if (depositPayments.length) {
+      dep = totalNetFromPaymentSplits(depositPayments);
+    } else {
+      dep = Number(depositAmount);
+      if (Number.isNaN(dep) || dep < 0) {
+        return res.status(400).json({ error: 'Valid deposit amount is required' });
+      }
+      dep = Math.round(dep * 100) / 100;
+      if (dep > 0) {
+        // Legacy clients: treat plain deposit amount as cash so drawer still updates.
+        depositPayments = [{ method: 'cash', amount: dep }];
+      }
     }
+
     const depositProofUrls = collectDepositProofUrls(depositTransferImageUrl, depositTransferImageUrls);
     if (depositProofUrls.length > MAX_DEPOSIT_PROOF_IMAGES) {
       return res.status(400).json({ error: `At most ${MAX_DEPOSIT_PROOF_IMAGES} deposit images allowed` });
@@ -274,12 +303,13 @@ export const createProductBooking = async (req, res) => {
       return res.status(400).json({ error: 'Invalid deposit transfer image URL(s)' });
     }
 
+    const hasNonCashDeposit = depositPayments.some((s) => !isPhysicalCashMethod(s.method));
     const transferRefRaw = String(transferReferencePhone || '').trim();
-    const needsTransferRef = dep > 0 || depositProofUrls.length > 0;
+    const needsTransferRef = hasNonCashDeposit || depositProofUrls.length > 0;
     if (needsTransferRef && !transferRefRaw) {
       return res
         .status(400)
-        .json({ error: 'Transfer reference phone is required when deposit or transfer proof is provided' });
+        .json({ error: 'Transfer reference phone is required when non-cash deposit or transfer proof is provided' });
     }
     let transferRefStored = '';
     if (transferRefRaw) {
@@ -308,6 +338,7 @@ export const createProductBooking = async (req, res) => {
     }
 
     const branchOid = product.branch || null;
+    const unitPrice = Math.round((Number(product.price) || 0) * 100) / 100;
 
     let client;
     try {
@@ -343,6 +374,11 @@ export const createProductBooking = async (req, res) => {
       pickupType,
       shippingAddress: String(shippingAddress || '').trim(),
       depositAmount: dep,
+      depositPayments,
+      depositPaymentFeeAllocations: feeAllocations,
+      productUnitPrice: unitPrice,
+      productNameSnapshot: String(product.name || '').trim(),
+      productCodeSnapshot: String(product.code || '').trim(),
       depositTransferImageUrls: depositProofUrls,
       depositTransferImageUrl: depositProofUrls[0] || '',
       transferReferencePhone: transferRefStored,
@@ -350,6 +386,24 @@ export const createProductBooking = async (req, res) => {
       status: 'active',
       createdBy: userId,
     });
+
+    const cashDrawerAmount = cashAmountFromPaymentSplits(depositPayments, feeAllocations);
+    if (cashDrawerAmount > 0) {
+      const treasuryAudit = buildTreasurySplitsFromPayment(depositPayments, feeAllocations);
+      try {
+        await recordClientCashDrawerReceipt({
+          branchId: branchIdBody || branchOid,
+          userId,
+          clientId: client._id,
+          amount: cashDrawerAmount,
+          paymentType: 'booking_deposit',
+          note: `Booking deposit — ${product.name || product.code || booking._id}`,
+          paymentTreasurySplits: treasuryAudit,
+        });
+      } catch (drawerErr) {
+        console.warn('⚠️ booking cash drawer receipt:', drawerErr?.message || drawerErr);
+      }
+    }
 
     await recalcProductBookingTotals(pid);
 

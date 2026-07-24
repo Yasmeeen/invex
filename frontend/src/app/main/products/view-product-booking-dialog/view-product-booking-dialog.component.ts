@@ -8,6 +8,10 @@ import { ProductBookingsService, ProductBookingsSummary } from '@shared/services
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { canPickBranchRole, isBranchManager, isModerator } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { BookingReceiptData } from '@shared/components/booking-receipt-print/booking-receipt-print.component';
+import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-view-product-booking-dialog',
@@ -37,7 +41,9 @@ export class ViewProductBookingDialogComponent implements OnInit {
     private auth: AuthenticationService,
     private bookingsApi: ProductBookingsService,
     private notify: AppNotificationService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private invoiceReprint: InvoiceReprintService,
+    private storeSettings: StoreSettingsService
   ) {
     this.product = data.product;
     this.canAddBooking = !!data.canAddBooking;
@@ -127,6 +133,63 @@ export class ViewProductBookingDialogComponent implements OnInit {
     return b.pickupType === 'online_shipping'
       ? this.translate.instant('tr_booking_online_shipping')
       : this.translate.instant('tr_booking_branch_pickup');
+  }
+
+  depositPaymentLabel(method: string | undefined | null): string {
+    return paymentMethodDisplayLabel(
+      method,
+      this.storeSettings.snapshot.paymentAppFeePercents,
+      this.translate
+    );
+  }
+
+  depositPaymentLines(b: ProductActiveBooking): Array<{ method: string; amount: number }> {
+    const list = b.depositPayments;
+    if (Array.isArray(list) && list.length) {
+      return list
+        .map((p) => ({
+          method: String(p?.method || '').trim(),
+          amount: Math.round((Number(p?.amount) || 0) * 100) / 100,
+        }))
+        .filter((p) => p.method && p.amount > 0);
+    }
+    const dep = Number(b.depositAmount) || 0;
+    return dep > 0 ? [{ method: 'cash', amount: dep }] : [];
+  }
+
+  bookingRemaining(b: ProductActiveBooking): number {
+    const qty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    const unit =
+      Number(b.productUnitPrice) >= 0 && b.productUnitPrice != null
+        ? Number(b.productUnitPrice)
+        : Number(this.product.price) || 0;
+    const total = Math.round(unit * qty * 100) / 100;
+    const dep = Math.round((Number(b.depositAmount) || 0) * 100) / 100;
+    return Math.round(Math.max(0, total - dep) * 100) / 100;
+  }
+
+  printBookingReceipt(b: ProductActiveBooking): void {
+    const qty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    const unit =
+      Number(b.productUnitPrice) >= 0 && b.productUnitPrice != null
+        ? Number(b.productUnitPrice)
+        : Number(this.product.price) || 0;
+    const receipt: BookingReceiptData = {
+      _id: b._id,
+      customerName: b.customerName,
+      customerPhone: b.customerPhone,
+      productName: b.productNameSnapshot || this.product.name,
+      productCode: b.productCodeSnapshot || this.product.code,
+      quantity: qty,
+      unitPrice: unit,
+      depositAmount: Number(b.depositAmount) || 0,
+      depositPayments: this.depositPaymentLines(b),
+      pickupType: b.pickupType,
+      shippingAddress: b.shippingAddress,
+      createdAt: b.createdAt,
+      bookingDate: b.bookingDate,
+    };
+    this.invoiceReprint.printBooking(receipt);
   }
 
   /** Deposit transfer proof URLs (one or many). */

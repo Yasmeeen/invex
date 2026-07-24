@@ -6,7 +6,7 @@ import {
   ValidationErrors,
   Validators,
 } from '@angular/forms';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { of, Subject } from 'rxjs';
 import {
@@ -21,10 +21,21 @@ import {
 import { environment } from 'src/environments/environment';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Product } from '@core/models/products.model';
+import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import {
+  PaymentSplitsDialogComponent,
+  PaymentSplitsDialogData,
+} from '@shared/components/payment-splits-dialog/payment-splits-dialog.component';
+import {
+  PaymentSplitsResult,
+  paymentSplitsNetTotal,
+} from '@shared/utils/payment-app-fee.util';
+import { BookingReceiptData } from '@shared/components/booking-receipt-print/booking-receipt-print.component';
 
 @Component({
   selector: 'app-book-product-dialog',
@@ -49,6 +60,9 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     { id: 'online_shipping', labelKey: 'tr_booking_online_shipping' },
   ];
 
+  confirmedPayment: PaymentSplitsResult | null = null;
+  printBookingReceipt = true;
+
   /** True when GET /clients/by-phone returned a client. */
   isExistingClient = false;
   clientLookupLoading = false;
@@ -64,7 +78,9 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     private bookings: ProductBookingsService,
     private orders: OrdersSerivce,
     private notify: AppNotificationService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private dialog: MatDialog,
+    private invoiceReprint: InvoiceReprintService
   ) {
     this.product = data.product;
     this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
@@ -78,7 +94,6 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       registeredAddress: [''],
       pickupType: ['branch_pickup', Validators.required],
       shippingAddress: [''],
-      depositAmount: [0, [Validators.required, Validators.min(0)]],
       transferReferencePhone: [''],
     });
   }
@@ -213,6 +228,53 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     return !!environment.cloudinary?.cloudName;
   }
 
+  depositSummaryText(): string {
+    if (!this.confirmedPayment) {
+      return '';
+    }
+    const methods = this.confirmedPayment.paymentSplits.filter((s) => s.amount > 0).length;
+    const total = paymentSplitsNetTotal(this.confirmedPayment.paymentSplits);
+    return this.translate.instant('tr_payment_splits_summary', { count: methods, total });
+  }
+
+  openPaymentSplitsDialog(): void {
+    const data: PaymentSplitsDialogData = {
+      invoiceNetTotal: 0,
+      mode: 'deposit',
+      initialState: this.confirmedPayment
+        ? {
+            selectedPayMethods: this.confirmedPayment.paymentSplits.map((s) => s.method),
+            payAmounts: this.confirmedPayment.paymentSplits.reduce(
+              (acc, s) => {
+                acc[s.method] = s.amount;
+                return acc;
+              },
+              {} as Record<string, number>
+            ),
+            feeSources: this.confirmedPayment.feeAllocations.map((f) => ({
+              forMethod: f.forMethod,
+              paidVia: f.paidVia === f.forMethod ? 'same' : f.paidVia,
+            })),
+          }
+        : undefined,
+    };
+
+    this.dialog
+      .open(PaymentSplitsDialogComponent, {
+        width: '560px',
+        maxWidth: '95vw',
+        panelClass: 'payment-splits-dialog-panel',
+        backdropClass: 'payment-splits-dialog-backdrop',
+        data,
+      })
+      .afterClosed()
+      .subscribe((result: PaymentSplitsResult | null) => {
+        if (result) {
+          this.confirmedPayment = result;
+        }
+      });
+  }
+
   onDepositProofSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -270,6 +332,13 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     this.depositPreviewUrl = null;
   }
 
+  private hasNonCashDeposit(): boolean {
+    const splits = this.confirmedPayment?.paymentSplits || [];
+    return splits.some(
+      (s) => s.amount > 0 && String(s.method || '').trim().toLowerCase() !== 'cash'
+    );
+  }
+
   submit(): void {
     if (this.saving || this.isUploadingDepositProof || this.clientLookupLoading) {
       return;
@@ -296,6 +365,13 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
 
     if (this.form.invalid) {
       this.notify.push(this.translate.instant('tr_booking_form_invalid'), 'error');
+      return;
+    }
+
+    const splits = (this.confirmedPayment?.paymentSplits || []).filter((s) => s.amount > 0);
+    const depositAmount = splits.length ? paymentSplitsNetTotal(splits) : 0;
+    if (depositAmount < 0) {
+      this.notify.push(this.translate.instant('tr_booking_api_valid_deposit_required'), 'error');
       return;
     }
 
@@ -327,13 +403,22 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const dep = Number(v.depositAmount);
     const refPhone = String(v.transferReferencePhone || '').trim();
-    const needsRef = dep > 0 || this.depositProofUrls.length > 0;
+    const needsRef = this.hasNonCashDeposit() || this.depositProofUrls.length > 0;
     if (needsRef && !refPhone) {
       this.notify.push(this.translate.instant('tr_booking_transfer_reference_required'), 'error');
       return;
     }
+
+    const productBranch = this.product.branch as { _id?: string } | string | null | undefined;
+    const forcedBranchId =
+      typeof productBranch === 'object' && productBranch
+        ? productBranch._id
+        : productBranch
+          ? String(productBranch)
+          : null;
+    const branchCtx = resolveActorBranchContext(user, forcedBranchId);
+
     this.saving = true;
     const urls = [...this.depositProofUrls];
     this.bookings
@@ -345,15 +430,23 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
         registeredAddress: regAddr,
         pickupType: v.pickupType,
         shippingAddress: v.pickupType === 'online_shipping' ? shipAddr : '',
-        depositAmount: Number(v.depositAmount),
+        depositAmount,
+        paymentSplits: splits.length ? splits : undefined,
+        paymentFeeAllocations: this.confirmedPayment?.feeAllocations?.length
+          ? this.confirmedPayment.feeAllocations
+          : undefined,
         depositTransferImageUrls: urls.length ? urls : undefined,
         depositTransferImageUrl: urls.length === 1 ? urls[0] : undefined,
         transferReferencePhone: refPhone,
         userId: uid,
+        branchId: branchCtx.branchId || undefined,
       })
       .subscribe({
-        next: () => {
+        next: (res) => {
           this.notify.push(this.translate.instant('tr_booking_created'), 'success');
+          if (this.printBookingReceipt) {
+            this.printCreatedBookingReceipt(res?.booking, quantity, depositAmount, splits, v);
+          }
           this.dialogRef.close(true);
         },
         error: (err) => {
@@ -377,6 +470,37 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       });
   }
 
+  private printCreatedBookingReceipt(
+    booking: any,
+    quantity: number,
+    depositAmount: number,
+    splits: Array<{ method: string; amount: number }>,
+    formValue: any
+  ): void {
+    const unitPrice =
+      Number(booking?.productUnitPrice) ||
+      Number(this.product.price) ||
+      0;
+    const receipt: BookingReceiptData = {
+      _id: booking?._id,
+      customerName: booking?.customerName || formValue.customerName,
+      customerPhone: booking?.customerPhone || formValue.customerPhone,
+      productName: booking?.productNameSnapshot || this.product.name,
+      productCode: booking?.productCodeSnapshot || this.product.code,
+      quantity: Number(booking?.quantity) || quantity,
+      unitPrice,
+      depositAmount: Number(booking?.depositAmount) || depositAmount,
+      depositPayments: Array.isArray(booking?.depositPayments)
+        ? booking.depositPayments
+        : splits,
+      pickupType: booking?.pickupType || formValue.pickupType,
+      shippingAddress: booking?.shippingAddress || formValue.shippingAddress,
+      createdAt: booking?.createdAt || booking?.bookingDate,
+      bookingDate: booking?.bookingDate,
+    };
+    this.invoiceReprint.printBooking(receipt);
+  }
+
   /** Map backend booking POST error strings to i18n (API always returns English). */
   private translateBookingCreateApiError(raw: string): string {
     const s = String(raw || '').trim();
@@ -386,6 +510,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     const exact: Record<string, string> = {
       'Invalid transfer reference phone': 'tr_booking_api_invalid_transfer_reference_phone',
       'Transfer reference phone is required when deposit or transfer proof is provided':
+        'tr_booking_transfer_reference_required',
+      'Transfer reference phone is required when non-cash deposit or transfer proof is provided':
         'tr_booking_transfer_reference_required',
       'Shipping address must differ from the registered customer address':
         'tr_booking_shipping_must_differ_from_registered',

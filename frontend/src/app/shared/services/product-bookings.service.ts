@@ -14,11 +14,28 @@ export interface CreateProductBookingPayload {
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   depositAmount: number;
+  paymentSplits?: Array<{ method: string; amount: number }>;
+  paymentFeeAllocations?: Array<{
+    forMethod: string;
+    feeNet: number;
+    paidVia: string;
+    feeGrossOnPaidVia?: number;
+    feePercentSnapshot?: number;
+  }>;
   depositTransferImageUrl?: string;
   depositTransferImageUrls?: string[];
-  /** Required when deposit > 0 or when transfer proof images are uploaded. */
+  /** Required when non-cash deposit methods or transfer proof images are uploaded. */
   transferReferencePhone?: string;
   userId: string;
+  branchId?: string;
+}
+
+export interface CreateProductBookingResponse {
+  message?: string;
+  booking: ProductActiveBooking & {
+    product?: string;
+    createdAt?: string;
+  };
 }
 
 export interface ProductBookingsSummary {
@@ -61,8 +78,8 @@ export interface BookingsReportResponse {
 export class ProductBookingsService {
   constructor(private http: HttpClient) {}
 
-  createBooking(payload: CreateProductBookingPayload): Observable<unknown> {
-    return this.http.post(PRODUCT_BOOKINGS_URL, payload);
+  createBooking(payload: CreateProductBookingPayload): Observable<CreateProductBookingResponse> {
+    return this.http.post<CreateProductBookingResponse>(PRODUCT_BOOKINGS_URL, payload);
   }
 
   cancelBooking(bookingId: string, body: { userId: string; reason?: string }): Observable<unknown> {

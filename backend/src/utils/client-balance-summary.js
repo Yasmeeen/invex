@@ -1,4 +1,11 @@
-/** Build who owes whom: client debit vs prepaid credit (we owe client). */
+/** Total credit we owe client = prepaid deposits + deferred desk-purchase payables. */
+export function computeTotalClientCreditOwed(prepaidBalance, deferredPayable = 0) {
+  const prepaid = Math.round((Number(prepaidBalance) || 0) * 100) / 100;
+  const deferred = Math.round((Number(deferredPayable) || 0) * 100) / 100;
+  return Math.round((prepaid + deferred) * 100) / 100;
+}
+
+/** Build who owes whom: client debit vs credit (prepaid + deferred purchases we owe). */
 export function buildClientNetBalanceMessage(debitTotal, creditTotal) {
   const debit = Math.round((Number(debitTotal) || 0) * 100) / 100;
   const credit = Math.round((Number(creditTotal) || 0) * 100) / 100;

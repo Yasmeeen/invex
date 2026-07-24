@@ -239,6 +239,18 @@ export class AccountHistoryPdfService {
       label: t('tr_client_credit_balance'),
       value: helpers.formatMoney(history.weOweClient ?? history.prepaidBalance ?? 0),
     });
+    if ((history.prepaidBalance || 0) > 0) {
+      summaryRows.push({
+        label: t('tr_client_credit_prepaid'),
+        value: helpers.formatMoney(history.prepaidBalance || 0),
+      });
+    }
+    if ((history.clientPayableDeferred || 0) > 0) {
+      summaryRows.push({
+        label: t('tr_client_payable_from_deferred'),
+        value: helpers.formatMoney(history.clientPayableDeferred || 0),
+      });
+    }
 
     if (history.netBalanceMessage) {
       summaryRows.push({ label: t('tr_client_net_balance'), value: helpers.netBalanceText() });

@@ -76,7 +76,14 @@
           <div class="balance-card__value">
             {{ (history.weOweClient ?? history.prepaidBalance ?? 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
           </div>
-          <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_prepaid_balance_hint' | translate }}</p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.prepaidBalance || 0) > 0">
+            {{ 'tr_client_credit_prepaid' | translate }}:
+            {{ history.prepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
+          <p class="size-small text-muted m-0 mt-1" *ngIf="(history.clientPayableDeferred || 0) > 0">
+            {{ 'tr_client_payable_from_deferred' | translate }}:
+            {{ history.clientPayableDeferred | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+          </p>
         </div>
       </div>
       <div class="col-md-4">
@@ -153,7 +160,7 @@
             <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
             <th>{{ 'tr_paid' | translate }}</th>
             <th>{{ 'tr_remaining' | translate }}</th>
-            <th>{{ 'tr_payment_status' | translate }}</th>
+            <th class="col-status">{{ 'tr_payment_status' | translate }}</th>
             <th>{{ 'tr_created_at' | translate }}</th>
             <th></th>
           </tr>
@@ -174,7 +181,7 @@
             <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td class="text-error">{{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-            <td>{{ paymentStatusLabel(o.paymentStatus) }}</td>
+            <td class="col-status">{{ paymentStatusLabel(o.paymentStatus) }}</td>
             <td>{{ o.createdAt | date:'short' }}</td>
             <td>
               <button
@@ -200,11 +207,11 @@
             <th>{{ 'tr_purchase_document_ref' | translate }}</th>
             <th>{{ 'tr_name' | translate }}</th>
             <th>{{ 'tr_code' | translate }}</th>
-            <th>{{ 'tr_cashier.QTY' | translate }}</th>
+            <th class="col-qty">{{ 'tr_cashier.QTY' | translate }}</th>
             <th>{{ 'tr_paid' | translate }}</th>
             <th>{{ 'tr_remaining' | translate }}</th>
             <th>{{ 'tr_receipt_purchase_treasury' | translate }}</th>
-            <th>{{ 'tr_status' | translate }}</th>
+            <th class="col-status">{{ 'tr_status' | translate }}</th>
             <th>{{ 'tr_created_at' | translate }}</th>
             <th></th>
           </tr>
@@ -224,7 +231,7 @@
             </td>
             <td>{{ p.productName }}</td>
             <td>{{ p.productCode }}</td>
-            <td>{{ p.quantity }}</td>
+            <td class="col-qty">{{ p.quantity }}</td>
             <td>{{ p.totalPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>
               <span *ngIf="p.isDeferredPurchase && (p.remaining || 0) > 0">
@@ -233,7 +240,7 @@
               <span *ngIf="!p.isDeferredPurchase || !(p.remaining || 0)">—</span>
             </td>
             <td>{{ purchaseTreasuryLabel(p) }}</td>
-            <td>{{ purchaseStatusLabel(p.status) }}</td>
+            <td class="col-status">{{ purchaseStatusLabel(p.status) }}</td>
             <td>{{ p.createdAt | date:'short' }}</td>
             <td>
               <button
@@ -263,7 +270,7 @@
             <th>{{ 'tr_remaining' | translate }}</th>
             <th>{{ 'tr_points_earned' | translate }}</th>
             <th>{{ 'tr_payment_method' | translate }}</th>
-            <th>{{ 'tr_status' | translate }}</th>
+            <th class="col-status">{{ 'tr_status' | translate }}</th>
             <th>{{ 'tr_created_at' | translate }}</th>
             <th></th>
           </tr>
@@ -291,7 +298,7 @@
             </td>
             <td>{{ o.pointsEarned ?? 0 }}</td>
             <td>{{ paymentMethodLabel(o.paymentMethod) }}</td>
-            <td>{{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus) }}</td>
+            <td class="col-status">{{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus) }}</td>
             <td>{{ o.createdAt | date:'short' }}</td>
             <td>
               <button

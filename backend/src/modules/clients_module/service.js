@@ -19,6 +19,7 @@ import {
 import {
   buildClientNetBalanceMessage,
   buildClientSettlementPreview,
+  computeTotalClientCreditOwed,
 } from "../../utils/client-balance-summary.js";
 import {
   buildTreasurySplitsFromPayment,
@@ -34,6 +35,8 @@ import {
 } from "../../utils/client-cash-drawer.js";
 import { resolveBranchForCashDrawer } from "../../utils/vendor-cash-drawer.js";
 import {
+  applyClientDeferredPayableSettlement,
+  computeClientDeferredPayablesByClients,
   computeClientPayableBreakdown,
   payClientWithTreasury,
 } from "../../utils/client-pay-treasury.js";
@@ -190,94 +193,79 @@ export const getClients = async (req, res) => {
           clientOwesUs: {
             $round: [{ $add: ["$owesFromSales", "$openingDebit"] }, 2],
           },
-          weOweClient: { $round: ["$prepaidBalance", 2] },
         },
       },
 
       {
-        $addFields: {
-          netAmount: {
-            $round: [{ $subtract: ["$clientOwesUs", "$weOweClient"] }, 2],
-          },
-        },
-      },
-
-      {
-        $addFields: {
-          balanceSide: {
-            $switch: {
-              branches: [
-                {
-                  case: {
-                    $and: [
-                      { $lte: ["$clientOwesUs", 0] },
-                      { $lte: ["$weOweClient", 0] },
-                    ],
-                  },
-                  then: "none",
-                },
-                {
-                  case: { $lt: [{ $abs: "$netAmount" }, 0.001] },
-                  then: "even",
-                },
-                {
-                  case: { $gt: ["$netAmount", 0] },
-                  then: "debit",
-                },
-              ],
-              default: "credit",
-            },
-          },
+        $project: {
+          name: 1,
+          phoneNumber: 1,
+          address: 1,
+          createdAt: 1,
+          branches: 1,
+          numberOfOrders: 1,
+          totalOrdersPrice: 1,
+          lastOrderDate: 1,
+          clientOwesUs: 1,
+          prepaidBalance: 1,
         },
       },
     ];
 
+    const matched = await Client.aggregate(pipeline);
+    const deferredMap = await computeClientDeferredPayablesByClients(matched);
+
+    let withBalances = matched.map((c) => {
+      const prepaid = Math.round((Number(c.prepaidBalance) || 0) * 100) / 100;
+      const deferred = deferredMap.get(String(c._id)) || 0;
+      const weOweClient = computeTotalClientCreditOwed(prepaid, deferred);
+      const clientOwesUs = Math.round((Number(c.clientOwesUs) || 0) * 100) / 100;
+      const netAmount = Math.round((clientOwesUs - weOweClient) * 100) / 100;
+      let balanceSide = "credit";
+      if (clientOwesUs <= 0 && weOweClient <= 0) balanceSide = "none";
+      else if (Math.abs(netAmount) < 0.001) balanceSide = "even";
+      else if (netAmount > 0) balanceSide = "debit";
+      return {
+        ...c,
+        prepaidBalance: prepaid,
+        clientPayableDeferred: deferred,
+        weOweClient,
+        clientOwesUs,
+        balanceSide,
+        netAmount,
+      };
+    });
+
     if (sideFilter === "debit" || sideFilter === "credit") {
-      pipeline.push({ $match: { balanceSide: sideFilter } });
+      withBalances = withBalances.filter((c) => c.balanceSide === sideFilter);
     }
 
-    pipeline.push(
-      {
-        $lookup: {
-          from: "branches",
-          localField: "branches",
-          foreignField: "_id",
-          as: "branchDetails",
-        },
-      },
-      {
-        $facet: {
-          meta: [{ $count: "total" }],
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-            {
-              $project: {
-                name: 1,
-                phoneNumber: 1,
-                address: 1,
-                createdAt: 1,
-                numberOfOrders: 1,
-                totalOrdersPrice: 1,
-                lastOrderDate: 1,
-                branches: "$branchDetails.name",
-                clientOwesUs: 1,
-                weOweClient: 1,
-                balanceSide: 1,
-                netAmount: 1,
-              },
-            },
-          ],
-        },
-      }
+    const total = withBalances.length;
+    const pageRows = withBalances.slice(skip, skip + limit);
+
+    const branchIds = [
+      ...new Set(
+        pageRows.flatMap((c) => (c.branches || []).map((b) => String(b)))
+      ),
+    ].filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const branchDocs = branchIds.length
+      ? await Branch.find({ _id: { $in: branchIds } }).select("name").lean()
+      : [];
+    const branchNameById = new Map(
+      branchDocs.map((b) => [String(b._id), b.name])
     );
 
-    const [facet] = await Client.aggregate(pipeline);
-    const total = facet?.meta?.[0]?.total || 0;
-    const clients = (facet?.data || []).map((c) => {
+    const clients = pageRows.map((c) => {
       const net = buildClientNetBalanceMessage(c.clientOwesUs, c.weOweClient);
-      const { netAmount, ...rest } = c;
-      return { ...rest, netBalanceMessage: net };
+      const { netAmount, prepaidBalance, clientPayableDeferred, branches, ...rest } =
+        c;
+      return {
+        ...rest,
+        branches: (branches || [])
+          .map((b) => branchNameById.get(String(b)))
+          .filter(Boolean),
+        netBalanceMessage: net,
+      };
     });
     const totalPages = Math.ceil(total / limit) || 0;
     const currentPage = Number(page);
@@ -508,7 +496,10 @@ export const getClientHistory = async (req, res) => {
       client._id,
       client.phoneNumber
     );
-    const weOweClient = prepaidBalance;
+    const weOweClient = computeTotalClientCreditOwed(
+      prepaidBalance,
+      payableBreakdown.deferred
+    );
     const netBalanceMessage = buildClientNetBalanceMessage(clientOwesUs, weOweClient);
     const settlementPreview = buildClientSettlementPreview(clientOwesUs, weOweClient);
     const creditOrders = ordersWithMeta.filter(
@@ -587,7 +578,7 @@ export const getClientHistory = async (req, res) => {
       owesFromOpeningBalance,
       weOweClient,
       prepaidBalance,
-      clientPayable: payableBreakdown.total,
+      clientPayable: weOweClient,
       clientPayableDeferred: payableBreakdown.deferred,
       canSettle: settlementPreview.canSettle,
       settlementPreview,
@@ -663,7 +654,7 @@ export const setClientOpeningDebitBalance = async (req, res) => {
   }
 };
 
-/** POST net settlement between client debt and prepaid balance. */
+/** POST net settlement between client debt and credit (prepaid + deferred purchases). */
 export const settleClientBalances = async (req, res) => {
   try {
     const client = await Client.findById(req.params.id);
@@ -673,14 +664,23 @@ export const settleClientBalances = async (req, res) => {
 
     const clientOwesUs = await computeClientOwesUs(client._id);
     const prepaidBefore = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
-    const settleAmount = Math.min(clientOwesUs, prepaidBefore);
+    const payableBefore = await computeClientPayableBreakdown(
+      client._id,
+      client.phoneNumber
+    );
+    const totalCreditBefore = computeTotalClientCreditOwed(
+      prepaidBefore,
+      payableBefore.deferred
+    );
+    const settleAmount = Math.min(clientOwesUs, totalCreditBefore);
 
     if (settleAmount <= 0) {
       return res.status(400).json({
         error: "No overlapping balances to settle",
         clientOwesUs,
-        weOweClient: prepaidBefore,
+        weOweClient: totalCreditBefore,
         prepaidBalance: prepaidBefore,
+        clientPayableDeferred: payableBefore.deferred,
       });
     }
 
@@ -732,7 +732,18 @@ export const settleClientBalances = async (req, res) => {
       remaining = Math.round((remaining - fromOpening) * 100) / 100;
     }
 
-    client.creditBalance = Math.round((prepaidBefore - settleAmount) * 100) / 100;
+    let creditToReduce = settleAmount;
+    const fromPrepaid = Math.min(creditToReduce, prepaidBefore);
+    client.creditBalance = Math.round((prepaidBefore - fromPrepaid) * 100) / 100;
+    creditToReduce = Math.round((creditToReduce - fromPrepaid) * 100) / 100;
+
+    if (creditToReduce > 0) {
+      await applyClientDeferredPayableSettlement(
+        client._id,
+        client.phoneNumber,
+        creditToReduce
+      );
+    }
 
     client.ledgerEntries = client.ledgerEntries || [];
     client.ledgerEntries.push({
@@ -750,8 +761,13 @@ export const settleClientBalances = async (req, res) => {
       Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
     const newClientOwesUs = await computeClientOwesUs(client._id);
     const newPrepaid = Math.round((Number(client.creditBalance) || 0) * 100) / 100;
-    const netBalanceMessage = buildClientNetBalanceMessage(newClientOwesUs, newPrepaid);
-    const settlementPreview = buildClientSettlementPreview(newClientOwesUs, newPrepaid);
+    const newPayable = await computeClientPayableBreakdown(
+      client._id,
+      client.phoneNumber
+    );
+    const newWeOwe = computeTotalClientCreditOwed(newPrepaid, newPayable.deferred);
+    const netBalanceMessage = buildClientNetBalanceMessage(newClientOwesUs, newWeOwe);
+    const settlementPreview = buildClientSettlementPreview(newClientOwesUs, newWeOwe);
 
     res.json({
       message: "Balances settled",
@@ -759,8 +775,10 @@ export const settleClientBalances = async (req, res) => {
       clientOwesUs: newClientOwesUs,
       owesFromSales: newOwesFromSales,
       owesFromOpeningBalance: newOwesFromOpening,
-      weOweClient: newPrepaid,
+      weOweClient: newWeOwe,
       prepaidBalance: newPrepaid,
+      clientPayable: newWeOwe,
+      clientPayableDeferred: newPayable.deferred,
       netBalanceMessage,
       settlementPreview,
     });
@@ -799,7 +817,10 @@ export const payClient = async (req, res) => {
       Math.round((Number(client.openingDebitBalance) || 0) * 100) / 100;
     const clientOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
     const prepaidBalance = round2(result.prepaidBalance);
-    const weOweClient = prepaidBalance;
+    const weOweClient = computeTotalClientCreditOwed(
+      prepaidBalance,
+      payableBreakdown.deferred
+    );
 
     res.json({
       message: "Client payment recorded",
@@ -807,7 +828,7 @@ export const payClient = async (req, res) => {
       clientOwesUs,
       weOweClient,
       prepaidBalance,
-      clientPayable: payableBreakdown.total,
+      clientPayable: weOweClient,
       clientPayableDeferred: payableBreakdown.deferred,
     });
   } catch (error) {

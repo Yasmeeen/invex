@@ -47,9 +47,9 @@ function takeTreasurySplitsFromPool(pool, target) {
   return { taken, pool: nextPool.filter((r) => r.amount > 0) };
 }
 
-export async function computeClientPayableBreakdown(clientId, phoneNumber) {
-  const phoneCandidates = buildPhoneSearchCandidates(phoneNumber);
+function clientDeferredPurchaseMatchOr(clientId, phoneNumber) {
   const purchaseMatchOr = [{ 'productPayload.acquiredFrom.clientId': clientId }];
+  const phoneCandidates = buildPhoneSearchCandidates(phoneNumber);
   if (phoneCandidates.length) {
     purchaseMatchOr.push({
       'productPayload.acquiredFrom.phone': { $in: phoneCandidates },
@@ -60,6 +60,11 @@ export async function computeClientPayableBreakdown(clientId, phoneNumber) {
       ],
     });
   }
+  return purchaseMatchOr;
+}
+
+export async function computeClientPayableBreakdown(clientId, phoneNumber) {
+  const purchaseMatchOr = clientDeferredPurchaseMatchOr(clientId, phoneNumber);
 
   const rows = await ProductPurchaseRequest.find({
     $or: purchaseMatchOr,
@@ -82,6 +87,103 @@ export async function computeClientPayableBreakdown(clientId, phoneNumber) {
     prepaid,
     total: round2(deferred + prepaid),
   };
+}
+
+/**
+ * Batch deferred desk-purchase remainings keyed by clientId string.
+ * Matches by acquiredFrom.clientId (primary) and optional phone fallback.
+ * @param {{ _id: import('mongoose').Types.ObjectId, phoneNumber?: string }[]} clients
+ */
+export async function computeClientDeferredPayablesByClients(clients) {
+  const list = (clients || []).filter((c) => c?._id);
+  const map = new Map(list.map((c) => [String(c._id), 0]));
+  if (!list.length) return map;
+
+  const clientIds = list.map((c) => c._id);
+  const phoneToClientIds = new Map();
+  for (const c of list) {
+    for (const phone of buildPhoneSearchCandidates(c.phoneNumber)) {
+      if (!phoneToClientIds.has(phone)) phoneToClientIds.set(phone, []);
+      phoneToClientIds.get(phone).push(String(c._id));
+    }
+  }
+  const phones = [...phoneToClientIds.keys()];
+
+  const rows = await ProductPurchaseRequest.find({
+    status: 'approved',
+    $or: [
+      { 'productPayload.acquiredFrom.clientId': { $in: clientIds } },
+      ...(phones.length
+        ? [
+            {
+              'productPayload.acquiredFrom.phone': { $in: phones },
+              $or: [
+                { 'productPayload.acquiredFrom.partyType': 'client' },
+                { 'productPayload.acquiredFrom.partyType': { $exists: false } },
+                { 'productPayload.acquiredFrom.partyType': null },
+              ],
+            },
+          ]
+        : []),
+    ],
+  })
+    .select(
+      'amountPaid purchaseTreasurySplits purchaseTreasuryKey productPayload.acquiredFrom quantity productPayload.netPrice'
+    )
+    .lean();
+
+  for (const p of rows) {
+    const rem = deferredDeskPurchaseRemaining(p);
+    if (rem <= 0) continue;
+    const af = p.productPayload?.acquiredFrom || {};
+    const byClientId = af.clientId ? String(af.clientId) : '';
+    if (byClientId && map.has(byClientId)) {
+      map.set(byClientId, round2((map.get(byClientId) || 0) + rem));
+      continue;
+    }
+    const phone = String(af.phone || '').trim();
+    const phoneMatches = phoneToClientIds.get(phone) || [];
+    // Phone fallback: attribute once (first matching client in the batch).
+    if (phoneMatches.length) {
+      const id = phoneMatches[0];
+      map.set(id, round2((map.get(id) || 0) + rem));
+    }
+  }
+  return map;
+}
+
+/**
+ * Net settlement: reduce deferred desk-purchase remainings (no cash drawer).
+ * Oldest approved deferred purchases first.
+ */
+export async function applyClientDeferredPayableSettlement(
+  clientId,
+  phoneNumber,
+  amount
+) {
+  let remaining = round2(amount);
+  if (remaining <= 0) return 0;
+
+  const purchaseMatchOr = clientDeferredPurchaseMatchOr(clientId, phoneNumber);
+  const rows = await ProductPurchaseRequest.find({
+    $or: purchaseMatchOr,
+    status: 'approved',
+  }).sort({ createdAt: 1 });
+
+  let totalApplied = 0;
+
+  for (const purchase of rows) {
+    if (remaining <= 0) break;
+    const due = deferredDeskPurchaseRemaining(purchase);
+    if (due <= 0) continue;
+    const apply = Math.min(remaining, due);
+    purchase.amountPaid = round2((Number(purchase.amountPaid) || 0) + apply);
+    await purchase.save();
+    remaining = round2(remaining - apply);
+    totalApplied = round2(totalApplied + apply);
+  }
+
+  return totalApplied;
 }
 
 /**

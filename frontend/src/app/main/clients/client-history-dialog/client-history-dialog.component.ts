@@ -375,9 +375,13 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   maxPayClientAmount(): number {
+    const weOwe = Number(this.history?.weOweClient);
+    if (Number.isFinite(weOwe) && weOwe > 0) {
+      return Math.round(weOwe * 100) / 100;
+    }
     const prepaid = Number(this.history?.prepaidBalance) || 0;
-    const payable = Number(this.history?.clientPayable) || 0;
-    return Math.round((prepaid + payable) * 100) / 100;
+    const deferred = Number(this.history?.clientPayableDeferred) || 0;
+    return Math.round((prepaid + deferred) * 100) / 100;
   }
 
   canPayClient(): boolean {

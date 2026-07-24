@@ -32,10 +32,11 @@ export class Client{
   openingDebitBalance?: number;
   /** Debit — client owes us. */
   clientOwesUs?: number;
-  /** Credit — we owe client (prepaid). */
+  /** Credit — we owe client (prepaid + deferred purchases). */
   weOweClient?: number;
   balanceSide?: 'debit' | 'credit' | 'even' | 'none';
   netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
+  clientPayableDeferred?: number;
 }
 
 export interface ClientSettlementPreview {
@@ -98,7 +99,7 @@ export interface ClientHistoryResponse {
   creditBalanceDue: number;
   owesFromSales?: number;
   owesFromOpeningBalance?: number;
-  /** Credit — prepaid deposit (we owe client). */
+  /** Credit — prepaid + deferred desk purchases (we owe client). */
   weOweClient?: number;
   prepaidBalance?: number;
   clientPayable?: number;

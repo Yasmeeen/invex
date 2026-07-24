@@ -1,4 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CategoriesServce } from './../../../shared/services/categories.service';
 import { MatDialog } from '@angular/material/dialog';
 // import { ordersSerivce } from '@shared/services/orders.services';
@@ -106,7 +107,9 @@ export class OrdersListComponent implements OnInit {
     private dashboardService: DashboardService,
     private branchesServce: BranchesServce,
     private storeSettings: StoreSettingsService,
-    private invoiceReprint: InvoiceReprintService
+    private invoiceReprint: InvoiceReprintService,
+    private route: ActivatedRoute,
+    private router: Router
   ) { }
 
   orderPaid(order: Order): number {
@@ -198,9 +201,31 @@ export class OrdersListComponent implements OnInit {
   ngOnInit(): void {
     const saved = localStorage.getItem('orders.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
+
+    const qp = this.route.snapshot.queryParamMap;
+    const section = String(qp.get('section') || '').trim().toLowerCase();
+    const search = (qp.get('search') || '').trim();
+    const printOrderId = (qp.get('printOrderId') || '').trim();
+
+    // Purchase deep-links use the same `search` param on the purchases tab.
+    if (section !== 'purchases' && search) {
+      this.nameSearchTerm = search;
+      this.params.search = search;
+      this.params.page = 1;
+    }
+
     this.getOrders();
     this.getOrderStatistics();
     this.getBranches();
+
+    if (printOrderId) {
+      this.printOrder({ _id: printOrderId } as Order);
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {},
+        replaceUrl: true,
+      });
+    }
   }
 
   setViewMode(mode: 'table' | 'cards'): void {

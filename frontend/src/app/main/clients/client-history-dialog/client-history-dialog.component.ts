@@ -1,5 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import { Order, Branch } from '@core/models/products.model';
 import { isPayLaterMethod } from '@core/utils/order-display.util';
 import {
@@ -54,6 +55,7 @@ export class ClientHistoryDialogComponent implements OnInit {
     private ref: MatDialogRef<ClientHistoryDialogComponent>,
     private storeSettings: StoreSettingsService,
     private dialog: MatDialog,
+    private router: Router,
     @Inject(MAT_DIALOG_DATA) public data: ClientHistoryDialogData
   ) {
     const actor = this.auth.getUserFromLocalStorage();
@@ -290,6 +292,30 @@ export class ClientHistoryDialogComponent implements OnInit {
 
   purchaseTreasuryLabel(row: ClientHistoryPurchaseRow): string {
     return String(row.purchaseTreasuryLabel || row.purchaseTreasuryKey || '').trim() || '—';
+  }
+
+  purchaseRef(row: { _id?: string } | null | undefined): string {
+    const id = normalizeMongoId(row?._id);
+    if (!id) return '—';
+    const s = String(id);
+    return s.length > 10 ? s.slice(-10).toUpperCase() : s.toUpperCase();
+  }
+
+  goToSalesInvoice(orderNumber?: number | string | null): void {
+    if (orderNumber == null || orderNumber === '') return;
+    this.ref.close(false);
+    this.router.navigate(['/orders'], {
+      queryParams: { section: 'sales', search: String(orderNumber) },
+    });
+  }
+
+  goToPurchaseInvoice(purchaseId?: string | null): void {
+    const id = normalizeMongoId(purchaseId);
+    if (!id) return;
+    this.ref.close(false);
+    this.router.navigate(['/orders'], {
+      queryParams: { section: 'purchases', search: id },
+    });
   }
 
   canPayOrder(order: ClientHistoryOrderRow): boolean {

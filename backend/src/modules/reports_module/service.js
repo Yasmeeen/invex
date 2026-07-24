@@ -6,6 +6,8 @@ import StockMovement from '../../DB/models/stockMovement.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import Vendor from '../../DB/models/vendor.model.js';
+import { buildPhoneSearchCandidates, digitsOnly } from '../../utils/phone-utils.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
   resolvePurchaseTreasurySplits,
@@ -93,6 +95,13 @@ const parseCustomerPhone = (query) => {
   return v.length ? v : null;
 };
 
+const parseSupplierPhone = (query) => {
+  const v = String(
+    query.supplier_phone ?? query.supplierPhone ?? query.vendor_phone ?? query.vendorPhone ?? ''
+  ).trim();
+  return v.length ? v : null;
+};
+
 /** Match orders by client ObjectId and/or phone (substring, case-insensitive). */
 const appendOrderCustomerFilters = (match, f) => {
   if (f.customerId) match.clientId = f.customerId;
@@ -125,11 +134,87 @@ const parseCommonFilters = (query) => {
       ? new mongoose.Types.ObjectId(String(query.customer_id))
       : null,
     customerPhone: parseCustomerPhone(query),
+    supplierPhone: parseSupplierPhone(query),
     sellerName: String(query.seller_name || '').trim(),
     groupBy: String(query.groupBy || 'daily') === 'monthly' ? 'monthly' : 'daily',
     page: Math.max(1, Number(query.page) || 1),
     limit: Math.max(1, Math.min(200, Number(query.limit) || 20)),
   };
+};
+
+/** Resolve vendor ids matching a supplier phone (exact candidates or last-10 / substring). */
+const resolveVendorIdsByPhone = async (supplierPhone) => {
+  if (!supplierPhone) return null;
+  const candidates = buildPhoneSearchCandidates(supplierPhone);
+  const last10 = digitsOnly(supplierPhone).slice(-10);
+  const or = [];
+  if (candidates.length) {
+    or.push({ phone: { $in: candidates } });
+  }
+  if (last10 && last10.length >= 7) {
+    or.push({ phone: { $regex: new RegExp(`${escapeRegex(last10)}$`) } });
+  }
+  or.push({ phone: { $regex: escapeRegex(supplierPhone), $options: 'i' } });
+  const vendors = await Vendor.find({ $or: or }).select('_id').lean();
+  return vendors.map((v) => v._id);
+};
+
+/** Products acquired from a supplier (by phone / vendor) or linked on that supplier's purchasing requests. */
+const resolveSupplierProductIds = async (supplierPhone) => {
+  if (!supplierPhone) return null;
+  const vendorIds = await resolveVendorIdsByPhone(supplierPhone);
+  const phoneRegex = { $regex: escapeRegex(supplierPhone), $options: 'i' };
+  const last10 = digitsOnly(supplierPhone).slice(-10);
+
+  const acquiredOr = [{ 'acquiredFrom.phone': phoneRegex }];
+  if (last10 && last10.length >= 7) {
+    acquiredOr.push({ 'acquiredFrom.phone': { $regex: new RegExp(`${escapeRegex(last10)}$`) } });
+  }
+  if (vendorIds?.length) {
+    acquiredOr.push({ 'acquiredFrom.vendorId': { $in: vendorIds } });
+  }
+
+  const [fromAcquired, fromPurchasing] = await Promise.all([
+    Product.find({ $or: acquiredOr }).distinct('_id'),
+    vendorIds?.length
+      ? PurchasingRequest.find({ supplier: { $in: vendorIds } }).distinct('products')
+      : Promise.resolve([]),
+  ]);
+
+  const ids = new Set();
+  for (const id of fromAcquired || []) {
+    if (id) ids.add(String(id));
+  }
+  for (const id of fromPurchasing || []) {
+    if (id) ids.add(String(id));
+  }
+  return [...ids].map((id) => new mongoose.Types.ObjectId(id));
+};
+
+/** Narrow a product-id filter by an optional supplier product id list. */
+const intersectProductIdFilter = (existingProductId, supplierProductIds) => {
+  if (!supplierProductIds) return existingProductId || null;
+
+  const supplierSet = new Set(supplierProductIds.map((id) => String(id)));
+  const toObjectId = (id) =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id));
+
+  if (!existingProductId) {
+    return { $in: supplierProductIds };
+  }
+
+  if (existingProductId instanceof mongoose.Types.ObjectId || typeof existingProductId === 'string') {
+    return supplierSet.has(String(existingProductId)) ? existingProductId : { $in: [] };
+  }
+
+  if (existingProductId.$in && Array.isArray(existingProductId.$in)) {
+    const intersection = existingProductId.$in
+      .filter((id) => supplierSet.has(String(id)))
+      .map(toObjectId);
+    return { $in: intersection };
+  }
+
+  return { $in: [] };
 };
 
 const getDateGroupExpr = (groupBy) =>
@@ -370,21 +455,25 @@ export const getProductsReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
     const lowStockThreshold = Math.max(0, Number(req.query.lowStockThreshold) || 5);
+    const supplierProductIds = f.supplierPhone ? await resolveSupplierProductIds(f.supplierPhone) : null;
+
     const orderMatch = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) orderMatch.branch = f.branchId;
     appendOrderCustomerFilters(orderMatch, f);
-    if (f.productId) {
-      orderMatch['products.productId'] = f.productId;
-    } else if (f.categoryId) {
+
+    let scopedProductIds = f.productId || null;
+    if (f.categoryId && !f.productId) {
       const categoryProductIds = await Product.find({ category: f.categoryId }).distinct('_id');
-      orderMatch['products.productId'] = { $in: categoryProductIds };
+      scopedProductIds = { $in: categoryProductIds };
+    }
+    const orderProductIdFilter = intersectProductIdFilter(scopedProductIds, supplierProductIds);
+    if (orderProductIdFilter) {
+      orderMatch['products.productId'] = orderProductIdFilter;
     }
 
-    const productLineMatch = f.productId
-      ? { 'products.productId': f.productId }
-      : f.categoryId
-        ? { 'products.productId': orderMatch['products.productId'] }
-        : null;
+    const productLineMatch = orderProductIdFilter
+      ? { 'products.productId': orderProductIdFilter }
+      : null;
 
     const topSellingProducts = await Order.aggregate([
       { $match: orderMatch },
@@ -405,8 +494,11 @@ export const getProductsReport = async (req, res) => {
 
     const productMatch = {};
     if (f.branchId) productMatch.branch = f.branchId;
-    if (f.productId) productMatch._id = f.productId;
     if (f.categoryId) productMatch.category = f.categoryId;
+    const inventoryProductIdFilter = intersectProductIdFilter(f.productId || null, supplierProductIds);
+    if (inventoryProductIdFilter) {
+      productMatch._id = inventoryProductIdFilter;
+    }
 
     const lowStockProducts = await Product.find({ ...productMatch, stock: { $lte: lowStockThreshold } })
       .populate('branch', 'name')

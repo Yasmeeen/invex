@@ -259,6 +259,19 @@ export interface VendorPurchasingRequestRow {
   remaining?: number;
   paymentStatus?: 'Installments' | 'Deferred' | string;
   installments?: VendorPurchasingInstallmentRow[];
+  /** Linked desk purchase invoice (ProductPurchaseRequest) when applicable. */
+  purchaseInvoiceId?: string | null;
+}
+
+export interface VendorDeskPurchaseRow {
+  _id?: string;
+  status?: string;
+  createdAt?: string;
+  productName?: string;
+  productCode?: string;
+  quantity?: number;
+  purchaseTreasuryKey?: string;
+  purchaseTreasuryLabel?: string;
 }
 
 export interface VendorSettlementPreview {
@@ -330,6 +343,7 @@ export interface VendorHistoryResponse {
   netBalanceMessage?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
   orders: Array<Order & { remaining?: number }>;
   purchasingRequests?: VendorPurchasingRequestRow[];
+  purchases?: VendorDeskPurchaseRow[];
   ledgerEntries: VendorLedgerEntry[];
 }
 

@@ -8,7 +8,23 @@ import { Globals } from '@core/globals';
 import { formatCairoDateTime } from '@core/utils/date-tz.util';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+
+export type SerialTrackDetailPart = {
+  text: string;
+  orderId?: string;
+  orderNumber?: string;
+  isOrderLink?: boolean;
+};
+
+type EventRow = {
+  event: ProductHistoryEvent;
+  parts: SerialTrackDetailPart[];
+  orderId?: string;
+  orderNumber?: string;
+};
 
 @Component({
   selector: 'app-serial-track',
@@ -20,12 +36,16 @@ export class SerialTrackComponent implements OnInit {
 
   code = '';
   loading = false;
+  openingOrder = false;
   searched = false;
   result: ProductSerialTrackResponse | null = null;
+  eventRows: EventRow[] = [];
   showProductsLink = true;
 
   constructor(
     private productsService: ProductsSerivce,
+    private ordersService: OrdersSerivce,
+    private invoiceReprint: InvoiceReprintService,
     private translate: TranslateService,
     private notify: AppNotificationService,
     private router: Router,
@@ -44,6 +64,7 @@ export class SerialTrackComponent implements OnInit {
   clear(): void {
     this.code = '';
     this.result = null;
+    this.eventRows = [];
     this.searched = false;
     setTimeout(() => this.focusCodeInput(), 0);
   }
@@ -65,16 +86,19 @@ export class SerialTrackComponent implements OnInit {
     this.loading = true;
     this.searched = true;
     this.result = null;
+    this.eventRows = [];
 
     this.productsService.trackProductSerial(code).subscribe({
       next: (res) => {
         this.result = res;
+        this.eventRows = (res?.events || []).map((event) => this.buildEventRow(event));
         this.loading = false;
         setTimeout(() => this.focusCodeInput(), 0);
       },
       error: (err) => {
         this.loading = false;
         this.result = null;
+        this.eventRows = [];
         const msg =
           err?.error?.error ||
           this.translate.instant('tr_serial_track_not_found');
@@ -94,63 +118,157 @@ export class SerialTrackComponent implements OnInit {
     return translated !== key ? translated : type;
   }
 
-  eventDetails(event: ProductHistoryEvent): string {
+  private buildEventRow(event: ProductHistoryEvent): EventRow {
+    const parts = this.buildDetailParts(event);
+    const orderPart = parts.find((p) => p.isOrderLink);
+    return {
+      event,
+      parts,
+      orderId: orderPart?.orderId,
+      orderNumber: orderPart?.orderNumber,
+    };
+  }
+
+  private buildDetailParts(event: ProductHistoryEvent): SerialTrackDetailPart[] {
     const d = event.details || {};
-    const parts: string[] = [];
+    const parts: SerialTrackDetailPart[] = [];
+
+    const orderIdRaw = d['orderId'];
+    const orderNumberRaw = d['orderNumber'];
+    let orderId =
+      orderIdRaw != null && String(orderIdRaw).trim()
+        ? String(orderIdRaw).trim()
+        : undefined;
+    let orderNumber =
+      orderNumberRaw != null && String(orderNumberRaw).trim()
+        ? String(orderNumberRaw).trim()
+        : undefined;
+
+    // Fallback: summary like "#123"
+    if (!orderNumber && event.summary) {
+      const m = String(event.summary).match(/#\s*(\d+)/);
+      if (m) orderNumber = m[1];
+    }
 
     if (d['quantity'] != null) {
-      parts.push(`${this.translate.instant('tr_quantity')}: ${d['quantity']}`);
+      parts.push({
+        text: `${this.translate.instant('tr_quantity')}: ${d['quantity']}`,
+      });
     }
-    if (d['orderNumber'] != null) {
-      parts.push(
-        `${this.translate.instant('tr_order_number')}: #${d['orderNumber']}`
-      );
+    if (orderNumber) {
+      parts.push({
+        text: `${this.translate.instant('tr_order_number')}: #${orderNumber}`,
+        orderId,
+        orderNumber,
+        isOrderLink: true,
+      });
     }
     if (d['clientName']) {
-      parts.push(`${this.translate.instant('tr_client')}: ${d['clientName']}`);
+      parts.push({
+        text: `${this.translate.instant('tr_client')}: ${d['clientName']}`,
+      });
     }
     if (d['customerName']) {
-      parts.push(`${this.translate.instant('tr_client')}: ${d['customerName']}`);
+      parts.push({
+        text: `${this.translate.instant('tr_client')}: ${d['customerName']}`,
+      });
     }
     if (d['fromBranch'] && d['toBranch']) {
-      parts.push(`${d['fromBranch']} → ${d['toBranch']}`);
+      parts.push({ text: `${d['fromBranch']} → ${d['toBranch']}` });
     } else if (d['branch']) {
-      parts.push(String(d['branch']));
+      parts.push({ text: String(d['branch']) });
     }
     if (d['refundTotal'] != null) {
-      parts.push(
-        `${this.translate.instant('tr_refund_amount')} ${d['refundTotal']}`
-      );
+      parts.push({
+        text: `${this.translate.instant('tr_refund_amount')} ${d['refundTotal']}`,
+      });
     }
     if (d['price'] != null && d['lineTotal'] != null) {
-      parts.push(`${d['lineTotal']} EGP`);
+      parts.push({ text: `${d['lineTotal']} EGP` });
     }
     if (d['paymentMethod']) {
-      parts.push(String(d['paymentMethod']));
+      parts.push({ text: String(d['paymentMethod']) });
     }
     if (d['cancelReason']) {
-      parts.push(String(d['cancelReason']));
+      parts.push({ text: String(d['cancelReason']) });
     }
     if (d['rejectReason']) {
-      parts.push(String(d['rejectReason']));
+      parts.push({ text: String(d['rejectReason']) });
     }
     if (d['resolutionNote']) {
-      parts.push(String(d['resolutionNote']));
+      parts.push({ text: String(d['resolutionNote']) });
     }
     if (d['notes']) {
-      parts.push(String(d['notes']));
+      parts.push({ text: String(d['notes']) });
     }
     if (d['acquiredFrom']) {
-      parts.push(String(d['acquiredFrom']));
+      parts.push({ text: String(d['acquiredFrom']) });
     }
     if (d['reason']) {
-      parts.push(String(d['reason']));
+      parts.push({ text: String(d['reason']) });
     }
 
     if (!parts.length && event.summary) {
-      return event.summary;
+      return [{ text: event.summary }];
     }
-    return parts.join(' · ');
+    return parts;
+  }
+
+  openOrder(orderId?: string, orderNumber?: string): void {
+    if (this.openingOrder) return;
+
+    const id = orderId ? String(orderId).trim() : '';
+    const number = orderNumber ? String(orderNumber).trim() : '';
+
+    if (!id && !number) {
+      this.notify.push(
+        this.translate.instant('tr_unexpected_error_message'),
+        'error'
+      );
+      return;
+    }
+
+    // Prefer opening the invoice here (works even if /orders is blocked for the role).
+    if (id) {
+      this.openingOrder = true;
+      this.ordersService.getOrder(id).subscribe({
+        next: (full: any) => {
+          this.openingOrder = false;
+          const order = full?.order || full;
+          if (!order) {
+            this.notify.push(
+              this.translate.instant('tr_unexpected_error_message'),
+              'error'
+            );
+            return;
+          }
+          this.invoiceReprint.printSale(order);
+        },
+        error: () => {
+          this.openingOrder = false;
+          // Fallback: go to invoices list filtered by order number
+          this.goToOrders(id, number);
+        },
+      });
+      return;
+    }
+
+    this.goToOrders(id, number);
+  }
+
+  private goToOrders(orderId: string, orderNumber: string): void {
+    const queryParams: { search?: string; printOrderId?: string } = {};
+    if (orderId) queryParams.printOrderId = orderId;
+    if (orderNumber) queryParams.search = orderNumber;
+
+    this.router.navigate(['/orders'], { queryParams }).then((ok) => {
+      if (!ok) {
+        this.notify.push(
+          this.translate.instant('tr_unexpected_error_message'),
+          'error'
+        );
+      }
+    });
   }
 
   productLocation(): string {

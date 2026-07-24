@@ -1,0 +1,114 @@
+<div class="product-details-dialog bg-white plr-4 ptb-4">
+  <div class="flex flex-space-between flex-middle mb-3">
+    <h3 class="m-0 product-details-dialog__title">
+      {{ 'tr_product_details' | translate }}
+    </h3>
+    <button type="button" class="s-btn btn-secondary" (click)="close()">✖</button>
+  </div>
+
+  <div class="product-details-dialog__layout">
+    <div class="product-details-dialog__media">
+      <img
+        *ngIf="product.imageUrl"
+        [src]="product.imageUrl"
+        [alt]="product.name"
+        class="product-details-dialog__image"
+      />
+      <div *ngIf="!product.imageUrl" class="product-details-dialog__placeholder" aria-hidden="true">
+        <i class="fa fa-cube"></i>
+      </div>
+    </div>
+
+    <div class="product-details-dialog__body">
+      <h2 class="product-details-dialog__name m-0 mb-1">{{ product.name }}</h2>
+      <div class="product-details-dialog__code mb-3" *ngIf="product.code">
+        {{ product.code }}
+      </div>
+
+      <div class="product-details-meta row">
+        <div class="col-md-4 col-6 mb-2" *ngIf="product.category?.name">
+          <span class="meta-label">{{ 'tr_category' | translate }}</span>
+          <strong>{{ product.category?.name }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_location' | translate }}</span>
+          <strong>{{ locationLabel() }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_stock' | translate }}</span>
+          <strong>{{ product.stock }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2" *ngIf="bookedQty() > 0">
+          <span class="meta-label">{{ 'tr_booked' | translate }}</span>
+          <strong>{{ bookedQty() }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2" *ngIf="bookedQty() > 0">
+          <span class="meta-label">{{ 'tr_available' | translate }}</span>
+          <strong>{{ freeSellableQty() }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2">
+          <span class="meta-label">{{ 'tr_price' | translate }}</span>
+          <strong *ngIf="!hasDiscount()">
+            {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
+          </strong>
+          <div *ngIf="hasDiscount()" class="price-with-discount">
+            <span class="price-old">{{ product.price | currency:'EGP ':'symbol':'1.2-2' }}</span>
+            <strong class="price-new">{{ discountedPrice() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            <span class="discount-badge">-{{ product.discount }}%</span>
+          </div>
+        </div>
+        <div class="col-md-4 col-6 mb-2" *ngIf="showNetPrice">
+          <span class="meta-label">{{ 'tr_net_price' | translate }}</span>
+          <strong>{{ product.netPrice | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div class="col-md-4 col-6 mb-2" *ngIf="product.addedBy">
+          <span class="meta-label">{{ 'tr_product_added_by' | translate }}</span>
+          <strong>{{ product.addedBy }}</strong>
+        </div>
+      </div>
+
+      <div class="product-details-section" *ngIf="attributeRows().length">
+        <h4 class="product-details-section__title">{{ 'tr_category_attributes' | translate }}</h4>
+        <div class="attr-grid">
+          <div class="attr-row" *ngFor="let row of attributeRows()">
+            <span class="attr-label">{{ row.label }}</span>
+            <strong class="attr-value">{{ row.value }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-details-section" *ngIf="hasSource()">
+        <h4 class="product-details-section__title">{{ 'tr_product_source_party' | translate }}</h4>
+        <div class="product-details-meta row">
+          <div class="col-md-4 col-6 mb-2" *ngIf="sourcePartyLabel()">
+            <span class="meta-label">{{ 'tr_party_type' | translate }}</span>
+            <strong>{{ sourcePartyLabel() }}</strong>
+          </div>
+          <div class="col-md-4 col-6 mb-2" *ngIf="sourceDisplayName()">
+            <span class="meta-label">{{ 'tr_name' | translate }}</span>
+            <strong>{{ sourceDisplayName() }}</strong>
+          </div>
+          <div class="col-md-4 col-6 mb-2" *ngIf="product.acquiredFrom?.phone">
+            <span class="meta-label">{{ 'tr_phone' | translate }}</span>
+            <strong>{{ product.acquiredFrom?.phone }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="product-details-dialog__actions flex flex-end gap-sm mt-3">
+    <button type="button" class="s-btn btn-secondary" (click)="close()">
+      {{ 'tr_close' | translate }}
+    </button>
+    <button
+      *ngIf="allowAddToOrder"
+      type="button"
+      class="s-btn btn-primary"
+      (click)="addToOrder()"
+      [disabled]="product.stock == 0"
+    >
+      {{ 'tr_cashier_add_to_order' | translate }}
+    </button>
+  </div>
+</div>

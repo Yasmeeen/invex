@@ -160,7 +160,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let o of history.creditOrders">
-            <td>{{ o.orderNumber }}</td>
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="o.orderNumber != null"
+                (click)="goToSalesInvoice(o.orderNumber)"
+              >
+                #{{ o.orderNumber }}
+              </button>
+              <span *ngIf="o.orderNumber == null">—</span>
+            </td>
             <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td class="text-error">{{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
@@ -187,6 +197,7 @@
       <table class="s-table table">
         <thead>
           <tr>
+            <th>{{ 'tr_purchase_document_ref' | translate }}</th>
             <th>{{ 'tr_name' | translate }}</th>
             <th>{{ 'tr_code' | translate }}</th>
             <th>{{ 'tr_cashier.QTY' | translate }}</th>
@@ -200,6 +211,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let p of history.purchases" [class.row-rejected]="p.status === 'rejected'">
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="p._id"
+                (click)="goToPurchaseInvoice(p._id)"
+              >
+                {{ purchaseRef(p) }}
+              </button>
+              <span *ngIf="!p._id">—</span>
+            </td>
             <td>{{ p.productName }}</td>
             <td>{{ p.productCode }}</td>
             <td>{{ p.quantity }}</td>
@@ -248,7 +270,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let o of history.orders" [class.row-restored]="o.status === 'restored'">
-            <td>{{ o.orderNumber }}</td>
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="o.orderNumber != null"
+                (click)="goToSalesInvoice(o.orderNumber)"
+              >
+                #{{ o.orderNumber }}
+              </button>
+              <span *ngIf="o.orderNumber == null">—</span>
+            </td>
             <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>

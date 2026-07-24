@@ -1,5 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import {
   Branch,
   Vendor,
@@ -15,6 +16,7 @@ import { AccountHistoryPdfService } from '@shared/services/account-history-pdf.s
 import { BranchesServce } from '@shared/services/branches.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
+import { normalizeMongoId } from '@core/utils/mongo-id.util';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from '../vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
 import { VendorPaySupplierDialogComponent } from '../vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.component';
@@ -50,6 +52,7 @@ export class VendorHistoryDialogComponent implements OnInit {
     private accountHistoryPdf: AccountHistoryPdfService,
     private dialog: MatDialog,
     private ref: MatDialogRef<VendorHistoryDialogComponent>,
+    private router: Router,
     @Inject(MAT_DIALOG_DATA) public data: VendorHistoryDialogData
   ) {
     const actor = this.auth.getUserFromLocalStorage();
@@ -303,6 +306,43 @@ export class VendorHistoryDialogComponent implements OnInit {
       default:
         return status || '—';
     }
+  }
+
+  purchaseRef(row: { _id?: string } | null | undefined): string {
+    const id = normalizeMongoId(row?._id);
+    if (!id) return '—';
+    const s = String(id);
+    return s.length > 10 ? s.slice(-10).toUpperCase() : s.toUpperCase();
+  }
+
+  purchaseStatusLabel(status?: string): string {
+    switch (String(status || '').toLowerCase()) {
+      case 'approved':
+        return this.translate.instant('tr_purchase_status_approved');
+      case 'rejected':
+        return this.translate.instant('tr_purchase_status_rejected');
+      case 'pending':
+        return this.translate.instant('tr_pending');
+      default:
+        return status || '—';
+    }
+  }
+
+  goToSalesInvoice(orderNumber?: number | string | null): void {
+    if (orderNumber == null || orderNumber === '') return;
+    this.ref.close(false);
+    this.router.navigate(['/orders'], {
+      queryParams: { section: 'sales', search: String(orderNumber) },
+    });
+  }
+
+  goToPurchaseInvoice(purchaseId?: string | null): void {
+    const id = normalizeMongoId(purchaseId);
+    if (!id) return;
+    this.ref.close(false);
+    this.router.navigate(['/orders'], {
+      queryParams: { section: 'purchases', search: id },
+    });
   }
 
   canPaySalesOrder(o: { _id?: string; paymentMethod?: string; status?: string; remaining?: number }): boolean {

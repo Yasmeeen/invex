@@ -60,6 +60,39 @@
   }
 }
 
+.serial-track-order-link,
+.serial-track-order-btn {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+
+  &:hover,
+  &:focus {
+    color: #1e40af;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.serial-track-order-btn {
+  display: inline-block;
+  margin-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #eff6ff;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
 .history-type-badge {
   display: inline-block;
   padding: 2px 8px;

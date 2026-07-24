@@ -82,6 +82,32 @@
     </div>
 
     <div class="store-settings-card__field">
+      <div class="store-settings-card__policy-head">
+        <label class="store-settings-card__label" for="bookingPolicy">
+          {{ 'tr_booking_policy' | translate }}
+        </label>
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input
+            type="checkbox"
+            name="showBookingPolicyOnReceipt"
+            [(ngModel)]="form.showBookingPolicyOnReceipt"
+          />
+          <span>{{ 'tr_show_booking_policy_on_receipt' | translate }}</span>
+        </label>
+      </div>
+      <p class="store-settings-card__hint">{{ 'tr_booking_policy_hint' | translate }}</p>
+      <textarea
+        id="bookingPolicy"
+        class="s-control store-settings-card__policy-text"
+        name="bookingPolicy"
+        [(ngModel)]="form.bookingPolicy"
+        rows="4"
+        maxlength="2000"
+        [placeholder]="'tr_booking_policy_placeholder' | translate"
+      ></textarea>
+    </div>
+
+    <div class="store-settings-card__field">
       <label class="store-settings-card__label">{{ 'tr_store_logo' | translate }}</label>
       <p class="store-settings-card__hint">{{ 'tr_logo_hint' | translate }}</p>
       <div class="store-settings-card__logo-row">

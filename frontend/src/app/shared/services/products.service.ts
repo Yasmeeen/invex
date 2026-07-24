@@ -209,6 +209,8 @@ listBranchTransfers(params: {
   toBranchId?: string;
   categoryId?: string;
   search?: string;
+  from?: string;
+  to?: string;
 }) {
   let hp = new HttpParams().set('userId', params.userId);
   if (params.status) {
@@ -231,6 +233,12 @@ listBranchTransfers(params: {
   }
   if (params.search) {
     hp = hp.set('search', params.search);
+  }
+  if (params.from) {
+    hp = hp.set('from', params.from);
+  }
+  if (params.to) {
+    hp = hp.set('to', params.to);
   }
   return this.http.get<{
     transfers: BranchTransferItem[];

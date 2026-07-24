@@ -6,6 +6,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { Globals } from '@core/globals';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch, Category } from '@core/models/products.model';
+import { formatCairoDateTime, formatCairoYMD } from '@core/utils/date-tz.util';
 import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -36,6 +37,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   selectedToBranches: string[] = [];
   selectedCategories: string[] = [];
   searchTerm = '';
+  listFromDate: Date | null = null;
+  listToDate: Date | null = null;
   searchTimeout: any;
 
   paginationPerPage = 20;
@@ -51,6 +54,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     toBranchId?: string;
     categoryId?: string;
     search?: string;
+    from?: string;
+    to?: string;
   };
 
   private subscriptions: Subscription[] = [];
@@ -163,7 +168,21 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     } else {
       delete this.params.search;
     }
+    if (this.listFromDate) {
+      this.params.from = formatCairoYMD(this.listFromDate);
+    } else {
+      delete this.params.from;
+    }
+    if (this.listToDate) {
+      this.params.to = formatCairoYMD(this.listToDate);
+    } else {
+      delete this.params.to;
+    }
     this.load();
+  }
+
+  onDateFilterChange(): void {
+    this.applyFilters();
   }
 
   clearFilters(): void {
@@ -171,6 +190,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     this.selectedToBranches = [];
     this.selectedCategories = [];
     this.searchTerm = '';
+    this.listFromDate = null;
+    this.listToDate = null;
     this.applyFilters();
   }
 
@@ -260,6 +281,11 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
       return 'tr_branch_transfer_status_rejected';
     }
     return 'tr_branch_transfer_status_pending';
+  }
+
+  /** Transfer request date/time in Cairo (dd/MM/yyyy HH:mm). */
+  formatTransferDate(value: string | Date | null | undefined): string {
+    return formatCairoDateTime(value);
   }
 
   startReject(t: BranchTransferItem): void {

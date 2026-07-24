@@ -28,6 +28,8 @@ export const getStoreSettings = async (req, res) => {
       paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
       returnExchangePolicy: doc.returnExchangePolicy || '',
       showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
+      bookingPolicy: doc.bookingPolicy || '',
+      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
     });
   } catch (error) {
     console.error('getStoreSettings:', error);
@@ -46,6 +48,8 @@ export const updateStoreSettings = async (req, res) => {
       paymentAppFeePercents,
       returnExchangePolicy,
       showReturnExchangePolicyOnReceipt,
+      bookingPolicy,
+      showBookingPolicyOnReceipt,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
@@ -107,6 +111,15 @@ export const updateStoreSettings = async (req, res) => {
     ) {
       return res.status(400).json({ error: 'showReturnExchangePolicyOnReceipt must be a boolean' });
     }
+    if (bookingPolicy !== undefined && typeof bookingPolicy !== 'string') {
+      return res.status(400).json({ error: 'bookingPolicy must be a string' });
+    }
+    if (
+      showBookingPolicyOnReceipt !== undefined &&
+      typeof showBookingPolicyOnReceipt !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'showBookingPolicyOnReceipt must be a boolean' });
+    }
 
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
@@ -120,6 +133,12 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (showReturnExchangePolicyOnReceipt !== undefined) {
       update.showReturnExchangePolicyOnReceipt = showReturnExchangePolicyOnReceipt;
+    }
+    if (bookingPolicy !== undefined) {
+      update.bookingPolicy = bookingPolicy.trim().slice(0, 2000);
+    }
+    if (showBookingPolicyOnReceipt !== undefined) {
+      update.showBookingPolicyOnReceipt = showBookingPolicyOnReceipt;
     }
 
     const existing = await getLatestSettingsDoc();
@@ -145,6 +164,8 @@ export const updateStoreSettings = async (req, res) => {
       paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
       returnExchangePolicy: doc.returnExchangePolicy || '',
       showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
+      bookingPolicy: doc.bookingPolicy || '',
+      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
     });
   } catch (error) {
     console.error('updateStoreSettings:', error);

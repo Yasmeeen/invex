@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import Product from '../../DB/models/product.model.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import ProductBranchTransfer from '../../DB/models/productBranchTransfer.model.js';
@@ -2016,6 +2017,21 @@ export const listBranchTransfers = async (req, res) => {
           },
         });
       }
+    }
+
+    // Optional createdAt date range (Cairo business days), query: from / to as YYYY-MM-DD
+    const fromDate = String(req.query.from || '').trim();
+    const toDate = String(req.query.to || '').trim();
+    if (fromDate || toDate) {
+      const timezone = 'Africa/Cairo';
+      const createdAt = {};
+      if (fromDate) {
+        createdAt.$gte = moment.tz(fromDate, 'YYYY-MM-DD', timezone).startOf('day').utc().toDate();
+      }
+      if (toDate) {
+        createdAt.$lte = moment.tz(toDate, 'YYYY-MM-DD', timezone).endOf('day').utc().toDate();
+      }
+      andParts.push({ createdAt });
     }
 
     const fromBranchIds = toObjectIds(parseOidCsvList(req.query.fromBranchId));

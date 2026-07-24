@@ -49,3 +49,20 @@
     min-width: 80px;
   }
 }
+
+.history-invoice-link {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+
+  &:hover,
+  &:focus {
+    color: #1e40af;
+  }
+}

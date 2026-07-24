@@ -52,6 +52,10 @@ const storeSettingsSchema = new mongoose.Schema(
     returnExchangePolicy: { type: String, default: '', trim: true, maxlength: 2000 },
     /** When true and policy text is set, print it on sale invoices/receipts. */
     showReturnExchangePolicyOnReceipt: { type: Boolean, default: false },
+    /** Free-text booking/reservation policy (shown on booking receipt when enabled). */
+    bookingPolicy: { type: String, default: '', trim: true, maxlength: 2000 },
+    /** When true and policy text is set, print it on booking receipts. */
+    showBookingPolicyOnReceipt: { type: Boolean, default: false },
   },
   { timestamps: true, collection: 'storesettings' }
 );

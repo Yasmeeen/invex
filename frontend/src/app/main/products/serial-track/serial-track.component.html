@@ -131,13 +131,13 @@
 
       <div
         class="empty-state-here text-center ptb-6"
-        *ngIf="!result.events?.length"
+        *ngIf="!eventRows.length"
       >
         <i class="fa fa-history empty-icon text-primary"></i>
         <p>{{ 'tr_product_history_empty' | translate }}</p>
       </div>
 
-      <div class="table-container" *ngIf="result.events?.length">
+      <div class="table-container" *ngIf="eventRows.length">
         <table class="s-table table layout-fixed product-history-table">
           <thead>
             <tr>
@@ -148,18 +148,39 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let event of result.events">
-              <td class="product-history-table__when">{{ formatWhen(event.occurredAt) }}</td>
+            <tr *ngFor="let row of eventRows">
+              <td class="product-history-table__when">{{ formatWhen(row.event.occurredAt) }}</td>
               <td>
                 <span
                   class="history-type-badge"
-                  [class.badge-removed]="event.type === 'removed_from_stock' || event.type === 'product_delete'"
+                  [class.badge-removed]="row.event.type === 'removed_from_stock' || row.event.type === 'product_delete'"
                 >
-                  {{ eventTypeLabel(event.type) }}
+                  {{ eventTypeLabel(row.event.type) }}
                 </span>
+                <button
+                  *ngIf="row.orderNumber"
+                  type="button"
+                  class="serial-track-order-btn"
+                  [disabled]="openingOrder"
+                  (click)="openOrder(row.orderId, row.orderNumber)"
+                >
+                  #{{ row.orderNumber }}
+                </button>
               </td>
-              <td class="product-history-table__details">{{ eventDetails(event) }}</td>
-              <td>{{ event.actorName || '—' }}</td>
+              <td class="product-history-table__details">
+                <ng-container *ngFor="let part of row.parts; let last = last">
+                  <button
+                    *ngIf="part.isOrderLink"
+                    type="button"
+                    class="serial-track-order-link"
+                    [disabled]="openingOrder"
+                    (click)="openOrder(part.orderId, part.orderNumber)"
+                  >{{ part.text }}</button>
+                  <span *ngIf="!part.isOrderLink">{{ part.text }}</span>
+                  <span *ngIf="!last"> · </span>
+                </ng-container>
+              </td>
+              <td>{{ row.event.actorName || '—' }}</td>
             </tr>
           </tbody>
         </table>

@@ -44,6 +44,16 @@
       >
       </ng-select>
     </div>
+    <div class="col-md-3 mt-4" *ngIf="reportType === 'products'">
+      <label>{{ 'tr_report_filter_supplier_phone' | translate }}</label>
+      <input
+        class="s-control"
+        type="tel"
+        [(ngModel)]="filters.supplier_phone"
+        [placeholder]="'tr_report_placeholder_supplier_phone' | translate"
+        autocomplete="tel"
+      />
+    </div>
     <div class="col-md-3 mt-4" *ngIf="reportType !== 'deskPurchases'">
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select

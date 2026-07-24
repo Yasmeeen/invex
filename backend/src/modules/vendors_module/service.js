@@ -2,6 +2,7 @@
 import Vendor from "../../DB/models/vendor.model.js";
 import Order from "../../DB/models/order.model.js";
 import PurchasingRequest from "../../DB/models/purchasingRequest.model.js";
+import ProductPurchaseRequest from "../../DB/models/productPurchaseRequest.model.js";
 import mongoose from "mongoose";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
 import {
@@ -361,6 +362,18 @@ export const getVendorHistory = async (req, res) => {
       .limit(100)
       .lean();
 
+    const purchasingRequestIds = purchasingRequests.map((pr) => pr._id).filter(Boolean);
+    const linkedDeskPurchases = purchasingRequestIds.length
+      ? await ProductPurchaseRequest.find({
+          linkedPurchasingRequestId: { $in: purchasingRequestIds },
+        })
+          .select('_id linkedPurchasingRequestId')
+          .lean()
+      : [];
+    const purchaseInvoiceByRequestId = new Map(
+      linkedDeskPurchases.map((p) => [String(p.linkedPurchasingRequestId), String(p._id)])
+    );
+
     const purchasingRequestsWithRemaining = purchasingRequests.map((pr) => ({
       ...pr,
       remaining:
@@ -368,6 +381,7 @@ export const getVendorHistory = async (req, res) => {
           ? deferredPurchaseRemaining(pr)
           : unpaidInstallmentsTotal(pr),
       amountPaid: Number(pr.amountPaid) || 0,
+      purchaseInvoiceId: purchaseInvoiceByRequestId.get(String(pr._id)) || null,
     }));
 
     const orders = await Order.find({
@@ -385,6 +399,39 @@ export const getVendorHistory = async (req, res) => {
       ...o,
       remaining: orderAmountRemaining(o),
     }));
+
+    const phoneCandidates = buildPhoneSearchCandidates(vendor.phone);
+    const purchaseMatchOr = [
+      { 'productPayload.acquiredFrom.vendorId': vendor._id },
+    ];
+    if (phoneCandidates.length) {
+      purchaseMatchOr.push({
+        'productPayload.acquiredFrom.phone': { $in: phoneCandidates },
+        'productPayload.acquiredFrom.partyType': 'supplier',
+      });
+    }
+
+    const deskPurchaseRows = await ProductPurchaseRequest.find({ $or: purchaseMatchOr })
+      .select(
+        'status quantity purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits productPayload createdAt amountPaid'
+      )
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    const purchases = deskPurchaseRows.map((p) => {
+      const pp = p.productPayload || {};
+      return {
+        _id: p._id,
+        status: p.status,
+        createdAt: p.createdAt,
+        productName: pp.name || '',
+        productCode: pp.code || '',
+        quantity: Math.max(1, Math.floor(Number(p.quantity) || 1)),
+        purchaseTreasuryKey: p.purchaseTreasuryKey,
+        purchaseTreasuryLabel: p.purchaseTreasuryLabel || '',
+      };
+    });
 
     const netBalanceMessage = buildNetBalanceMessage(supplierOwesUs, weOweSupplier);
     const settlementPreview = buildSettlementPreview(supplierOwesUs, weOweSupplier);
@@ -405,6 +452,7 @@ export const getVendorHistory = async (req, res) => {
       netBalanceMessage,
       orders: ordersWithRemaining,
       purchasingRequests: purchasingRequestsWithRemaining,
+      purchases,
       ledgerEntries: (ledgerSource.ledgerEntries || []).slice().reverse(),
     });
   } catch (error) {

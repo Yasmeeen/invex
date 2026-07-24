@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute } from '@angular/router';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -59,13 +60,23 @@ export class PurchaseInvoicesListComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private dialog: MatDialog,
-    private invoiceReprint: InvoiceReprintService
+    private invoiceReprint: InvoiceReprintService,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
     const saved = localStorage.getItem('purchase-invoices.viewMode');
     this.viewMode = saved === 'cards' ? 'cards' : 'table';
     this.curentUser = this.auth.getUserFromLocalStorage();
+
+    const qp = this.route.snapshot.queryParamMap;
+    const section = String(qp.get('section') || '').trim().toLowerCase();
+    const search = (qp.get('search') || '').trim();
+    if (section === 'purchases' && search) {
+      this.searchTerm = search;
+      this.isFilterOpen = true;
+    }
+
     this.getBranches();
     this.loadPurchases();
   }
@@ -84,6 +95,12 @@ export class PurchaseInvoicesListComponent implements OnInit {
   }
 
   loadPurchases(): void {
+    const deepLinkId = normalizeMongoId(this.searchTerm);
+    if (deepLinkId && String(this.searchTerm || '').trim().length >= 20) {
+      this.loadPurchaseById(deepLinkId);
+      return;
+    }
+
     const q: Record<string, string | number> = {
       page: this.params.page,
       limit: this.params.limit,
@@ -130,6 +147,42 @@ export class PurchaseInvoicesListComponent implements OnInit {
     });
   }
 
+  private loadPurchaseById(purchaseId: string): void {
+    const userId = this.curentUser?._id;
+    if (!userId) {
+      this.loading = false;
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      return;
+    }
+    this.loading = true;
+    this.api.getById(purchaseId, String(userId)).subscribe({
+      next: (res: any) => {
+        const purchase = res?.purchase || res;
+        this.purchasesList = purchase?._id ? [purchase] : [];
+        this.paginationData = {
+          currentPage: 1,
+          nextPage: 1,
+          prevPage: 1,
+          totalCount: this.purchasesList.length,
+          totalPages: 1,
+        };
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+        this.purchasesList = [];
+        this.paginationData = {
+          currentPage: 1,
+          nextPage: 1,
+          prevPage: 1,
+          totalCount: 0,
+          totalPages: 1,
+        };
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
+  }
+
   private resolveBranchId(): string | null {
     const role = this.curentUser?.role;
     if (role === 'Cashier' || role === 'Branch Manager') {
@@ -146,12 +199,14 @@ export class PurchaseInvoicesListComponent implements OnInit {
     const party = String(pp.acquiredFrom?.displayName || pp.acquiredFrom?.name || '').toLowerCase();
     const phone = String(pp.acquiredFrom?.phone || '').toLowerCase();
     const id = String(p?._id || '').toLowerCase();
+    const ref = this.purchaseRef(p).toLowerCase();
     return (
       code.includes(term) ||
       name.includes(term) ||
       party.includes(term) ||
       phone.includes(term) ||
-      id.includes(term)
+      id.includes(term) ||
+      ref.includes(term)
     );
   }
 

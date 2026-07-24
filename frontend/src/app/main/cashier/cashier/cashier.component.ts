@@ -37,6 +37,9 @@ import { canPickBranchRole } from '@core/utils/role-utils';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import {
+  ProductDetailsDialogComponent,
+} from '../../products/product-details-dialog/product-details-dialog.component';
+import {
   DeskPurchaseDeferredPaymentDialogComponent,
   ExchangeSettlementTreasuryResult,
 } from '../../orders/desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
@@ -68,6 +71,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   products: Product[] = [];
   orderItems: any[] = [];
+  /** Index of order line whose unit price is being edited; null when not editing. */
+  editingPriceIndex: number | null = null;
+  /** Draft unit price while editing (invoice-only; does not update catalog). */
+  editingPriceValue: number | string = '';
   todayDate = new Date();
   createdOrder:any;
   /** Data URL for Innovation website QR on printed receipt. */
@@ -970,6 +977,17 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));
   }
 
+  openProductDetails(product: Product | any, event?: Event): void {
+    event?.stopPropagation();
+    if (!product) return;
+    this.dialog.open(ProductDetailsDialogComponent, {
+      width: '760px',
+      maxWidth: '95vw',
+      data: { product, allowAddToOrder: false },
+      autoFocus: false,
+    });
+  }
+
   addProduct(product: any) {
     if(product.stock == 0)
       return
@@ -1051,9 +1069,83 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.focusBarcodeInput();
   }
   removeItem(i: number) {
+    if (this.editingPriceIndex === i) {
+      this.cancelEditLinePrice();
+    } else if (this.editingPriceIndex != null && this.editingPriceIndex > i) {
+      this.editingPriceIndex--;
+    }
     this.orderItems.splice(i, 1);
     this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
+  }
+
+  /** Start inline edit of unit price for this invoice line only. */
+  startEditLinePrice(i: number): void {
+    const item = this.orderItems[i];
+    if (!item) return;
+    this.editingPriceIndex = i;
+    this.editingPriceValue = Math.round(this.lineUnitPrice(item) * 100) / 100;
+    setTimeout(() => {
+      const el = document.querySelector(
+        '.order-line-price-input'
+      ) as HTMLInputElement | null;
+      if (el) {
+        el.focus();
+        el.select();
+      }
+    }, 0);
+  }
+
+  onLinePriceKeydown(event: KeyboardEvent, i: number): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.commitLinePrice(i);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      this.cancelEditLinePrice();
+      this.focusBarcodeInput();
+    }
+  }
+
+  /**
+   * Apply edited unit price to this order line only (catalog product price unchanged).
+   * Clears line discount so the receipt shows exactly the entered price.
+   */
+  commitLinePrice(i: number): void {
+    if (this.editingPriceIndex !== i) return;
+    const item = this.orderItems[i];
+    if (!item) {
+      this.cancelEditLinePrice();
+      return;
+    }
+
+    let v = Number(this.editingPriceValue);
+    if (!Number.isFinite(v) || v < 0) {
+      this.cancelEditLinePrice();
+      this.focusBarcodeInput();
+      return;
+    }
+
+    v = Math.round(v * 100) / 100;
+    const previous = Math.round(this.lineUnitPrice(item) * 100) / 100;
+    if (v === previous) {
+      this.cancelEditLinePrice();
+      this.focusBarcodeInput();
+      return;
+    }
+
+    // Invoice-line override only — catalog product.price is never updated.
+    item.price = v;
+    item.isApplyDiscount = false;
+    item.priceOverridden = true;
+    this.cancelEditLinePrice();
+    this.refreshExchangePaymentDefaults();
+    this.focusBarcodeInput();
+  }
+
+  cancelEditLinePrice(): void {
+    this.editingPriceIndex = null;
+    this.editingPriceValue = '';
   }
 
   /** Unit price after product-level discount (matches backend). */
@@ -1421,6 +1513,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       window.print();
 
       this.orderItems = [];
+      this.cancelEditLinePrice();
       this.resetPaymentLinesAfterCheckout();
       this.invoiceDiscountMode = 'percent';
       this.invoiceExtraValue = 0;

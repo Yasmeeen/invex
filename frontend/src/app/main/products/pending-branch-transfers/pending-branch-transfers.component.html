@@ -126,6 +126,50 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label for="transferListFromDate">{{ 'tr_branch_transfer_date_from' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <input
+              id="transferListFromDate"
+              name="transferListFromDate"
+              [(ngModel)]="listFromDate"
+              (dateChange)="onDateFilterChange()"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="transferFromPicker"
+              class="s-control bg-white"
+              autocomplete="off"
+            />
+            <mat-datepicker #transferFromPicker></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="transferFromPicker">
+            </mat-datepicker-toggle>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label for="transferListToDate">{{ 'tr_branch_transfer_date_to' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <input
+              id="transferListToDate"
+              name="transferListToDate"
+              [(ngModel)]="listToDate"
+              (dateChange)="onDateFilterChange()"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="transferToPicker"
+              class="s-control bg-white"
+              autocomplete="off"
+            />
+            <mat-datepicker #transferToPicker></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="transferToPicker">
+            </mat-datepicker-toggle>
+          </div>
+        </div>
+      </div>
 
       <div class="col-md-3 flex flex-bottom pb-2 filters-actions">
         <button type="button" class="s-btn btn-secondary mr-2" (click)="applyFilters()">
@@ -148,6 +192,7 @@
             <th>{{ 'tr_branch_transfer_to_branch' | translate }}</th>
             <th>{{ 'tr_branch_transfer_quantity' | translate }}</th>
             <th>{{ 'tr_branch_transfer_status_col' | translate }}</th>
+            <th>{{ 'tr_branch_transfer_date' | translate }}</th>
             <th>{{ 'tr_branch_transfer_by' | translate }}</th>
             <th></th>
           </tr>
@@ -163,6 +208,9 @@
             <td>{{ t.quantity }}</td>
             <td>
               <span [class.text-warning]="t.status === 'pending'">{{ statusLabelKey(t) | translate }}</span>
+            </td>
+            <td>
+              <span class="size-small">{{ formatTransferDate(t.createdAt) || '—' }}</span>
             </td>
             <td>
               <span class="size-small text-muted">{{ t.initiatedBy?.name || '—' }}</span>

@@ -26,6 +26,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     paymentAppFeePercents: [],
     returnExchangePolicy: '',
     showReturnExchangePolicyOnReceipt: false,
+    bookingPolicy: '',
+    showBookingPolicyOnReceipt: false,
   };
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
@@ -57,6 +59,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         paymentAppFeePercents: v.paymentAppFeePercents || [],
         returnExchangePolicy: v.returnExchangePolicy || '',
         showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
+        bookingPolicy: v.bookingPolicy || '',
+        showBookingPolicyOnReceipt: Boolean(v.showBookingPolicyOnReceipt),
       };
       this.logoPreview = this.form.logoUrl || '';
     });
@@ -123,6 +127,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         receiptLanguage: this.form.receiptLanguage || 'en',
         returnExchangePolicy: this.form.returnExchangePolicy?.trim() || '',
         showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
+        bookingPolicy: this.form.bookingPolicy?.trim() || '',
+        showBookingPolicyOnReceipt: Boolean(this.form.showBookingPolicyOnReceipt),
       })
       .subscribe({
         next: () => {

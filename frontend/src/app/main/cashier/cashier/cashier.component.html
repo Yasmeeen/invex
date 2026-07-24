@@ -346,12 +346,27 @@
               <span class="order-line-product">
                 <img
                   *ngIf="item.imageUrl"
-                  class="order-line-thumb"
+                  class="order-line-thumb order-line-thumb--clickable"
                   [src]="item.imageUrl"
                   alt=""
+                  (click)="openProductDetails(item)"
+                  [attr.title]="'tr_product_details' | translate"
                 />
+                <span
+                  *ngIf="!item.imageUrl"
+                  class="order-line-thumb order-line-thumb--placeholder order-line-thumb--clickable"
+                  (click)="openProductDetails(item)"
+                  [attr.title]="'tr_product_details' | translate"
+                  aria-hidden="true"
+                >
+                  <i class="fa fa-cube"></i>
+                </span>
                 <span class="order-line-product__text">
-                  <span class="order-line-product__name">{{ item.name }}</span>
+                  <span
+                    class="order-line-product__name order-line-product__name--clickable"
+                    (click)="openProductDetails(item)"
+                    [attr.title]="'tr_product_details' | translate"
+                  >{{ item.name }}</span>
                   <span class="order-line-product__code" *ngIf="item.code">{{ item.code }}</span>
                 </span>
               </span>
@@ -361,7 +376,32 @@
               {{ item.quantity }}
               <button (click)="increaseQty(i)">+</button>
             </td>
-            <td>{{ lineUnitPrice(item) | currency:'EGP ':'symbol':'1.2-2' }}</td>
+            <td class="order-line-price-cell">
+              <input
+                *ngIf="editingPriceIndex === i"
+                type="number"
+                class="order-line-price-input s-control"
+                min="0"
+                step="0.01"
+                [(ngModel)]="editingPriceValue"
+                (keydown)="onLinePriceKeydown($event, i)"
+                (blur)="commitLinePrice(i)"
+                (click)="$event.stopPropagation()"
+                [attr.aria-label]="'tr_cashier.EDIT_PRICE' | translate"
+                #linePriceInput
+              />
+              <button
+                *ngIf="editingPriceIndex !== i"
+                type="button"
+                class="order-line-price-btn"
+                [class.order-line-price-btn--overridden]="item.priceOverridden"
+                [attr.title]="'tr_cashier.EDIT_PRICE_HINT' | translate"
+                (click)="startEditLinePrice(i)"
+              >
+                {{ lineUnitPrice(item) | currency:'EGP ':'symbol':'1.2-2' }}
+                <i class="fa fa-pencil" aria-hidden="true"></i>
+              </button>
+            </td>
             <td>{{ lineUnitPrice(item) * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
             <td><button (click)="removeItem(i)">x</button></td>
           </tr>

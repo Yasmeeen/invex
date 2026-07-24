@@ -35,6 +35,10 @@ export interface StoreSettings {
   returnExchangePolicy: string;
   /** Print returnExchangePolicy on sale receipts when true. */
   showReturnExchangePolicyOnReceipt: boolean;
+  /** Booking/reservation policy text (optional). */
+  bookingPolicy: string;
+  /** Print bookingPolicy on booking receipts when true. */
+  showBookingPolicyOnReceipt: boolean;
 }
 
 const DEFAULTS: StoreSettings = {
@@ -46,6 +50,8 @@ const DEFAULTS: StoreSettings = {
   paymentAppFeePercents: [],
   returnExchangePolicy: '',
   showReturnExchangePolicyOnReceipt: false,
+  bookingPolicy: '',
+  showBookingPolicyOnReceipt: false,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -114,6 +120,8 @@ export class StoreSettingsService {
           paymentAppFeePercents: this.normalizePaymentAppFeePercents(data.paymentAppFeePercents),
           returnExchangePolicy: data.returnExchangePolicy ?? '',
           showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
+          bookingPolicy: data.bookingPolicy ?? '',
+          showBookingPolicyOnReceipt: Boolean(data.showBookingPolicyOnReceipt),
         });
         this.ensureReceiptTranslationPacks();
       },

@@ -165,7 +165,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let o of history.orders">
-            <td>{{ o.orderNumber }}</td>
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="o.orderNumber != null"
+                (click)="goToSalesInvoice(o.orderNumber)"
+              >
+                #{{ o.orderNumber }}
+              </button>
+              <span *ngIf="o.orderNumber == null">—</span>
+            </td>
             <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ o.amountPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ o.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
@@ -187,12 +197,53 @@
     </div>
     <p *ngIf="!history.orders?.length" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
 
+    <h5>{{ 'tr_vendor_desk_purchases' | translate }}</h5>
+    <p class="size-small text-muted mb-2">{{ 'tr_vendor_desk_purchases_hint' | translate }}</p>
+    <div class="table-container mb-3" *ngIf="history.purchases?.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_purchase_document_ref' | translate }}</th>
+            <th>{{ 'tr_name' | translate }}</th>
+            <th>{{ 'tr_code' | translate }}</th>
+            <th>{{ 'tr_cashier.QTY' | translate }}</th>
+            <th>{{ 'tr_receipt_purchase_treasury' | translate }}</th>
+            <th>{{ 'tr_status' | translate }}</th>
+            <th>{{ 'tr_created_at' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of history.purchases">
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="p._id"
+                (click)="goToPurchaseInvoice(p._id)"
+              >
+                {{ purchaseRef(p) }}
+              </button>
+              <span *ngIf="!p._id">—</span>
+            </td>
+            <td>{{ p.productName }}</td>
+            <td>{{ p.productCode }}</td>
+            <td>{{ p.quantity }}</td>
+            <td>{{ p.purchaseTreasuryLabel || p.purchaseTreasuryKey || '—' }}</td>
+            <td>{{ purchaseStatusLabel(p.status) }}</td>
+            <td>{{ p.createdAt | date:'short' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p *ngIf="!history.purchases?.length" class="text-muted mb-3">{{ 'tr_empty_state' | translate }}</p>
+
     <h5>{{ 'tr_vendor_purchasing_requests' | translate }}</h5>
     <p class="size-small text-muted mb-2">{{ 'tr_vendor_purchasing_requests_hint' | translate }}</p>
     <div class="table-container mb-3" *ngIf="history.purchasingRequests?.length">
       <table class="s-table table">
         <thead>
           <tr>
+            <th>{{ 'tr_order_number' | translate }}</th>
             <th>{{ 'tr_request_date' | translate }}</th>
             <th>{{ 'tr_payment_terms' | translate }}</th>
             <th>{{ 'tr_total_amount' | translate }}</th>
@@ -204,6 +255,17 @@
         </thead>
         <tbody>
           <tr *ngFor="let pr of history.purchasingRequests">
+            <td>
+              <button
+                type="button"
+                class="history-invoice-link"
+                *ngIf="pr.purchaseInvoiceId"
+                (click)="goToPurchaseInvoice(pr.purchaseInvoiceId)"
+              >
+                {{ purchaseRef({ _id: pr.purchaseInvoiceId }) }}
+              </button>
+              <span *ngIf="!pr.purchaseInvoiceId">{{ purchaseRef(pr) }}</span>
+            </td>
             <td>{{ pr.requestDate | date:'shortDate' }}</td>
             <td>{{ paymentStatusLabel(pr.paymentStatus) }}</td>
             <td>{{ pr.totalAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
@@ -257,7 +319,14 @@
             <td>{{ ledgerTypeLabel(e.type) }}</td>
             <td>{{ e.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>
-              <span *ngIf="e.orderNumber">#{{ e.orderNumber }} — </span>{{ e.note }}
+              <span *ngIf="e.orderNumber">
+                <button
+                  type="button"
+                  class="history-invoice-link"
+                  (click)="goToSalesInvoice(e.orderNumber)"
+                >#{{ e.orderNumber }}</button>
+                <span> — </span>
+              </span>{{ e.note }}
             </td>
           </tr>
         </tbody>

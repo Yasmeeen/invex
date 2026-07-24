@@ -31,6 +31,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     to: this.formatDate(new Date()),
     branch_id: null as string | null,
     category_id: null as string | null,
+    supplier_phone: '',
     product_id: null as string | null,
     customer_phone: '',
     seller_name: null as string | null,
@@ -192,6 +193,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     };
     if (this.reportType === 'products') {
       base.category_id = this.filters.category_id ? String(this.filters.category_id) : '';
+      base.supplier_phone = (this.filters.supplier_phone || '').trim();
     }
     if (this.reportType === 'sales' || this.reportType === 'profit') {
       base.seller_name = this.filters.seller_name ? String(this.filters.seller_name) : '';
@@ -227,6 +229,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       }
     }
     this.filters.category_id = null;
+    this.filters.supplier_phone = '';
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.seller_name = null;

@@ -11,8 +11,8 @@ import { formatDate } from '@angular/common';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
-import { debounceTime, switchMap, catchError } from 'rxjs/operators';
-import { of, Subscription } from 'rxjs';
+import { of, Subject, Subscription } from 'rxjs';
+import { debounceTime, switchMap, catchError, takeUntil } from 'rxjs/operators';
 import { Globals } from '@core/globals';
 import {
   buildCashierPaymentMethods,
@@ -48,6 +48,13 @@ import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
 import { DrawerCloseService } from '@shared/services/drawer-close.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
+import {
+  BookingDepositAllocation,
+  CheckoutActiveBooking,
+  ProductBookingsService,
+} from '@shared/services/product-bookings.service';
+import { BookingReprintService } from '@shared/services/booking-reprint.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -125,6 +132,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Avoid repeating the same “registered” toast for the same lookup. */
   private lastNotifiedPartyId: string | null = null;
 
+  /** Active product bookings for the current client (deposit credit at checkout). */
+  clientActiveBookings: CheckoutActiveBooking[] = [];
+  private clientBookingsLoadToken = 0;
+  private readonly destroy$ = new Subject<void>();
+
   /** Built from store settings; refreshed on settings$ updates (receipt labels). */
   paymentMethods: CashierPaymentMethod[] = [];
 
@@ -145,6 +157,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private translate: TranslateService,
     public storeSettings: StoreSettingsService,
     private drawerCloseService: DrawerCloseService,
+    private productBookings: ProductBookingsService,
+    private bookingReprint: BookingReprintService,
+    private invoiceReprint: InvoiceReprintService,
     private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
@@ -164,6 +179,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
     this.settingsSub?.unsubscribe();
     if (this.barcodeScanTimer != null) {
       clearTimeout(this.barcodeScanTimer);
@@ -492,20 +509,148 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return Math.round(Math.max(0, cr - sale) * 100) / 100;
   }
 
-  /** Payment totals compare against this amount at cashier when exchange active. */
+  /** Payment totals compare against this amount at cashier when exchange / booking deposit active. */
   effectiveCheckoutTotal(): number {
+    let due = Math.round(this.finalOrderTotal() * 100) / 100;
     if (this.exchangeTradeInPurchase) {
-      return this.exchangeAmountDue();
+      due = this.exchangeAmountDue();
     }
-    return Math.round(this.finalOrderTotal() * 100) / 100;
+    const bookingCredit = this.bookingDepositCredit();
+    return Math.round(Math.max(0, due - bookingCredit) * 100) / 100;
+  }
+
+  /** Prepaid booking deposits applied to matching cart lines for the current client. */
+  bookingDepositCredit(): number {
+    return this.bookingDepositAllocations().reduce((s, a) => s + a.creditApplied, 0);
+  }
+
+  bookingDepositAllocations(): BookingDepositAllocation[] {
+    if (this.partyType !== 'client' || !this.clientActiveBookings?.length || !this.orderItems?.length) {
+      return [];
+    }
+    const remainingByBooking = new Map<string, number>();
+    for (const b of this.clientActiveBookings) {
+      remainingByBooking.set(String(b._id), Math.max(1, Math.floor(Number(b.quantity) || 1)));
+    }
+    const depositByBooking = new Map<string, number>();
+    for (const b of this.clientActiveBookings) {
+      depositByBooking.set(
+        String(b._id),
+        Math.round((Number(b.depositAmount) || 0) * 100) / 100
+      );
+    }
+    const qtyByBooking = new Map<string, number>();
+    for (const b of this.clientActiveBookings) {
+      qtyByBooking.set(String(b._id), Math.max(1, Math.floor(Number(b.quantity) || 1)));
+    }
+
+    const byProduct = new Map<string, CheckoutActiveBooking[]>();
+    for (const b of this.clientActiveBookings) {
+      const pid = String(b.productId || '');
+      if (!pid) continue;
+      const list = byProduct.get(pid) || [];
+      list.push(b);
+      byProduct.set(pid, list);
+    }
+
+    const allocations: BookingDepositAllocation[] = [];
+    let saleRemaining =
+      this.exchangeTradeInPurchase
+        ? this.exchangeAmountDue()
+        : Math.round(this.finalOrderTotal() * 100) / 100;
+
+    for (const item of this.orderItems) {
+      if (saleRemaining <= 0) break;
+      const pid = String(item.productId || item._id || '');
+      const bookings = byProduct.get(pid);
+      if (!bookings?.length) continue;
+
+      let needQty = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      const lineTotal = Math.round(this.lineUnitPrice(item) * needQty * 100) / 100;
+      let lineCreditCap = Math.min(lineTotal, saleRemaining);
+
+      for (const b of bookings) {
+        if (needQty <= 0 || lineCreditCap <= 0 || saleRemaining <= 0) break;
+        const id = String(b._id);
+        const left = remainingByBooking.get(id) || 0;
+        if (left <= 0) continue;
+        const take = Math.min(needQty, left);
+        const bookedQty = qtyByBooking.get(id) || take;
+        const dep = depositByBooking.get(id) || 0;
+        let credit = Math.round((dep * (take / bookedQty)) * 100) / 100;
+        credit = Math.min(credit, lineCreditCap, saleRemaining, dep);
+        if (credit <= 0 || take <= 0) continue;
+
+        allocations.push({
+          bookingId: id,
+          quantityApplied: take,
+          creditApplied: credit,
+        });
+        remainingByBooking.set(id, left - take);
+        needQty -= take;
+        lineCreditCap = Math.round((lineCreditCap - credit) * 100) / 100;
+        saleRemaining = Math.round((saleRemaining - credit) * 100) / 100;
+      }
+    }
+
+    return allocations;
   }
 
   private refreshExchangePaymentDefaults(): void {
     this.invalidateConfirmedPayment();
   }
 
+  private loadClientActiveBookings(): void {
+    if (this.partyType !== 'client') {
+      this.clientActiveBookings = [];
+      this.invalidateConfirmedPayment();
+      return;
+    }
+    const phone = String(this.clientForm?.get('phone')?.value || '').trim();
+    const clientId = this.selectedClientId || '';
+    if (!phone && !clientId) {
+      this.clientActiveBookings = [];
+      this.invalidateConfirmedPayment();
+      return;
+    }
+    const token = ++this.clientBookingsLoadToken;
+    this.productBookings
+      .getActiveForCheckout({ phone: phone || undefined, clientId: clientId || undefined })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          if (token !== this.clientBookingsLoadToken) return;
+          this.clientActiveBookings = Array.isArray(res?.bookings) ? res.bookings : [];
+          this.invalidateConfirmedPayment();
+          const hasDeposit = this.clientActiveBookings.some(
+            (b) => (Number(b.depositAmount) || 0) > 0
+          );
+          if (hasDeposit) {
+            this.translate.get('tr_cashier_booking_deposit_applied').subscribe((msg) => {
+              this.appNotificationService.push(msg, 'success');
+            });
+          }
+        },
+        error: () => {
+          if (token !== this.clientBookingsLoadToken) return;
+          this.clientActiveBookings = [];
+          this.invalidateConfirmedPayment();
+        },
+      });
+  }
+
+  private clearClientActiveBookings(): void {
+    this.clientBookingsLoadToken++;
+    this.clientActiveBookings = [];
+  }
+
   receiptExchangeCredit(): number {
     const v = Number(this.createdOrder?.exchangeTradeInCreditAmount);
+    return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  receiptBookingDepositCredit(): number {
+    const v = Number(this.createdOrder?.bookingDepositCreditAmount);
     return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
   }
 
@@ -517,7 +662,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   printDeskPurchaseReceipt(): void {
     setTimeout(() => {
       this.cdr.detectChanges();
-      window.print();
+      this.runCashierPrint();
       this.printMode = 'sale';
     }, 250);
   }
@@ -599,6 +744,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
             this.clearPartyLookupState(nameControl, addressControl, false);
             nameControl?.reset();
             addressControl?.reset();
+            this.clearClientActiveBookings();
             return of(null);
           }
           const lookup$ =
@@ -610,6 +756,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
             catchError((err) => {
               if (err.status === 404) {
                 this.clearPartyLookupState(nameControl, addressControl, true);
+                // Still try bookings by phone (customer may only exist on booking).
+                if (this.partyType === 'client') {
+                  this.loadClientActiveBookings();
+                } else {
+                  this.clearClientActiveBookings();
+                }
               }
               return of(null);
             })
@@ -638,6 +790,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           this.selectedClientId = null;
           this.selectedVendorId = party._id ? String(party._id) : null;
           this.supplierCompanyName = party.nameOfcompany || '';
+          this.clearClientActiveBookings();
           nameControl?.setValue(party.name, { emitEvent: false });
           addressControl?.setValue(party.address || '', { emitEvent: false });
           nameControl?.disable({ emitEvent: false });
@@ -664,6 +817,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           addressControl?.disable({ emitEvent: false });
           nameControl?.clearValidators();
           addressControl?.clearValidators();
+          this.loadClientActiveBookings();
         }
         nameControl?.updateValueAndValidity({ emitEvent: false });
         addressControl?.updateValueAndValidity({ emitEvent: false });
@@ -705,6 +859,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const nameControl = this.clientForm.get('name');
     const addressControl = this.clientForm.get('address');
     this.clearPartyLookupState(nameControl, addressControl, !!phone);
+    this.clearClientActiveBookings();
     if (phone) {
       this.clientForm.get('phone')?.setValue(phone);
     }
@@ -752,6 +907,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.selectedClientId = null;
     this.selectedVendorId = null;
     this.supplierCompanyName = '';
+    this.clearClientActiveBookings();
   }
 
   /**
@@ -809,6 +965,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     nameControl?.updateValueAndValidity({ emitEvent: false });
     addressControl?.updateValueAndValidity({ emitEvent: false });
+    this.loadClientActiveBookings();
   }
 
   /** Client fields for checkout: open panel, or exchange trade-in source when panel is closed. */
@@ -1461,6 +1618,15 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     }
 
+    const bookingAllocations = this.bookingDepositAllocations();
+    const bookingCredit = round2(
+      bookingAllocations.reduce((s, a) => s + a.creditApplied, 0)
+    );
+    if (bookingCredit > 0 && bookingAllocations.length) {
+      orderData.bookingDepositCreditAmount = bookingCredit;
+      orderData.bookingDepositAllocations = bookingAllocations;
+    }
+
     const settlement = this.pendingExchangeSettlement;
     if (settlement?.paymentTreasurySplits?.length) {
       orderData.exchangeSettlementTreasurySplits = settlement.paymentTreasurySplits.map(
@@ -1490,11 +1656,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         subtotalPrice: receiptSubtotal,
         invoiceDiscountAmount: receiptInvoiceDisc,
         totalPrice: receiptFinal,
+        bookingDepositCreditAmount:
+          Number(base?.bookingDepositCreditAmount) > 0
+            ? Number(base.bookingDepositCreditAmount)
+            : bookingCredit,
       };
 
       this.pendingExchangePurchaseReceipt =
         exchangeCredit > 0 && pendingPurchaseReceipt ? pendingPurchaseReceipt : null;
 
+      this.clearClientActiveBookings();
       this.printInvoice();
 
       this.loadProducts();
@@ -1510,7 +1681,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   printInvoice(): void {
     setTimeout(() => {
       this.cdr.detectChanges();
-      window.print();
+      this.runCashierPrint();
 
       this.orderItems = [];
       this.cancelEditLinePrice();
@@ -1528,7 +1699,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           this.printMode = 'deskPurchase';
           this.cdr.detectChanges();
           setTimeout(() => {
-            window.print();
+            this.runCashierPrint();
             setTimeout(() => {
               this.printMode = 'sale';
               this.createdDeskPurchase = null;
@@ -1538,6 +1709,27 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         }, 650);
       }
     }, 300);
+  }
+
+  /** Isolates cashier invoice from booking / order reprint hosts. */
+  private runCashierPrint(): void {
+    this.bookingReprint.clearPending();
+    this.invoiceReprint.clearPending();
+    if (typeof document === 'undefined') {
+      window.print();
+      return;
+    }
+    document.body.setAttribute('data-receipt-print', 'cashier');
+    const clearFlag = () => {
+      if (document.body.getAttribute('data-receipt-print') === 'cashier') {
+        document.body.removeAttribute('data-receipt-print');
+      }
+      window.removeEventListener('afterprint', clearFlag);
+    };
+    window.addEventListener('afterprint', clearFlag);
+    window.print();
+    // Fallback if afterprint never fires (some browsers / cancelled dialogs)
+    setTimeout(clearFlag, 60000);
   }
 
   receiptLinesSubtotal(): number {

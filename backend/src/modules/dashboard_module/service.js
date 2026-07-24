@@ -152,6 +152,10 @@ export const getCategoriesStatistics = async (req, res) => {
         const products = await Product.find({
           category: category._id,
           ...branchFilter, // optional branch filter
+          $or: [
+            { removedWhenOutOfStock: { $ne: true } },
+            { removedWhenOutOfStock: { $exists: false } },
+          ],
         });
 
         const productsCount = products.length;

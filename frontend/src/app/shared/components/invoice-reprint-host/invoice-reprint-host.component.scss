@@ -1,59 +1,10 @@
-$receiptWidth: 80mm;
-$receiptHeight: 200mm;
-
-#print-container,
+/* Screen: hosts stay hidden. Print visibility is owned by _receipt-print-modes.scss */
+#print-sale-receipt,
 #print-purchase-receipt {
   display: none;
 }
 
-@media print {
-  @page {
-    size: $receiptWidth $receiptHeight;
-    margin: 0;
-  }
-
-  html,
-  body {
-    width: $receiptWidth;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  body * {
-    visibility: hidden;
-  }
-
-  .app-notification,
-  #app-notifications-container,
-  #main-sidebar,
-  .app-sidebar,
-  app-vixa-chat,
-  .vixa,
-  .vixa__panel,
-  .vixa__fab {
-    display: none !important;
-  }
-
-  #print-container,
-  #print-container *,
-  #print-purchase-receipt,
-  #print-purchase-receipt * {
-    visibility: visible;
-  }
-
-  #print-container,
-  #print-purchase-receipt {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: $receiptWidth;
-    height: auto;
-    overflow: visible;
-  }
-}
-
-#print-container[dir='rtl'],
+#print-sale-receipt[dir='rtl'],
 #print-purchase-receipt[dir='rtl'] {
   direction: rtl;
   text-align: right;

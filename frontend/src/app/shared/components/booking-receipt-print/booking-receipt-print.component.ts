@@ -41,7 +41,7 @@ export class BookingReceiptPrintComponent implements OnInit, AfterViewInit {
   @Input() booking: BookingReceiptData | null = null;
   @Input() printDate: Date = new Date();
 
-  @HostBinding('attr.id') readonly hostPrintId = 'print-container';
+  @HostBinding('attr.id') readonly hostPrintId = 'print-booking-receipt';
 
   @HostBinding('attr.dir')
   receiptDir: 'rtl' | 'ltr' = 'ltr';

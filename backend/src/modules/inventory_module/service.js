@@ -8,12 +8,27 @@ export const getProducts = async (req, res) => {
 
     const query = search
       ? {
-          $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { code: { $regex: search, $options: 'i' } },
+          $and: [
+            {
+              $or: [
+                { removedWhenOutOfStock: { $ne: true } },
+                { removedWhenOutOfStock: { $exists: false } },
+              ],
+            },
+            {
+              $or: [
+                { name: { $regex: search, $options: 'i' } },
+                { code: { $regex: search, $options: 'i' } },
+              ],
+            },
           ],
         }
-      : {};
+      : {
+          $or: [
+            { removedWhenOutOfStock: { $ne: true } },
+            { removedWhenOutOfStock: { $exists: false } },
+          ],
+        };
 
     const [products, total] = await Promise.all([
       Product.find(query)

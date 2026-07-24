@@ -426,4 +426,5 @@ body[dir=rtl] {
 
 @media print {
     @import 'print';
+    @import 'receipt-print-modes';
 }

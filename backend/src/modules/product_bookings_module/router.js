@@ -6,11 +6,13 @@ import {
   getBookingByProductId,
   getBookingsReport,
   listProductBookings,
+  getActiveBookingsForCheckout,
 } from './service.js';
 
 const router = express.Router();
 
 router.get('/report', getBookingsReport);
+router.get('/active-for-checkout', getActiveBookingsForCheckout);
 router.get('/', listProductBookings);
 router.get('/product/:productId', getBookingByProductId);
 router.post('/', createProductBooking);

@@ -55,6 +55,16 @@ const orderSchema = new mongoose.Schema(
       ref: 'ProductPurchaseRequest',
     },
 
+    /**
+     * Booking deposit prepaid credit applied toward this sale (EGP).
+     * Payment validation uses (totalPrice − exchangeCredit − bookingDepositCredit).
+     */
+    bookingDepositCreditAmount: { type: Number, default: 0, min: 0 },
+    appliedBookingIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ProductBooking' }],
+      default: undefined,
+    },
+
     /** Credit (بيع بالآجل): track partial payments until fully settled. */
     amountPaid: { type: Number, min: 0, default: 0 },
     paymentStatus: {

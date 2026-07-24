@@ -487,6 +487,74 @@ export const createProductPurchaseRequest = async (req, res) => {
 
       const existing = await Product.findOne({ code, branch: branchId }).session(session);
       if (existing) {
+        if (existing.removedWhenOutOfStock) {
+          existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
+          existing.removedWhenOutOfStock = false;
+          existing.name = name || existing.name;
+          if (payload.price != null) existing.price = payload.price;
+          if (payload.netPrice != null) existing.netPrice = payload.netPrice;
+          if (payload.discount != null) existing.discount = payload.discount;
+          if (payload.category) existing.category = payload.category;
+          if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
+          if (payload.attributes) existing.attributes = payload.attributes;
+          if (payload.addedBy) existing.addedBy = payload.addedBy;
+          Object.assign(existing, acquiredFromFields);
+          await existing.save({ session });
+          createdProduct = existing;
+
+          created.createdProductId = existing._id;
+          await created.save({ session });
+
+          await session.commitTransaction();
+          session.endSession();
+
+          if (purchaseHasDeferredTreasury(created)) {
+            try {
+              await syncDeferredSupplierDeskPurchase(created, {
+                userId: actor._id,
+                actorName: actor?.name,
+              });
+            } catch (e) {
+              console.error('⚠️ deferred desk purchase vendor sync:', e?.message || e);
+            }
+          }
+
+          try {
+            await StockMovement.create({
+              movementType: 'purchase',
+              productId: existing._id,
+              productName: existing.name,
+              branchId: branchId,
+              fromBranchId: null,
+              toBranchId: branchId,
+              quantity: q,
+              unitPrice: payload.netPrice,
+              totalValue: deskPurchaseLineTotal(created),
+              referenceType: 'productPurchaseRequest',
+              referenceId: created._id,
+              notes: `Product purchase (desk, revived soft-removed)`,
+            });
+          } catch (e) {
+            console.warn('⚠️ product purchase stock movement:', e?.message || e);
+          }
+
+          await auditLog(req, {
+            action: 'create',
+            module: 'product_purchase_requests',
+            entityType: 'ProductPurchaseRequest',
+            entityId: created?._id,
+            message: 'Product purchase request created (auto-approved, revived soft-removed)',
+            metadata: { branchId, productCode: code, quantity: q, createdProductId: existing._id },
+          });
+
+          const purchaseOut = await leanPurchaseForResponse(created._id);
+          return res.status(201).json({
+            message: '✅ Purchase created and approved',
+            purchase: purchaseOut || (created.toObject ? created.toObject() : created),
+            createdProduct,
+          });
+        }
+
         await session.abortTransaction();
         session.endSession();
         return res.status(409).json({ error: 'Product code already exists in this branch' });
@@ -755,33 +823,50 @@ export const approveProductPurchaseRequest = async (req, res) => {
     } else {
       const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
       if (existing) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(409).json({ error: 'Product code already exists in this branch' });
+        if (existing.removedWhenOutOfStock) {
+          existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
+          existing.removedWhenOutOfStock = false;
+          existing.name = pp.name || existing.name;
+          if (pp.price != null) existing.price = Number(pp.price) || 0;
+          if (pp.netPrice != null) existing.netPrice = Number(pp.netPrice) || 0;
+          if (pp.discount != null) existing.discount = Number(pp.discount) || 0;
+          if (pp.category) existing.category = pp.category;
+          if (pp.imageUrl != null) existing.imageUrl = normalizeImageUrl(pp.imageUrl);
+          if (attrsNorm) existing.attributes = attrsNorm;
+          if (pp.addedBy) existing.addedBy = normalizeAddedBy(pp.addedBy);
+          Object.assign(existing, acquiredFromFields);
+          await existing.save({ session });
+          prod = existing;
+          createdList = [existing];
+        } else {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(409).json({ error: 'Product code already exists in this branch' });
+        }
+      } else {
+        const [pRow] = await Product.create(
+          [
+            {
+              name: pp.name,
+              code,
+              price: Number(pp.price) || 0,
+              netPrice: Number(pp.netPrice) || 0,
+              stock: q,
+              discount: Number(pp.discount) || 0,
+              category: pp.category,
+              branch: purchase.branch,
+              inWarehouse: false,
+              imageUrl: normalizeImageUrl(pp.imageUrl),
+              attributes: attrsNorm,
+              ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
+              ...acquiredFromFields,
+            },
+          ],
+          { session }
+        );
+        prod = pRow;
+        createdList = [pRow];
       }
-
-      const [pRow] = await Product.create(
-        [
-          {
-            name: pp.name,
-            code,
-            price: Number(pp.price) || 0,
-            netPrice: Number(pp.netPrice) || 0,
-            stock: q,
-            discount: Number(pp.discount) || 0,
-            category: pp.category,
-            branch: purchase.branch,
-            inWarehouse: false,
-            imageUrl: normalizeImageUrl(pp.imageUrl),
-            attributes: attrsNorm,
-            ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
-            ...acquiredFromFields,
-          },
-        ],
-        { session }
-      );
-      prod = pRow;
-      createdList = [pRow];
     }
 
     purchase.status = 'approved';

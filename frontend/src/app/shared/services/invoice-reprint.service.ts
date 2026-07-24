@@ -1,8 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
-import { BookingReceiptData } from '@shared/components/booking-receipt-print/booking-receipt-print.component';
 
-export type InvoiceReprintMode = 'sale' | 'purchase' | 'booking';
+export type InvoiceReprintMode = 'sale' | 'purchase';
 
 export interface InvoiceReprintRequest {
   mode: InvoiceReprintMode;
@@ -10,11 +9,14 @@ export interface InvoiceReprintRequest {
   printDate: Date;
 }
 
+/** Sale / purchase invoice reprints only (booking uses BookingReprintService). */
 @Injectable({ providedIn: 'root' })
 export class InvoiceReprintService {
   private readonly requests$ = new Subject<InvoiceReprintRequest>();
+  private readonly clear$ = new Subject<void>();
 
   readonly reprint$ = this.requests$.asObservable();
+  readonly clearPending$ = this.clear$.asObservable();
 
   printSale(order: any, printDate?: Date | string | null): void {
     if (!order) return;
@@ -34,15 +36,9 @@ export class InvoiceReprintService {
     });
   }
 
-  printBooking(booking: BookingReceiptData, printDate?: Date | string | null): void {
-    if (!booking) return;
-    this.requests$.next({
-      mode: 'booking',
-      data: booking,
-      printDate: this.resolvePrintDate(
-        printDate ?? booking?.createdAt ?? booking?.bookingDate
-      ),
-    });
+  /** Drop any in-DOM sale/purchase reprint so it cannot leak into the next print. */
+  clearPending(): void {
+    this.clear$.next();
   }
 
   private resolvePrintDate(value: Date | string | null | undefined): Date {

@@ -88,6 +88,11 @@
   display: none;
 }
 
+/* Booking receipts never belong to cashier invoice print */
+#print-booking-receipt {
+  display: none !important;
+}
+
 /* Fullscreen overlay */
 .cashier-overlay {
     position: fixed;
@@ -964,57 +969,11 @@
 
   @import 'invoice-container-print';
 
-  /* Print Styles */
+  /* Visibility/isolation for print is in global _receipt-print-modes.scss (data-receipt-print=cashier). */
   @media print {
     @page {
       size: $receiptWidth $receiptHeight;
       margin: 0;
-    }
-
-    html,
-    body {
-      width: $receiptWidth;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-
-    body *, .cashier {
-      visibility: hidden;
-      display: none !important;
-    }
-    .app-notification,
-    #app-notifications-container,
-    .cashier,
-    #main-sidebar,
-    .app-sidebar {
-      display: none !important;
-    }
-
-    /* Never print Vixa chat widget/panel even if positioned fixed. */
-    app-vixa-chat,
-    .vixa,
-    .vixa__panel,
-    .vixa__fab {
-      display: none !important;
-      visibility: hidden !important;
-    }
-  
-    #print-container,
-    #print-container *,
-    #print-purchase-receipt,
-    #print-purchase-receipt * {
-      visibility: visible;
-    }
-
-    #print-container,
-    #print-purchase-receipt {
-      display: block !important;
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: $receiptWidth;
-      height: auto;
-      overflow: visible;
     }
   }
 

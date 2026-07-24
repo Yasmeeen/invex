@@ -1,0 +1,13 @@
+/* Screen: booking receipt stays hidden. Print visibility is owned by _receipt-print-modes.scss */
+#print-booking-receipt {
+  display: none !important;
+}
+
+#print-booking-receipt[dir='rtl'] {
+  direction: rtl;
+  text-align: right;
+
+  .invoice-table td {
+    text-align: right;
+  }
+}

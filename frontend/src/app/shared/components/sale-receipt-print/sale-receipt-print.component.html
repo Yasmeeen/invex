@@ -120,7 +120,13 @@
           -{{ formatReceiptAmount(receiptExchangeCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr class="bold" *ngIf="receiptExchangeCredit() > 0">
+      <tr *ngIf="receiptBookingDepositCredit() > 0">
+        <td>{{ 'tr_cashier_booking_deposit_credit' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          -{{ formatReceiptAmount(receiptBookingDepositCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold" *ngIf="receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0">
         <td>{{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
@@ -162,14 +168,14 @@
     <div class="separator double-border"></div>
 
     <div class="final-total center bold">
-      <ng-container *ngIf="receiptExchangeCredit() <= 0">
+      <ng-container *ngIf="receiptExchangeCredit() <= 0 && receiptBookingDepositCredit() <= 0">
         {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>
       </ng-container>
-      <ng-container *ngIf="receiptExchangeCredit() > 0">
-        {{ 'tr_exchange_sale_and_trade_in' | receiptTranslate: st.receiptLanguage }} <br />
+      <ng-container *ngIf="receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0">
+        {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>

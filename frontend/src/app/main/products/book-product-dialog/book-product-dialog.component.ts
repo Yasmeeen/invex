@@ -26,7 +26,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
-import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { BookingReprintService } from '@shared/services/booking-reprint.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -80,7 +80,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     private notify: AppNotificationService,
     private translate: TranslateService,
     private dialog: MatDialog,
-    private invoiceReprint: InvoiceReprintService
+    private bookingReprint: BookingReprintService
   ) {
     this.product = data.product;
     this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
@@ -498,7 +498,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       createdAt: booking?.createdAt || booking?.bookingDate,
       bookingDate: booking?.bookingDate,
     };
-    this.invoiceReprint.printBooking(receipt);
+    this.bookingReprint.printBooking(receipt);
   }
 
   /** Map backend booking POST error strings to i18n (API always returns English). */

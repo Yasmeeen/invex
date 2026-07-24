@@ -91,6 +91,7 @@ function formatProductPayload(product, extras = {}) {
 
 function stockStatus(product, exists) {
   if (!exists) return 'removed_from_stock';
+  if (product?.removedWhenOutOfStock) return 'removed_from_stock';
   if (Number(product.stock) > 0) return 'in_stock';
   return 'out_of_stock';
 }

@@ -895,10 +895,21 @@ function buildProductsListQuery(queryParams = {}) {
     categoryId,
     attrKey,
     attrValue,
+    includeRemoved,
   } = queryParams;
 
   const query = {};
   const andParts = [];
+
+  // Soft-hidden after last-unit sale (deleteProductWhenOutOfStock) — exclude unless asked
+  if (includeRemoved !== 'true' && includeRemoved !== true) {
+    andParts.push({
+      $or: [
+        { removedWhenOutOfStock: { $ne: true } },
+        { removedWhenOutOfStock: { $exists: false } },
+      ],
+    });
+  }
 
   if (booked === 'true' || booked === true) {
     query.bookingStatus = 'active';
@@ -2410,7 +2421,13 @@ export const getProductStats = async (req, res) => {
   try {
     const { branchId } = req.query;
     const safeBranchId = parseBranchIdFilter(branchId);
-    const filter = safeBranchId ? { branch: safeBranchId } : {};
+    const filter = {
+      ...(safeBranchId ? { branch: safeBranchId } : {}),
+      $or: [
+        { removedWhenOutOfStock: { $ne: true } },
+        { removedWhenOutOfStock: { $exists: false } },
+      ],
+    };
 
     // Count stats
     const totalProducts = await Product.countDocuments(filter);

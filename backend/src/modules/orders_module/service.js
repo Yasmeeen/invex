@@ -17,6 +17,11 @@ import {
   processFullOrderRestore,
   processOrderReturn,
 } from '../../utils/order-return.js';
+import ProductBooking from '../../DB/models/productBooking.model.js';
+import {
+  consumeBookingsForSale,
+  reconcileBookingsToStock,
+} from '../product_bookings_module/service.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -235,6 +240,8 @@ export const createOrder = async (req, res) => {
       exchangeTradeInCreditAmount: exchangeCreditRaw,
       exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
       exchangeSettlementTreasurySplits: exchangeSettlementSplitsRaw,
+      bookingDepositCreditAmount: bookingDepositCreditRaw,
+      bookingDepositAllocations: bookingDepositAllocationsRaw,
       partyType: partyTypeRaw,
       vendorId: vendorIdRaw,
     } = req.body;
@@ -346,6 +353,8 @@ export const createOrder = async (req, res) => {
     let numberOfProducts = 0;
     const orderProducts = [];
     const categoryById = new Map();
+    /** Products whose stock changed — reconcile bookings after commit. */
+    const soldProductIds = new Set();
     /** Products removed because category.deleteProductWhenOutOfStock (audit after commit). */
     const autoDeletedProducts = [];
 
@@ -383,6 +392,7 @@ export const createOrder = async (req, res) => {
 
       productDoc.stock -= quantity;
       await productDoc.save({ session });
+      soldProductIds.add(String(productDoc._id));
 
       const categoryDoc = await getCategoryCached(productDoc.category);
       const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
@@ -404,7 +414,7 @@ export const createOrder = async (req, res) => {
         ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
       });
 
-      // Category setting: remove product entirely once stock is exhausted
+      // Category setting: soft-hide product once stock is exhausted (keep row for returns)
       if (
         Number(productDoc.stock) <= 0 &&
         categoryDoc?.deleteProductWhenOutOfStock
@@ -417,8 +427,13 @@ export const createOrder = async (req, res) => {
           branch: productDoc.branch,
           inWarehouse: productDoc.inWarehouse,
           addedBy: productDoc.addedBy,
+          category: productDoc.category,
+          price: productDoc.price,
+          netPrice: productDoc.netPrice,
         });
-        await Product.findByIdAndDelete(productDoc._id).session(session);
+        productDoc.stock = 0;
+        productDoc.removedWhenOutOfStock = true;
+        await productDoc.save({ session });
       }
     }
 
@@ -445,7 +460,97 @@ export const createOrder = async (req, res) => {
       exchangeTradeInCreditAmount = Math.round(creditReq * 100) / 100;
     }
     const exchangeCreditApplied = Math.min(exchangeTradeInCreditAmount, totalRounded);
-    const amountDueForPayment = Math.round((totalRounded - exchangeCreditApplied) * 100) / 100;
+    let amountDueForPayment = Math.round((totalRounded - exchangeCreditApplied) * 100) / 100;
+
+    // Booking deposit prepaid credit (after exchange credit).
+    let bookingDepositCreditApplied = 0;
+    let validatedBookingAllocations = [];
+    const bookingAllocationsRawList = Array.isArray(bookingDepositAllocationsRaw)
+      ? bookingDepositAllocationsRaw
+          .map((a) => ({
+            bookingId: String(a?.bookingId || a?._id || '').trim(),
+            quantityApplied: Math.max(0, Math.floor(Number(a?.quantityApplied) || 0)),
+            creditApplied: Math.round((Number(a?.creditApplied) || 0) * 100) / 100,
+          }))
+          .filter(
+            (a) =>
+              mongoose.Types.ObjectId.isValid(a.bookingId) &&
+              a.quantityApplied > 0 &&
+              a.creditApplied > 0
+          )
+      : [];
+
+    if (bookingAllocationsRawList.length && partyType === 'client') {
+      const bookingIds = bookingAllocationsRawList.map((a) => a.bookingId);
+      const activeBookings = await ProductBooking.find({
+        _id: { $in: bookingIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        status: 'active',
+      })
+        .session(session)
+        .lean();
+
+      const byId = new Map(activeBookings.map((b) => [String(b._id), b]));
+      let maxFromBookings = 0;
+      const validated = [];
+      for (const a of bookingAllocationsRawList) {
+        const b = byId.get(a.bookingId);
+        if (!b) continue;
+        // Must belong to this client (id or phone).
+        const bookingClient = b.client ? String(b.client) : '';
+        const orderClient = finalClientId ? String(finalClientId) : '';
+        const phoneOk =
+          saleClientPhone &&
+          String(b.customerPhone || '').replace(/\D/g, '').slice(-10) ===
+            String(saleClientPhone).replace(/\D/g, '').slice(-10);
+        if (orderClient && bookingClient && orderClient !== bookingClient && !phoneOk) {
+          continue;
+        }
+        if (!orderClient && !phoneOk) {
+          continue;
+        }
+        const bookedQty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+        const take = Math.min(bookedQty, a.quantityApplied);
+        const dep = Math.round((Number(b.depositAmount) || 0) * 100) / 100;
+        const credit = Math.min(
+          a.creditApplied,
+          Math.round((dep * (take / bookedQty)) * 100) / 100 + 0.001
+        );
+        const creditRounded = Math.round(Math.min(credit, dep) * 100) / 100;
+        if (creditRounded <= 0 || take <= 0) continue;
+        maxFromBookings += creditRounded;
+        validated.push({
+          bookingId: a.bookingId,
+          quantityApplied: take,
+          creditApplied: creditRounded,
+        });
+      }
+
+      const requested = Number(bookingDepositCreditRaw);
+      const requestedRounded =
+        Number.isFinite(requested) && requested > 0
+          ? Math.round(requested * 100) / 100
+          : maxFromBookings;
+
+      bookingDepositCreditApplied = Math.min(
+        requestedRounded,
+        maxFromBookings,
+        amountDueForPayment
+      );
+      bookingDepositCreditApplied = Math.round(bookingDepositCreditApplied * 100) / 100;
+
+      // Scale allocations if capped.
+      if (bookingDepositCreditApplied < maxFromBookings - 0.001 && maxFromBookings > 0) {
+        const scale = bookingDepositCreditApplied / maxFromBookings;
+        for (const v of validated) {
+          v.creditApplied = Math.round(v.creditApplied * scale * 100) / 100;
+        }
+      }
+
+      validatedBookingAllocations = validated.filter((v) => v.creditApplied > 0);
+      amountDueForPayment = Math.round(
+        (amountDueForPayment - bookingDepositCreditApplied) * 100
+      ) / 100;
+    }
 
     let exchangeProductPurchaseRequestId;
     if (
@@ -595,6 +700,14 @@ export const createOrder = async (req, res) => {
                   : {}),
               }
             : {}),
+          ...(bookingDepositCreditApplied > 0
+            ? {
+                bookingDepositCreditAmount: bookingDepositCreditApplied,
+                appliedBookingIds: validatedBookingAllocations.map(
+                  (a) => new mongoose.Types.ObjectId(a.bookingId)
+                ),
+              }
+            : {}),
           amountPaid: paidAmount,
           paymentStatus,
           payments,
@@ -607,6 +720,34 @@ export const createOrder = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    if (validatedBookingAllocations.length && bookingDepositCreditApplied > 0) {
+      try {
+        await consumeBookingsForSale({
+          allocations: validatedBookingAllocations,
+          userId,
+          orderId: newOrder._id,
+        });
+      } catch (bookingConsumeErr) {
+        console.warn(
+          '⚠️ consumeBookingsForSale:',
+          bookingConsumeErr?.message || bookingConsumeErr
+        );
+      }
+    }
+
+    // Free orphan reservations when sold qty left stock below booked qty
+    // (e.g. sale without applying booking deposit credit).
+    for (const pid of soldProductIds) {
+      try {
+        await reconcileBookingsToStock(pid, {
+          userId,
+          reason: `Released after sale #${newOrder?.orderNumber ?? newOrder?._id}`,
+        });
+      } catch (reconcileErr) {
+        console.warn('⚠️ reconcileBookingsToStock:', reconcileErr?.message || reconcileErr);
+      }
+    }
 
     const storeOwesExchange = round2(
       Math.max(0, exchangeTradeInCreditAmount - totalRounded)
@@ -684,7 +825,7 @@ export const createOrder = async (req, res) => {
         module: 'products',
         entityType: 'Product',
         entityId: removed._id,
-        message: `Product removed from stock after sale ${removed.code || ''}`.trim(),
+        message: `Product hidden from stock after sale ${removed.code || ''}`.trim(),
         before: {
           code: removed.code,
           name: removed.name,
@@ -692,9 +833,13 @@ export const createOrder = async (req, res) => {
           branch: removed.branch,
           inWarehouse: removed.inWarehouse,
           addedBy: removed.addedBy,
+          category: removed.category,
+          price: removed.price,
+          netPrice: removed.netPrice,
         },
         metadata: {
           reason: 'deleteProductWhenOutOfStock',
+          softRemoved: true,
           orderId: newOrder?._id,
           orderNumber: newOrder?.orderNumber,
         },

@@ -25,7 +25,7 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
   @Input() order: any;
   @Input() printDate: Date = new Date();
 
-  @HostBinding('attr.id') readonly hostPrintId = 'print-container';
+  @HostBinding('attr.id') readonly hostPrintId = 'print-sale-receipt';
 
   @HostBinding('attr.dir')
   receiptDir: 'rtl' | 'ltr' = 'ltr';
@@ -99,6 +99,11 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
 
   receiptExchangeCredit(): number {
     const v = Number(this.order?.exchangeTradeInCreditAmount);
+    return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  receiptBookingDepositCredit(): number {
+    const v = Number(this.order?.bookingDepositCreditAmount);
     return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
   }
 

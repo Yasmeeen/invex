@@ -173,6 +173,65 @@ async function recalcProductBookingTotals(productId) {
   return total;
 }
 
+/**
+ * After stock drops (sale), active reservations must not exceed current stock.
+ * Cancels / shrinks oldest active bookings until bookedQty <= stock.
+ */
+export async function reconcileBookingsToStock(productId, { userId, reason } = {}) {
+  if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
+    return { trimmed: 0 };
+  }
+  const pid = new mongoose.Types.ObjectId(String(productId));
+  const product = await Product.findById(pid).select('stock').lean();
+  if (!product) {
+    return { trimmed: 0 };
+  }
+  const stock = Math.max(0, Math.floor(Number(product.stock) || 0));
+  let booked = await sumActiveBookedQuantity(pid);
+  if (booked <= stock) {
+    await recalcProductBookingTotals(pid);
+    return { trimmed: 0 };
+  }
+
+  let excess = booked - stock;
+  const bookings = await ProductBooking.find({ product: pid, status: 'active' }).sort({
+    createdAt: 1,
+  });
+  const uid =
+    userId && mongoose.Types.ObjectId.isValid(String(userId))
+      ? new mongoose.Types.ObjectId(String(userId))
+      : undefined;
+  const cancelReason = String(reason || 'Released: stock no longer covers reservation').slice(0, 500);
+  let trimmed = 0;
+
+  for (const b of bookings) {
+    if (excess <= 0) break;
+    const q = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    const dep = Math.round((Number(b.depositAmount) || 0) * 100) / 100;
+    if (q <= excess) {
+      b.status = 'cancelled';
+      b.cancelledAt = new Date();
+      if (uid) b.cancelledBy = uid;
+      b.cancelReason = cancelReason;
+      b.depositAmount = 0;
+      await b.save();
+      excess -= q;
+      trimmed += q;
+    } else {
+      const remainQty = q - excess;
+      const remainDep = Math.round(dep * (remainQty / q) * 100) / 100;
+      b.quantity = remainQty;
+      b.depositAmount = remainDep;
+      await b.save();
+      trimmed += excess;
+      excess = 0;
+    }
+  }
+
+  await recalcProductBookingTotals(pid);
+  return { trimmed };
+}
+
 async function isStoreAdmin(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
     return false;
@@ -1034,3 +1093,157 @@ export const listProductBookings = async (req, res) => {
     return res.status(500).json({ error: 'Failed to list bookings' });
   }
 };
+
+/**
+ * Cashier: active bookings for a client (by phone and/or clientId).
+ * Not scoped by viewer — any cashier may apply deposit credit for the matching customer.
+ */
+export const getActiveBookingsForCheckout = async (req, res) => {
+  try {
+    const phone = String(req.query.phone || '').trim();
+    const clientId = String(req.query.clientId || '').trim();
+    const productId = String(req.query.productId || '').trim();
+
+    if (!phone && !clientId) {
+      return res.status(400).json({ error: 'phone or clientId is required' });
+    }
+
+    const or = [];
+    if (clientId && mongoose.Types.ObjectId.isValid(clientId)) {
+      or.push({ client: new mongoose.Types.ObjectId(clientId) });
+    }
+    if (phone) {
+      const candidates = buildPhoneSearchCandidates(phone);
+      if (candidates.length) {
+        or.push({ customerPhone: { $in: candidates } });
+        const last10 = digitsOnly(phone).slice(-10);
+        if (last10.length === 10) {
+          or.push({ customerPhone: { $regex: new RegExp(`${last10}$`) } });
+        }
+      }
+    }
+    if (!or.length) {
+      return res.json({ bookings: [] });
+    }
+
+    const match = {
+      status: 'active',
+      $or: or,
+    };
+    if (productId && mongoose.Types.ObjectId.isValid(productId)) {
+      match.product = new mongoose.Types.ObjectId(productId);
+    }
+
+    const bookings = await ProductBooking.find(match)
+      .sort({ createdAt: 1 })
+      .select(
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice productNameSnapshot productCodeSnapshot confirmed createdAt bookingDate'
+      )
+      .populate('product', 'name code price')
+      .lean();
+
+    return res.json({
+      bookings: (bookings || []).map((b) => ({
+        _id: b._id,
+        productId: b.product?._id || b.product,
+        productName: b.product?.name || b.productNameSnapshot || '',
+        productCode: b.product?.code || b.productCodeSnapshot || '',
+        clientId: b.client,
+        customerName: b.customerName,
+        customerPhone: b.customerPhone,
+        quantity: Math.max(1, Math.floor(Number(b.quantity) || 1)),
+        depositAmount: Math.round((Number(b.depositAmount) || 0) * 100) / 100,
+        productUnitPrice: Math.round((Number(b.productUnitPrice) || 0) * 100) / 100,
+        confirmed: Boolean(b.confirmed),
+        createdAt: b.createdAt,
+        bookingDate: b.bookingDate,
+      })),
+    });
+  } catch (error) {
+    console.error('❌ getActiveBookingsForCheckout:', error.message);
+    return res.status(500).json({ error: 'Failed to load active bookings' });
+  }
+};
+
+/**
+ * Apply deposit credit from bookings on sale.
+ * allocations: [{ bookingId, quantityApplied, creditApplied }]
+ * Fully consumed bookings are cancelled; partially used bookings shrink qty/deposit.
+ */
+export async function consumeBookingsForSale({ allocations, userId, orderId, session }) {
+  const rows = (Array.isArray(allocations) ? allocations : [])
+    .map((a) => ({
+      bookingId: String(a?.bookingId || a?._id || '').trim(),
+      quantityApplied: Math.max(0, Math.floor(Number(a?.quantityApplied) || 0)),
+      creditApplied: Math.round((Number(a?.creditApplied) || 0) * 100) / 100,
+    }))
+    .filter((a) => mongoose.Types.ObjectId.isValid(a.bookingId) && a.quantityApplied > 0);
+
+  if (!rows.length) {
+    return { consumedIds: [], updatedIds: [], creditApplied: 0 };
+  }
+
+  const uid =
+    userId && mongoose.Types.ObjectId.isValid(String(userId))
+      ? new mongoose.Types.ObjectId(String(userId))
+      : undefined;
+
+  const consumedIds = [];
+  const updatedIds = [];
+  let creditApplied = 0;
+  const productIds = new Set();
+
+  for (const row of rows) {
+    const q = ProductBooking.findOne({
+      _id: new mongoose.Types.ObjectId(row.bookingId),
+      status: 'active',
+    });
+    if (session) q.session(session);
+    const b = await q;
+    if (!b) continue;
+
+    const bookedQty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    const take = Math.min(bookedQty, row.quantityApplied);
+    if (take <= 0) continue;
+
+    const dep = Math.round((Number(b.depositAmount) || 0) * 100) / 100;
+    const portionCredit =
+      row.creditApplied > 0
+        ? Math.min(row.creditApplied, dep)
+        : Math.round((dep * (take / bookedQty)) * 100) / 100;
+    creditApplied += portionCredit;
+
+    if (b.product) productIds.add(String(b.product));
+
+    if (take >= bookedQty) {
+      b.status = 'cancelled';
+      b.cancelledAt = new Date();
+      if (uid) b.cancelledBy = uid;
+      b.cancelReason = orderId
+        ? `Deposit applied on sale ${orderId}`
+        : 'Deposit applied on sale';
+      b.depositAmount = 0;
+      if (session) await b.save({ session });
+      else await b.save();
+      consumedIds.push(String(b._id));
+    } else {
+      const remainQty = bookedQty - take;
+      const remainDep = Math.round(Math.max(0, dep - portionCredit) * 100) / 100;
+      b.quantity = remainQty;
+      b.depositAmount = remainDep;
+      if (session) await b.save({ session });
+      else await b.save();
+      updatedIds.push(String(b._id));
+    }
+  }
+
+  for (const pid of productIds) {
+    await recalcProductBookingTotals(pid);
+  }
+
+  return {
+    consumedIds,
+    updatedIds,
+    creditApplied: Math.round(creditApplied * 100) / 100,
+  };
+}

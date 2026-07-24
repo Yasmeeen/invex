@@ -116,6 +116,15 @@ const productSchema = new mongoose.Schema(
       displayName: { type: String, default: '', trim: true },
       phone: { type: String, default: '', trim: true },
     },
+    /**
+     * Soft-hide after last unit sold when category.deleteProductWhenOutOfStock.
+     * Kept in DB so sales returns can restore stock and show the product again.
+     */
+    removedWhenOutOfStock: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,

@@ -492,7 +492,12 @@ export const getProductsReport = async (req, res) => {
       { $project: { _id: 0, productId: '$_id', productName: 1, soldQty: 1, soldAmount: { $round: ['$soldAmount', 2] } } },
     ]);
 
-    const productMatch = {};
+    const productMatch = {
+      $or: [
+        { removedWhenOutOfStock: { $ne: true } },
+        { removedWhenOutOfStock: { $exists: false } },
+      ],
+    };
     if (f.branchId) productMatch.branch = f.branchId;
     if (f.categoryId) productMatch.category = f.categoryId;
     const inventoryProductIdFilter = intersectProductIdFilter(f.productId || null, supplierProductIds);

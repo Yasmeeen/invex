@@ -1,0 +1,156 @@
+/* Strict receipt print modes — one visible target at a time.
+   Set on document.body via data-receipt-print:
+   - cashier  → #print-container / desk #print-purchase-receipt
+   - sale     → #print-sale-receipt (orders reprint)
+   - purchase → #print-purchase-receipt (orders reprint)
+   - booking  → #print-booking-receipt
+*/
+
+@media print {
+  body[data-receipt-print='cashier'] *,
+  body[data-receipt-print='sale'] *,
+  body[data-receipt-print='purchase'] *,
+  body[data-receipt-print='booking'] * {
+    visibility: hidden;
+  }
+
+  body[data-receipt-print='cashier'] .app-notification,
+  body[data-receipt-print='cashier'] #app-notifications-container,
+  body[data-receipt-print='cashier'] #main-sidebar,
+  body[data-receipt-print='cashier'] .app-sidebar,
+  body[data-receipt-print='cashier'] app-vixa-chat,
+  body[data-receipt-print='cashier'] .vixa,
+  body[data-receipt-print='cashier'] .vixa__panel,
+  body[data-receipt-print='cashier'] .vixa__fab,
+  body[data-receipt-print='sale'] .app-notification,
+  body[data-receipt-print='sale'] #app-notifications-container,
+  body[data-receipt-print='sale'] #main-sidebar,
+  body[data-receipt-print='sale'] .app-sidebar,
+  body[data-receipt-print='sale'] app-vixa-chat,
+  body[data-receipt-print='sale'] .vixa,
+  body[data-receipt-print='sale'] .vixa__panel,
+  body[data-receipt-print='sale'] .vixa__fab,
+  body[data-receipt-print='purchase'] .app-notification,
+  body[data-receipt-print='purchase'] #app-notifications-container,
+  body[data-receipt-print='purchase'] #main-sidebar,
+  body[data-receipt-print='purchase'] .app-sidebar,
+  body[data-receipt-print='purchase'] app-vixa-chat,
+  body[data-receipt-print='purchase'] .vixa,
+  body[data-receipt-print='purchase'] .vixa__panel,
+  body[data-receipt-print='purchase'] .vixa__fab,
+  body[data-receipt-print='booking'] .app-notification,
+  body[data-receipt-print='booking'] #app-notifications-container,
+  body[data-receipt-print='booking'] #main-sidebar,
+  body[data-receipt-print='booking'] .app-sidebar,
+  body[data-receipt-print='booking'] app-vixa-chat,
+  body[data-receipt-print='booking'] .vixa,
+  body[data-receipt-print='booking'] .vixa__panel,
+  body[data-receipt-print='booking'] .vixa__fab {
+    display: none !important;
+  }
+
+  /* --- cashier sale / desk purchase --- */
+  body[data-receipt-print='cashier'] #print-container,
+  body[data-receipt-print='cashier'] #print-container *,
+  body[data-receipt-print='cashier'] #print-purchase-receipt,
+  body[data-receipt-print='cashier'] #print-purchase-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='cashier'] #print-container,
+  body[data-receipt-print='cashier'] #print-purchase-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='cashier'] #print-booking-receipt,
+  body[data-receipt-print='cashier'] #print-booking-receipt *,
+  body[data-receipt-print='cashier'] #print-sale-receipt,
+  body[data-receipt-print='cashier'] #print-sale-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- sale reprint --- */
+  body[data-receipt-print='sale'] #print-sale-receipt,
+  body[data-receipt-print='sale'] #print-sale-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='sale'] #print-sale-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='sale'] #print-container,
+  body[data-receipt-print='sale'] #print-container *,
+  body[data-receipt-print='sale'] #print-booking-receipt,
+  body[data-receipt-print='sale'] #print-booking-receipt *,
+  body[data-receipt-print='sale'] #print-purchase-receipt,
+  body[data-receipt-print='sale'] #print-purchase-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- purchase reprint --- */
+  body[data-receipt-print='purchase'] #print-purchase-receipt,
+  body[data-receipt-print='purchase'] #print-purchase-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='purchase'] #print-purchase-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='purchase'] #print-container,
+  body[data-receipt-print='purchase'] #print-container *,
+  body[data-receipt-print='purchase'] #print-booking-receipt,
+  body[data-receipt-print='purchase'] #print-booking-receipt *,
+  body[data-receipt-print='purchase'] #print-sale-receipt,
+  body[data-receipt-print='purchase'] #print-sale-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- booking receipt --- */
+  body[data-receipt-print='booking'] #print-booking-receipt,
+  body[data-receipt-print='booking'] #print-booking-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='booking'] #print-booking-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='booking'] #print-container,
+  body[data-receipt-print='booking'] #print-container *,
+  body[data-receipt-print='booking'] #print-sale-receipt,
+  body[data-receipt-print='booking'] #print-sale-receipt *,
+  body[data-receipt-print='booking'] #print-purchase-receipt,
+  body[data-receipt-print='booking'] #print-purchase-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

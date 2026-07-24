@@ -470,6 +470,14 @@
             {{ "tr_final_after_extra_discount" | translate }}:
             {{ finalOrderTotal() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
+          <div class="size-small text-success mt-1" *ngIf="bookingDepositCredit() > 0">
+            {{ 'tr_cashier_booking_deposit_credit' | translate }}:
+            −{{ bookingDepositCredit() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+          <div class="weight-bold mt-1" *ngIf="bookingDepositCredit() > 0 || exchangeTradeInPurchase">
+            {{ 'tr_cashier_amount_due_after_credits' | translate }}:
+            {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
         </div>
         <button class="pay-btn" (click)="onPayClick()">
           {{ "tr_cashier.PAY" | translate }}
@@ -613,7 +621,13 @@
           -{{ formatReceiptAmount(receiptExchangeCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr class="bold" *ngIf="receiptExchangeCredit() > 0">
+      <tr *ngIf="receiptBookingDepositCredit() > 0">
+        <td>{{ 'tr_cashier_booking_deposit_credit' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          -{{ formatReceiptAmount(receiptBookingDepositCredit()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold" *ngIf="receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0">
         <td>{{ 'tr_exchange_amount_collected_line' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
@@ -657,14 +671,14 @@
     <div class="separator double-border"></div>
 
     <div class="final-total center bold">
-      <ng-container *ngIf="receiptExchangeCredit() <= 0">
+      <ng-container *ngIf="receiptExchangeCredit() <= 0 && receiptBookingDepositCredit() <= 0">
         {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>
       </ng-container>
-      <ng-container *ngIf="receiptExchangeCredit() > 0">
-        {{ 'tr_exchange_sale_and_trade_in' | receiptTranslate: st.receiptLanguage }} <br />
+      <ng-container *ngIf="receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0">
+        {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>

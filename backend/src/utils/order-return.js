@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import Product from '../DB/models/product.model.js';
 import StockMovement from '../DB/models/stockMovement.model.js';
+import AuditLog from '../DB/models/auditLog.model.js';
+import ProductPurchaseRequest from '../DB/models/productPurchaseRequest.model.js';
 import { isClientCreditOrder } from './client-order-utils.js';
 import {
   buildSalesRefundPaymentSplits,
@@ -65,6 +67,202 @@ export function defaultRefundPaymentSplitsFromOrder(order, refundTotal) {
 function findOrderLine(order, productId) {
   const pid = lineProductId(productId);
   return (order.products || []).find((line) => lineProductId(line.productId) === pid);
+}
+
+function attrsToPlain(attributes) {
+  if (!attributes) return {};
+  if (attributes instanceof Map) return Object.fromEntries(attributes.entries());
+  if (typeof attributes === 'object') return { ...attributes };
+  return {};
+}
+
+function toObjectId(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'object' && raw._id != null) {
+    return mongoose.Types.ObjectId.isValid(String(raw._id))
+      ? new mongoose.Types.ObjectId(String(raw._id))
+      : null;
+  }
+  return mongoose.Types.ObjectId.isValid(String(raw))
+    ? new mongoose.Types.ObjectId(String(raw))
+    : null;
+}
+
+/**
+ * Rebuild product fields for a hard-deleted row (legacy deleteProductWhenOutOfStock).
+ */
+async function snapshotForDeletedProduct(order, line) {
+  const code = String(line?.code || '').trim();
+  const productOid = line?.productId;
+  const branchId = order?.branch ? toObjectId(order.branch) : null;
+
+  const snapshot = {
+    name: String(line?.name || code || 'Product').trim(),
+    code: code || String(productOid || ''),
+    price: Math.max(0, Number(line?.price) || 0),
+    netPrice: Math.max(0, Number(line?.cost) || 0),
+    category: null,
+    branch: branchId,
+    inWarehouse: !branchId,
+    addedBy: '',
+    attributes: {},
+    imageUrl: '',
+    discount: 0,
+  };
+
+  const [audits, purchases] = await Promise.all([
+    productOid
+      ? AuditLog.find({
+          entityType: 'Product',
+          entityId: String(productOid),
+        })
+          .sort({ createdAt: -1 })
+          .limit(30)
+          .lean()
+      : Promise.resolve([]),
+    code
+      ? ProductPurchaseRequest.find({
+          $or: [
+            { 'productPayload.code': code },
+            { 'productPayload.unitCodes': code },
+            ...(productOid
+              ? [
+                  { createdProductId: productOid },
+                  { createdProductIds: productOid },
+                ]
+              : []),
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
+  ]);
+
+  for (const log of audits || []) {
+    const src = log.before || log.after || {};
+    if (!snapshot.category && src.category) {
+      snapshot.category = toObjectId(src.category);
+    }
+    // Keep invoice line price/cost — audits/purchases often hold stale catalog values
+    if (src.addedBy) snapshot.addedBy = String(src.addedBy);
+    if (src.inWarehouse != null) snapshot.inWarehouse = !!src.inWarehouse;
+    if (src.branch != null) snapshot.branch = toObjectId(src.branch);
+    if (src.attributes && !Object.keys(snapshot.attributes).length) {
+      snapshot.attributes = attrsToPlain(src.attributes);
+    }
+    if (src.imageUrl && !snapshot.imageUrl) snapshot.imageUrl = String(src.imageUrl);
+    if (src.discount != null && !snapshot.discount) {
+      snapshot.discount = Math.max(0, Number(src.discount) || 0);
+    }
+    if (!snapshot.name && src.name) snapshot.name = String(src.name);
+    if (src.code) snapshot.code = String(src.code);
+  }
+
+  for (const pr of purchases || []) {
+    const payload = pr.productPayload || {};
+    if (!snapshot.category && payload.category) {
+      snapshot.category = toObjectId(payload.category);
+    }
+    // Do not overwrite price/netPrice from purchase — invoice line is source of truth on return
+    if (payload.addedBy && !snapshot.addedBy) snapshot.addedBy = String(payload.addedBy);
+    if (payload.attributes && !Object.keys(snapshot.attributes).length) {
+      snapshot.attributes = attrsToPlain(payload.attributes);
+    }
+    if (payload.imageUrl && !snapshot.imageUrl) snapshot.imageUrl = String(payload.imageUrl);
+    if (payload.discount != null && !snapshot.discount) {
+      snapshot.discount = Math.max(0, Number(payload.discount) || 0);
+    }
+    if (!snapshot.name && payload.name) snapshot.name = String(payload.name);
+    if (!snapshot.branch && pr.branch) snapshot.branch = toObjectId(pr.branch);
+  }
+
+  if (snapshot.branch) snapshot.inWarehouse = false;
+  return snapshot;
+}
+
+/**
+ * Restore stock for a return line. Soft-unhides removedWhenOutOfStock rows.
+ * Recreates hard-deleted legacy products when enough snapshot data exists.
+ */
+export async function restoreProductStockForReturn(order, line, quantity) {
+  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+  if (qty <= 0) return null;
+
+  let product = await Product.findById(line.productId);
+  if (product) {
+    product.stock = Math.max(0, (Number(product.stock) || 0) + qty);
+    product.removedWhenOutOfStock = false;
+    await product.save();
+    return product;
+  }
+
+  // Same code may still exist (recreated / soft-hidden under another id)
+  const code = String(line?.code || '').trim();
+  const orderBranch = order?.branch ? toObjectId(order.branch) : null;
+  if (code) {
+    const byCode = await Product.findOne({
+      code,
+      ...(orderBranch
+        ? { branch: orderBranch }
+        : { $or: [{ branch: null }, { branch: { $exists: false } }] }),
+    });
+    if (byCode) {
+      byCode.stock = Math.max(0, (Number(byCode.stock) || 0) + qty);
+      byCode.removedWhenOutOfStock = false;
+      await byCode.save();
+      return byCode;
+    }
+  }
+
+  const snapshot = await snapshotForDeletedProduct(order, line);
+  if (!snapshot.category) {
+    throw new Error(
+      `Cannot restore product ${code || line.productId}: it was deleted and category data is missing. Re-add it manually, then retry the return.`
+    );
+  }
+
+  const createPayload = {
+    name: snapshot.name,
+    code: snapshot.code,
+    price: snapshot.price,
+    netPrice: snapshot.netPrice,
+    stock: qty,
+    discount: snapshot.discount || 0,
+    category: snapshot.category,
+    branch: snapshot.branch,
+    inWarehouse: !!snapshot.inWarehouse && !snapshot.branch,
+    imageUrl: snapshot.imageUrl || '',
+    attributes: snapshot.attributes || {},
+    addedBy: snapshot.addedBy || '',
+    removedWhenOutOfStock: false,
+  };
+
+  if (line.productId && mongoose.Types.ObjectId.isValid(String(line.productId))) {
+    createPayload._id = new mongoose.Types.ObjectId(String(line.productId));
+  }
+
+  try {
+    product = await Product.create(createPayload);
+  } catch (err) {
+    if (err?.code === 11000 && code) {
+      const conflict = await Product.findOne({
+        code,
+        ...(snapshot.branch
+          ? { branch: snapshot.branch }
+          : { $or: [{ branch: null }, { branch: { $exists: false } }] }),
+      });
+      if (conflict) {
+        conflict.stock = Math.max(0, (Number(conflict.stock) || 0) + qty);
+        conflict.removedWhenOutOfStock = false;
+        await conflict.save();
+        return conflict;
+      }
+    }
+    throw err;
+  }
+
+  return product;
 }
 
 function normalizeReturnItems(order, { returnAll, items }) {
@@ -234,11 +432,8 @@ export async function processOrderReturn(order, body = {}) {
     );
     line.returnedQuantity = alreadyReturned + row.quantity;
 
-    const product = await Product.findById(row.productId);
+    const product = await restoreProductStockForReturn(order, line, row.quantity);
     if (product) {
-      product.stock = Math.max(0, (Number(product.stock) || 0) + row.quantity);
-      await product.save();
-
       try {
         await StockMovement.create({
           movementType: 'return',

@@ -8,7 +8,7 @@ import { ProductBookingsService, ProductBookingsSummary } from '@shared/services
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { canPickBranchRole, isBranchManager, isModerator } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
-import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { BookingReprintService } from '@shared/services/booking-reprint.service';
 import { BookingReceiptData } from '@shared/components/booking-receipt-print/booking-receipt-print.component';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
@@ -42,7 +42,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
     private bookingsApi: ProductBookingsService,
     private notify: AppNotificationService,
     private translate: TranslateService,
-    private invoiceReprint: InvoiceReprintService,
+    private bookingReprint: BookingReprintService,
     private storeSettings: StoreSettingsService
   ) {
     this.product = data.product;
@@ -189,7 +189,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
       createdAt: b.createdAt,
       bookingDate: b.bookingDate,
     };
-    this.invoiceReprint.printBooking(receipt);
+    this.bookingReprint.printBooking(receipt);
   }
 
   /** Deposit transfer proof URLs (one or many). */

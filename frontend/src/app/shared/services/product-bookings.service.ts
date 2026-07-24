@@ -74,12 +74,50 @@ export interface BookingsReportResponse {
   meta: { totalCount: number; page: number; limit: number };
 }
 
+export interface CheckoutActiveBooking {
+  _id: string;
+  productId: string;
+  productName?: string;
+  productCode?: string;
+  clientId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  quantity: number;
+  depositAmount: number;
+  productUnitPrice?: number;
+  confirmed?: boolean;
+  createdAt?: string;
+  bookingDate?: string;
+}
+
+export interface BookingDepositAllocation {
+  bookingId: string;
+  quantityApplied: number;
+  creditApplied: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductBookingsService {
   constructor(private http: HttpClient) {}
 
   createBooking(payload: CreateProductBookingPayload): Observable<CreateProductBookingResponse> {
     return this.http.post<CreateProductBookingResponse>(PRODUCT_BOOKINGS_URL, payload);
+  }
+
+  /** Active bookings for cashier deposit credit (by phone and/or clientId). */
+  getActiveForCheckout(params: {
+    phone?: string;
+    clientId?: string;
+    productId?: string;
+  }): Observable<{ bookings: CheckoutActiveBooking[] }> {
+    const httpParams: Record<string, string> = {};
+    if (params.phone) httpParams.phone = String(params.phone).trim();
+    if (params.clientId) httpParams.clientId = String(params.clientId).trim();
+    if (params.productId) httpParams.productId = String(params.productId).trim();
+    return this.http.get<{ bookings: CheckoutActiveBooking[] }>(
+      `${PRODUCT_BOOKINGS_URL}/active-for-checkout`,
+      { params: httpParams }
+    );
   }
 
   cancelBooking(bookingId: string, body: { userId: string; reason?: string }): Observable<unknown> {

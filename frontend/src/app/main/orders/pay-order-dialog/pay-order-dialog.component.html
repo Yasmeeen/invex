@@ -28,6 +28,24 @@
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-group" *ngIf="showBranchPicker">
+        <label>{{ 'tr_branches' | translate }}</label>
+        <div class="input-with-icon">
+          <ng-select
+            class="s-control s-select"
+            formControlName="branchId"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [clearable]="false"
+            placeholder="{{ 'tr_branches' | translate }}"
+          >
+          </ng-select>
+          <i class="fa fa-caret-down input-icon"></i>
+        </div>
+        <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_payment_branch_hint' | translate }}</p>
+      </div>
+
       <div class="mb-3">
         <button type="button" class="s-btn btn-secondary btn-sm" (click)="openPaymentSplitsDialog()">
           {{ 'tr_payment_splits_open' | translate }}

@@ -1,12 +1,13 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Order } from '@core/models/products.model';
+import { Branch, Order } from '@core/models/products.model';
 import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import {
   PaymentSplitsDialogComponent,
@@ -19,22 +20,32 @@ import {
 
 export type PayOrderDialogData = { order: Order; forcedBranchId?: string | null };
 
+function orderBranchId(order: Order | null | undefined): string {
+  const b = order?.branch as { _id?: string } | string | undefined;
+  if (typeof b === 'string') return String(b).trim();
+  if (b?._id) return String(b._id).trim();
+  return '';
+}
+
 @Component({
   selector: 'app-pay-order-dialog',
   templateUrl: './pay-order-dialog.component.html',
   styleUrls: ['./pay-order-dialog.component.scss'],
 })
-export class PayOrderDialogComponent {
+export class PayOrderDialogComponent implements OnInit {
   form: FormGroup;
   saving = false;
   readonly order: Order;
-  readonly paymentBranchId: string | null;
+  branches: Branch[] = [];
+  showBranchPicker = false;
+  private paymentBranchId: string | null = null;
   confirmedPayment: PaymentSplitsResult | null = null;
 
   constructor(
     private fb: FormBuilder,
     private orders: OrdersSerivce,
     private auth: AuthenticationService,
+    private branchesService: BranchesServce,
     private translate: TranslateService,
     private notify: AppNotificationService,
     private dialog: MatDialog,
@@ -45,15 +56,52 @@ export class PayOrderDialogComponent {
     const actor = this.auth.getUserFromLocalStorage();
     const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
     this.paymentBranchId = ctx.branchId;
+    this.showBranchPicker = ctx.showBranchPicker;
+
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
 
+    const defaultBranch =
+      ctx.branchId || (this.showBranchPicker ? orderBranchId(this.order) : '') || '';
+
     this.form = this.fb.group({
+      branchId: [defaultBranch, this.showBranchPicker ? Validators.required : []],
       paidAt: [`${yyyy}-${mm}-${dd}`, [Validators.required]],
       note: ['', Validators.maxLength(500)],
     });
+  }
+
+  ngOnInit(): void {
+    if (this.showBranchPicker) {
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => {
+          this.branches = res?.branches || [];
+          if (this.form.get('branchId')?.value) {
+            this.paymentBranchId = String(this.form.get('branchId')?.value);
+            return;
+          }
+          const fromOrder = orderBranchId(this.order);
+          const preferred =
+            (fromOrder && this.branches.some((b) => String(b._id) === fromOrder)
+              ? fromOrder
+              : '') ||
+            this.branches[0]?._id ||
+            '';
+          if (preferred) {
+            this.form.patchValue({ branchId: preferred });
+            this.paymentBranchId = String(preferred);
+          }
+        },
+        error: () => {
+          this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+        },
+      });
+    } else if (this.paymentBranchId) {
+      this.form.patchValue({ branchId: this.paymentBranchId });
+      this.form.get('branchId')?.disable();
+    }
   }
 
   get remaining(): number {
@@ -115,6 +163,9 @@ export class PayOrderDialogComponent {
     if (this.saving) {
       return;
     }
+    if (this.showBranchPicker) {
+      this.form.get('branchId')?.enable();
+    }
     this.form.markAllAsTouched();
     if (!this.form.valid) {
       return;
@@ -125,15 +176,18 @@ export class PayOrderDialogComponent {
       return;
     }
 
-    if (!this.paymentBranchId) {
+    const branchId = String(
+      this.form.getRawValue().branchId || this.paymentBranchId || ''
+    ).trim();
+    if (!branchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
       return;
     }
 
-    this.postPayment(this.confirmedPayment);
+    this.postPayment(this.confirmedPayment, branchId);
   }
 
-  private postPayment(payment: PaymentSplitsResult): void {
+  private postPayment(payment: PaymentSplitsResult, branchId: string): void {
     const orderId = this.order._id;
     if (!orderId) {
       return;
@@ -164,7 +218,7 @@ export class PayOrderDialogComponent {
         paidAt,
         userId: u?._id,
         note,
-        branchId: this.paymentBranchId || undefined,
+        branchId,
       })
       .subscribe({
         next: () => {

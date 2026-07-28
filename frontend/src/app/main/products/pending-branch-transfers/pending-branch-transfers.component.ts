@@ -99,7 +99,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   }
 
   get showBranchFilter(): boolean {
-    return canPickBranchRole(this.globals.currentUser?.role);
+    const role = this.globals.currentUser?.role;
+    return canPickBranchRole(role) || isBranchManager(role);
   }
 
   loadBranches(): void {

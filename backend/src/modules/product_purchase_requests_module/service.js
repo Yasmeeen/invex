@@ -1186,8 +1186,15 @@ export const returnProductPurchaseRequest = async (req, res) => {
   } catch (error) {
     const msg = error?.message || 'Failed to process purchase return';
     const status =
-      msg.includes('not found') ? 404 : msg.includes('cannot') || msg.includes('already') || msg.includes('Only') ? 400 : 500;
+      Number(error?.status) ||
+      (msg.includes('تعذر إتمام الاسترجاع') || msg.includes('PURCHASE_RETURN_STOCK_MISSING')
+        ? 400
+        : msg.includes('not found')
+          ? 404
+          : msg.includes('cannot') || msg.includes('already') || msg.includes('Only') || msg.includes('Invalid') || msg.includes('Select')
+            ? 400
+            : 500);
     console.error('returnProductPurchaseRequest:', error);
-    return res.status(status).json({ error: msg });
+    return res.status(status).json({ error: msg, code: error?.code });
   }
 };

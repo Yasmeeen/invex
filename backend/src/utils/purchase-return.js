@@ -67,73 +67,190 @@ function defaultRefundTreasurySplits(purchase, refundTotal) {
   return splits.length ? splits : [{ key: 'cash', label: 'Cash', amount: total }];
 }
 
-async function reducePurchaseStock(purchase, qty, returnedProductIds) {
+function purchaseProductLabel(purchase, product) {
+  const pp = purchase?.productPayload || {};
+  const name = String(product?.name || pp.name || '').trim();
+  const code = String(product?.code || pp.code || '').trim();
+  if (name && code) return `«${name}» (كود: ${code})`;
+  if (name) return `«${name}»`;
+  if (code) return `(كود: ${code})`;
+  return '';
+}
+
+function purchaseReturnMissingStockError(purchase, { multi = false, product = null } = {}) {
+  const label = purchaseProductLabel(purchase, product);
+  const message = multi
+    ? label
+      ? `تعذر إتمام الاسترجاع: الوحدة ${label} غير موجودة في المخزون، ويبدو أنها بيعت أو أُزيلت. اختر وحدات متاحة فقط أو راجع المخزون ثم أعد المحاولة.`
+      : 'تعذر إتمام الاسترجاع: بعض المنتجات المحددة غير موجودة في المخزون، ويبدو أنها بيعت أو أُزيلت. اختر وحدات متاحة فقط أو راجع المخزون ثم أعد المحاولة.'
+    : label
+      ? `تعذر إتمام الاسترجاع: المنتج ${label} غير موجود في المخزون، ويبدو أنه تم بيعه أو إزالته. لا يمكن إرجاعه للعميل وهو غير متوفر.`
+      : 'تعذر إتمام الاسترجاع: المنتج غير موجود في المخزون، ويبدو أنه تم بيعه أو إزالته. لا يمكن إرجاعه للعميل وهو غير متوفر.';
+  const err = new Error(message);
+  err.status = 400;
+  err.code = 'PURCHASE_RETURN_STOCK_MISSING';
+  return err;
+}
+
+async function findPurchaseLinkedProduct(
+  id,
+  purchase,
+  { preferVisible = true, allowCodeFallback = true } = {}
+) {
+  if (id && mongoose.Types.ObjectId.isValid(String(id))) {
+    const byId = await Product.findById(id);
+    if (byId) {
+      const unavailable =
+        preferVisible &&
+        (byId.removedWhenOutOfStock === true || Number(byId.stock) <= 0);
+      if (!unavailable) return byId;
+    }
+  }
+
+  if (!allowCodeFallback) return null;
+
   const pp = purchase.productPayload || {};
+  const code = String(pp.code || '').trim();
+  if (!code) return null;
+
+  const branchFilter = purchase.branch
+    ? { branch: purchase.branch }
+    : { $or: [{ branch: null }, { branch: { $exists: false } }] };
+
+  if (preferVisible) {
+    const visible = await Product.findOne({
+      code,
+      ...branchFilter,
+      stock: { $gt: 0 },
+      $or: [
+        { removedWhenOutOfStock: { $ne: true } },
+        { removedWhenOutOfStock: { $exists: false } },
+      ],
+    });
+    return visible || null;
+  }
+
+  return Product.findOne({ code, ...branchFilter });
+}
+
+async function hideOrReduceProductStock(product, qtyToRemove) {
+  const removeQty = Math.max(0, Math.floor(Number(qtyToRemove) || 0));
+  const nextStock = Math.max(0, (Number(product.stock) || 0) - removeQty);
+  product.stock = nextStock;
+  if (nextStock <= 0) {
+    product.stock = 0;
+    product.removedWhenOutOfStock = true;
+  }
+  await product.save();
+  return product;
+}
+
+async function logPurchaseReturnMovement(purchase, product, quantity) {
+  const pp = purchase.productPayload || {};
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+  try {
+    await StockMovement.create({
+      movementType: 'return',
+      productId: product._id,
+      productName: product.name,
+      branchId: purchase.branch || null,
+      fromBranchId: purchase.branch || null,
+      toBranchId: null,
+      quantity: qty,
+      unitPrice: Number(pp.netPrice) || 0,
+      totalValue: round2((Number(pp.netPrice) || 0) * qty),
+      referenceType: 'productPurchaseRequest',
+      referenceId: purchase._id,
+      notes: `Purchase return ${String(pp.code || product.code || '').trim()}`,
+    });
+  } catch (e) {
+    console.warn('⚠️ purchase return stock movement:', e?.message || e);
+  }
+}
+
+async function reducePurchaseStock(purchase, qty, returnedProductIds) {
+  const isMultiUnit = Boolean(purchase.createdProductIds?.length);
   const ids =
     Array.isArray(returnedProductIds) && returnedProductIds.length
       ? returnedProductIds
-      : purchase.createdProductIds?.length
+      : isMultiUnit
         ? purchase.createdProductIds.slice(-qty)
         : purchase.createdProductId
           ? [purchase.createdProductId]
           : [];
 
-  if (!ids.length) {
-    throw new Error('Purchase has no linked products to return');
+  // Single-unit desk buys may lack createdProductId on legacy rows — resolve by code+branch.
+  if (!ids.length && !isMultiUnit) {
+    const fallback = await findPurchaseLinkedProduct(null, purchase);
+    if (!fallback) {
+      throw purchaseReturnMissingStockError(purchase);
+    }
+    await hideOrReduceProductStock(fallback, qty);
+    await logPurchaseReturnMovement(purchase, fallback, qty);
+    purchase.createdProductId = undefined;
+    return [fallback._id];
   }
 
-  if (purchase.createdProductIds?.length && ids.length !== qty) {
+  if (!ids.length) {
+    throw isMultiUnit
+      ? purchaseReturnMissingStockError(purchase, { multi: true })
+      : purchaseReturnMissingStockError(purchase);
+  }
+
+  if (isMultiUnit && ids.length !== qty) {
     throw new Error('Select one product unit per returned quantity');
   }
 
   const removed = [];
-  for (const id of ids) {
-    const product = await Product.findById(id);
-    if (!product) continue;
 
-    if (purchase.createdProductIds?.length) {
-      await Product.findByIdAndDelete(id);
-      removed.push(id);
-    } else {
-      const stock = Math.max(0, (Number(product.stock) || 0) - qty);
-      product.stock = stock;
-      if (stock <= 0) {
-        await Product.findByIdAndDelete(id);
-      } else {
-        await product.save();
-      }
-      removed.push(id);
-      break;
-    }
-
-    try {
-      await StockMovement.create({
-        movementType: 'return',
-        productId: product._id,
-        productName: product.name,
-        branchId: purchase.branch || null,
-        fromBranchId: purchase.branch || null,
-        toBranchId: null,
-        quantity: purchase.createdProductIds?.length ? 1 : qty,
-        unitPrice: Number(pp.netPrice) || 0,
-        totalValue: round2(
-          (Number(pp.netPrice) || 0) * (purchase.createdProductIds?.length ? 1 : qty)
-        ),
-        referenceType: 'productPurchaseRequest',
-        referenceId: purchase._id,
-        notes: `Purchase return ${String(pp.code || '').trim()}`,
+  if (isMultiUnit) {
+    for (const id of ids) {
+      // Multi-code units are unique — never fall back to payload.code (would hit the wrong unit).
+      const product = await findPurchaseLinkedProduct(id, purchase, {
+        preferVisible: true,
+        allowCodeFallback: false,
       });
-    } catch (e) {
-      console.warn('⚠️ purchase return stock movement:', e?.message || e);
+      if (!product) {
+        const hidden = await findPurchaseLinkedProduct(id, purchase, {
+          preferVisible: false,
+          allowCodeFallback: false,
+        });
+        throw purchaseReturnMissingStockError(purchase, {
+          multi: true,
+          product: hidden,
+        });
+      }
+      await hideOrReduceProductStock(product, 1);
+      await logPurchaseReturnMovement(purchase, product, 1);
+      removed.push(product._id);
     }
-  }
 
-  if (purchase.createdProductIds?.length) {
     const removedSet = new Set(removed.map(String));
     purchase.createdProductIds = purchase.createdProductIds.filter(
       (id) => !removedSet.has(String(id))
     );
     purchase.createdProductId = purchase.createdProductIds[0] || undefined;
+  } else {
+    const id = ids[0];
+    const product = await findPurchaseLinkedProduct(id, purchase, { preferVisible: true });
+    if (!product) {
+      const hidden = await findPurchaseLinkedProduct(id, purchase, { preferVisible: false });
+      throw purchaseReturnMissingStockError(purchase, { product: hidden });
+    }
+    await hideOrReduceProductStock(product, qty);
+    await logPurchaseReturnMovement(purchase, product, qty);
+    removed.push(product._id);
+
+    const remainingAfter = purchaseRemainingQty(purchase) - qty;
+    if (remainingAfter <= 0) {
+      purchase.createdProductId = undefined;
+    } else {
+      purchase.createdProductId = product._id;
+    }
+  }
+
+  if (removed.length < 1) {
+    throw purchaseReturnMissingStockError(purchase, { multi: isMultiUnit });
   }
 
   return removed;

@@ -593,6 +593,44 @@
                   <div class="col-md-12" [formGroup]="sourcePartyForm">
                     <h4 class="m-0 mb-3">{{ sourcePartyInfoTitleKey() | translate }}</h4>
                     <div class="row">
+                      <div class="col-md-12 mb-3" *ngIf="sourcePartyType === 'supplier'">
+                        <div class="form-group">
+                          <label>{{ 'tr_search_supplier' | translate }}</label>
+                          <div class="input-with-icon bg-white">
+                            <ng-select
+                              class="s-control s-select"
+                              [items]="vendorSearchItems"
+                              [typeahead]="vendorTypeahead$"
+                              [loading]="vendorsLoading"
+                              bindLabel="label"
+                              bindValue="_id"
+                              [ngModel]="selectedSourceVendor?._id || null"
+                              [ngModelOptions]="{ standalone: true }"
+                              (ngModelChange)="onSourceVendorIdChange($event)"
+                              (open)="onVendorSelectOpen()"
+                              (clear)="onSourceVendorPicked(null)"
+                              appendTo="#create-edit-product-modal-root"
+                              [placeholder]="'tr_search_supplier_placeholder' | translate"
+                              [clearable]="true"
+                              [searchable]="true"
+                              notFoundText="{{ 'tr_no_items_found' | translate }}"
+                            >
+                              <ng-template ng-option-tmp let-item="item">
+                                <div class="weight-medium">{{ item.nameOfcompany }}</div>
+                                <div class="size-small text-muted">
+                                  {{ item.name }}
+                                  <span *ngIf="item.phone"> · {{ item.phone }}</span>
+                                </div>
+                              </ng-template>
+                              <ng-template ng-label-tmp let-item="item">
+                                {{ item.nameOfcompany }}
+                                <span *ngIf="item.name"> — {{ item.name }}</span>
+                              </ng-template>
+                            </ng-select>
+                            <i class="fa fa-caret-down input-icon"></i>
+                          </div>
+                        </div>
+                      </div>
                       <div
                         class="col-md-4"
                         [class.has-error]="sourcePartyForm.get('phone')?.invalid && sourcePartyForm.get('phone')?.touched"

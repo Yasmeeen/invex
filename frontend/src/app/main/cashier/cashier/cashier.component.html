@@ -160,6 +160,45 @@
 
                 <div class="cashier-client-fields cashier-client-fields--row">
                   <div
+                    class="cashier-client-fields__item cashier-client-fields__item--full"
+                    *ngIf="partyType === 'supplier'"
+                  >
+                    <label>{{ 'tr_search_supplier' | translate }}</label>
+                    <div class="input-with-icon bg-white width-100">
+                      <ng-select
+                        class="s-control s-select"
+                        [items]="vendorSearchItems"
+                        [typeahead]="vendorTypeahead$"
+                        [loading]="vendorsLoading"
+                        bindLabel="label"
+                        bindValue="_id"
+                        [ngModel]="selectedVendor?._id || null"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onCashierVendorIdChange($event)"
+                        (open)="onVendorSelectOpen()"
+                        (clear)="onCashierVendorPicked(null)"
+                        [placeholder]="'tr_search_supplier_placeholder' | translate"
+                        [clearable]="true"
+                        [searchable]="true"
+                        notFoundText="{{ 'tr_no_items_found' | translate }}"
+                        name="cashierSupplierSearch"
+                      >
+                        <ng-template ng-option-tmp let-item="item">
+                          <div class="weight-medium">{{ item.nameOfcompany }}</div>
+                          <div class="size-small text-muted">
+                            {{ item.name }}
+                            <span *ngIf="item.phone"> · {{ item.phone }}</span>
+                          </div>
+                        </ng-template>
+                        <ng-template ng-label-tmp let-item="item">
+                          {{ item.nameOfcompany }}
+                          <span *ngIf="item.name"> — {{ item.name }}</span>
+                        </ng-template>
+                      </ng-select>
+                      <i class="fa fa-caret-down input-icon"></i>
+                    </div>
+                  </div>
+                  <div
                     class="cashier-client-fields__item"
                     [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
                   >
@@ -250,7 +289,7 @@
             </div>
           </div>
  
-      <div class="products-grid">
+      <div class="products-grid" (scroll)="onProductsScroll($event)">
         <div
           class="product-card"
           *ngFor="let product of filteredProducts()"
@@ -291,6 +330,12 @@
               {{ cardDiscountedPrice(product) | currency:'EGP ':'symbol':'1.2-2' }}
             </div>
           </div>
+        </div>
+        <div class="products-grid__status" *ngIf="productsLoading">
+          <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+        </div>
+        <div class="products-grid__status text-muted" *ngIf="!productsLoading && !filteredProducts().length">
+          {{ 'tr_no_items_found' | translate }}
         </div>
       </div>
     </div>

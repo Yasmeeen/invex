@@ -526,6 +526,8 @@
   "tr_party_supplier": "مورد",
   "tr_party_type": "نوع الطرف",
   "tr_supplier_contact_name": "اسم المسؤول",
+  "tr_search_supplier": "اختيار المورد",
+  "tr_search_supplier_placeholder": "ابحث باسم الشركة أو المسؤول أو التليفون",
   "tr_invoice_party_client": "فاتورة عميل",
   "tr_invoice_party_supplier": "فاتورة مورد",
   "tr_cashier_supplier_registered": "مورد مسجّل — تم تعبئة البيانات",

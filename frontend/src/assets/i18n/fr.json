@@ -782,6 +782,8 @@
   "tr_number_of_orders": "Nombre de commandes",
   "tr_total_orders_price": "Prix total des commandes",
   "tr_legal_name": "Nom légal de l’entreprise",
+  "tr_search_supplier": "Choisir le fournisseur",
+  "tr_search_supplier_placeholder": "Rechercher par société, contact ou téléphone",
   "tr_new_suplier": "Nouveau fournisseur",
   "tr_edit_suplier": "Modifier le fournisseur",
   "tr_suplier_name": "Nom du fournisseur",

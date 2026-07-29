@@ -464,6 +464,11 @@
   .cashier-client-fields__item {
       min-width: 0;
 
+      &--full {
+        grid-column: 1 / -1;
+        margin-bottom: 0.65rem;
+      }
+
       label {
         display: block;
         margin-bottom: 0.15rem;
@@ -571,6 +576,14 @@
       min-height: 0;
       overflow-y: auto;
       padding-bottom: 0.5rem;
+    }
+
+    .products-grid__status {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 0.75rem 0.5rem;
+      font-size: 0.9rem;
+      color: #7f8c8d;
     }
   
     .product-card {

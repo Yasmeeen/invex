@@ -1,10 +1,14 @@
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import { canUseBookings, canUseProfit, canUseReports } from './policy.js';
 import { createProvider } from './provider.js';
 import { toolBookings, toolProfit, toolSales } from './tools.js';
 import { searchMarketPrices } from './web_search.js';
+
+/** Match reports/orders business calendar (Egypt). */
+const VIXA_TZ = 'Africa/Cairo';
 
 function normalizeArabicText(s) {
   return String(s || '')
@@ -16,42 +20,34 @@ function normalizeArabicText(s) {
     .replace(/[أإآٱ]/g, 'ا');
 }
 
-function formatLocalISODate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function formatCairoISODate(d = moment.tz(VIXA_TZ)) {
+  return moment.tz(d, VIXA_TZ).format('YYYY-MM-DD');
 }
 
 function todayRangeISO() {
-  // IMPORTANT: do not use toISOString().slice(0, 10); it converts to UTC and can shift the day.
-  const now = new Date();
-  const iso = formatLocalISODate(now);
+  // IMPORTANT: use Africa/Cairo, not UTC / server-local, so “النهارده” matches store day.
+  const iso = formatCairoISODate();
   return { from: iso, to: iso };
 }
 
 function yesterdayRangeISO() {
-  const now = new Date();
-  const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const iso = formatLocalISODate(y);
+  const iso = formatCairoISODate(moment.tz(VIXA_TZ).subtract(1, 'day'));
   return { from: iso, to: iso };
 }
 
-/** Monday–Sunday range for the current calendar week (local time). */
+/** Monday–Sunday range for the current calendar week (Cairo). */
 function thisWeekRangeISO() {
-  const now = new Date();
-  const dayFromMonday = (now.getDay() + 6) % 7; // Mon=0 … Sun=6
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayFromMonday);
-  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6);
-  return { from: formatLocalISODate(from), to: formatLocalISODate(to) };
+  const from = moment.tz(VIXA_TZ).startOf('isoWeek'); // Monday
+  const to = from.clone().endOf('isoWeek'); // Sunday
+  return { from: from.format('YYYY-MM-DD'), to: to.format('YYYY-MM-DD') };
 }
 
 function thisMonthRangeISO() {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  // day 0 of next month = last day of current month
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { from: formatLocalISODate(from), to: formatLocalISODate(to) };
+  const now = moment.tz(VIXA_TZ);
+  return {
+    from: now.clone().startOf('month').format('YYYY-MM-DD'),
+    to: now.clone().endOf('month').format('YYYY-MM-DD'),
+  };
 }
 
 function pickIsoDate(s) {

@@ -11,8 +11,8 @@ import { formatDate } from '@angular/common';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
-import { of, Subject, Subscription } from 'rxjs';
-import { debounceTime, switchMap, catchError, takeUntil } from 'rxjs/operators';
+import { Observable, of, Subject, Subscription } from 'rxjs';
+import { debounceTime, switchMap, catchError, takeUntil, distinctUntilChanged, tap, map } from 'rxjs/operators';
 import { Globals } from '@core/globals';
 import {
   buildCashierPaymentMethods,
@@ -77,6 +77,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('barcodeInput') barcodeInput!: ElementRef;
 
   products: Product[] = [];
+  /** Infinite-scroll product list (first page + append on scroll). */
+  readonly productsPageSize = 20;
+  productsLoading = false;
+  productsHasMore = true;
+  private productsPage = 1;
+  private productsLoadToken = 0;
   orderItems: any[] = [];
   /** Index of order line whose unit price is being edited; null when not editing. */
   editingPriceIndex: number | null = null;
@@ -129,6 +135,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedClientId: string | null = null;
   selectedVendorId: string | null = null;
   supplierCompanyName = '';
+  /** Searchable supplier picker (company / contact / phone). */
+  vendorSearchItems: any[] = [];
+  selectedVendor: any = null;
+  vendorsLoading = false;
+  readonly vendorTypeahead$ = new Subject<string>();
   /** Avoid repeating the same “registered” toast for the same lookup. */
   private lastNotifiedPartyId: string | null = null;
 
@@ -170,6 +181,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadBranchSalespeople();
     }
     this.initClientForm();
+    this.initVendorTypeahead();
   }
 
   ngOnInit(): void {
@@ -739,6 +751,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     phoneControl?.valueChanges
       .pipe(
         debounceTime(400),
+        takeUntil(this.destroy$),
         switchMap((phone: string) => {
           if (!phone) {
             this.clearPartyLookupState(nameControl, addressControl, false);
@@ -778,25 +791,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         const addressControl = this.clientForm.get('address');
 
         if (this.partyType === 'supplier') {
-          const dedupeKey = party._id != null ? String(party._id) : String(party.phone || '');
-          if (dedupeKey && dedupeKey !== this.lastNotifiedPartyId) {
-            this.lastNotifiedPartyId = dedupeKey;
-            this.translate
-              .get('tr_cashier_supplier_registered')
-              .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
-          }
-          this.isExistingVendor = true;
-          this.isExistingClient = false;
-          this.selectedClientId = null;
-          this.selectedVendorId = party._id ? String(party._id) : null;
-          this.supplierCompanyName = party.nameOfcompany || '';
-          this.clearClientActiveBookings();
-          nameControl?.setValue(party.name, { emitEvent: false });
-          addressControl?.setValue(party.address || '', { emitEvent: false });
-          nameControl?.disable({ emitEvent: false });
-          addressControl?.disable({ emitEvent: false });
-          nameControl?.clearValidators();
-          addressControl?.clearValidators();
+          this.applySelectedCashierVendor(party, true);
         } else {
           const dedupeKey =
             party._id != null ? String(party._id) : String(party.phoneNumber || '');
@@ -810,6 +805,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           this.isExistingVendor = false;
           this.selectedClientId = party._id ? String(party._id) : null;
           this.selectedVendorId = null;
+          this.selectedVendor = null;
           this.supplierCompanyName = '';
           nameControl?.setValue(party.name, { emitEvent: false });
           addressControl?.setValue(party.address, { emitEvent: false });
@@ -817,11 +813,153 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           addressControl?.disable({ emitEvent: false });
           nameControl?.clearValidators();
           addressControl?.clearValidators();
+          nameControl?.updateValueAndValidity({ emitEvent: false });
+          addressControl?.updateValueAndValidity({ emitEvent: false });
           this.loadClientActiveBookings();
         }
-        nameControl?.updateValueAndValidity({ emitEvent: false });
-        addressControl?.updateValueAndValidity({ emitEvent: false });
       });
+  }
+
+  private initVendorTypeahead(): void {
+    this.vendorTypeahead$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        takeUntil(this.destroy$),
+        tap(() => (this.vendorsLoading = true)),
+        switchMap((term: string) => {
+          const search = String(term || '').trim();
+          const params: Record<string, string | number> = { page: 1, limit: 25 };
+          if (search) {
+            params.search = search;
+          }
+          return this.vendorsSerivce.getVendors(params).pipe(
+            catchError(() => of({ vendors: [] })),
+            tap(() => (this.vendorsLoading = false))
+          );
+        })
+      )
+      .subscribe((res: any) => {
+        const list = Array.isArray(res?.vendors) ? res.vendors : [];
+        this.vendorSearchItems = list.map((v: any) => this.withVendorLabel(v));
+        if (
+          this.selectedVendor?._id &&
+          !this.vendorSearchItems.some(
+            (v) => String(v._id) === String(this.selectedVendor._id)
+          )
+        ) {
+          this.vendorSearchItems = [
+            this.withVendorLabel(this.selectedVendor),
+            ...this.vendorSearchItems,
+          ];
+        }
+      });
+  }
+
+  onVendorSelectOpen(): void {
+    this.vendorTypeahead$.next('');
+  }
+
+  private withVendorLabel(vendor: any): any {
+    if (!vendor) {
+      return vendor;
+    }
+    const company = String(vendor.nameOfcompany || '').trim();
+    const name = String(vendor.name || '').trim();
+    const phone = String(vendor.phone || '').trim();
+    return {
+      ...vendor,
+      label: [company, name, phone].filter(Boolean).join(' — '),
+    };
+  }
+
+  onCashierVendorPicked(vendor: any): void {
+    if (!vendor) {
+      this.clearSelectedCashierVendor(true);
+      return;
+    }
+    this.applySelectedCashierVendor(vendor, true);
+  }
+
+  onCashierVendorIdChange(vendorId: string | null): void {
+    if (!vendorId) {
+      this.onCashierVendorPicked(null);
+      return;
+    }
+    const found = this.vendorSearchItems.find((v) => String(v._id) === String(vendorId));
+    if (found) {
+      this.onCashierVendorPicked(found);
+      return;
+    }
+    this.vendorsSerivce.getVendor(String(vendorId)).subscribe({
+      next: (v) => this.onCashierVendorPicked(v),
+      error: () => this.onCashierVendorPicked(null),
+    });
+  }
+
+  private applySelectedCashierVendor(vendor: any, notify: boolean): void {
+    if (!vendor) {
+      return;
+    }
+    const labeled = this.withVendorLabel(vendor);
+    this.selectedVendor = labeled;
+    if (
+      !this.vendorSearchItems.some((v) => String(v._id) === String(labeled._id))
+    ) {
+      this.vendorSearchItems = [labeled, ...this.vendorSearchItems];
+    }
+
+    const nameControl = this.clientForm.get('name');
+    const addressControl = this.clientForm.get('address');
+    const phoneControl = this.clientForm.get('phone');
+
+    if (notify) {
+      const dedupeKey = labeled._id != null ? String(labeled._id) : String(labeled.phone || '');
+      if (dedupeKey && dedupeKey !== this.lastNotifiedPartyId) {
+        this.lastNotifiedPartyId = dedupeKey;
+        this.translate
+          .get('tr_cashier_supplier_registered')
+          .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+      }
+    }
+
+    this.isExistingVendor = true;
+    this.isExistingClient = false;
+    this.selectedClientId = null;
+    this.selectedVendorId = labeled._id ? String(labeled._id) : null;
+    this.supplierCompanyName = labeled.nameOfcompany || '';
+    this.clearClientActiveBookings();
+    phoneControl?.setValue(labeled.phone || '', { emitEvent: false });
+    nameControl?.setValue(labeled.name || '', { emitEvent: false });
+    addressControl?.setValue(labeled.address || '', { emitEvent: false });
+    nameControl?.disable({ emitEvent: false });
+    addressControl?.disable({ emitEvent: false });
+    nameControl?.clearValidators();
+    addressControl?.clearValidators();
+    nameControl?.updateValueAndValidity({ emitEvent: false });
+    addressControl?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private clearSelectedCashierVendor(clearFields: boolean): void {
+    const nameControl = this.clientForm.get('name');
+    const addressControl = this.clientForm.get('address');
+    const phoneControl = this.clientForm.get('phone');
+    this.selectedVendor = null;
+    this.selectedVendorId = null;
+    this.isExistingVendor = false;
+    this.supplierCompanyName = '';
+    this.lastNotifiedPartyId = null;
+    nameControl?.enable({ emitEvent: false });
+    addressControl?.enable({ emitEvent: false });
+    if (clearFields) {
+      phoneControl?.setValue('', { emitEvent: false });
+      nameControl?.setValue('', { emitEvent: false });
+      addressControl?.setValue('', { emitEvent: false });
+      nameControl?.setValidators([Validators.required]);
+      addressControl?.setValidators([Validators.required]);
+      nameControl?.updateValueAndValidity({ emitEvent: false });
+      addressControl?.updateValueAndValidity({ emitEvent: false });
+    }
   }
 
   private clearPartyLookupState(
@@ -833,6 +971,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isExistingVendor = false;
     this.selectedClientId = null;
     this.selectedVendorId = null;
+    this.selectedVendor = null;
     this.supplierCompanyName = '';
     nameControl?.enable({ emitEvent: false });
     addressControl?.enable({ emitEvent: false });
@@ -855,12 +994,17 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.partyType === type) return;
     this.partyType = type;
     this.lastNotifiedPartyId = null;
+    this.selectedVendor = null;
+    this.vendorSearchItems = [];
     const phone = String(this.clientForm.get('phone')?.value || '').trim();
     const nameControl = this.clientForm.get('name');
     const addressControl = this.clientForm.get('address');
     this.clearPartyLookupState(nameControl, addressControl, !!phone);
     this.clearClientActiveBookings();
-    if (phone) {
+    if (type === 'supplier') {
+      this.clientForm.patchValue({ phone: '', name: '', address: '' }, { emitEvent: false });
+      this.clientForm.get('phone')?.enable({ emitEvent: false });
+    } else if (phone) {
       this.clientForm.get('phone')?.setValue(phone);
     }
   }
@@ -906,6 +1050,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isExistingVendor = false;
     this.selectedClientId = null;
     this.selectedVendorId = null;
+    this.selectedVendor = null;
     this.supplierCompanyName = '';
     this.clearClientActiveBookings();
   }
@@ -1059,10 +1204,13 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  loadProducts() {
-    let params: any = {
-      page: 1,
-      limit: 1000
+  /** Branch / warehouse filters shared by grid pagination and barcode lookup. */
+  private buildCashierProductListParams(
+    extra: Record<string, string | number | boolean> = {}
+  ): Record<string, string | number | boolean> {
+    const params: Record<string, string | number | boolean> = {
+      inStock: true,
+      ...extra,
     };
     const selectedBranchId = canPickBranchRole(this.curentUser?.role)
       ? this.adminSelectedBranchId
@@ -1073,18 +1221,116 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       params['excludeWarehouse'] = true;
     }
+    return params;
+  }
 
-    this.productsSerivce.getProducts(params).subscribe((res: any) => {
-      this.products = res.products;
+  /**
+   * Load cashier products in pages of 20.
+   * `reset` (default): replace list from page 1 (branch change, checkout refresh).
+   * `reset=false`: append next page (infinite scroll).
+   */
+  loadProducts(reset = true): void {
+    if (!reset && (this.productsLoading || !this.productsHasMore)) {
+      return;
+    }
+
+    if (reset) {
+      this.productsPage = 1;
+      this.productsHasMore = true;
+      this.products = [];
+      this.loadDrawerOpeningBalance();
+    }
+
+    const page = this.productsPage;
+    const token = ++this.productsLoadToken;
+    this.productsLoading = true;
+
+    const params = this.buildCashierProductListParams({
+      page,
+      limit: this.productsPageSize,
     });
-    this.loadDrawerOpeningBalance();
+
+    this.productsSerivce.getProducts(params).subscribe({
+      next: (res: any) => {
+        if (token !== this.productsLoadToken) {
+          return;
+        }
+        const list = Array.isArray(res?.products) ? res.products : [];
+        this.products = reset ? list : [...this.products, ...list];
+        const nextPage = res?.meta?.nextPage;
+        this.productsHasMore = nextPage != null;
+        if (this.productsHasMore) {
+          this.productsPage = Number(nextPage);
+        }
+        this.productsLoading = false;
+        this.cdr.markForCheck();
+        // If the grid has no scrollbar yet, keep filling until it can scroll or pages end.
+        setTimeout(() => this.fillProductsGridIfNeeded(), 0);
+      },
+      error: () => {
+        if (token !== this.productsLoadToken) {
+          return;
+        }
+        this.productsLoading = false;
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  /** When products don't overflow the grid, scroll never fires — load next page until they do. */
+  private fillProductsGridIfNeeded(): void {
+    if (this.productsLoading || !this.productsHasMore) {
+      return;
+    }
+    const el = document.querySelector('.cashier .products-grid') as HTMLElement | null;
+    if (!el) {
+      return;
+    }
+    if (el.scrollHeight <= el.clientHeight + 4) {
+      this.loadProducts(false);
+    }
+  }
+
+  /** Near bottom of products grid → fetch next page (does not touch search / barcode / branch UI). */
+  onProductsScroll(event: Event): void {
+    const el = event.target as HTMLElement | null;
+    if (!el || this.productsLoading || !this.productsHasMore) {
+      return;
+    }
+    const threshold = 140;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+      this.loadProducts(false);
+    }
   }
 
   filteredProducts() {
-    const inStock = this.products.filter((p: Product) => Number(p.stock ?? 0) > 0);
-    if (!this.searchTerm) return inStock;
-    return inStock.filter((p: Product) =>
+    if (!this.searchTerm) {
+      return this.products;
+    }
+    return this.products.filter((p: Product) =>
       productMatchesSearchTerm(p, this.searchTerm)
+    );
+  }
+
+  /** Resolve a scanned code from loaded pages, or fetch from API if not yet loaded. */
+  private resolveProductByScannedCode(code: string): Observable<Product | undefined> {
+    const local = findProductByScannedCode(this.products, code);
+    if (local) {
+      return of(local);
+    }
+    // Barcode lookup must not be limited to the first grid page.
+    const params = this.buildCashierProductListParams({
+      page: 1,
+      limit: 50,
+      search: String(code || '').trim(),
+    });
+    delete params.inStock;
+
+    return this.productsSerivce.getProducts(params).pipe(
+      map((res: any): Product | undefined =>
+        findProductByScannedCode((res?.products || []) as Product[], code)
+      ),
+      catchError(() => of(undefined as Product | undefined))
     );
   }
 
@@ -1181,6 +1427,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /**
    * Auto-add when scanner/type finishes (no Enter needed).
    * Scanners dump chars quickly then pause; debounce waits for that pause.
+   * Works even when the SKU is not in the currently loaded product pages.
+   * Leaves the field intact if no match (user can keep typing / press Enter).
    */
   onBarcodeInput(): void {
     if (this.barcodeScanTimer != null) {
@@ -1191,9 +1439,18 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.barcodeScanTimer = setTimeout(() => {
       this.barcodeScanTimer = null;
-      if (findProductByScannedCode(this.products, code)) {
-        this.scanProduct(code);
-      }
+      this.resolveProductByScannedCode(code)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((product) => {
+          if (!product) {
+            return;
+          }
+          if ((this.barcode || '').trim() !== code) {
+            return;
+          }
+          this.addProduct(product);
+          this.barcode = '';
+        });
     }, 180);
   }
 
@@ -1202,10 +1459,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       clearTimeout(this.barcodeScanTimer);
       this.barcodeScanTimer = null;
     }
-    if (!code) return;
-    const product = findProductByScannedCode(this.products, code);
-    if (product) this.addProduct(product);
-    this.barcode = '';
+    const trimmed = String(code || '').trim();
+    if (!trimmed) return;
+    this.resolveProductByScannedCode(trimmed)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((product) => {
+        if (product) {
+          this.addProduct(product);
+        }
+        this.barcode = '';
+      });
   }
 
   increaseQty(i: number) {

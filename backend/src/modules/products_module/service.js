@@ -896,6 +896,7 @@ function buildProductsListQuery(queryParams = {}) {
     attrKey,
     attrValue,
     includeRemoved,
+    inStock,
   } = queryParams;
 
   const query = {};
@@ -909,6 +910,11 @@ function buildProductsListQuery(queryParams = {}) {
         { removedWhenOutOfStock: { $exists: false } },
       ],
     });
+  }
+
+  // Cashier / grids that only need sellable units
+  if (inStock === 'true' || inStock === true) {
+    query.stock = { $gt: 0 };
   }
 
   if (booked === 'true' || booked === true) {

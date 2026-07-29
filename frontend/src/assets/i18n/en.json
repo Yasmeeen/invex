@@ -489,6 +489,8 @@
   "tr_party_supplier": "Supplier",
   "tr_party_type": "Party type",
   "tr_supplier_contact_name": "Contact name",
+  "tr_search_supplier": "Select supplier",
+  "tr_search_supplier_placeholder": "Search by company, contact, or phone",
   "tr_invoice_party_client": "Client invoice",
   "tr_invoice_party_supplier": "Supplier invoice",
   "tr_cashier_supplier_registered": "Registered supplier — details filled in",

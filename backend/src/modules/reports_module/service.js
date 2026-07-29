@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import moment from 'moment-timezone';
 import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import PurchasingRequest from '../../DB/models/purchasingRequest.model.js';
@@ -12,6 +13,9 @@ import {
   aggregateTreasuryAmountsFromPurchases,
   resolvePurchaseTreasurySplits,
 } from '../../utils/purchase-treasury-splits.js';
+
+/** Business calendar for report date filters (matches orders/dashboard). */
+const REPORT_TZ = 'Africa/Cairo';
 
 /** Monthly branch fixed costs (rent + salaries + invoices + expenses) spread over this many days for daily rate. */
 const BRANCH_OVERHEAD_MONTHLY_DAYS = 30;
@@ -82,10 +86,20 @@ function daysInMonthOverlappingRange(periodKey, rangeFrom, rangeTo) {
   return calendarDaysInclusive(overlapFrom, overlapEnd);
 }
 
-const toDate = (value, fallback) => {
-  const d = value ? new Date(value) : fallback;
-  if (!d || Number.isNaN(d.getTime())) return fallback;
-  return d;
+/**
+ * Parse a calendar day in Africa/Cairo.
+ * IMPORTANT: `new Date('YYYY-MM-DD')` is UTC midnight and shifts the day in Egypt (UTC+2/+3),
+ * which drops early-morning sales from “today” filters used by reports and Vixa.
+ */
+const toDate = (value, fallback, { endOfDay = false } = {}) => {
+  const raw = value != null ? String(value).trim() : '';
+  if (raw) {
+    const day = moment.tz(raw, ['YYYY-MM-DD', moment.ISO_8601], true, REPORT_TZ);
+    if (day.isValid()) {
+      return (endOfDay ? day.endOf('day') : day.startOf('day')).utc().toDate();
+    }
+  }
+  return fallback;
 };
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -111,10 +125,13 @@ const appendOrderCustomerFilters = (match, f) => {
 };
 
 const parseCommonFilters = (query) => {
-  const now = new Date();
-  const from = toDate(query.from, new Date(now.getFullYear(), now.getMonth(), 1));
-  const to = toDate(query.to, now);
-  to.setHours(23, 59, 59, 999);
+  const nowCairo = moment.tz(REPORT_TZ);
+  const from = toDate(
+    query.from,
+    nowCairo.clone().startOf('month').startOf('day').utc().toDate(),
+    { endOfDay: false }
+  );
+  const to = toDate(query.to, nowCairo.clone().endOf('day').utc().toDate(), { endOfDay: true });
 
   const categoryRaw = String(query.category_id || query.categoryId || '').trim();
 
@@ -219,8 +236,8 @@ const intersectProductIdFilter = (existingProductId, supplierProductIds) => {
 
 const getDateGroupExpr = (groupBy) =>
   groupBy === 'monthly'
-    ? { $dateToString: { format: '%Y-%m', date: '$createdAt' } }
-    : { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+    ? { $dateToString: { format: '%Y-%m', date: '$createdAt', timezone: REPORT_TZ } }
+    : { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: REPORT_TZ } };
 
 /** Cash; credit; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
 const salesPaymentCategoryExpr = {

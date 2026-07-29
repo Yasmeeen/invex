@@ -18,8 +18,8 @@ import {
   productBarcodeAttributeValues,
   ProductsSerivce,
 } from '@shared/services/products.service';
-import { forkJoin, Observable, of, Subscription } from 'rxjs';
-import { catchError, debounceTime, switchMap } from 'rxjs/operators';
+import { forkJoin, Observable, of, Subject, Subscription } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { TranslateService } from '@ngx-translate/core';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
@@ -50,6 +50,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   isExistingSourceVendor = false;
   selectedSourceVendorId: string | null = null;
   sourceSupplierCompanyName = '';
+  /** ng-select typeahead for picking an existing supplier by company / contact / phone. */
+  vendorSearchItems: any[] = [];
+  selectedSourceVendor: any = null;
+  vendorsLoading = false;
+  readonly vendorTypeahead$ = new Subject<string>();
   private lastNotifiedSourcePartyId: string | null = null;
   branches: Branch [];
   codeReader = new BrowserMultiFormatReader();
@@ -668,6 +673,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.initSourcePartyPhoneLookup();
+    this.initVendorTypeahead();
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
     if (this.cashDeskPurchase) {
@@ -822,7 +828,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.isExistingSourceVendor) {
       this.vendorsSerivce.getVendor(this.selectedSourceVendorId!).subscribe({
         next: (v: any) => {
-          this.sourceSupplierCompanyName = v?.nameOfcompany || '';
+          this.applySelectedVendor(v, false);
         },
         error: () => {},
       });
@@ -840,6 +846,141 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     }
   }
 
+  private initVendorTypeahead(): void {
+    this.subscriptions.push(
+      this.vendorTypeahead$
+        .pipe(
+          debounceTime(300),
+          distinctUntilChanged(),
+          tap(() => (this.vendorsLoading = true)),
+          switchMap((term: string) => {
+            const search = String(term || '').trim();
+            const params: Record<string, string | number> = { page: 1, limit: 25 };
+            if (search) {
+              params.search = search;
+            }
+            return this.vendorsSerivce.getVendors(params).pipe(
+              catchError(() => of({ vendors: [] })),
+              tap(() => (this.vendorsLoading = false))
+            );
+          })
+        )
+        .subscribe((res: any) => {
+          const list = Array.isArray(res?.vendors) ? res.vendors : [];
+          this.vendorSearchItems = list.map((v: any) => this.withVendorLabel(v));
+          // Keep the currently selected vendor visible even if it is outside this page.
+          if (
+            this.selectedSourceVendor?._id &&
+            !this.vendorSearchItems.some(
+              (v) => String(v._id) === String(this.selectedSourceVendor._id)
+            )
+          ) {
+            this.vendorSearchItems = [
+              this.withVendorLabel(this.selectedSourceVendor),
+              ...this.vendorSearchItems,
+            ];
+          }
+        })
+    );
+  }
+
+  onVendorSelectOpen(): void {
+    this.vendorTypeahead$.next('');
+  }
+
+  private withVendorLabel(vendor: any): any {
+    if (!vendor) {
+      return vendor;
+    }
+    const company = String(vendor.nameOfcompany || '').trim();
+    const name = String(vendor.name || '').trim();
+    const phone = String(vendor.phone || '').trim();
+    return {
+      ...vendor,
+      label: [company, name, phone].filter(Boolean).join(' — '),
+    };
+  }
+
+  onSourceVendorPicked(vendor: any): void {
+    if (!vendor) {
+      this.clearSelectedVendorFields(true);
+      return;
+    }
+    this.applySelectedVendor(vendor, true);
+  }
+
+  onSourceVendorIdChange(vendorId: string | null): void {
+    if (!vendorId) {
+      this.onSourceVendorPicked(null);
+      return;
+    }
+    const found = this.vendorSearchItems.find((v) => String(v._id) === String(vendorId));
+    if (found) {
+      this.onSourceVendorPicked(found);
+      return;
+    }
+    this.vendorsSerivce.getVendor(String(vendorId)).subscribe({
+      next: (v) => this.onSourceVendorPicked(v),
+      error: () => this.onSourceVendorPicked(null),
+    });
+  }
+
+  private applySelectedVendor(vendor: any, notify: boolean): void {
+    if (!vendor) {
+      return;
+    }
+    const labeled = this.withVendorLabel(vendor);
+    this.selectedSourceVendor = labeled;
+    if (
+      !this.vendorSearchItems.some((v) => String(v._id) === String(labeled._id))
+    ) {
+      this.vendorSearchItems = [labeled, ...this.vendorSearchItems];
+    }
+    this.isExistingSourceVendor = true;
+    this.isExistingSourceClient = false;
+    this.selectedSourceVendorId = labeled._id ? String(labeled._id) : null;
+    this.sourceSupplierCompanyName = labeled.nameOfcompany || '';
+
+    const nameControl = this.sourcePartyForm.get('name');
+    const addressControl = this.sourcePartyForm.get('address');
+    const phoneControl = this.sourcePartyForm.get('phone');
+    phoneControl?.setValue(labeled.phone || '', { emitEvent: false });
+    nameControl?.setValue(labeled.name || '', { emitEvent: false });
+    addressControl?.setValue(labeled.address || '', { emitEvent: false });
+    nameControl?.disable({ emitEvent: false });
+    addressControl?.disable({ emitEvent: false });
+
+    if (notify) {
+      const dedupeKey = labeled._id != null ? String(labeled._id) : String(labeled.phone || '');
+      if (dedupeKey && dedupeKey !== this.lastNotifiedSourcePartyId) {
+        this.lastNotifiedSourcePartyId = dedupeKey;
+        this.translateService
+          .get('tr_cashier_supplier_registered')
+          .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+      }
+    }
+    this.syncDeskPurchaseTreasuryKey();
+  }
+
+  private clearSelectedVendorFields(enableManualEntry: boolean): void {
+    const nameControl = this.sourcePartyForm.get('name');
+    const addressControl = this.sourcePartyForm.get('address');
+    const phoneControl = this.sourcePartyForm.get('phone');
+    this.selectedSourceVendor = null;
+    this.selectedSourceVendorId = null;
+    this.isExistingSourceVendor = false;
+    this.sourceSupplierCompanyName = '';
+    this.lastNotifiedSourcePartyId = null;
+    nameControl?.enable({ emitEvent: false });
+    addressControl?.enable({ emitEvent: false });
+    if (enableManualEntry) {
+      phoneControl?.setValue('', { emitEvent: false });
+      nameControl?.setValue('', { emitEvent: false });
+      addressControl?.setValue('', { emitEvent: false });
+    }
+    this.syncDeskPurchaseTreasuryKey();
+  }
+
   private initSourcePartyPhoneLookup(): void {
     const phoneControl = this.sourcePartyForm.get('phone');
     const nameControl = this.sourcePartyForm.get('name');
@@ -855,6 +996,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
               this.clearSourcePartyLookupState(nameControl, addressControl, false);
               return of(null);
             }
+            // Supplier primary path is the searchable select; phone lookup remains as fallback.
             const lookup$ =
               this.sourcePartyType === 'supplier'
                 ? this.vendorsSerivce.getVendorByPhone(trimmed)
@@ -875,22 +1017,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
             return;
           }
           if (this.sourcePartyType === 'supplier') {
-            const dedupeKey = party._id != null ? String(party._id) : String(party.phone || '');
-            if (dedupeKey && dedupeKey !== this.lastNotifiedSourcePartyId) {
-              this.lastNotifiedSourcePartyId = dedupeKey;
-              this.translateService
-                .get('tr_cashier_supplier_registered')
-                .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
-            }
-            this.isExistingSourceVendor = true;
-            this.isExistingSourceClient = false;
-            this.selectedSourceVendorId = party._id ? String(party._id) : null;
-            this.sourceSupplierCompanyName = party.nameOfcompany || '';
-            nameControl?.setValue(party.name, { emitEvent: false });
-            addressControl?.setValue(party.address || '', { emitEvent: false });
-            nameControl?.disable({ emitEvent: false });
-            addressControl?.disable({ emitEvent: false });
-            this.syncDeskPurchaseTreasuryKey();
+            this.applySelectedVendor(party, true);
           } else {
             const dedupeKey =
               party._id != null ? String(party._id) : String(party.phoneNumber || '');
@@ -902,6 +1029,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
             }
             this.isExistingSourceClient = true;
             this.isExistingSourceVendor = false;
+            this.selectedSourceVendor = null;
             this.selectedSourceVendorId = null;
             this.sourceSupplierCompanyName = '';
             nameControl?.setValue(party.name, { emitEvent: false });
@@ -922,6 +1050,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     this.isExistingSourceClient = false;
     this.isExistingSourceVendor = false;
     this.selectedSourceVendorId = null;
+    this.selectedSourceVendor = null;
     this.sourceSupplierCompanyName = '';
     nameControl?.enable({ emitEvent: false });
     addressControl?.enable({ emitEvent: false });
@@ -939,11 +1068,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.sourcePartyType === type) return;
     this.sourcePartyType = type;
     this.lastNotifiedSourcePartyId = null;
+    this.selectedSourceVendor = null;
+    this.vendorSearchItems = [];
     const phone = String(this.sourcePartyForm.get('phone')?.value || '').trim();
     const nameControl = this.sourcePartyForm.get('name');
     const addressControl = this.sourcePartyForm.get('address');
     this.clearSourcePartyLookupState(nameControl, addressControl, !!phone);
-    if (phone) {
+    if (type === 'supplier') {
+      this.sourcePartyForm.patchValue({ phone: '', name: '', address: '' }, { emitEvent: false });
+    } else if (phone) {
       this.sourcePartyForm.get('phone')?.setValue(phone);
     }
   }

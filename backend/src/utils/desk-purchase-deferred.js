@@ -23,6 +23,7 @@ import {
   syncVendorPurchaseLedger,
 } from './vendor-purchase-ledger.js';
 import { resolveBranchForCashDrawer } from './vendor-cash-drawer.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from './treasury-ledger.js';
 
 export function deferredDeskPurchaseRemaining(purchase) {
   if (!purchase || !purchaseHasDeferredTreasury(purchase)) return 0;
@@ -240,6 +241,22 @@ export async function recordDeskPurchaseDeferredPayment(
       });
     }
   }
+
+  await safeTreasuryPost('desk_deferred_paid', async () => {
+    const resolvedBranch = await resolveBranchForCashDrawer({
+      userId,
+      branchId: branchId || purchase.branch,
+    });
+    if (!resolvedBranch) return;
+    await postTreasurySplitOutflows({
+      branchId: resolvedBranch,
+      splits,
+      sourceType: 'desk_purchase',
+      sourceId: purchase._id,
+      note: String(note || '').trim() || 'Desk purchase deferred payment',
+      createdBy: userId,
+    });
+  });
 
   return {
     applied,

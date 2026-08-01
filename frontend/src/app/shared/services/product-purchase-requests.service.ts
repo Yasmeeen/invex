@@ -46,6 +46,18 @@ export class ProductPurchaseRequestsService {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }
 
+  /** Append another device to an existing exchange trade-in purchase (one invoice). */
+  addLine(
+    purchaseId: string,
+    payload: {
+      userId: string;
+      quantity?: number;
+      product: DeskPurchaseProductPayload;
+    }
+  ): Observable<any> {
+    return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}/add-line`, payload);
+  }
+
   approve(purchaseId: string, payload: { userId: string; resolutionNote?: string }): Observable<any> {
     return this.http.patch(`${PRODUCT_PURCHASE_REQUESTS_URL}/${purchaseId}/approve`, payload);
   }

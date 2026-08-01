@@ -1,0 +1,163 @@
+.treasury-row {
+  cursor: pointer;
+}
+.treasury-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.fw-bold {
+  font-weight: 600;
+}
+
+.treasury-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  padding-bottom: 1.5rem;
+}
+
+.treasury-card {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  border-radius: 14px;
+  padding: 0.95rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.treasury-card:hover {
+  border-color: rgba(30, 77, 43, 0.28);
+  box-shadow: 0 12px 28px rgba(30, 77, 43, 0.1);
+  transform: translateY(-1px);
+}
+
+.treasury-card__top {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.treasury-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #e8ede9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  background: rgba(30, 77, 43, 0.07);
+  color: #1e4d2b;
+}
+
+.treasury-card__icon--cash {
+  background: rgba(5, 150, 105, 0.08);
+  color: #047857;
+  border-color: rgba(5, 150, 105, 0.16);
+}
+
+.treasury-card__icon--settlement {
+  background: rgba(217, 119, 6, 0.08);
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.16);
+}
+
+.treasury-card__icon--treasury {
+  background: rgba(30, 77, 43, 0.08);
+  color: #1e4d2b;
+  border-color: rgba(30, 77, 43, 0.16);
+}
+
+.treasury-card__name {
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.treasury-card__meta {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.treasury-card__balances {
+  margin-top: 0.85rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.balance-pill {
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid transparent;
+}
+
+.balance-pill--opening {
+  background: rgba(107, 114, 128, 0.06);
+  border-color: rgba(107, 114, 128, 0.14);
+}
+
+.balance-pill--expected {
+  background: rgba(30, 77, 43, 0.07);
+  border-color: rgba(30, 77, 43, 0.16);
+}
+
+.balance-pill__label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.balance-pill__value {
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #111827;
+  margin-top: 0.12rem;
+}
+
+.balance-pill--expected .balance-pill__value {
+  color: #1e4d2b;
+}
+
+.treasury-card__footer {
+  margin-top: 0.85rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid #eef2f0;
+}
+
+.treasury-card__footer-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.treasury-card__footer-value {
+  font-size: 0.82rem;
+  color: #374151;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.dot {
+  color: #9ca3af;
+}
+
+.text-success {
+  color: #047857;
+}
+
+.text-danger {
+  color: #b91c1c;
+}

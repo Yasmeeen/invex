@@ -2,7 +2,12 @@
   <h2 class="size-body title-with-btn plr-4 ptb-4">
     <span class="page-title">{{ 'tr_daily_expenses_page_title' | translate }}</span>
     <div class="btn-group flex flex-middle gap-sm">
-      <button type="button" class="s-btn btn-primary size-body" (click)="openAddDialog()">
+      <button
+        type="button"
+        class="s-btn btn-primary size-body"
+        *ngIf="activeTab === 'operating'"
+        (click)="openAddDialog()"
+      >
         {{ 'tr_daily_expenses_add' | translate }}
       </button>
       <button type="button" class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
@@ -10,6 +15,32 @@
       </button>
     </div>
   </h2>
+
+  <div class="expenses-tabs plr-4" role="tablist">
+    <button
+      type="button"
+      class="expenses-tabs__btn"
+      role="tab"
+      [attr.aria-selected]="activeTab === 'operating'"
+      [class.expenses-tabs__btn--active]="activeTab === 'operating'"
+      (click)="setTab('operating')"
+    >
+      {{ 'tr_daily_expenses_tab_operating' | translate }}
+    </button>
+    <button
+      type="button"
+      class="expenses-tabs__btn"
+      role="tab"
+      [attr.aria-selected]="activeTab === 'cash_movements'"
+      [class.expenses-tabs__btn--active]="activeTab === 'cash_movements'"
+      (click)="setTab('cash_movements')"
+    >
+      {{ 'tr_daily_expenses_tab_cash_movements' | translate }}
+    </button>
+  </div>
+  <p class="expenses-tabs__hint plr-4 text-muted size-caption" *ngIf="isCashMovementsTab">
+    {{ 'tr_daily_expenses_cash_movements_hint' | translate }}
+  </p>
 
   <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
     <div class="row flex-wrap">
@@ -55,6 +86,16 @@
   </div>
 
   <div class="plr-4 mt-4" *ngIf="!loading">
+    <div class="expenses-total-bar flex flex-middle flex-between mb-4" *ngIf="paginationData">
+      <div class="text-muted size-caption">
+        {{ filteredCountKey | translate : { count: paginationData.totalCount } }}
+      </div>
+      <div class="expenses-total-bar__sum">
+        <span class="text-muted size-caption">{{ totalAmountLabelKey | translate }}</span>
+        <strong class="size-h5 ml-2">{{ totalAmount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+      </div>
+    </div>
+
     <div class="table-container" *ngIf="expenses.length > 0">
       <table class="s-table table layout-fixed">
         <thead>
@@ -74,7 +115,7 @@
             <td>{{ row.branch?.name || '—' }}</td>
             <td>{{ row.amount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td class="expenses-treasury">{{ expenseTreasuryDisplay(row) }}</td>
-            <td>{{ row.expenseType }}</td>
+            <td>{{ expenseTypeLabel(row) }}</td>
             <td class="expenses-notes">{{ row.notes || '—' }}</td>
             <td>{{ row.recordedBy?.name || row.recordedBy?.email || '—' }}</td>
           </tr>

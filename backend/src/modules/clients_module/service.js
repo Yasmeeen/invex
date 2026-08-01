@@ -35,6 +35,10 @@ import {
 } from "../../utils/client-cash-drawer.js";
 import { resolveBranchForCashDrawer } from "../../utils/vendor-cash-drawer.js";
 import {
+  postPaymentMethodInflows,
+  safeTreasuryPost,
+} from "../../utils/treasury-ledger.js";
+import {
   applyClientDeferredPayableSettlement,
   computeClientDeferredPayablesByClients,
   computeClientPayableBreakdown,
@@ -917,6 +921,18 @@ export const addClientDeposit = async (req, res) => {
         paymentTreasurySplits: treasuryAudit,
       });
     }
+
+    await safeTreasuryPost("client_deposit", async () => {
+      if (!branchId) return;
+      await postPaymentMethodInflows({
+        branchId,
+        methodAmounts: splits,
+        sourceType: "client_deposit",
+        sourceId: client._id,
+        note,
+        createdBy: req.body?.userId,
+      });
+    });
 
     res.json({
       message: "Deposit recorded",

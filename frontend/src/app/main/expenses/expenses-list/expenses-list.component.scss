@@ -3,3 +3,46 @@
   word-break: break-word;
   max-width: 280px;
 }
+
+.expenses-total-bar {
+  padding: 0.75rem 1rem;
+  background: var(--secondary, #f5f7fa);
+  border-radius: 6px;
+
+  &__sum {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+}
+
+.expenses-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid #e8e8ef;
+  margin-bottom: 0.5rem;
+}
+
+.expenses-tabs__btn {
+  border: none;
+  background: transparent;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.expenses-tabs__btn--active {
+  color: #5b21b6;
+  border-bottom-color: #5b21b6;
+}
+
+.expenses-tabs__hint {
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}

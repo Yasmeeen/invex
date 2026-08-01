@@ -19,8 +19,11 @@ export class ReportCardComponent {
   @Input() trendPositive = true;
   /** Format value as EGP currency. */
   @Input() money = false;
+  /** `loss` → red value / icon (negative profit period). */
+  @Input() tone: '' | 'loss' = '';
 
   get headerIconClass(): string {
+    if (this.tone === 'loss') return 'fa-arrow-down';
     const icons = ['fa-users', 'fa-hand-pointer-o', 'fa-file-text-o', 'fa-bar-chart'];
     return icons[this.variantIndex % icons.length];
   }

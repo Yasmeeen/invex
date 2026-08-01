@@ -122,10 +122,21 @@
       font-size: 14px;
     }
 
+    /* Qty: compact — give space to Total for amounts like EGP 88,000.00 */
     th:nth-child(2),
     td:nth-child(2){
-      width: 140px;
-      min-width: 140px;
+      width: 88px;
+      min-width: 88px;
+      max-width: 96px;
+      white-space: nowrap;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+    }
+
+    th:nth-child(4),
+    td:nth-child(4){
+      width: 7.5rem;
+      min-width: 7.5rem;
       white-space: nowrap;
     }
   }
@@ -741,7 +752,7 @@
   .order-panel {
     flex: 1;
     background: #ecf0f1;
-    padding: 1rem;
+    padding: 1rem 1rem 2.5rem;
     display: flex;
     flex-direction: column;
   
@@ -758,6 +769,33 @@
       .cashier-desk-actions__btn {
         flex: 1 1 140px;
         min-width: 0;
+      }
+    }
+
+    .cashier-booking-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .cashier-booking-bar {
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      font-weight: 600;
+
+      &--warn {
+        color: #b71c1c;
+        background: #ffebee;
+        border: 1px solid #ef9a9a;
+      }
+
+      &--deposit {
+        color: #1b5e20;
+        background: #e8f5e9;
+        border: 1px solid #a5d6a7;
       }
     }
   
@@ -811,6 +849,16 @@
         font-weight: 600;
         word-break: break-all;
         line-height: 1.2;
+      }
+
+      .order-line-product__name--reserved {
+        color: #c62828 !important;
+        font-weight: 700;
+      }
+
+      .order-line-product__name--deposit-matched {
+        color: #2e7d32 !important;
+        font-weight: 700;
       }
 
       .order-line-thumb {

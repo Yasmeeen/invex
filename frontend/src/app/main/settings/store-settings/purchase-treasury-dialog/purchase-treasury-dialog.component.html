@@ -48,7 +48,13 @@
   </div>
 
   <div mat-dialog-actions align="end" class="purchase-treasury-dialog__actions">
-    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+    <button
+      type="button"
+      class="s-btn btn-secondary"
+      *ngIf="isDialog"
+      (click)="cancel()"
+      [disabled]="saving"
+    >
       {{ 'tr_cancel' | translate }}
     </button>
     <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">

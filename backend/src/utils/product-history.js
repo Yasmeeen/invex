@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import AuditLog from '../DB/models/auditLog.model.js';
 import Order from '../DB/models/order.model.js';
+import Product from '../DB/models/product.model.js';
 import ProductBooking from '../DB/models/productBooking.model.js';
 import ProductBranchTransfer from '../DB/models/productBranchTransfer.model.js';
 import ProductPurchaseRequest from '../DB/models/productPurchaseRequest.model.js';
@@ -33,14 +34,81 @@ function branchName(branch) {
 }
 
 /**
- * Build a chronological timeline of everything that happened to a product row.
+ * Collect every product row that shares the same unit code / transfer chain
+ * so serial track keeps pre-transfer history after a branch clone.
+ */
+export async function resolveRelatedProductIds(product, extraIds = []) {
+  const seed = new Set();
+  const add = (id) => {
+    const oid = toOid(id);
+    if (oid) seed.add(String(oid));
+  };
+
+  add(product?._id);
+  for (const id of extraIds || []) add(id);
+
+  const code = String(product?.code || '').trim();
+  if (code) {
+    const siblings = await Product.find({ code }).select('_id').lean();
+    for (const s of siblings || []) add(s._id);
+  }
+
+  const seedOids = [...seed].map((id) => toOid(id)).filter(Boolean);
+  if (seedOids.length) {
+    const transfers = await ProductBranchTransfer.find({
+      $or: [
+        { product: { $in: seedOids } },
+        { destinationProduct: { $in: seedOids } },
+      ],
+    })
+      .select('product destinationProduct')
+      .lean();
+
+    for (const t of transfers || []) {
+      add(t.product);
+      add(t.destinationProduct);
+    }
+  }
+
+  return [...seed].map((id) => toOid(id)).filter(Boolean);
+}
+
+/**
+ * Build a chronological timeline of everything that happened to a product row
+ * (and related same-code / transfer-linked clones).
  * @param {object} product — lean Product with category + branch populated
+ * @param {{ relatedProductIds?: Array<string|object>, relatedProducts?: object[] }} [options]
  * @returns {Promise<{ events: object[] }>}
  */
-export async function buildProductHistoryEvents(product) {
-  const pid = toOid(product._id);
-  if (!pid) return { events: [] };
-  const pidStr = String(product._id);
+export async function buildProductHistoryEvents(product, options = {}) {
+  const primaryOid = toOid(product._id);
+  if (!primaryOid) return { events: [] };
+
+  const extraFromOptions = [
+    ...(options.relatedProductIds || []),
+    ...((options.relatedProducts || []).map((p) => p?._id).filter(Boolean)),
+  ];
+  const productIds = await resolveRelatedProductIds(product, extraFromOptions);
+  if (!productIds.length) return { events: [] };
+
+  const pidStrs = productIds.map((id) => String(id));
+  const pidSet = new Set(pidStrs);
+
+  const relatedProductsById = new Map();
+  relatedProductsById.set(String(product._id), product);
+  for (const p of options.relatedProducts || []) {
+    if (p?._id) relatedProductsById.set(String(p._id), p);
+  }
+
+  const missingIds = productIds.filter((id) => !relatedProductsById.has(String(id)));
+  if (missingIds.length) {
+    const fetched = await Product.find({ _id: { $in: missingIds } })
+      .populate('branch', 'name')
+      .lean();
+    for (const p of fetched || []) {
+      relatedProductsById.set(String(p._id), p);
+    }
+  }
 
   const [
     auditLogs,
@@ -52,74 +120,127 @@ export async function buildProductHistoryEvents(product) {
   ] = await Promise.all([
     AuditLog.find({
       $or: [
-        { entityType: 'Product', entityId: pidStr },
-        { 'metadata.productId': pidStr },
-        { 'metadata.productIds': pidStr },
-        { 'metadata.createdProductId': pidStr },
-        { 'metadata.createdProductIds': pidStr },
+        { entityType: 'Product', entityId: { $in: pidStrs } },
+        { 'metadata.productId': { $in: pidStrs } },
+        { 'metadata.productIds': { $in: pidStrs } },
+        { 'metadata.createdProductId': { $in: pidStrs } },
+        { 'metadata.createdProductIds': { $in: pidStrs } },
       ],
     })
       .sort({ createdAt: -1 })
-      .limit(200)
+      .limit(400)
       .lean(),
 
-    StockMovement.find({ productId: pid }).sort({ createdAt: -1 }).limit(200).lean(),
+    StockMovement.find({ productId: { $in: productIds } })
+      .sort({ createdAt: -1 })
+      .limit(400)
+      .lean(),
 
-    ProductBooking.find({ product: pid })
+    ProductBooking.find({ product: { $in: productIds } })
       .populate('client', 'name phoneNumber')
       .populate('createdBy', 'name')
       .populate('confirmedBy', 'name')
       .populate('cancelledBy', 'name')
       .populate('branch', 'name')
       .sort({ createdAt: -1 })
-      .limit(100)
+      .limit(200)
       .lean(),
 
-    ProductBranchTransfer.find({ product: pid })
+    ProductBranchTransfer.find({
+      $or: [
+        { product: { $in: productIds } },
+        { destinationProduct: { $in: productIds } },
+      ],
+    })
       .populate('fromBranch', 'name')
       .populate('toBranch', 'name')
       .populate('initiatedBy', 'name')
       .populate('resolvedBy', 'name')
       .sort({ createdAt: -1 })
-      .limit(100)
+      .limit(200)
       .lean(),
 
-    Order.find({ 'products.productId': pid })
+    Order.find({ 'products.productId': { $in: productIds } })
       .select(
         'orderNumber products status createdAt restoredAt branch paymentMethod totalPrice clientName sellerName payments paidByUserId returns'
       )
       .populate('branch', 'name')
       .sort({ createdAt: -1 })
-      .limit(200)
+      .limit(400)
       .lean(),
 
     ProductPurchaseRequest.find({
-      $or: [{ createdProductId: pid }, { createdProductIds: pid }],
+      $or: [
+        { createdProductId: { $in: productIds } },
+        { createdProductIds: { $in: productIds } },
+      ],
     })
       .populate('branch', 'name')
       .populate('createdBy', 'name')
       .populate('resolvedBy', 'name')
       .sort({ createdAt: -1 })
-      .limit(50)
+      .limit(100)
       .lean(),
   ]);
 
   const events = [];
+  const seenEventIds = new Set();
+  const pushUnique = (event) => {
+    if (!event?.id || seenEventIds.has(event.id)) return;
+    seenEventIds.add(event.id);
+    pushEvent(events, event);
+  };
 
-  pushEvent(events, {
-    id: `product-created-${pidStr}`,
-    type: 'product_created',
-    occurredAt: product.createdAt,
-    actorName: product.addedBy || '',
-    summary: product.code,
-    details: {
-      code: product.code,
-      name: product.name,
-      stock: product.stock,
-      branch: branchName(product.branch),
-      inWarehouse: !!product.inWarehouse,
-    },
+  // Destination clones created by an approved branch transfer should not look like a fresh device.
+  const createdByTransferIds = new Set();
+  for (const t of branchTransfers || []) {
+    if (t.status !== 'approved') continue;
+    if (t.destinationProduct) {
+      createdByTransferIds.add(String(t.destinationProduct));
+      continue;
+    }
+    // Legacy transfers (before destinationProduct was stored): match clone created at approve time.
+    if (!t.resolvedAt) continue;
+    const resolvedMs = new Date(t.resolvedAt).getTime();
+    const toBranchId = String(t.toBranch?._id || t.toBranch || '');
+    for (const p of relatedProductsById.values()) {
+      if (String(p._id) === String(t.product)) continue;
+      const createdMs = new Date(p.createdAt || 0).getTime();
+      if (Number.isNaN(resolvedMs) || Number.isNaN(createdMs)) continue;
+      if (Math.abs(createdMs - resolvedMs) > 60_000) continue;
+      const pBranchId = String(p.branch?._id || p.branch || '');
+      if (toBranchId && pBranchId && toBranchId === pBranchId) {
+        createdByTransferIds.add(String(p._id));
+      }
+    }
+  }
+
+  // Prefer chronological origin: earliest product_created among related rows.
+  const relatedList = [...relatedProductsById.values()].sort((a, b) => {
+    const ta = new Date(a.createdAt || 0).getTime();
+    const tb = new Date(b.createdAt || 0).getTime();
+    return ta - tb;
   });
+
+  for (const p of relatedList) {
+    const idStr = String(p._id);
+    if (createdByTransferIds.has(idStr)) continue;
+    pushUnique({
+      id: `product-created-${idStr}`,
+      type: 'product_created',
+      occurredAt: p.createdAt,
+      actorName: p.addedBy || '',
+      summary: p.code,
+      details: {
+        code: p.code,
+        name: p.name,
+        stock: p.stock,
+        branch: branchName(p.branch),
+        inWarehouse: !!p.inWarehouse,
+        productId: idStr,
+      },
+    });
+  }
 
   for (const log of auditLogs) {
     if (log.entityType === 'Product' && log.action === 'create') continue;
@@ -131,7 +252,7 @@ export async function buildProductHistoryEvents(product) {
       continue;
     }
     if (log.entityType === 'Product') {
-      pushEvent(events, {
+      pushUnique({
         id: `audit-${log._id}`,
         type: `product_${log.action}`,
         occurredAt: log.createdAt,
@@ -149,7 +270,9 @@ export async function buildProductHistoryEvents(product) {
 
   for (const m of stockMovements) {
     if (m.movementType === 'sale' || m.movementType === 'return') continue;
-    pushEvent(events, {
+    // Branch-transfer stock rows are covered by ProductBranchTransfer events (with names + approver).
+    if (m.referenceType === 'branch_transfer') continue;
+    pushUnique({
       id: `stock-${m._id}`,
       type: m.movementType === 'transfer' ? 'stock_transfer' : `stock_${m.movementType}`,
       occurredAt: m.createdAt,
@@ -170,46 +293,57 @@ export async function buildProductHistoryEvents(product) {
   }
 
   for (const t of branchTransfers) {
-    pushEvent(events, {
+    const initiatedByName = actorFromUser(t.initiatedBy);
+    const resolvedByName = actorFromUser(t.resolvedBy);
+    const from = branchName(t.fromBranch);
+    const to = branchName(t.toBranch);
+    const routeSummary = from && to ? `${from} → ${to}` : `${t.quantity}`;
+
+    pushUnique({
       id: `bt-request-${t._id}`,
       type: 'branch_transfer_requested',
       occurredAt: t.createdAt,
-      actorName: actorFromUser(t.initiatedBy),
-      summary: `${t.quantity}`,
+      actorName: initiatedByName,
+      summary: routeSummary,
       details: {
         quantity: t.quantity,
-        fromBranch: branchName(t.fromBranch),
-        toBranch: branchName(t.toBranch),
+        fromBranch: from,
+        toBranch: to,
         status: t.status,
+        initiatedBy: initiatedByName,
       },
     });
 
     if (t.status === 'approved' && t.resolvedAt) {
-      pushEvent(events, {
+      pushUnique({
         id: `bt-approve-${t._id}`,
         type: 'branch_transfer_approved',
         occurredAt: t.resolvedAt,
-        actorName: actorFromUser(t.resolvedBy),
-        summary: `${t.quantity}`,
+        actorName: resolvedByName,
+        summary: routeSummary,
         details: {
           quantity: t.quantity,
-          fromBranch: branchName(t.fromBranch),
-          toBranch: branchName(t.toBranch),
+          fromBranch: from,
+          toBranch: to,
+          initiatedBy: initiatedByName,
+          approvedBy: resolvedByName,
         },
       });
     }
 
     if (t.status === 'rejected' && t.resolvedAt) {
-      pushEvent(events, {
+      pushUnique({
         id: `bt-reject-${t._id}`,
         type: 'branch_transfer_rejected',
         occurredAt: t.resolvedAt,
-        actorName: actorFromUser(t.resolvedBy),
-        summary: t.rejectReason || `${t.quantity}`,
+        actorName: resolvedByName,
+        summary: t.rejectReason || routeSummary,
         details: {
           quantity: t.quantity,
-          fromBranch: branchName(t.fromBranch),
-          toBranch: branchName(t.toBranch),
+          fromBranch: from,
+          toBranch: to,
+          initiatedBy: initiatedByName,
+          rejectedBy: resolvedByName,
           rejectReason: t.rejectReason || '',
         },
       });
@@ -217,7 +351,7 @@ export async function buildProductHistoryEvents(product) {
   }
 
   for (const b of bookings) {
-    pushEvent(events, {
+    pushUnique({
       id: `booking-create-${b._id}`,
       type: 'booking_created',
       occurredAt: b.bookingDate || b.createdAt,
@@ -235,7 +369,7 @@ export async function buildProductHistoryEvents(product) {
     });
 
     if (b.confirmed && b.confirmedAt) {
-      pushEvent(events, {
+      pushUnique({
         id: `booking-confirm-${b._id}`,
         type: 'booking_confirmed',
         occurredAt: b.confirmedAt,
@@ -246,7 +380,7 @@ export async function buildProductHistoryEvents(product) {
     }
 
     if (b.status === 'cancelled' && b.cancelledAt) {
-      pushEvent(events, {
+      pushUnique({
         id: `booking-cancel-${b._id}`,
         type: 'booking_cancelled',
         occurredAt: b.cancelledAt,
@@ -263,7 +397,7 @@ export async function buildProductHistoryEvents(product) {
 
   for (const pr of purchaseRequests) {
     const payload = pr.productPayload || {};
-    pushEvent(events, {
+    pushUnique({
       id: `purchase-create-${pr._id}`,
       type: pr.status === 'pending' ? 'purchase_request_created' : 'purchase_request_submitted',
       occurredAt: pr.createdAtUserLocal || pr.createdAt,
@@ -281,7 +415,7 @@ export async function buildProductHistoryEvents(product) {
     });
 
     if (pr.resolvedAt && pr.status === 'approved') {
-      pushEvent(events, {
+      pushUnique({
         id: `purchase-approve-${pr._id}`,
         type: 'purchase_request_approved',
         occurredAt: pr.resolvedAt,
@@ -295,7 +429,7 @@ export async function buildProductHistoryEvents(product) {
     }
 
     if (pr.resolvedAt && pr.status === 'rejected') {
-      pushEvent(events, {
+      pushUnique({
         id: `purchase-reject-${pr._id}`,
         type: 'purchase_request_rejected',
         occurredAt: pr.resolvedAt,
@@ -312,10 +446,10 @@ export async function buildProductHistoryEvents(product) {
       const ret = pr.returns[i];
       const affectsThis =
         !ret.returnedProductIds?.length ||
-        ret.returnedProductIds.some((id) => String(id) === pidStr);
+        ret.returnedProductIds.some((id) => pidSet.has(String(id)));
       if (!affectsThis) continue;
 
-      pushEvent(events, {
+      pushUnique({
         id: `purchase-return-${pr._id}-${i}`,
         type: 'purchase_return',
         occurredAt: ret.returnedAt,
@@ -390,10 +524,10 @@ export async function buildProductHistoryEvents(product) {
   };
 
   for (const order of orders) {
-    const line = (order.products || []).find((p) => String(p.productId) === pidStr);
+    const line = (order.products || []).find((p) => pidSet.has(String(p.productId)));
     if (!line) continue;
 
-    pushEvent(events, {
+    pushUnique({
       id: `sale-${order._id}`,
       type: 'sale',
       occurredAt: order.createdAt,
@@ -414,10 +548,10 @@ export async function buildProductHistoryEvents(product) {
 
     for (let i = 0; i < (order.returns || []).length; i++) {
       const ret = order.returns[i];
-      const item = (ret.items || []).find((it) => String(it.productId) === pidStr);
+      const item = (ret.items || []).find((it) => pidSet.has(String(it.productId)));
       if (!item) continue;
 
-      pushEvent(events, {
+      pushUnique({
         id: `sale-return-${order._id}-${i}`,
         type: 'sale_return',
         occurredAt: ret.returnedAt,

@@ -178,6 +178,19 @@ export class SerialTrackComponent implements OnInit {
     } else if (d['branch']) {
       parts.push({ text: String(d['branch']) });
     }
+    if (d['approvedBy']) {
+      parts.push({
+        text: `${this.translate.instant('tr_product_history_approved_by')}: ${d['approvedBy']}`,
+      });
+    } else if (d['rejectedBy']) {
+      parts.push({
+        text: `${this.translate.instant('tr_product_history_rejected_by')}: ${d['rejectedBy']}`,
+      });
+    } else if (d['initiatedBy'] && event.type === 'branch_transfer_requested') {
+      parts.push({
+        text: `${this.translate.instant('tr_product_history_requested_by')}: ${d['initiatedBy']}`,
+      });
+    }
     if (d['refundTotal'] != null) {
       parts.push({
         text: `${this.translate.instant('tr_refund_amount')} ${d['refundTotal']}`,

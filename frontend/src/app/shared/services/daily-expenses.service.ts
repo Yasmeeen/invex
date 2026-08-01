@@ -26,6 +26,8 @@ export interface DailyExpenseDto {
 export interface DailyExpenseListMeta {
   currentPage: number;
   totalCount: number;
+  /** Sum of amounts for all rows matching current filters (not only current page). */
+  totalAmount: number;
   totalPages: number;
   nextPage: number | null;
   prevPage: number | null;
@@ -62,6 +64,8 @@ export class DailyExpensesService {
     branch_id?: string;
     dateFrom?: string;
     dateTo?: string;
+    /** operating (default) | cash_movements | all */
+    category?: 'operating' | 'cash_movements' | 'all';
   }): Observable<DailyExpenseListResponse> {
     let httpParams = new HttpParams().set('viewerUserId', params.viewerUserId);
     if (params.page != null) httpParams = httpParams.set('page', String(params.page));
@@ -69,6 +73,7 @@ export class DailyExpensesService {
     if (params.branch_id) httpParams = httpParams.set('branch_id', params.branch_id);
     if (params.dateFrom) httpParams = httpParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) httpParams = httpParams.set('dateTo', params.dateTo);
+    if (params.category) httpParams = httpParams.set('category', params.category);
     return this.http.get<DailyExpenseListResponse>(DAILY_EXPENSES_URL, { params: httpParams });
   }
 }

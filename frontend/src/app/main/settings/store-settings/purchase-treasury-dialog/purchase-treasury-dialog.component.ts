@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Optional } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -19,11 +19,15 @@ export class PurchaseTreasuryDialogComponent implements OnInit {
   saving = false;
 
   constructor(
-    private dialogRef: MatDialogRef<PurchaseTreasuryDialogComponent>,
+    @Optional() private dialogRef: MatDialogRef<PurchaseTreasuryDialogComponent>,
     private storeSettingsService: StoreSettingsService,
     private notify: AppNotificationService,
     private translate: TranslateService
   ) {}
+
+  get isDialog(): boolean {
+    return !!this.dialogRef;
+  }
 
   ngOnInit(): void {
     const methods = this.storeSettingsService.snapshot.purchaseTreasuryMethods?.length
@@ -47,7 +51,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit {
   }
 
   cancel(): void {
-    this.dialogRef.close(false);
+    this.dialogRef?.close(false);
   }
 
   save(): void {
@@ -60,7 +64,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit {
       next: () => {
         this.saving = false;
         this.notify.push(this.translate.instant('tr_settings_saved'), 'success');
-        this.dialogRef.close(true);
+        this.dialogRef?.close(true);
       },
       error: () => {
         this.saving = false;

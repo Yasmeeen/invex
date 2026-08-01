@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { Globals } from '@core/globals';
 import { isBranchManager } from '@core/utils/role-utils';
@@ -6,13 +15,16 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { UserSerivce } from '@shared/services/user.service';
+import { VendorsSerivce } from '@shared/services/vendors.service';
+import { of, Subject, Subscription } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-report-filters',
   templateUrl: './report-filters.component.html',
   styleUrls: ['./report-filters.component.scss'],
 })
-export class ReportFiltersComponent implements OnInit, OnChanges {
+export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   /** When `bookings`, show booking-specific filters and hide group-by. */
   @Input() reportType = '';
 
@@ -26,12 +38,19 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
   branchFilterLocked = false;
 
+  vendorSearchItems: any[] = [];
+  selectedSupplierId: string | null = null;
+  selectedSupplierLabel = '';
+  vendorsLoading = false;
+  readonly vendorTypeahead$ = new Subject<string>();
+  private vendorTypeaheadSub?: Subscription;
+
   filters: any = {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
     branch_id: null as string | null,
     category_id: null as string | null,
-    supplier_phone: '',
+    supplier_id: null as string | null,
     product_id: null as string | null,
     customer_phone: '',
     seller_name: null as string | null,
@@ -48,6 +67,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     private categoriesServce: CategoriesServce,
     private productsSerivce: ProductsSerivce,
     private userSerivce: UserSerivce,
+    private vendorsSerivce: VendorsSerivce,
     private authenticationService: AuthenticationService,
     public globals: Globals
   ) {}
@@ -58,11 +78,16 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       this.branchFilterLocked = true;
       this.filters.branch_id = String(u.branch._id);
     }
+    this.initVendorTypeahead();
     this.loadBranches();
     this.loadCategories();
     this.loadProducts();
     this.ensureBookingUsersLoaded();
     queueMicrotask(() => this.applyFilters());
+  }
+
+  ngOnDestroy(): void {
+    this.vendorTypeaheadSub?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -145,6 +170,74 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     this.loadProducts();
   }
 
+  private initVendorTypeahead(): void {
+    this.vendorTypeaheadSub = this.vendorTypeahead$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        tap(() => (this.vendorsLoading = true)),
+        switchMap((term: string) => {
+          const search = String(term || '').trim();
+          const params: Record<string, string | number> = { page: 1, limit: 25 };
+          if (search) {
+            params.search = search;
+          }
+          return this.vendorsSerivce.getVendors(params).pipe(
+            catchError(() => of({ vendors: [] })),
+            tap(() => (this.vendorsLoading = false))
+          );
+        })
+      )
+      .subscribe((res: any) => {
+        const list = Array.isArray(res?.vendors) ? res.vendors : [];
+        this.vendorSearchItems = list.map((v: any) => this.withVendorLabel(v));
+        if (
+          this.selectedSupplierId &&
+          this.selectedSupplierLabel &&
+          !this.vendorSearchItems.some(
+            (v) => String(v._id) === String(this.selectedSupplierId)
+          )
+        ) {
+          this.vendorSearchItems = [
+            {
+              _id: this.selectedSupplierId,
+              label: this.selectedSupplierLabel,
+              nameOfcompany: this.selectedSupplierLabel,
+            },
+            ...this.vendorSearchItems,
+          ];
+        }
+      });
+  }
+
+  onVendorSelectOpen(): void {
+    this.vendorTypeahead$.next('');
+  }
+
+  private withVendorLabel(vendor: any): any {
+    if (!vendor) {
+      return vendor;
+    }
+    const company = String(vendor.nameOfcompany || '').trim();
+    const name = String(vendor.name || '').trim();
+    const phone = String(vendor.phone || '').trim();
+    return {
+      ...vendor,
+      label: [company, name, phone].filter(Boolean).join(' — '),
+    };
+  }
+
+  onSupplierIdChange(vendorId: string | null): void {
+    this.selectedSupplierId = vendorId ? String(vendorId) : null;
+    this.filters.supplier_id = this.selectedSupplierId;
+    if (!vendorId) {
+      this.selectedSupplierLabel = '';
+      return;
+    }
+    const found = this.vendorSearchItems.find((v) => String(v._id) === String(vendorId));
+    this.selectedSupplierLabel = found?.label || found?.nameOfcompany || '';
+  }
+
   loadSalespeople(): void {
     if (this.reportType !== 'sales' && this.reportType !== 'profit') {
       this.salespeople = [];
@@ -193,7 +286,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
     };
     if (this.reportType === 'products') {
       base.category_id = this.filters.category_id ? String(this.filters.category_id) : '';
-      base.supplier_phone = (this.filters.supplier_phone || '').trim();
+      if (this.filters.supplier_id) {
+        base.supplier_id = String(this.filters.supplier_id);
+      }
     }
     if (this.reportType === 'sales' || this.reportType === 'profit') {
       base.seller_name = this.filters.seller_name ? String(this.filters.seller_name) : '';
@@ -229,7 +324,10 @@ export class ReportFiltersComponent implements OnInit, OnChanges {
       }
     }
     this.filters.category_id = null;
-    this.filters.supplier_phone = '';
+    this.filters.supplier_id = null;
+    this.selectedSupplierId = null;
+    this.selectedSupplierLabel = '';
+    this.vendorSearchItems = [];
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.seller_name = null;

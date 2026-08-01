@@ -44,6 +44,11 @@ import {
   normalizePaymentSplitsRaw,
   totalNetFromPaymentSplits,
 } from "../../utils/deposit-payment-splits.js";
+import {
+  postPaymentMethodInflows,
+  postPaymentMethodOutflows,
+  safeTreasuryPost,
+} from "../../utils/treasury-ledger.js";
 
 // 📌 Create Vendor
 export const createVendor = async (req, res) => {
@@ -979,6 +984,18 @@ export const addVendorDeposit = async (req, res) => {
       });
     }
 
+    await safeTreasuryPost('vendor_deposit', async () => {
+      if (!branchId) return;
+      await postPaymentMethodOutflows({
+        branchId,
+        methodAmounts: splits,
+        sourceType: 'vendor_payment',
+        sourceId: vendor._id,
+        note,
+        createdBy: req.body?.userId,
+      });
+    });
+
     res.json({
       message: 'Deposit recorded',
       weOweSupplier: vendor.creditBalance,
@@ -1061,6 +1078,18 @@ export const addVendorReceivedDeposit = async (req, res) => {
         paymentTreasurySplits: treasuryAudit,
       });
     }
+
+    await safeTreasuryPost('vendor_received_deposit', async () => {
+      if (!branchId) return;
+      await postPaymentMethodInflows({
+        branchId,
+        methodAmounts: splits,
+        sourceType: 'vendor_receipt',
+        sourceId: vendor._id,
+        note,
+        createdBy: req.body?.userId,
+      });
+    });
 
     const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
     const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;

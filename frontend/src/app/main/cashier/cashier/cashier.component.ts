@@ -119,9 +119,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   createdDeskPurchase: any = null;
   printMode: 'sale' | 'deskPurchase' = 'sale';
 
-  /** Exchange: trade-in product intake recorded via desk purchase; cleared after checkout / cancel. */
+  /** Exchange: one trade-in purchase invoice (may contain multiple device lines). */
   exchangeTradeInPurchase: any = null;
-  /** After sale receipt print, optionally print trade-in purchase receipt. */
+  /** After sale receipt print, print the single trade-in purchase receipt. */
   private pendingExchangePurchaseReceipt: any = null;
   /** Store pays customer/supplier the exchange difference — treasury chosen at checkout. */
   private pendingExchangeSettlement: ExchangeSettlementTreasuryResult | null = null;
@@ -146,6 +146,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Active product bookings for the current client (deposit credit at checkout). */
   clientActiveBookings: CheckoutActiveBooking[] = [];
   private clientBookingsLoadToken = 0;
+  /** Confirmed reservations by product id (red cart-line warning). */
+  productReservationsById: Record<string, CheckoutActiveBooking[]> = {};
+  private productReservationLoadTokens = new Map<string, number>();
+  /** Avoid repeating the same red reservation toast for a SKU in this cart session. */
+  private foreignBookingToastShown = new Set<string>();
   private readonly destroy$ = new Subject<void>();
 
   /** Built from store settings; refreshed on settings$ updates (receipt labels). */
@@ -304,6 +309,38 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
   }
 
+  hasExchangeTradeIn(): boolean {
+    return !!this.exchangeTradeInPurchase;
+  }
+
+  /** All device lines on the current exchange purchase invoice. */
+  exchangeTradeInLines(): Array<{ productPayload: any; quantity: number }> {
+    const p = this.exchangeTradeInPurchase;
+    if (!p) return [];
+    if (Array.isArray(p.lines) && p.lines.length) {
+      return p.lines
+        .map((l: any) => ({
+          productPayload: l?.productPayload,
+          quantity: Math.max(1, Math.floor(Number(l?.quantity) || 1)),
+        }))
+        .filter((l: any) => l.productPayload);
+    }
+    if (!p.productPayload) return [];
+    return [
+      {
+        productPayload: p.productPayload,
+        quantity: Math.max(1, Math.floor(Number(p.quantity) || 1)),
+      },
+    ];
+  }
+
+  tradeInLineCredit(line: { productPayload?: any; quantity?: number }): number {
+    const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+    const net = Number(line?.productPayload?.netPrice);
+    if (!Number.isFinite(net) || net < 0) return 0;
+    return Math.round(net * q * 100) / 100;
+  }
+
   /** Record cash-drawer daily expense (same dialog as `/expenses` page). */
   openDailyExpenseDialog(): void {
     const uid = this.curentUser?._id;
@@ -459,6 +496,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     const isExchange = opts?.mode === 'exchange';
+    const appendToId =
+      isExchange && this.exchangeTradeInPurchase?._id
+        ? String(this.exchangeTradeInPurchase._id)
+        : '';
 
     const ref = this.dialog.open(CreateEditProductComponent, {
       width: '850px',
@@ -467,6 +508,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         cashDeskPurchase: true,
         forcedBranchId: String(selectedBranchId),
         exchangeFlow: isExchange,
+        ...(appendToId ? { appendToExchangePurchaseId: appendToId } : {}),
       },
       disableClose: true,
     });
@@ -499,12 +541,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Purchase cost credited toward exchange settlement (= agreed trade-in value toward sale). */
   exchangeTradeInCredit(): number {
-    const p = this.exchangeTradeInPurchase;
-    if (!p?.productPayload) return 0;
-    const q = Math.max(1, Math.floor(Number(p.quantity) || 1));
-    const net = Number(p.productPayload.netPrice);
-    if (!Number.isFinite(net) || net < 0) return 0;
-    return Math.round(net * q * 100) / 100;
+    return Math.round(
+      this.exchangeTradeInLines().reduce((sum, line) => sum + this.tradeInLineCredit(line), 0) * 100
+    ) / 100;
   }
 
   /** Cash to collect after trade-in credit (minimum zero). */
@@ -524,7 +563,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Payment totals compare against this amount at cashier when exchange / booking deposit active. */
   effectiveCheckoutTotal(): number {
     let due = Math.round(this.finalOrderTotal() * 100) / 100;
-    if (this.exchangeTradeInPurchase) {
+    if (this.hasExchangeTradeIn()) {
       due = this.exchangeAmountDue();
     }
     const bookingCredit = this.bookingDepositCredit();
@@ -567,7 +606,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const allocations: BookingDepositAllocation[] = [];
     let saleRemaining =
-      this.exchangeTradeInPurchase
+      this.hasExchangeTradeIn()
         ? this.exchangeAmountDue()
         : Math.round(this.finalOrderTotal() * 100) / 100;
 
@@ -634,14 +673,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           if (token !== this.clientBookingsLoadToken) return;
           this.clientActiveBookings = Array.isArray(res?.bookings) ? res.bookings : [];
           this.invalidateConfirmedPayment();
-          const hasDeposit = this.clientActiveBookings.some(
-            (b) => (Number(b.depositAmount) || 0) > 0
-          );
-          if (hasDeposit) {
-            this.translate.get('tr_cashier_booking_deposit_applied').subscribe((msg) => {
-              this.appNotificationService.push(msg, 'success');
-            });
-          }
+          this.notifyMatchedBookingDeposit();
         },
         error: () => {
           if (token !== this.clientBookingsLoadToken) return;
@@ -651,9 +683,304 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       });
   }
 
+  /** Toast when the entered phone matches a booking with deposit on cart lines. */
+  private lastNotifiedDepositCredit = -1;
+  private notifyMatchedBookingDeposit(): void {
+    const credit = this.bookingDepositCredit();
+    if (credit <= 0) {
+      this.lastNotifiedDepositCredit = -1;
+      return;
+    }
+    if (Math.abs(credit - this.lastNotifiedDepositCredit) < 0.01) return;
+    this.lastNotifiedDepositCredit = credit;
+    const remaining = this.effectiveCheckoutTotal();
+    if (remaining <= 0.009) {
+      this.translate
+        .get('tr_cashier_booking_fully_paid', {
+          deposit: credit.toFixed(2),
+        })
+        .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+    } else {
+      this.translate
+        .get('tr_cashier_booking_deposit_matched', {
+          deposit: credit.toFixed(2),
+          remaining: remaining.toFixed(2),
+        })
+        .subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+    }
+  }
+
   private clearClientActiveBookings(): void {
     this.clientBookingsLoadToken++;
     this.clientActiveBookings = [];
+  }
+
+  private orderLineProductId(item: any): string {
+    return String(item?.productId || item?._id || '').trim();
+  }
+
+  private phoneLast10(phone: string | undefined | null): string {
+    return String(phone || '').replace(/\D/g, '').slice(-10);
+  }
+
+  private phonesMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+    const da = this.phoneLast10(a);
+    const db = this.phoneLast10(b);
+    return da.length >= 10 && db.length >= 10 && da === db;
+  }
+
+  isBookingMatchedToCurrentClient(b: CheckoutActiveBooking): boolean {
+    if (this.partyType !== 'client' || !b) return false;
+    const phone = String(this.clientForm?.get('phone')?.value || '').trim();
+    if (phone && this.phonesMatch(phone, b.customerPhone)) return true;
+    if (
+      this.selectedClientId &&
+      b.clientId &&
+      String(this.selectedClientId) === String(b.clientId)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Load reservation holders for a SKU (red warning details). */
+  ensureProductReservationsLoaded(product: Product | any, opts?: { toast?: boolean }): void {
+    const productId = this.orderLineProductId(product);
+    if (!productId || !this.hasActiveBookingSignal(product)) return;
+    if (Object.prototype.hasOwnProperty.call(this.productReservationsById, productId)) {
+      if (opts?.toast) {
+        this.pushForeignBookingWarningToast(productId);
+      }
+      return;
+    }
+    const token = (this.productReservationLoadTokens.get(productId) || 0) + 1;
+    this.productReservationLoadTokens.set(productId, token);
+    this.productBookings
+      .getActiveReservationsForProduct(productId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          if (this.productReservationLoadTokens.get(productId) !== token) return;
+          this.productReservationsById = {
+            ...this.productReservationsById,
+            [productId]: Array.isArray(res?.bookings) ? res.bookings : [],
+          };
+          if (opts?.toast) {
+            this.pushForeignBookingWarningToast(productId);
+          }
+        },
+        error: () => {
+          if (this.productReservationLoadTokens.get(productId) !== token) return;
+          this.productReservationsById = {
+            ...this.productReservationsById,
+            [productId]: [],
+          };
+        },
+      });
+  }
+
+  reservationsForProduct(productId: string): CheckoutActiveBooking[] {
+    return this.productReservationsById[productId] || [];
+  }
+
+  foreignReservationsForProduct(productId: string): CheckoutActiveBooking[] {
+    return this.reservationsForProduct(productId).filter(
+      (b) => !this.isBookingMatchedToCurrentClient(b)
+    );
+  }
+
+  matchedReservationsForProduct(productId: string): CheckoutActiveBooking[] {
+    return this.reservationsForProduct(productId).filter((b) =>
+      this.isBookingMatchedToCurrentClient(b)
+    );
+  }
+
+  bookingDaysAgo(b: CheckoutActiveBooking): number {
+    const raw = b?.bookingDate || b?.createdAt;
+    if (!raw) return 0;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return 0;
+    return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+  }
+
+  /** Persistent red line warning when cart item is reserved for someone else. */
+  lineShowsForeignBookingWarning(item: any): boolean {
+    const pid = this.orderLineProductId(item);
+    if (!pid) return false;
+    const loaded = Object.prototype.hasOwnProperty.call(this.productReservationsById, pid);
+    if (loaded) {
+      return this.foreignReservationsForProduct(pid).length > 0;
+    }
+    if (!this.hasActiveBookingSignal(item)) return false;
+    const matchedViaCheckout = (this.clientActiveBookings || []).some(
+      (b) => String(b.productId) === pid && this.isBookingMatchedToCurrentClient(b)
+    );
+    // If this client already matches a booking, suppress the generic red until holders load.
+    return !matchedViaCheckout;
+  }
+
+  lineForeignBookingWarningParams(item: any): {
+    name: string;
+    phone: string;
+    days: number;
+  } | null {
+    const pid = this.orderLineProductId(item);
+    const foreign = this.foreignReservationsForProduct(pid);
+    const b = foreign[0];
+    if (!b) return null;
+    return {
+      name: String(b.customerName || '').trim() || '—',
+      phone: String(b.customerPhone || '').trim() || '—',
+      days: this.bookingDaysAgo(b),
+    };
+  }
+
+  /** Bars above the cart table: reserved items (not for the current client). */
+  cartForeignBookingBars(): Array<{
+    productId: string;
+    productName: string;
+    name: string;
+    phone: string;
+    days: number;
+  }> {
+    const bars: Array<{
+      productId: string;
+      productName: string;
+      name: string;
+      phone: string;
+      days: number;
+    }> = [];
+    const seen = new Set<string>();
+    for (const item of this.orderItems || []) {
+      if (!this.lineShowsForeignBookingWarning(item)) continue;
+      const productId = this.orderLineProductId(item);
+      if (!productId || seen.has(productId)) continue;
+      seen.add(productId);
+      const wp = this.lineForeignBookingWarningParams(item);
+      bars.push({
+        productId,
+        productName: String(item?.name || '').trim() || '—',
+        name: wp?.name || '—',
+        phone: wp?.phone || '—',
+        days: wp?.days ?? 0,
+      });
+    }
+    return bars;
+  }
+
+  /** Bars above the cart table: deposit matched to current client. */
+  cartMatchedDepositBars(): Array<{
+    productId: string;
+    productName: string;
+    deposit: number;
+    remaining: number;
+    fullyPaid: boolean;
+  }> {
+    const bars: Array<{
+      productId: string;
+      productName: string;
+      deposit: number;
+      remaining: number;
+      fullyPaid: boolean;
+    }> = [];
+    const seen = new Set<string>();
+    for (const item of this.orderItems || []) {
+      if (!this.lineShowsMatchedDepositInfo(item)) continue;
+      const productId = this.orderLineProductId(item);
+      if (!productId || seen.has(productId)) continue;
+      seen.add(productId);
+      bars.push({
+        productId,
+        productName: String(item?.name || '').trim() || '—',
+        deposit: this.lineMatchedDepositDisplayAmount(item),
+        remaining: this.lineRemainingAfterMatchedDeposit(item),
+        fullyPaid: this.lineFullyPaidByDeposit(item),
+      });
+    }
+    return bars;
+  }
+
+  /** Green deposit info when the checkout client holds the reservation on this line. */
+  lineShowsMatchedDepositInfo(item: any): boolean {
+    const pid = this.orderLineProductId(item);
+    if (!pid) return false;
+    if (this.matchedReservationsForProduct(pid).length > 0) return true;
+    return (this.clientActiveBookings || []).some(
+      (b) => String(b.productId) === pid && (Number(b.depositAmount) || 0) > 0
+    );
+  }
+
+  lineMatchedDepositCredit(item: any): number {
+    const pid = this.orderLineProductId(item);
+    return this.bookingDepositAllocations()
+      .filter((a) => {
+        const b =
+          this.clientActiveBookings.find((x) => String(x._id) === String(a.bookingId)) ||
+          this.reservationsForProduct(pid).find((x) => String(x._id) === String(a.bookingId));
+        return b && String(b.productId) === pid;
+      })
+      .reduce((s, a) => s + (Number(a.creditApplied) || 0), 0);
+  }
+
+  lineRemainingAfterMatchedDeposit(item: any): number {
+    const qty = Math.max(0, Math.floor(Number(item?.quantity) || 0));
+    const lineTotal = Math.round(this.lineUnitPrice(item) * qty * 100) / 100;
+    const credit = this.lineMatchedDepositCredit(item);
+    // If allocations not yet computed but matched bookings exist, estimate from booking deposits.
+    if (credit <= 0) {
+      const pid = this.orderLineProductId(item);
+      const matched =
+        this.matchedReservationsForProduct(pid).length > 0
+          ? this.matchedReservationsForProduct(pid)
+          : (this.clientActiveBookings || []).filter((b) => String(b.productId) === pid);
+      let est = 0;
+      let need = qty;
+      for (const b of matched) {
+        if (need <= 0) break;
+        const bq = Math.max(1, Math.floor(Number(b.quantity) || 1));
+        const take = Math.min(need, bq);
+        const dep = Math.round((Number(b.depositAmount) || 0) * 100) / 100;
+        est += Math.round((dep * (take / bq)) * 100) / 100;
+        need -= take;
+      }
+      return Math.max(0, Math.round((lineTotal - Math.min(est, lineTotal)) * 100) / 100);
+    }
+    return Math.max(0, Math.round((lineTotal - credit) * 100) / 100);
+  }
+
+  lineFullyPaidByDeposit(item: any): boolean {
+    if (!this.lineShowsMatchedDepositInfo(item)) return false;
+    return this.lineRemainingAfterMatchedDeposit(item) <= 0.009;
+  }
+
+  /** Deposit amount shown on the matched green line (allocated or estimated). */
+  lineMatchedDepositDisplayAmount(item: any): number {
+    const credit = this.lineMatchedDepositCredit(item);
+    if (credit > 0) return Math.round(credit * 100) / 100;
+    const qty = Math.max(0, Math.floor(Number(item?.quantity) || 0));
+    const lineTotal = Math.round(this.lineUnitPrice(item) * qty * 100) / 100;
+    const remaining = this.lineRemainingAfterMatchedDeposit(item);
+    return Math.max(0, Math.round((lineTotal - remaining) * 100) / 100);
+  }
+
+  private pushForeignBookingWarningToast(productId: string): void {
+    const foreign = this.foreignReservationsForProduct(productId);
+    if (!foreign.length) return;
+    if (this.foreignBookingToastShown.has(productId)) return;
+    this.foreignBookingToastShown.add(productId);
+    const b = foreign[0];
+    const days = this.bookingDaysAgo(b);
+    const key =
+      days <= 0
+        ? 'tr_cashier_booked_for_customer_today'
+        : 'tr_cashier_booked_for_customer';
+    this.translate
+      .get(key, {
+        name: String(b.customerName || '').trim() || '—',
+        phone: String(b.customerPhone || '').trim() || '—',
+        days,
+      })
+      .subscribe((msg) => this.appNotificationService.push(msg, 'error'));
   }
 
   receiptExchangeCredit(): number {
@@ -1334,13 +1661,22 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
-  /** Confirmed active reservation count on this SKU (unconfirmed bookings do not warn cashier). */
+  /** Confirmed active reservation count on this SKU (unconfirmed bookings do not reduce free sellable). */
   bookedQty(product: Product | any): number {
     const c = product?.confirmedBookedQuantity;
     if (c != null && Number.isFinite(Number(c))) {
       return Math.max(0, Math.floor(Number(c)));
     }
     return 0;
+  }
+
+  /** Any active booking on the SKU (confirmed or pending) — drives cashier red warning. */
+  hasActiveBookingSignal(product: Product | any): boolean {
+    const all = product?.bookedQuantity;
+    if (all != null && Number.isFinite(Number(all)) && Number(all) > 0) {
+      return true;
+    }
+    return this.bookedQty(product) > 0;
   }
 
   /** Units sellable without touching reserved quantity. */
@@ -1368,16 +1704,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
-  private maybePushBookingWarning(product: Product | any, newLineQuantity: number): void {
-    if (this.bookedQty(product) <= 0) {
+  private maybePushBookingWarning(product: Product | any, _newLineQuantity?: number): void {
+    if (!this.hasActiveBookingSignal(product)) {
       return;
     }
-    if (newLineQuantity <= this.freeSellableQty(product)) {
-      return;
-    }
-    this.translate
-      .get('tr_cashier_booked_product_warning')
-      .subscribe((msg) => this.appNotificationService.push(msg, 'warning'));
+    this.ensureProductReservationsLoaded(product, { toast: true });
   }
 
   openProductDetails(product: Product | any, event?: Event): void {
@@ -1422,6 +1753,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.focusBarcodeInput();
     this.refreshExchangePaymentDefaults();
+    this.notifyMatchedBookingDeposit();
   }
 
   /**
@@ -1481,6 +1813,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     item.quantity++;
     this.maybePushBookingWarning(item, item.quantity);
     this.refreshExchangePaymentDefaults();
+    this.notifyMatchedBookingDeposit();
     this.focusBarcodeInput();
   }
   decreaseQty(i: number) { 
@@ -1494,7 +1827,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     } else if (this.editingPriceIndex != null && this.editingPriceIndex > i) {
       this.editingPriceIndex--;
     }
+    const removed = this.orderItems[i];
+    const pid = this.orderLineProductId(removed);
     this.orderItems.splice(i, 1);
+    if (pid && !this.orderItems.some((it) => this.orderLineProductId(it) === pid)) {
+      this.foreignBookingToastShown.delete(pid);
+    }
     this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
   }
@@ -1715,7 +2053,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (this.exchangeTradeInPurchase) {
+    if (this.hasExchangeTradeIn()) {
       const storeOwes = this.exchangeStoreOwesCustomer();
       if (storeOwes > 0.01) {
         this.openExchangeSettlementTreasuryDialog(storeOwes, () => this.continueExchangeCheckout());
@@ -1798,6 +2136,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const partyType = String(af?.partyType || 'client').toLowerCase();
     const partyTypeKey =
       partyType === 'supplier' ? 'tr_supplier_info' : 'tr_client_info';
+    const productName = this.exchangeTradeInLines()
+      .map((l) => String(l?.productPayload?.name || '').trim())
+      .filter(Boolean)
+      .join(' · ');
 
     const ref = this.dialog.open(DeskPurchaseDeferredPaymentDialogComponent, {
       width: '520px',
@@ -1806,7 +2148,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       data: {
         exchangeSettlementOnly: true,
         remaining: amount,
-        productName: this.exchangeTradeInPurchase?.productPayload?.name || '',
+        productName,
         partyName: String(af?.displayName || af?.name || '').trim(),
         partyTypeLabel: this.translate.instant(partyTypeKey),
         forcedBranchId: String(selectedBranchId),
@@ -1845,8 +2187,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       amount: round2(s.amount),
     }));
 
-    const exchangeCredit = this.exchangeTradeInPurchase ? this.exchangeTradeInCredit() : 0;
-    const exchangePurchaseId = this.exchangeTradeInPurchase?._id;
+    const exchangeCredit = this.hasExchangeTradeIn() ? this.exchangeTradeInCredit() : 0;
+    const exchangePurchaseId = this.exchangeTradeInPurchase?._id
+      ? String(this.exchangeTradeInPurchase._id)
+      : '';
 
     const orderData: Record<string, unknown> = {
       products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
@@ -1878,6 +2222,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       orderData.exchangeTradeInCreditAmount = exchangeCredit;
       if (exchangePurchaseId) {
         orderData.exchangeProductPurchaseRequestId = exchangePurchaseId;
+        orderData.exchangeProductPurchaseRequestIds = [exchangePurchaseId];
       }
     }
 
@@ -1908,7 +2253,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       Math.round((receiptSubtotal - receiptInvoiceDisc) * 100) / 100;
 
     this.ordersSerivce.createOrder(orderData).subscribe((res: any) => {
-      const pendingPurchaseReceipt = this.exchangeTradeInPurchase;
+      const pendingPurchaseReceipt =
+        exchangeCredit > 0 ? this.exchangeTradeInPurchase : null;
       this.exchangeTradeInPurchase = null;
 
       const base = res?.newOrder ?? {};
@@ -1925,8 +2271,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
             : bookingCredit,
       };
 
-      this.pendingExchangePurchaseReceipt =
-        exchangeCredit > 0 && pendingPurchaseReceipt ? pendingPurchaseReceipt : null;
+      this.pendingExchangePurchaseReceipt = pendingPurchaseReceipt;
 
       this.clearClientActiveBookings();
       this.printInvoice();

@@ -9,7 +9,6 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { TranslateService } from '@ngx-translate/core';
 import { MatDialog } from '@angular/material/dialog';
 import { PaymentAppFeesDialogComponent } from './payment-app-fees-dialog/payment-app-fees-dialog.component';
-import { PurchaseTreasuryDialogComponent } from './purchase-treasury-dialog/purchase-treasury-dialog.component';
 
 @Component({
   selector: 'app-store-settings',
@@ -23,6 +22,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     logoUrl: '',
     receiptLanguage: 'en',
     purchaseTreasuryMethods: [],
+    moneyAccounts: [],
+    paymentMethodAccountMap: [],
     paymentAppFeePercents: [],
     returnExchangePolicy: '',
     showReturnExchangePolicyOnReceipt: false,
@@ -56,6 +57,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         logoUrl: v.logoUrl,
         receiptLanguage: v.receiptLanguage || 'en',
         purchaseTreasuryMethods: v.purchaseTreasuryMethods || [],
+        moneyAccounts: v.moneyAccounts || [],
+        paymentMethodAccountMap: v.paymentMethodAccountMap || [],
         paymentAppFeePercents: v.paymentAppFeePercents || [],
         returnExchangePolicy: v.returnExchangePolicy || '',
         showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
@@ -76,15 +79,6 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
       maxWidth: '96vw',
       panelClass: 'payment-app-fees-dialog-panel',
       backdropClass: 'payment-app-fees-dialog-backdrop',
-    });
-  }
-
-  openPurchaseTreasuryDialog(): void {
-    this.dialog.open(PurchaseTreasuryDialogComponent, {
-      width: '520px',
-      maxWidth: '96vw',
-      panelClass: 'purchase-treasury-dialog-panel',
-      backdropClass: 'purchase-treasury-dialog-backdrop',
     });
   }
 

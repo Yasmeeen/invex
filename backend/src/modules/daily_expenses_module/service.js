@@ -7,6 +7,8 @@ import {
   treasuryMethodMap,
 } from '../settings_module/treasuryMethods.js';
 import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import { dailyExpenseCategoryMatch } from '../../utils/daily-expense-categories.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -119,6 +121,17 @@ export const createDailyExpense = async (req, res) => {
       expenseTreasurySplits,
     });
 
+    await safeTreasuryPost('daily_expense', async () => {
+      await postTreasurySplitOutflows({
+        branchId: branch,
+        splits: expenseTreasurySplits,
+        sourceType: 'daily_expense',
+        sourceId: doc._id,
+        note: typeTrim,
+        createdBy: userId,
+      });
+    });
+
     const populated = await DailyExpense.findById(doc._id)
       .populate('branch', 'name')
       .populate('recordedBy', 'name email role')
@@ -140,6 +153,7 @@ export const listDailyExpenses = async (req, res) => {
       branch_id: branchIdRaw,
       dateFrom,
       dateTo,
+      category: categoryRaw,
     } = req.query;
 
     if (!viewerUserId || !mongoose.Types.ObjectId.isValid(String(viewerUserId))) {
@@ -151,7 +165,9 @@ export const listDailyExpenses = async (req, res) => {
       return res.status(403).json({ error: 'Not allowed to view expenses' });
     }
 
-    const query = {};
+    const query = {
+      ...dailyExpenseCategoryMatch(categoryRaw),
+    };
 
     if (ADMIN_ROLES.includes(viewer.role)) {
       if (branchIdRaw && mongoose.Types.ObjectId.isValid(String(branchIdRaw))) {
@@ -186,7 +202,7 @@ export const listDailyExpenses = async (req, res) => {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, sumRows] = await Promise.all([
       DailyExpense.find(query)
         .populate('branch', 'name')
         .populate('recordedBy', 'name email role')
@@ -195,15 +211,21 @@ export const listDailyExpenses = async (req, res) => {
         .limit(Number(limit))
         .lean(),
       DailyExpense.countDocuments(query),
+      DailyExpense.aggregate([
+        { $match: query },
+        { $group: { _id: null, totalAmount: { $sum: '$amount' } } },
+      ]),
     ]);
 
     const totalPages = Math.ceil(total / Number(limit)) || 1;
+    const totalAmount = round2(sumRows?.[0]?.totalAmount ?? 0);
 
     res.json({
       expenses: rows,
       meta: {
         currentPage: Number(page),
         totalCount: total,
+        totalAmount,
         totalPages,
         nextPage: Number(page) < totalPages ? Number(page) + 1 : null,
         prevPage: Number(page) > 1 ? Number(page) - 1 : null,

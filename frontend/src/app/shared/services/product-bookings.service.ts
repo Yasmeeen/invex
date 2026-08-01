@@ -120,6 +120,15 @@ export class ProductBookingsService {
     );
   }
 
+  /** Confirmed active reservations on a SKU (cashier reserved-stock warning). */
+  getActiveReservationsForProduct(
+    productId: string
+  ): Observable<{ bookings: CheckoutActiveBooking[] }> {
+    return this.http.get<{ bookings: CheckoutActiveBooking[] }>(
+      `${PRODUCT_BOOKINGS_URL}/active-reservations/${productId}`
+    );
+  }
+
   cancelBooking(bookingId: string, body: { userId: string; reason?: string }): Observable<unknown> {
     return this.http.patch(`${PRODUCT_BOOKINGS_URL}/${bookingId}/cancel`, body);
   }

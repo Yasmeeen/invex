@@ -8,11 +8,13 @@ import ProductBooking from '../../DB/models/productBooking.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Vendor from '../../DB/models/vendor.model.js';
+import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import { buildPhoneSearchCandidates, digitsOnly } from '../../utils/phone-utils.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
   resolvePurchaseTreasurySplits,
 } from '../../utils/purchase-treasury-splits.js';
+import { NON_OPERATING_DAILY_EXPENSE_TYPES } from '../../utils/daily-expense-categories.js';
 
 /** Business calendar for report date filters (matches orders/dashboard). */
 const REPORT_TZ = 'Africa/Cairo';
@@ -59,6 +61,42 @@ async function getBranchOverheadForReport(branchIdFilter) {
   }
   const dailyRate = monthlyTotal / BRANCH_OVERHEAD_MONTHLY_DAYS;
   return { monthlyTotal, dailyRate, breakdown, branchCount: branches.length };
+}
+
+/** Operating daily expenses in range (optional branch). Returns total + map period → amount. */
+async function getOperatingDailyExpensesForReport({ from, to, branchId, groupBy }) {
+  const match = {
+    createdAt: { $gte: from, $lte: to },
+    expenseType: { $nin: NON_OPERATING_DAILY_EXPENSE_TYPES },
+  };
+  if (branchId) match.branch = branchId;
+
+  const [summaryRow] = await DailyExpense.aggregate([
+    { $match: match },
+    { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+  ]);
+
+  const byPeriodRows = await DailyExpense.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: getDateGroupExpr(groupBy),
+        total: { $sum: '$amount' },
+      },
+    },
+    { $project: { _id: 0, period: '$_id', total: { $round: ['$total', 2] } } },
+  ]);
+
+  const byPeriod = new Map();
+  for (const row of byPeriodRows || []) {
+    byPeriod.set(String(row.period), round2(row.total));
+  }
+
+  return {
+    total: round2(summaryRow?.total ?? 0),
+    count: Number(summaryRow?.count) || 0,
+    byPeriod,
+  };
 }
 
 /** Inclusive calendar days between two dates (local). */
@@ -116,6 +154,13 @@ const parseSupplierPhone = (query) => {
   return v.length ? v : null;
 };
 
+const parseSupplierId = (query) => {
+  const raw = String(
+    query.supplier_id ?? query.supplierId ?? query.vendor_id ?? query.vendorId ?? ''
+  ).trim();
+  return mongoose.Types.ObjectId.isValid(raw) ? new mongoose.Types.ObjectId(raw) : null;
+};
+
 /** Match orders by client ObjectId and/or phone (substring, case-insensitive). */
 const appendOrderCustomerFilters = (match, f) => {
   if (f.customerId) match.clientId = f.customerId;
@@ -152,6 +197,7 @@ const parseCommonFilters = (query) => {
       : null,
     customerPhone: parseCustomerPhone(query),
     supplierPhone: parseSupplierPhone(query),
+    supplierId: parseSupplierId(query),
     sellerName: String(query.seller_name || '').trim(),
     groupBy: String(query.groupBy || 'daily') === 'monthly' ? 'monthly' : 'daily',
     page: Math.max(1, Number(query.page) || 1),
@@ -176,19 +222,29 @@ const resolveVendorIdsByPhone = async (supplierPhone) => {
   return vendors.map((v) => v._id);
 };
 
-/** Products acquired from a supplier (by phone / vendor) or linked on that supplier's purchasing requests. */
-const resolveSupplierProductIds = async (supplierPhone) => {
-  if (!supplierPhone) return null;
-  const vendorIds = await resolveVendorIdsByPhone(supplierPhone);
-  const phoneRegex = { $regex: escapeRegex(supplierPhone), $options: 'i' };
-  const last10 = digitsOnly(supplierPhone).slice(-10);
+/** Products acquired from a supplier (by id and/or phone) or linked on purchasing requests. */
+const resolveSupplierProductIds = async (supplierPhone, supplierId = null) => {
+  if (!supplierPhone && !supplierId) return null;
 
-  const acquiredOr = [{ 'acquiredFrom.phone': phoneRegex }];
-  if (last10 && last10.length >= 7) {
-    acquiredOr.push({ 'acquiredFrom.phone': { $regex: new RegExp(`${escapeRegex(last10)}$`) } });
+  let vendorIds = supplierId ? [supplierId] : null;
+  if (!vendorIds?.length && supplierPhone) {
+    vendorIds = await resolveVendorIdsByPhone(supplierPhone);
+  }
+
+  const acquiredOr = [];
+  if (supplierPhone) {
+    const phoneRegex = { $regex: escapeRegex(supplierPhone), $options: 'i' };
+    const last10 = digitsOnly(supplierPhone).slice(-10);
+    acquiredOr.push({ 'acquiredFrom.phone': phoneRegex });
+    if (last10 && last10.length >= 7) {
+      acquiredOr.push({ 'acquiredFrom.phone': { $regex: new RegExp(`${escapeRegex(last10)}$`) } });
+    }
   }
   if (vendorIds?.length) {
     acquiredOr.push({ 'acquiredFrom.vendorId': { $in: vendorIds } });
+  }
+  if (!acquiredOr.length) {
+    return [];
   }
 
   const [fromAcquired, fromPurchasing] = await Promise.all([
@@ -363,6 +419,12 @@ export const getProfitReport = async (req, res) => {
     const overhead = await getBranchOverheadForReport(f.branchId);
     const daysInPeriod = calendarDaysInclusive(f.from, f.to);
     const branchOperatingCostTotal = overhead.dailyRate * daysInPeriod;
+    const dailyExpenses = await getOperatingDailyExpensesForReport({
+      from: f.from,
+      to: f.to,
+      branchId: f.branchId,
+      groupBy: f.groupBy,
+    });
 
     const [aggSummary] = await Order.aggregate([
       { $match: match },
@@ -388,7 +450,10 @@ export const getProfitReport = async (req, res) => {
     const totalRevenue = aggSummary?.totalRevenue ?? 0;
     const totalCost = aggSummary?.totalCost ?? 0;
     const tradingProfit = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
-    const netProfitAfterBranch = round2(tradingProfit - branchOperatingCostTotal);
+    const dailyExpensesTotal = dailyExpenses.total;
+    const netProfitAfterBranch = round2(
+      tradingProfit - branchOperatingCostTotal - dailyExpensesTotal
+    );
     const profitMargin =
       totalRevenue > 0 ? round2((netProfitAfterBranch / totalRevenue) * 100) : 0;
 
@@ -397,6 +462,8 @@ export const getProfitReport = async (req, res) => {
       totalCost,
       tradingProfit,
       branchOperatingCost: round2(branchOperatingCostTotal),
+      dailyExpensesTotal,
+      dailyExpensesCount: dailyExpenses.count,
       netProfit: netProfitAfterBranch,
       profitMargin,
       branchOverhead: {
@@ -436,24 +503,34 @@ export const getProfitReport = async (req, res) => {
       },
     ]);
 
-    const profitOverTime = (profitOverTimeRaw || []).map((row) => {
-      const revenue = Number(row.revenue) || 0;
-      const cost = Number(row.cost) || 0;
+    const salesByPeriod = new Map(
+      (profitOverTimeRaw || []).map((row) => [String(row.period), row])
+    );
+    const allPeriods = [
+      ...new Set([...salesByPeriod.keys(), ...dailyExpenses.byPeriod.keys()]),
+    ].sort();
+
+    const profitOverTime = allPeriods.map((period) => {
+      const row = salesByPeriod.get(period);
+      const revenue = Number(row?.revenue) || 0;
+      const cost = Number(row?.cost) || 0;
       const trading = round2(revenue - cost);
       let overheadAlloc = 0;
       if (f.groupBy === 'monthly') {
-        const d = daysInMonthOverlappingRange(row.period, f.from, f.to);
+        const d = daysInMonthOverlappingRange(period, f.from, f.to);
         overheadAlloc = round2(overhead.dailyRate * d);
       } else {
         overheadAlloc = round2(overhead.dailyRate);
       }
+      const periodDailyExpenses = dailyExpenses.byPeriod.get(period) || 0;
       return {
-        period: row.period,
+        period,
         revenue,
         cost,
         tradingProfit: trading,
         branchOverheadAllocated: overheadAlloc,
-        netProfit: round2(trading - overheadAlloc),
+        dailyExpenses: periodDailyExpenses,
+        netProfit: round2(trading - overheadAlloc - periodDailyExpenses),
       };
     });
 
@@ -472,7 +549,10 @@ export const getProductsReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
     const lowStockThreshold = Math.max(0, Number(req.query.lowStockThreshold) || 5);
-    const supplierProductIds = f.supplierPhone ? await resolveSupplierProductIds(f.supplierPhone) : null;
+    const supplierProductIds =
+      f.supplierPhone || f.supplierId
+        ? await resolveSupplierProductIds(f.supplierPhone, f.supplierId)
+        : null;
 
     const orderMatch = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) orderMatch.branch = f.branchId;

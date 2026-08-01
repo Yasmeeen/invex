@@ -1648,6 +1648,8 @@ export const requestBranchTransfer = async (req, res) => {
 
     const transfer = await ProductBranchTransfer.create({
       product: product._id,
+      productNameSnapshot: String(product.name || '').trim(),
+      productCodeSnapshot: String(product.code || '').trim(),
       fromBranch: fromBranchId,
       toBranch: toBranchId,
       quantity: qty,
@@ -1780,6 +1782,11 @@ export const approveBranchTransfer = async (req, res) => {
 
     sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
     sourceProduct.stock = stock - qty;
+    // Hide empty source row so the same serial doesn't appear twice in product search.
+    if (Number(sourceProduct.stock) <= 0) {
+      sourceProduct.stock = 0;
+      sourceProduct.removedWhenOutOfStock = true;
+    }
     await sourceProduct.save({ session });
 
     const toBranchId = transfer.toBranch;
@@ -1794,6 +1801,10 @@ export const approveBranchTransfer = async (req, res) => {
 
     if (destinationProduct) {
       destinationProduct.stock = Number(destinationProduct.stock) + qty;
+      destinationProduct.removedWhenOutOfStock = false;
+      if (!destinationProduct.acquiredFrom && sourceProduct.acquiredFrom) {
+        destinationProduct.acquiredFrom = sourceProduct.acquiredFrom;
+      }
       await destinationProduct.save({ session });
     } else {
       const created = await Product.create(
@@ -1811,6 +1822,9 @@ export const approveBranchTransfer = async (req, res) => {
             imageUrl: imageUrlNorm,
             attributes: attrs,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            ...(sourceProduct.acquiredFrom
+              ? { acquiredFrom: sourceProduct.acquiredFrom }
+              : {}),
           },
         ],
         { session }
@@ -1819,6 +1833,7 @@ export const approveBranchTransfer = async (req, res) => {
     }
 
     transfer.status = 'approved';
+    transfer.destinationProduct = destinationProduct._id;
     transfer.resolvedBy = userId;
     transfer.resolvedAt = new Date();
     await transfer.save({ session });
@@ -1872,7 +1887,12 @@ export const approveBranchTransfer = async (req, res) => {
       entityType: 'ProductBranchTransfer',
       entityId: transfer._id,
       message: `Branch transfer approved (${qty})`,
-      metadata: { productId: sourceProduct._id, fromBranchId: transfer.fromBranch, toBranchId },
+      metadata: {
+        productId: sourceProduct._id,
+        destinationProductId: destinationProduct._id,
+        fromBranchId: transfer.fromBranch,
+        toBranchId,
+      },
     });
 
     return res.json({ message: 'Transfer approved and stock moved', transferId: transfer._id });
@@ -2078,7 +2098,20 @@ export const listBranchTransfers = async (req, res) => {
       }
       const matchingProducts = await Product.find(productQuery).select('_id').lean();
       const productIds = (matchingProducts || []).map((p) => p._id);
-      if (!productIds.length) {
+      const productMatchOr = [];
+      if (productIds.length) {
+        productMatchOr.push(
+          { product: { $in: productIds } },
+          { destinationProduct: { $in: productIds } }
+        );
+      }
+      if (search) {
+        productMatchOr.push(
+          { productNameSnapshot: { $regex: escapeRegex(search), $options: 'i' } },
+          { productCodeSnapshot: { $regex: escapeRegex(search), $options: 'i' } }
+        );
+      }
+      if (!productMatchOr.length) {
         return res.json({
           transfers: [],
           meta: {
@@ -2090,7 +2123,7 @@ export const listBranchTransfers = async (req, res) => {
           },
         });
       }
-      andParts.push({ product: { $in: productIds } });
+      andParts.push({ $or: productMatchOr });
     }
 
     const q =
@@ -2107,6 +2140,7 @@ export const listBranchTransfers = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .populate('product', 'name code stock branch inWarehouse transferReservedQuantity category')
+        .populate('destinationProduct', 'name code')
         .populate('fromBranch', 'name')
         .populate('toBranch', 'name')
         .populate('initiatedBy', 'name')
@@ -2114,10 +2148,46 @@ export const listBranchTransfers = async (req, res) => {
         .lean(),
     ]);
 
+    // Source product may have been deleted after approve — fall back to dest / snapshot / stock movement.
+    const missingProductTransferIds = (transfers || [])
+      .filter((t) => !t.product)
+      .map((t) => t._id);
+    let movementNameByTransferId = new Map();
+    if (missingProductTransferIds.length) {
+      const movements = await StockMovement.find({
+        referenceType: 'branch_transfer',
+        referenceId: { $in: missingProductTransferIds },
+      })
+        .select('referenceId productName')
+        .lean();
+      movementNameByTransferId = new Map(
+        (movements || [])
+          .filter((m) => m.referenceId)
+          .map((m) => [String(m.referenceId), String(m.productName || '').trim()])
+      );
+    }
+
+    const hydratedTransfers = (transfers || []).map((t) => {
+      if (t.product) {
+        return t;
+      }
+      const dest = t.destinationProduct;
+      const name =
+        (dest && dest.name) ||
+        t.productNameSnapshot ||
+        movementNameByTransferId.get(String(t._id)) ||
+        '';
+      const code = (dest && dest.code) || t.productCodeSnapshot || '';
+      return {
+        ...t,
+        product: name || code ? { name, code } : null,
+      };
+    });
+
     const totalPages = Math.ceil(totalCount / limit) || 0;
 
     return res.json({
-      transfers,
+      transfers: hydratedTransfers,
       meta: {
         currentPage: page,
         totalCount,
@@ -2230,6 +2300,10 @@ export const transferProductStock = async (req, res) => {
 
     // Decrease stock at source (warehouse or branch)
     sourceProduct.stock = Number(sourceProduct.stock) - transferQty;
+    if (Number(sourceProduct.stock) <= 0) {
+      sourceProduct.stock = 0;
+      sourceProduct.removedWhenOutOfStock = true;
+    }
     await sourceProduct.save({ session });
 
     // Increase stock in destination branch if same code exists there, otherwise create one.
@@ -2241,9 +2315,13 @@ export const transferProductStock = async (req, res) => {
 
     if (destinationProduct) {
       destinationProduct.stock = Number(destinationProduct.stock) + transferQty;
+      destinationProduct.removedWhenOutOfStock = false;
+      if (!destinationProduct.acquiredFrom && sourceProduct.acquiredFrom) {
+        destinationProduct.acquiredFrom = sourceProduct.acquiredFrom;
+      }
       await destinationProduct.save({ session });
     } else {
-      destinationProduct = await Product.create(
+      const created = await Product.create(
         [
           {
             name: sourceProduct.name,
@@ -2256,10 +2334,14 @@ export const transferProductStock = async (req, res) => {
             branch: toBranchId,
             inWarehouse: false,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            ...(sourceProduct.acquiredFrom
+              ? { acquiredFrom: sourceProduct.acquiredFrom }
+              : {}),
           },
         ],
         { session }
       );
+      destinationProduct = Array.isArray(created) ? created[0] : created;
     }
 
     await session.commitTransaction();

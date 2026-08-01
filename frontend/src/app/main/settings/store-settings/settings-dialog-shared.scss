@@ -3,7 +3,9 @@
 }
 
 .payment-app-fees-dialog,
-.purchase-treasury-dialog {
+.purchase-treasury-dialog,
+.settlement-accounts-dialog,
+.payment-method-account-map-dialog {
   display: flex;
   flex-direction: column;
   max-height: min(85vh, 640px);

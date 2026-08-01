@@ -18,6 +18,7 @@ import {
   treasuryKeyIsCashDrawer,
   treasuryMethodMap,
 } from '../modules/settings_module/treasuryMethods.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from './treasury-ledger.js';
 
 function unpaidInstallmentsTotal(request) {
   if (!request || request.paymentStatus !== 'Installments') return 0;
@@ -276,6 +277,20 @@ export async function recordVendorInstallmentPaymentWithTreasury(
       paymentTreasurySplits: splits,
     });
   }
+
+  await safeTreasuryPost('vendor_installment', async () => {
+    const resolved =
+      (await resolveBranchForCashDrawer({ userId, branchId })) || null;
+    if (!resolved) return;
+    await postTreasurySplitOutflows({
+      branchId: resolved,
+      splits,
+      sourceType: 'vendor_payment',
+      sourceId: request._id,
+      note: baseNote,
+      createdBy: userId,
+    });
+  });
 
   return {
     applied: instAmount,
@@ -565,6 +580,19 @@ export async function recordVendorDeferredPayment(
     });
   }
 
+  await safeTreasuryPost('vendor_deferred', async () => {
+    const resolved = await resolveBranchForCashDrawer({ userId, branchId });
+    if (!resolved) return;
+    await postTreasurySplitOutflows({
+      branchId: resolved,
+      splits,
+      sourceType: 'vendor_payment',
+      sourceId: request._id,
+      note: payNote,
+      createdBy: userId,
+    });
+  });
+
   return {
     applied,
     cashDrawerAmount,
@@ -761,6 +789,19 @@ export async function payVendorSupplierWithTreasury(
           paymentTreasurySplits: taken,
         });
       }
+
+      await safeTreasuryPost('vendor_pay_supplier', async () => {
+        const resolved = await resolveBranchForCashDrawer({ userId, branchId });
+        if (!resolved) return;
+        await postTreasurySplitOutflows({
+          branchId: resolved,
+          splits: taken,
+          sourceType: 'vendor_payment',
+          sourceId: vendorDoc._id,
+          note: payNote,
+          createdBy: userId,
+        });
+      });
 
       appliedToPrepaid = chunk;
       budget = round2(budget - chunk);

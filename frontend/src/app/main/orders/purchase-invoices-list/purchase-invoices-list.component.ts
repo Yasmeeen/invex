@@ -44,7 +44,7 @@ export class PurchaseInvoicesListComponent implements OnInit {
   listToDate: Date | null = null;
   branches: Branch[] = [];
   curentUser: any;
-  viewMode: 'table' | 'cards' = 'table';
+  viewMode: 'table' | 'cards' = 'cards';
 
   readonly statusOptions = [
     { value: null, labelKey: 'tr_all' },
@@ -66,7 +66,7 @@ export class PurchaseInvoicesListComponent implements OnInit {
 
   ngOnInit(): void {
     const saved = localStorage.getItem('purchase-invoices.viewMode');
-    this.viewMode = saved === 'cards' ? 'cards' : 'table';
+    this.viewMode = saved === 'table' ? 'table' : 'cards';
     this.curentUser = this.auth.getUserFromLocalStorage();
 
     const qp = this.route.snapshot.queryParamMap;
@@ -195,7 +195,10 @@ export class PurchaseInvoicesListComponent implements OnInit {
   private matchesSearch(p: any, term: string): boolean {
     const pp = p?.productPayload || {};
     const code = String(pp.code || '').toLowerCase();
-    const name = String(pp.name || '').toLowerCase();
+    const name = String(this.purchaseProductLabel(p) || '').toLowerCase();
+    const lineNames = Array.isArray(p?.lines)
+      ? p.lines.map((l: any) => String(l?.productPayload?.name || '').toLowerCase()).join(' ')
+      : '';
     const party = String(pp.acquiredFrom?.displayName || pp.acquiredFrom?.name || '').toLowerCase();
     const phone = String(pp.acquiredFrom?.phone || '').toLowerCase();
     const id = String(p?._id || '').toLowerCase();
@@ -203,6 +206,7 @@ export class PurchaseInvoicesListComponent implements OnInit {
     return (
       code.includes(term) ||
       name.includes(term) ||
+      lineNames.includes(term) ||
       party.includes(term) ||
       phone.includes(term) ||
       id.includes(term) ||
@@ -211,9 +215,38 @@ export class PurchaseInvoicesListComponent implements OnInit {
   }
 
   lineTotal(p: any): number {
+    if (Array.isArray(p?.lines) && p.lines.length) {
+      return Math.round(
+        p.lines.reduce((sum: number, line: any) => {
+          const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+          const net = Number(line?.productPayload?.netPrice) || 0;
+          return sum + net * q;
+        }, 0) * 100
+      ) / 100;
+    }
     const q = Math.max(1, Math.floor(Number(p?.quantity) || 1));
     const net = Number(p?.productPayload?.netPrice) || 0;
     return Math.round(net * q * 100) / 100;
+  }
+
+  purchaseProductLabel(p: any): string {
+    if (Array.isArray(p?.lines) && p.lines.length > 1) {
+      const names = p.lines
+        .map((l: any) => String(l?.productPayload?.name || '').trim())
+        .filter(Boolean);
+      if (names.length > 1) {
+        return `${names[0]} +${names.length - 1}`;
+      }
+      if (names.length === 1) return names[0];
+    }
+    return p?.productPayload?.name || '—';
+  }
+
+  purchaseCodeLabel(p: any): string {
+    if (Array.isArray(p?.lines) && p.lines.length > 1) {
+      return String(p.lines.length);
+    }
+    return p?.productPayload?.code || '—';
   }
 
   hasDeferredTreasury(p: any): boolean {
@@ -383,7 +416,7 @@ export class PurchaseInvoicesListComponent implements OnInit {
         remaining: this.remaining(p),
         partyTypeLabel: this.partyTypeLabel(p),
         partyName: this.partyNameRaw(p),
-        productName: String(p?.productPayload?.name || '').trim(),
+        productName: this.purchaseProductLabel(p),
         requestDate: p?.createdAt,
         forcedBranchId: branchId,
       },

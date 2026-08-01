@@ -1,0 +1,24 @@
+.treasury-config-page__toolbar {
+  border-bottom: 1px solid #e8ede9;
+}
+
+.treasury-config-page__body {
+  padding-bottom: 0.5rem;
+}
+
+/* When embedded as a page (not MatDialog overlay), drop modal chrome limits. */
+.treasury-config-page__body ::ng-deep .purchase-treasury-dialog,
+.treasury-config-page__body ::ng-deep .settlement-accounts-dialog,
+.treasury-config-page__body ::ng-deep .payment-method-account-map-dialog {
+  max-height: none;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.treasury-config-page__body ::ng-deep .purchase-treasury-dialog__scroll,
+.treasury-config-page__body ::ng-deep .settlement-accounts-dialog__scroll,
+.treasury-config-page__body ::ng-deep .payment-method-account-map-dialog__scroll {
+  max-height: none;
+}

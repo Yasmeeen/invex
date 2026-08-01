@@ -17,6 +17,7 @@ import { sumVendorCashDrawerInflows } from '../../utils/vendor-cash-drawer-inflo
 import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
 import { refundAllocationFromReturnRecord, salesReturnTreasuryRefundLines } from '../../utils/order-return.js';
 import { refundTreasuryCashFromReturnRecord } from '../../utils/purchase-return.js';
+import { sumCashTransferNet } from '../../utils/treasury-ledger.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 /** Business day boundaries for drawer close (store operations). */
@@ -540,6 +541,12 @@ export async function computeDrawerPreview(branchOid, bounds) {
     sumPurchaseReturnCashDrawerInflow(branchOid, start, end),
   ]);
 
+  const cashTransferNet = await sumCashTransferNet({
+    branchId: branchOid,
+    start,
+    end,
+  });
+
   const cashReceived = sumMethods(paymentsIn, isPhysicalCashMethod);
   const cashRefunded = sumMethods(refundInfo.merged, isPhysicalCashMethod);
 
@@ -556,7 +563,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
       vendorCashFromDrawer +
       vendorCashInDrawer +
       clientDepositCashIn +
-      purchaseReturnCashIn
+      purchaseReturnCashIn +
+      cashTransferNet
   );
 
   return {
@@ -583,6 +591,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     clientDepositCashDrawerCount: clientDepositCashInfo.clientDepositCashDrawerCount,
     cashReceivedTotal: cashReceived,
     cashRefundedTotal: cashRefunded,
+    /** Net of cash↔account transfers / settlements in the period. */
+    cashTransferNet,
     periodNetCashMovements,
     /** Net movements only (no opening balance); use computeDrawerPreviewWithPeriod for full expected. */
     expectedCashInDrawer: periodNetCashMovements,
@@ -641,6 +651,7 @@ export const previewDrawerClose = async (req, res) => {
         deskPurchaseDevices: [],
         cashReceivedTotal: 0,
         cashRefundedTotal: 0,
+        cashTransferNet: 0,
         periodAlreadyClosed: true,
       });
     }

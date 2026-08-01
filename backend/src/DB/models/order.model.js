@@ -49,10 +49,16 @@ const orderSchema = new mongoose.Schema(
      * Payment validation uses (totalPrice − appliedCredit); totalPrice stays gross sale.
      */
     exchangeTradeInCreditAmount: { type: Number, default: 0, min: 0 },
+    /** @deprecated Prefer exchangeProductPurchaseRequestIds; kept as first trade-in for older clients. */
     exchangeProductPurchaseRequestId: {
       type: mongoose.Schema.Types.ObjectId,
       required: false,
       ref: 'ProductPurchaseRequest',
+    },
+    /** Cashier exchange: one or more trade-in purchase intakes linked to this sale. */
+    exchangeProductPurchaseRequestIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ProductPurchaseRequest' }],
+      default: undefined,
     },
 
     /**

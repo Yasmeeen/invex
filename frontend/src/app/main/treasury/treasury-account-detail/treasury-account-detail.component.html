@@ -1,0 +1,96 @@
+<div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">
+      <button type="button" class="s-btn btn-link" (click)="back()">
+        <i class="fa fa-arrow-left"></i>
+      </button>
+      {{ label || accountKey }}
+    </span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button type="button" class="s-btn btn-secondary size-body" *ngIf="canSetOpening" (click)="openOpening()">
+        {{ 'tr_treasury_set_opening' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-primary size-body" (click)="openTransfer(isSettlement)">
+        {{ (isSettlement ? 'tr_treasury_settlement' : 'tr_treasury_transfer') | translate }}
+      </button>
+    </div>
+  </h2>
+
+  <div class="plr-4 pb-3 flex flex-wrap gap-md treasury-summary">
+    <div>
+      <div class="text-muted size-caption">{{ 'tr_treasury_opening' | translate }}</div>
+      <div class="size-h5">{{ openingBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
+    </div>
+    <div>
+      <div class="text-muted size-caption">{{ 'tr_treasury_expected' | translate }}</div>
+      <div class="size-h5 fw-bold">{{ expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
+    </div>
+  </div>
+
+  <p class="plr-4 text-muted size-caption mb-3" *ngIf="isSettlement">
+    {{ 'tr_treasury_settlement_hint' | translate }}
+  </p>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-4">
+    <div class="row flex-wrap">
+      <div class="col-md-3">
+        <label>{{ 'tr_daily_expenses_date_from' | translate }}</label>
+        <input class="s-control width-100" type="date" [(ngModel)]="dateFrom" />
+      </div>
+      <div class="col-md-3">
+        <label>{{ 'tr_daily_expenses_date_to' | translate }}</label>
+        <input class="s-control width-100" type="date" [(ngModel)]="dateTo" />
+      </div>
+      <div class="col-md-3 flex flex-bottom pb-2">
+        <button type="button" class="s-btn btn-secondary" (click)="applyFilters()">
+          {{ 'tr_apply' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4" *ngIf="!loading">
+    <div class="table-container" *ngIf="entries.length > 0">
+      <table class="s-table table layout-fixed">
+        <thead>
+          <tr>
+            <th>{{ 'tr_daily_expenses_recorded_at' | translate }}</th>
+            <th>{{ 'tr_treasury_source' | translate }}</th>
+            <th>{{ 'tr_treasury_direction' | translate }}</th>
+            <th>{{ 'tr_daily_expense_amount' | translate }}</th>
+            <th>{{ 'tr_treasury_counter' | translate }}</th>
+            <th>{{ 'tr_daily_expense_notes' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let e of entries">
+            <td>{{ e.occurredAt | date : 'short' }}</td>
+            <td>{{ sourceLabel(e.sourceType) }}</td>
+            <td>
+              <span [class.text-success]="e.direction === 'in'" [class.text-danger]="e.direction === 'out'">
+                {{ e.direction === 'in' ? ('tr_treasury_in' | translate) : ('tr_treasury_out' | translate) }}
+              </span>
+            </td>
+            <td>{{ e.amount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ e.counterAccountKey || '—' }}</td>
+            <td>{{ e.note || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="empty-state text-center ptb-6" *ngIf="entries.length === 0">
+      {{ 'tr_no_items_found' | translate }}
+    </div>
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="limit"
+        (paginationUpdate)="onPageChange($event)"
+      >
+      </pagination>
+    </div>
+  </div>
+  <div class="plr-4 ptb-6 text-center" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i>
+  </div>
+</div>

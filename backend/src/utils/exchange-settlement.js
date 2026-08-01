@@ -13,6 +13,7 @@ import {
   normalizeTreasurySplitsInput,
 } from './purchase-treasury-splits.js';
 import { resolveBranchForCashDrawer } from './vendor-cash-drawer.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from './treasury-ledger.js';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -76,6 +77,22 @@ export async function recordExchangeSettlement(
   }
   purchase.markModified('exchangeSettlementSplits');
   await purchase.save();
+
+  await safeTreasuryPost('exchange_settlement', async () => {
+    const resolvedBranch = await resolveBranchForCashDrawer({
+      userId,
+      branchId: branchId || purchase.branch,
+    });
+    if (!resolvedBranch) return;
+    await postTreasurySplitOutflows({
+      branchId: resolvedBranch,
+      splits,
+      sourceType: 'desk_purchase',
+      sourceId: purchase._id,
+      note: String(note || '').trim() || 'Exchange settlement',
+      createdBy: userId,
+    });
+  });
 
   if (cashDrawerAmount > 0) {
     const resolvedBranch = await resolveBranchForCashDrawer({

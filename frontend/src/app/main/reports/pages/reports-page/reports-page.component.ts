@@ -25,6 +25,8 @@ type ReportCardVM = {
   trendPositive?: boolean;
   /** Format value as EGP currency (thousands separators + pound symbol). */
   money?: boolean;
+  /** Red styling + loss messaging when period is at a loss. */
+  tone?: 'loss';
 };
 
 @Component({
@@ -52,17 +54,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   bookingsPage = 1;
   bookingsLimit = 100;
   bookingsMeta: { totalCount: number; page: number; limit: number } | null = null;
-  topProductsColumns: { key: string; labelKey: string }[] = [];
+  topProductsColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   topProductsRows: any[] = [];
-  upcomingColumns: { key: string; labelKey: string }[] = [];
+  upcomingColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   upcomingRows: any[] = [];
 
   /** Desk purchases: detail lines below treasury summary. */
-  deskPurchasesDetailColumns: { key: string; labelKey: string }[] = [];
+  deskPurchasesDetailColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   deskPurchasesDetailRows: any[] = [];
 
   /** Sales report: breakdown by cash / card / application payment types. */
-  salesPaymentColumns: { key: string; labelKey: string }[] = [];
+  salesPaymentColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   salesPaymentRows: any[] = [];
 
   /** Products report: inventory capital per branch. */
@@ -235,13 +237,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'sales') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_card_total_sales', value: s.totalSales || 0 },
+        { titleKey: 'tr_report_card_total_sales', value: s.totalSales || 0, money: true },
         { titleKey: 'tr_report_card_total_orders', value: s.totalOrders || 0 },
-        { titleKey: 'tr_report_card_avg_order', value: s.averageOrderValue || 0 },
+        { titleKey: 'tr_report_card_avg_order', value: s.averageOrderValue || 0, money: true },
       ];
       this.tableColumns = [
         { key: 'period', labelKey: 'tr_report_col_period' },
-        { key: 'totalSales', labelKey: 'tr_report_col_sales' },
+        { key: 'totalSales', labelKey: 'tr_report_col_sales', format: 'money' },
         { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
       ];
       this.tableRows = res.salesOverTime || [];
@@ -263,7 +265,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       );
       this.salesPaymentColumns = [
         { key: 'paymentType', labelKey: 'tr_report_col_payment_type' },
-        { key: 'totalSales', labelKey: 'tr_report_col_sales' },
+        { key: 'totalSales', labelKey: 'tr_report_col_sales', format: 'money' },
         { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
       ];
       this.salesPaymentRows = sortedPayment.map((x: any) => ({
@@ -285,36 +287,74 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'profit') {
       const s = res.summary || {};
       const bo = s.branchOverhead;
+      const tradingProfit = Number(s.tradingProfit) || 0;
+      const netProfit = Number(s.netProfit) || 0;
+      const profitMargin = s.profitMargin != null ? Number(s.profitMargin) : 0;
+      const tradingIsLoss = tradingProfit < 0;
+      const netIsLoss = netProfit < 0;
+      const marginIsLoss = profitMargin < 0;
+      const lossBadge = t('tr_report_loss_badge');
       this.cards = [
-        { titleKey: 'tr_report_card_revenue', value: s.totalRevenue ?? 0 },
-        { titleKey: 'tr_report_card_cost', value: s.totalCost ?? 0 },
-        { titleKey: 'tr_report_card_trading_profit', value: s.tradingProfit ?? 0 },
+        { titleKey: 'tr_report_card_revenue', value: s.totalRevenue ?? 0, money: true },
+        { titleKey: 'tr_report_card_cost', value: s.totalCost ?? 0, money: true },
+        {
+          titleKey: tradingIsLoss
+            ? 'tr_report_card_trading_loss'
+            : 'tr_report_card_trading_profit',
+          value: tradingIsLoss ? Math.abs(tradingProfit) : tradingProfit,
+          money: true,
+          tone: tradingIsLoss ? 'loss' : undefined,
+          trendLabel: tradingIsLoss ? lossBadge : undefined,
+          trendPositive: tradingIsLoss ? false : undefined,
+          hintKey: tradingIsLoss ? 'tr_report_trading_loss_hint' : undefined,
+        },
         {
           titleKey: 'tr_report_card_branch_overhead',
           value: s.branchOperatingCost ?? 0,
+          money: true,
           hintKey: bo ? 'tr_report_branch_overhead_hint' : undefined,
           hintParams: bo
             ? {
-                monthly: bo.monthlyFixedTotal,
-                daily: bo.dailyRate,
+                monthly: formatEgpMoney(bo.monthlyFixedTotal),
+                daily: formatEgpMoney(bo.dailyRate),
                 days: bo.daysInPeriod,
                 divisor: bo.divisorDays,
               }
             : undefined,
         },
-        { titleKey: 'tr_net_profit', value: s.netProfit ?? 0 },
         {
-          titleKey: 'tr_report_card_margin',
-          value: s.profitMargin != null ? `${Number(s.profitMargin).toFixed(2)}%` : '0%',
+          titleKey: 'tr_report_card_daily_expenses',
+          value: s.dailyExpensesTotal ?? 0,
+          money: true,
+          hintKey: 'tr_report_daily_expenses_hint',
+          hintParams: { count: s.dailyExpensesCount ?? 0 },
+        },
+        {
+          titleKey: netIsLoss ? 'tr_net_loss' : 'tr_net_profit',
+          value: netIsLoss ? Math.abs(netProfit) : netProfit,
+          money: true,
+          tone: netIsLoss ? 'loss' : undefined,
+          trendLabel: netIsLoss ? lossBadge : undefined,
+          trendPositive: netIsLoss ? false : undefined,
+          hintKey: netIsLoss ? 'tr_report_net_loss_hint' : undefined,
+        },
+        {
+          titleKey: marginIsLoss ? 'tr_report_card_loss_margin' : 'tr_report_card_margin',
+          value: `${Math.abs(profitMargin).toFixed(2)}%`,
+          tone: marginIsLoss ? 'loss' : undefined,
+          trendLabel: marginIsLoss ? lossBadge : undefined,
+          trendPositive: marginIsLoss ? false : undefined,
+          hintKey: marginIsLoss ? 'tr_report_loss_margin_hint' : undefined,
         },
       ];
       this.tableColumns = [
         { key: 'period', labelKey: 'tr_report_col_period' },
-        { key: 'revenue', labelKey: 'tr_report_col_revenue' },
-        { key: 'cost', labelKey: 'tr_report_col_cost' },
-        { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit' },
-        { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead' },
-        { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch' },
+        { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
+        { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+        { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
+        { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead', format: 'money' },
+        { key: 'dailyExpenses', labelKey: 'tr_report_col_daily_expenses', format: 'money' },
+        { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch', format: 'money' },
       ];
       this.tableRows = res.profitOverTime || [];
       this.chartOptions = this.lineChart(
@@ -403,8 +443,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'movementType', labelKey: 'tr_report_col_type' },
         { key: 'productName', labelKey: 'tr_report_col_product' },
         { key: 'quantity', labelKey: 'tr_report_col_qty' },
-        { key: 'unitPrice', labelKey: 'tr_report_col_unit_price' },
-        { key: 'totalValue', labelKey: 'tr_report_col_total_value' },
+        { key: 'unitPrice', labelKey: 'tr_report_col_unit_price', format: 'money' },
+        { key: 'totalValue', labelKey: 'tr_report_col_total_value', format: 'money' },
         { key: 'createdAt', labelKey: 'tr_report_col_date' },
       ];
       this.tableRows = (res.movements || []).map((x: any) => ({ ...x, createdAt: new Date(x.createdAt).toLocaleString() }));
@@ -421,7 +461,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'customerName', labelKey: 'tr_report_col_customer' },
         { key: 'customerPhone', labelKey: 'tr_report_col_phone' },
         { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
-        { key: 'totalSpending', labelKey: 'tr_report_col_spending' },
+        { key: 'totalSpending', labelKey: 'tr_report_col_spending', format: 'money' },
       ];
       this.tableRows = res.customers || [];
       const barTitle = t('tr_report_chart_top_customers_spending');
@@ -436,12 +476,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'deskPurchases') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_desk_purchases_total_cost', value: s.totalAmount ?? 0 },
+        { titleKey: 'tr_report_desk_purchases_total_cost', value: s.totalAmount ?? 0, money: true },
         { titleKey: 'tr_report_desk_purchases_intakes', value: s.totalIntakes ?? 0 },
       ];
       this.tableColumns = [
         { key: 'treasuryLabel', labelKey: 'tr_report_col_purchase_treasury' },
-        { key: 'totalAmount', labelKey: 'tr_report_col_amount' },
+        { key: 'totalAmount', labelKey: 'tr_report_col_amount', format: 'money' },
         { key: 'intakeCount', labelKey: 'tr_report_desk_purchases_col_intakes' },
       ];
       const bt = s.byTreasury || [];
@@ -466,8 +506,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'treasuryLabel', labelKey: 'tr_report_col_purchase_treasury' },
         { key: 'productName', labelKey: 'tr_report_col_product' },
         { key: 'quantity', labelKey: 'tr_report_col_qty' },
-        { key: 'unitCost', labelKey: 'tr_purchase_price' },
-        { key: 'lineTotal', labelKey: 'tr_report_col_amount' },
+        { key: 'unitCost', labelKey: 'tr_purchase_price', format: 'money' },
+        { key: 'lineTotal', labelKey: 'tr_report_col_amount', format: 'money' },
       ];
       this.deskPurchasesDetailRows = (res.lines || []).map((x: any) => ({
         createdAt: x.createdAt ? new Date(x.createdAt).toLocaleString() : '',
@@ -486,12 +526,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.cards = [
         { titleKey: 'tr_report_card_paid_count', value: s.paidCount || 0 },
         { titleKey: 'tr_report_card_unpaid_count', value: s.unpaidCount || 0 },
-        { titleKey: 'tr_report_card_paid_amount', value: s.paidAmount || 0 },
-        { titleKey: 'tr_report_card_unpaid_amount', value: s.unpaidAmount || 0 },
+        { titleKey: 'tr_report_card_paid_amount', value: s.paidAmount || 0, money: true },
+        { titleKey: 'tr_report_card_unpaid_amount', value: s.unpaidAmount || 0, money: true },
       ];
       this.tableColumns = [
         { key: 'dueDate', labelKey: 'tr_report_col_due_date' },
-        { key: 'amount', labelKey: 'tr_amount' },
+        { key: 'amount', labelKey: 'tr_amount', format: 'money' },
         { key: 'paid', labelKey: 'tr_paid' },
         { key: 'status', labelKey: 'tr_report_col_request_status' },
       ];
@@ -514,7 +554,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.cards = [
       { titleKey: 'tr_bookings_report_card_total', value: s.totalBookings || 0 },
       { titleKey: 'tr_bookings_report_card_units', value: s.totalUnits || 0 },
-      { titleKey: 'tr_bookings_report_card_deposits', value: s.totalDeposits || 0 },
+      { titleKey: 'tr_bookings_report_card_deposits', value: s.totalDeposits || 0, money: true },
       { titleKey: 'tr_bookings_report_card_active', value: s.activeCount || 0 },
       { titleKey: 'tr_bookings_report_card_cancelled', value: s.cancelledCount || 0 },
       { titleKey: 'tr_bookings_report_card_confirmed', value: s.confirmedActive || 0 },
@@ -530,7 +570,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       { key: 'customerPhone', labelKey: 'tr_booking_customer_phone' },
       { key: 'transferReferencePhone', labelKey: 'tr_booking_transfer_reference_phone' },
       { key: 'pickup', labelKey: 'tr_booking_pickup_type' },
-      { key: 'depositAmount', labelKey: 'tr_booking_deposit' },
+      { key: 'depositAmount', labelKey: 'tr_booking_deposit', format: 'money' },
       { key: 'depositProof', labelKey: 'tr_booking_deposit_proof' },
       { key: 'createdBy', labelKey: 'tr_requested_by' },
       { key: 'status', labelKey: 'tr_report_col_request_status' },
@@ -629,7 +669,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       const t = (key: string) => this.translate.instant(key);
       const summaryRows = this.cards.map((c) => ({
         [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
-        [t('tr_report_col_value')]: c.money ? formatEgpMoney(c.value) : c.value,
+        [t('tr_report_col_value')]: this.formatCardExportValue(c),
       }));
       const capitalRows = this.mapRowsForExport(this.branchCapitalColumns, this.branchCapitalRows);
       const topRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
@@ -646,14 +686,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.exportService.exportToExcel(filename, this.tableRows);
+    this.exportService.exportToExcel(
+      filename,
+      this.mapRowsForExport(this.tableColumns, this.tableRows)
+    );
   }
 
   async exportPdf(): Promise<void> {
     const title = this.translate.instant(this.reportTitleKey);
     const summaryRows = this.cards.map((c) => ({
       label: this.translate.instant(c.titleKey, c.titleParams || {}),
-      value: c.money ? formatEgpMoney(c.value) : c.value,
+      value: this.formatCardExportValue(c),
     }));
 
     if (this.reportType === 'products') {
@@ -692,6 +735,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     const colLabels = this.tableColumns.map((c) => this.translate.instant(c.labelKey));
     const pdfRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
     await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
+  }
+
+  private formatCardExportValue(c: ReportCardVM): string | number {
+    const raw = c.money ? formatEgpMoney(c.value) : c.value;
+    if (c.tone === 'loss') {
+      return `${this.translate.instant('tr_report_loss_badge')}: ${raw}`;
+    }
+    return raw;
   }
 
   private mapRowsForExport(

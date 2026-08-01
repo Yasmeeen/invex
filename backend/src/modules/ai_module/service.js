@@ -326,8 +326,8 @@ export const chat = async (req, res) => {
           : `Branch: ${branchMeta.branchName}\n`
         : '';
       const answer = ar
-        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nالإيرادات: ${s.totalRevenue || 0}\nالتكلفة: ${s.totalCost || 0}\nربح التشغيل: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nصافي الربح: ${s.netProfit || 0}`
-        : `${branchLine}Range: ${rf} to ${rt}\nRevenue: ${s.totalRevenue || 0}\nCost: ${s.totalCost || 0}\nTrading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nNet profit: ${s.netProfit || 0}`;
+        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nالإيرادات: ${s.totalRevenue || 0}\nالتكلفة: ${s.totalCost || 0}\nربح التشغيل: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nالمصروفات اليومية: ${s.dailyExpensesTotal || 0}\nصافي الربح: ${s.netProfit || 0}`
+        : `${branchLine}Range: ${rf} to ${rt}\nRevenue: ${s.totalRevenue || 0}\nCost: ${s.totalCost || 0}\nTrading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nDaily expenses: ${s.dailyExpensesTotal || 0}\nNet profit: ${s.netProfit || 0}`;
       return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt }, branch: branchMeta } });
     }
 

@@ -8,6 +8,16 @@ const productBranchTransferSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /** Kept if source product is later deleted — list/export still show name/code. */
+    productNameSnapshot: { type: String, default: '', trim: true },
+    productCodeSnapshot: { type: String, default: '', trim: true },
+    /** Set on approve — product row that received the stock at toBranch. */
+    destinationProduct: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+      index: true,
+    },
     fromBranch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',

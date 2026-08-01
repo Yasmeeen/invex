@@ -16,6 +16,19 @@ export interface PurchaseTreasuryMethod {
   label: string;
 }
 
+export type MoneyAccountKind = 'cash' | 'treasury' | 'settlement';
+
+export interface MoneyAccount {
+  key: string;
+  label: string;
+  kind: MoneyAccountKind;
+}
+
+export interface PaymentMethodAccountMapRow {
+  method: string;
+  accountKey: string;
+}
+
 export interface PaymentAppFeePercent {
   method: string;
   label?: string;
@@ -29,6 +42,10 @@ export interface StoreSettings {
   receiptLanguage: ReceiptLanguageCode;
   /** Purchase desk treasury buckets (from API; includes cash + banks/wallets). */
   purchaseTreasuryMethods: PurchaseTreasuryMethod[];
+  /** Balance-bearing accounts including settlement apps. */
+  moneyAccounts: MoneyAccount[];
+  /** Cashier payment method → money account. */
+  paymentMethodAccountMap: PaymentMethodAccountMapRow[];
   /** Cashier: customer gross payment → invoice net (percent on top of net). */
   paymentAppFeePercents: PaymentAppFeePercent[];
   /** Return & exchange policy text (optional). */
@@ -47,6 +64,8 @@ const DEFAULTS: StoreSettings = {
   logoUrl: '',
   receiptLanguage: 'en',
   purchaseTreasuryMethods: [{ key: 'cash', label: 'Cash' }],
+  moneyAccounts: [{ key: 'cash', label: 'Cash', kind: 'cash' }],
+  paymentMethodAccountMap: [{ method: 'cash', accountKey: 'cash' }],
   paymentAppFeePercents: [],
   returnExchangePolicy: '',
   showReturnExchangePolicyOnReceipt: false,
@@ -93,6 +112,50 @@ export class StoreSettingsService {
     return out;
   }
 
+  private normalizeMoneyAccounts(raw: unknown): MoneyAccount[] {
+    if (!Array.isArray(raw)) return [...DEFAULTS.moneyAccounts];
+    const seen = new Set<string>();
+    const out: MoneyAccount[] = [];
+    for (const row of raw as MoneyAccount[]) {
+      const key = String(row?.key ?? '')
+        .trim()
+        .toLowerCase();
+      const label = String(row?.label ?? '').trim();
+      let kind = String(row?.kind ?? 'treasury').trim().toLowerCase() as MoneyAccountKind;
+      if (!key || !label || seen.has(key)) continue;
+      if (key === 'cash') kind = 'cash';
+      if (kind !== 'cash' && kind !== 'treasury' && kind !== 'settlement') kind = 'treasury';
+      seen.add(key);
+      out.push({ key, label, kind });
+    }
+    if (!out.some((a) => a.key === 'cash')) {
+      out.unshift({ key: 'cash', label: 'Cash', kind: 'cash' });
+    }
+    return out;
+  }
+
+  private normalizePaymentMethodAccountMap(raw: unknown): PaymentMethodAccountMapRow[] {
+    if (!Array.isArray(raw)) return [...DEFAULTS.paymentMethodAccountMap];
+    const seen = new Set<string>();
+    const out: PaymentMethodAccountMapRow[] = [];
+    for (const row of raw as PaymentMethodAccountMapRow[]) {
+      const method = String(row?.method ?? '')
+        .trim()
+        .toLowerCase();
+      let accountKey = String(row?.accountKey ?? '')
+        .trim()
+        .toLowerCase();
+      if (!method || !accountKey || seen.has(method)) continue;
+      if (method === 'cash') accountKey = 'cash';
+      seen.add(method);
+      out.push({ method, accountKey });
+    }
+    if (!out.some((r) => r.method === 'cash')) {
+      out.unshift({ method: 'cash', accountKey: 'cash' });
+    }
+    return out;
+  }
+
   /** Load from API (call once after login / main layout). */
   load(): void {
     const epoch = ++this.loadEpoch;
@@ -117,6 +180,10 @@ export class StoreSettingsService {
           logoUrl: data.logoUrl ?? '',
           receiptLanguage,
           purchaseTreasuryMethods: methods.length ? methods : DEFAULTS.purchaseTreasuryMethods,
+          moneyAccounts: this.normalizeMoneyAccounts(data.moneyAccounts),
+          paymentMethodAccountMap: this.normalizePaymentMethodAccountMap(
+            data.paymentMethodAccountMap
+          ),
           paymentAppFeePercents: this.normalizePaymentAppFeePercents(data.paymentAppFeePercents),
           returnExchangePolicy: data.returnExchangePolicy ?? '',
           showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
@@ -191,11 +258,21 @@ export class StoreSettingsService {
           data.paymentAppFeePercents !== undefined && data.paymentAppFeePercents !== null
             ? this.normalizePaymentAppFeePercents(data.paymentAppFeePercents)
             : this._settings.value.paymentAppFeePercents;
+        const mergedMoney =
+          data.moneyAccounts !== undefined && data.moneyAccounts !== null
+            ? this.normalizeMoneyAccounts(data.moneyAccounts)
+            : this._settings.value.moneyAccounts;
+        const mergedMap =
+          data.paymentMethodAccountMap !== undefined && data.paymentMethodAccountMap !== null
+            ? this.normalizePaymentMethodAccountMap(data.paymentMethodAccountMap)
+            : this._settings.value.paymentMethodAccountMap;
         this._settings.next({
           ...this._settings.value,
           ...data,
           receiptLanguage,
           purchaseTreasuryMethods: mergedMethods?.length ? mergedMethods : DEFAULTS.purchaseTreasuryMethods,
+          moneyAccounts: mergedMoney,
+          paymentMethodAccountMap: mergedMap,
           paymentAppFeePercents: mergedFees,
         });
         this.ensureReceiptTranslationPacks();

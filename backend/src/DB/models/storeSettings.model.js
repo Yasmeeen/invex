@@ -12,6 +12,31 @@ const purchaseTreasuryMethodEntry = new mongoose.Schema(
   { _id: false }
 );
 
+/** Unified money accounts: cash drawer, bank/wallet treasuries, app settlement receivables. */
+const moneyAccountEntry = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true, maxlength: 40 },
+    label: { type: String, required: true, trim: true, maxlength: 120 },
+    /** cash = drawer; treasury = bank/wallet; settlement = app pending payout (aman/valu/…). */
+    kind: {
+      type: String,
+      enum: ['cash', 'treasury', 'settlement'],
+      required: true,
+      default: 'treasury',
+    },
+  },
+  { _id: false }
+);
+
+/** Cashier payment method → money account that receives the funds. */
+const paymentMethodAccountMapEntry = new mongoose.Schema(
+  {
+    method: { type: String, required: true, trim: true, maxlength: 40 },
+    accountKey: { type: String, required: true, trim: true, maxlength: 40 },
+  },
+  { _id: false }
+);
+
 const paymentAppFeePercentEntry = new mongoose.Schema(
   {
     /** Same ids as cashier payment splits (fawry, valu, aman, …). */
@@ -41,6 +66,19 @@ const storeSettingsSchema = new mongoose.Schema(
      */
     purchaseTreasuryMethods: {
       type: [purchaseTreasuryMethodEntry],
+      default: [],
+    },
+    /**
+     * All balance-bearing accounts (cash + banks/wallets + settlement apps).
+     * Empty → API seeds from purchaseTreasuryMethods + default settlement apps.
+     */
+    moneyAccounts: {
+      type: [moneyAccountEntry],
+      default: [],
+    },
+    /** Cashier payment method → which moneyAccounts.key receives the money. */
+    paymentMethodAccountMap: {
+      type: [paymentMethodAccountMapEntry],
       default: [],
     },
     /** Cashier: gross → net allocation per payment app (customer pays net × (1 + percent/100)). */

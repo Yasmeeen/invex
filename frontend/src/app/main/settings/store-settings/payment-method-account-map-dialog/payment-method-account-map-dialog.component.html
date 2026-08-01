@@ -1,0 +1,50 @@
+<div class="payment-method-account-map-dialog">
+  <h2 mat-dialog-title class="payment-method-account-map-dialog__title">
+    {{ 'tr_payment_account_map_title' | translate }}
+  </h2>
+
+  <div mat-dialog-content class="payment-method-account-map-dialog__content">
+    <div class="payment-method-account-map-dialog__scroll">
+      <p class="payment-method-account-map-dialog__lead">{{ 'tr_payment_account_map_hint' | translate }}</p>
+
+      <div class="settings-dialog-table payment-account-map-table">
+        <div class="settings-dialog-table__head payment-account-map-table__head">
+          <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
+          <span>{{ 'tr_treasury_account' | translate }}</span>
+        </div>
+        <div
+          class="settings-dialog-table__row payment-account-map-table__row"
+          *ngFor="let row of rows"
+        >
+          <div class="payment-account-map-table__method">{{ row.label }}</div>
+          <select
+            class="s-control"
+            [(ngModel)]="row.accountKey"
+            [name]="'payMap_' + row.method"
+            [disabled]="row.method === 'cash'"
+          >
+            <option value="">{{ 'tr_payment_account_map_none' | translate }}</option>
+            <option *ngFor="let a of accounts" [value]="a.key">
+              {{ a.label }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div mat-dialog-actions align="end" class="payment-method-account-map-dialog__actions">
+    <button
+      type="button"
+      class="s-btn btn-secondary"
+      *ngIf="isDialog"
+      (click)="cancel()"
+      [disabled]="saving"
+    >
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">
+      {{ 'tr_save_settings' | translate }}
+    </button>
+  </div>
+</div>

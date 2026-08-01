@@ -15,6 +15,7 @@ import {
   BranchTransferItem,
   ProductsSerivce,
 } from '@shared/services/products.service';
+import { ReportExportService } from '@shared/services/report-export.service';
 
 @Component({
   selector: 'app-pending-branch-transfers',
@@ -23,6 +24,7 @@ import {
 })
 export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   loading = true;
+  exporting = false;
   isFilterOpen = true;
   isNotAuthorized = false;
   transfers: BranchTransferItem[] = [];
@@ -67,6 +69,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     private categoriesService: CategoriesServce,
     private notify: AppNotificationService,
     private translate: TranslateService,
+    private exportService: ReportExportService,
     private globals: Globals,
     private router: Router
   ) {}
@@ -249,6 +252,62 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   goToProducts(): void {
     this.router.navigate(['/products']);
+  }
+
+  async exportExcel(): Promise<void> {
+    if (this.exporting || !this.params?.userId) {
+      return;
+    }
+    this.exporting = true;
+    try {
+      const transfers = await this.fetchAllTransfersForExport();
+      if (!transfers.length) {
+        this.notify.push(this.translate.instant('tr_branch_transfers_empty'), 'error');
+        return;
+      }
+      const rows = transfers.map((t) => this.mapTransferExportRow(t));
+      const filename = `branch_transfers_${new Date().toISOString().slice(0, 10)}`;
+      await this.exportService.exportToExcel(filename, rows);
+    } catch {
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+    } finally {
+      this.exporting = false;
+    }
+  }
+
+  private async fetchAllTransfersForExport(): Promise<BranchTransferItem[]> {
+    const pageSize = 100;
+    const all: BranchTransferItem[] = [];
+    let page = 1;
+    let totalPages = 1;
+    while (page <= totalPages) {
+      const r = await this.products
+        .listBranchTransfers({
+          ...this.params,
+          page,
+          limit: pageSize,
+        })
+        .toPromise();
+      all.push(...(r?.transfers || []));
+      totalPages = Math.max(1, Number(r?.meta?.totalPages) || 1);
+      page += 1;
+    }
+    return all;
+  }
+
+  private mapTransferExportRow(t: BranchTransferItem): Record<string, string | number> {
+    return {
+      [this.translate.instant('tr_product_name')]: t.product?.name || '',
+      [this.translate.instant('tr_code')]: t.product?.code || '',
+      [this.translate.instant('tr_branch_transfer_from')]: t.fromBranch?.name || '',
+      [this.translate.instant('tr_branch_transfer_to_branch')]: t.toBranch?.name || '',
+      [this.translate.instant('tr_branch_transfer_quantity')]: t.quantity ?? 0,
+      [this.translate.instant('tr_branch_transfer_status_col')]: this.translate.instant(
+        this.statusLabelKey(t)
+      ),
+      [this.translate.instant('tr_branch_transfer_date')]: this.formatTransferDate(t.createdAt) || '',
+      [this.translate.instant('tr_branch_transfer_by')]: t.initiatedBy?.name || '',
+    };
   }
 
   canResolve(transfer: BranchTransferItem): boolean {

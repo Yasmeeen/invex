@@ -89,6 +89,28 @@
   font-family: inherit;
 }
 
+.report-card--loss {
+  border-color: #fecaca;
+  box-shadow: 0 4px 18px rgba(185, 28, 28, 0.08);
+}
+
+.report-card--loss .report-card__icon-box {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.report-card--loss .report-card__title {
+  color: #991b1b;
+}
+
+.report-card--loss .report-card__value {
+  color: #b91c1c;
+}
+
+.report-card--loss .report-card__note {
+  color: #b91c1c;
+}
+
 .report-card__footer {
   display: flex;
   flex-wrap: wrap;

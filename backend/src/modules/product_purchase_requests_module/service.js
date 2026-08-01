@@ -30,6 +30,26 @@ import {
   purchaseHasDeferredTreasury,
 } from '../../utils/purchase-treasury-splits.js';
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+
+async function postDeskPurchaseTreasuryLedger(purchase, { userId, branchId } = {}) {
+  if (!purchase) return;
+  const splits = Array.isArray(purchase.purchaseTreasurySplits)
+    ? purchase.purchaseTreasurySplits
+    : [];
+  if (!splits.length) return;
+  if (String(purchase.status) !== 'approved') return;
+  await safeTreasuryPost('desk_purchase', async () => {
+    await postTreasurySplitOutflows({
+      branchId: branchId || purchase.branch,
+      splits,
+      sourceType: 'desk_purchase',
+      sourceId: purchase._id,
+      note: String(purchase.productPayload?.name || 'Desk purchase').slice(0, 200),
+      createdBy: userId,
+    });
+  });
+}
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -46,6 +66,42 @@ const normalizeImageUrl = (raw) => {
 };
 
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
+
+/** Keep lines[0] in sync when root createdProductId(s) are set. */
+function syncFirstLineCreatedProducts(purchase, productId, productIds) {
+  if (!purchase) return;
+  if (!Array.isArray(purchase.lines) || !purchase.lines.length) {
+    purchase.lines = [
+      {
+        productPayload: purchase.productPayload,
+        quantity: Math.max(1, Math.floor(Number(purchase.quantity) || 1)),
+      },
+    ];
+  }
+  if (productId) {
+    purchase.lines[0].createdProductId = productId;
+  }
+  if (Array.isArray(productIds) && productIds.length) {
+    purchase.lines[0].createdProductIds = productIds;
+  }
+  purchase.markModified('lines');
+}
+
+/** Aggregate root createdProductIds from all lines. */
+function refreshRootCreatedProductIds(purchase) {
+  if (!purchase || !Array.isArray(purchase.lines) || !purchase.lines.length) return;
+  const all = [];
+  for (const line of purchase.lines) {
+    if (Array.isArray(line.createdProductIds) && line.createdProductIds.length) {
+      all.push(...line.createdProductIds);
+    } else if (line.createdProductId) {
+      all.push(line.createdProductId);
+    }
+  }
+  if (!all.length) return;
+  purchase.createdProductId = all[0];
+  purchase.createdProductIds = all.length > 1 ? all : undefined;
+}
 
 async function leanPurchaseForResponse(purchaseId) {
   if (!purchaseId) return null;
@@ -368,6 +424,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           createdBy: actor._id,
           productPayload: payload,
           quantity: q,
+          lines: [{ productPayload: payload, quantity: q }],
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
           purchaseTreasurySplits,
@@ -424,6 +481,7 @@ export const createProductPurchaseRequest = async (req, res) => {
         createdProduct = createdList[0];
         created.createdProductId = createdList[0]._id;
         created.createdProductIds = createdList.map((p) => p._id);
+        syncFirstLineCreatedProducts(created, createdList[0]._id, createdList.map((p) => p._id));
         await created.save({ session });
 
         await session.commitTransaction();
@@ -477,6 +535,7 @@ export const createProductPurchaseRequest = async (req, res) => {
         });
 
         const purchaseOut = await leanPurchaseForResponse(created._id);
+        await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
         return res.status(201).json({
           message: '✅ Purchase created and approved',
           purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -503,6 +562,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           createdProduct = existing;
 
           created.createdProductId = existing._id;
+          syncFirstLineCreatedProducts(created, existing._id);
           await created.save({ session });
 
           await session.commitTransaction();
@@ -548,6 +608,7 @@ export const createProductPurchaseRequest = async (req, res) => {
           });
 
           const purchaseOut = await leanPurchaseForResponse(created._id);
+          await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
           return res.status(201).json({
             message: '✅ Purchase created and approved',
             purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -583,6 +644,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       createdProduct = prod;
 
       created.createdProductId = prod._id;
+      syncFirstLineCreatedProducts(created, prod._id);
       await created.save({ session });
 
       await session.commitTransaction();
@@ -628,6 +690,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       });
 
       const purchaseOut = await leanPurchaseForResponse(created._id);
+      await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
       return res.status(201).json({
         message: '✅ Purchase created and approved',
         purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -690,6 +753,352 @@ export const createProductPurchaseRequest = async (req, res) => {
     session.endSession();
     console.error('createProductPurchaseRequest:', e);
     return res.status(500).json({ error: 'Failed to create product purchase request', details: e?.message });
+  }
+};
+
+/**
+ * Build normalized productPayload + quantity for a desk purchase line (create / add-line).
+ */
+async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) {
+  const q = Math.max(1, Math.floor(Number(qtyRaw) || 1));
+  const name = String(product?.name || '').trim();
+  const code = String(product?.code || '').trim();
+  const categoryId = product?.categoryId || product?.category;
+  const priceNum = Number(product?.price);
+  const netNum = Number(product?.netPrice);
+  const notes = String(product?.notes || '').trim().slice(0, 500);
+  const discountNum =
+    product?.discount === undefined || product?.discount === null || product?.discount === ''
+      ? 0
+      : Number(product?.discount);
+  const imageUrlNorm = normalizeImageUrl(product?.imageUrl);
+
+  if (!name || !code || !categoryId) {
+    return { error: 'name, code, categoryId are required' };
+  }
+  if (!mongoose.Types.ObjectId.isValid(String(categoryId))) {
+    return { error: 'Invalid categoryId' };
+  }
+  if (Number.isNaN(priceNum) || priceNum < 0 || Number.isNaN(netNum) || netNum < 0) {
+    return { error: 'Valid price and netPrice are required' };
+  }
+  if (Number.isNaN(discountNum) || discountNum < 0 || discountNum > 100) {
+    return { error: 'Invalid discount' };
+  }
+
+  const attrsNorm = await normalizeAttributesForCategory(String(categoryId), product?.attributes);
+  if (attrsNorm === null) {
+    return { error: 'attributes must be an object' };
+  }
+
+  const catMultiRow = await Category.findById(String(categoryId))
+    .select('multiCodePerPiece')
+    .session(session)
+    .lean();
+  const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+
+  let unitCodesNorm = [];
+  if (categoryIsMulti && q > 1) {
+    const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
+    unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+    if (unitCodesNorm.length !== q) {
+      try {
+        unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
+      } catch (e) {
+        return { error: e?.message || 'Cannot allocate codes' };
+      }
+    }
+    const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
+    if (seen.size !== unitCodesNorm.length) {
+      return { error: 'Duplicate codes in unitCodes' };
+    }
+    for (const c of unitCodesNorm) {
+      const chk = await validateProductCodeForCategory(String(categoryId), c);
+      if (!chk.ok) return { error: chk.error };
+    }
+  }
+
+  const addedByNorm = normalizeAddedBy(product?.addedBy);
+  const payload = {
+    name,
+    code: categoryIsMulti && q > 1 ? unitCodesNorm[0] : code,
+    category: new mongoose.Types.ObjectId(String(categoryId)),
+    price: Math.round(priceNum * 100) / 100,
+    netPrice: Math.round(netNum * 100) / 100,
+    discount: Math.round(discountNum * 100) / 100,
+    attributes: attrsNorm,
+    imageUrl: imageUrlNorm,
+    notes,
+    ...(addedByNorm ? { addedBy: addedByNorm } : {}),
+  };
+  if (categoryIsMulti && q > 1) {
+    payload.unitCodes = unitCodesNorm;
+  }
+  if (product?.acquiredFrom && typeof product.acquiredFrom === 'object') {
+    payload.acquiredFrom = product.acquiredFrom;
+  }
+
+  let acquiredFromFields = {};
+  try {
+    const resolved = await resolveProductAcquiredFrom(
+      { acquiredFrom: payload.acquiredFrom },
+      { categoryId: String(categoryId), branchOid: branchId }
+    );
+    if (resolved?.acquiredFrom) {
+      acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+      payload.acquiredFrom = resolved.acquiredFrom;
+    }
+  } catch (e) {
+    return { error: e?.message || 'Invalid source party', code: e?.code };
+  }
+
+  return {
+    q,
+    name,
+    code: payload.code,
+    payload,
+    categoryIsMulti,
+    unitCodesNorm,
+    acquiredFromFields,
+    categoryId: String(categoryId),
+  };
+}
+
+/**
+ * Create stock Product row(s) for one purchase line (auto-approve / approve / add-line).
+ */
+async function createProductsForLine(session, { linePayload, branchId, acquiredFromFields }) {
+  const { q, name, code, payload, categoryIsMulti, unitCodesNorm } = linePayload;
+  const createdList = [];
+
+  if (categoryIsMulti && q > 1) {
+    const free = await assertCodesNotUsedInStorage(unitCodesNorm, branchId, false);
+    if (!free.ok) {
+      return { error: free.error, status: 409 };
+    }
+    for (const unitCode of unitCodesNorm) {
+      const [prodRow] = await Product.create(
+        [
+          {
+            name,
+            code: unitCode,
+            price: payload.price,
+            netPrice: payload.netPrice,
+            stock: 1,
+            discount: payload.discount,
+            category: payload.category,
+            branch: branchId,
+            inWarehouse: false,
+            imageUrl: payload.imageUrl,
+            attributes: payload.attributes,
+            ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+            ...acquiredFromFields,
+          },
+        ],
+        { session }
+      );
+      createdList.push(prodRow);
+    }
+    return { createdList, createdProduct: createdList[0] };
+  }
+
+  const existing = await Product.findOne({ code, branch: branchId }).session(session);
+  if (existing) {
+    if (existing.removedWhenOutOfStock) {
+      existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
+      existing.removedWhenOutOfStock = false;
+      existing.name = name || existing.name;
+      if (payload.price != null) existing.price = payload.price;
+      if (payload.netPrice != null) existing.netPrice = payload.netPrice;
+      if (payload.discount != null) existing.discount = payload.discount;
+      if (payload.category) existing.category = payload.category;
+      if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
+      if (payload.attributes) existing.attributes = payload.attributes;
+      if (payload.addedBy) existing.addedBy = payload.addedBy;
+      Object.assign(existing, acquiredFromFields);
+      await existing.save({ session });
+      return { createdList: [existing], createdProduct: existing };
+    }
+    return { error: 'Product code already exists in this branch', status: 409 };
+  }
+
+  const [prod] = await Product.create(
+    [
+      {
+        name,
+        code,
+        price: payload.price,
+        netPrice: payload.netPrice,
+        stock: q,
+        discount: payload.discount,
+        category: payload.category,
+        branch: branchId,
+        inWarehouse: false,
+        imageUrl: payload.imageUrl,
+        attributes: payload.attributes,
+        ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+        ...acquiredFromFields,
+      },
+    ],
+    { session }
+  );
+  return { createdList: [prod], createdProduct: prod };
+}
+
+/**
+ * Append another device/line to an existing exchange trade-in purchase (one invoice).
+ * POST /product-purchase-requests/:id/add-line
+ */
+export const addProductPurchaseLine = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const { id } = req.params;
+    const { userId, quantity: qtyRaw, product } = req.body || {};
+
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Invalid purchase id' });
+    }
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const actor = await User.findById(userId).select('_id name role branch').session(session);
+    if (!actor) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const purchase = await ProductPurchaseRequest.findById(id).session(session);
+    if (!purchase) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    if (!purchase.isExchangeTradeIn) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Only exchange trade-in purchases can receive extra lines' });
+    }
+    if (!['pending', 'approved'].includes(String(purchase.status))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Cannot add lines to this purchase' });
+    }
+
+    const branchId = purchase.branch;
+    const built = await buildPurchaseLinePayload(product, qtyRaw, { session, branchId });
+    if (built.error) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: built.error, code: built.code });
+    }
+
+    if (!Array.isArray(purchase.lines) || !purchase.lines.length) {
+      purchase.lines = [
+        {
+          productPayload: purchase.productPayload,
+          quantity: Math.max(1, Math.floor(Number(purchase.quantity) || 1)),
+          ...(purchase.createdProductId ? { createdProductId: purchase.createdProductId } : {}),
+          ...(Array.isArray(purchase.createdProductIds) && purchase.createdProductIds.length
+            ? { createdProductIds: purchase.createdProductIds }
+            : {}),
+        },
+      ];
+    }
+
+    const newLine = {
+      productPayload: built.payload,
+      quantity: built.q,
+    };
+
+    let createdProduct = null;
+    let createdList = [];
+
+    if (purchase.status === 'approved') {
+      const created = await createProductsForLine(session, {
+        linePayload: built,
+        branchId,
+        acquiredFromFields: built.acquiredFromFields,
+      });
+      if (created.error) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(created.status || 400).json({ error: created.error });
+      }
+      createdList = created.createdList;
+      createdProduct = created.createdProduct;
+      newLine.createdProductId = createdProduct._id;
+      if (createdList.length > 1) {
+        newLine.createdProductIds = createdList.map((p) => p._id);
+      }
+    }
+
+    purchase.lines.push(newLine);
+    purchase.markModified('lines');
+    refreshRootCreatedProductIds(purchase);
+    await purchase.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    if (createdList.length) {
+      for (const prodRow of createdList) {
+        try {
+          await StockMovement.create({
+            movementType: 'purchase',
+            productId: prodRow._id,
+            productName: prodRow.name,
+            branchId,
+            fromBranchId: null,
+            toBranchId: branchId,
+            quantity: createdList.length > 1 ? 1 : built.q,
+            unitPrice: built.payload.netPrice,
+            totalValue:
+              Math.round(
+                built.payload.netPrice * (createdList.length > 1 ? 1 : built.q) * 100
+              ) / 100,
+            referenceType: 'productPurchaseRequest',
+            referenceId: purchase._id,
+            notes: `Exchange trade-in line added`,
+          });
+        } catch (e) {
+          console.warn('⚠️ exchange add-line stock movement:', e?.message || e);
+        }
+      }
+    }
+
+    await auditLog(req, {
+      action: 'update',
+      module: 'product_purchase_requests',
+      entityType: 'ProductPurchaseRequest',
+      entityId: purchase._id,
+      message: 'Exchange trade-in line added',
+      metadata: {
+        lineCount: purchase.lines.length,
+        productCode: built.payload.code,
+        quantity: built.q,
+        ...(createdProduct ? { createdProductId: createdProduct._id } : {}),
+      },
+    });
+
+    const purchaseOut = await leanPurchaseForResponse(purchase._id);
+    return res.status(200).json({
+      message: '✅ Line added',
+      purchase: purchaseOut || (purchase.toObject ? purchase.toObject() : purchase),
+      ...(createdProduct ? { createdProduct } : {}),
+      ...(createdList.length > 1 ? { createdProducts: createdList } : {}),
+    });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('addProductPurchaseLine:', e);
+    return res.status(500).json({ error: 'Failed to add purchase line', details: e?.message });
   }
 };
 
@@ -877,10 +1286,60 @@ export const approveProductPurchaseRequest = async (req, res) => {
     if (createdList.length > 1) {
       purchase.createdProductIds = createdList.map((p) => p._id);
     }
+    syncFirstLineCreatedProducts(
+      purchase,
+      prod._id,
+      createdList.length > 1 ? createdList.map((p) => p._id) : undefined
+    );
+
+    // Approve any extra trade-in lines that were appended before approval.
+    if (Array.isArray(purchase.lines) && purchase.lines.length > 1) {
+      for (let i = 1; i < purchase.lines.length; i++) {
+        const line = purchase.lines[i];
+        if (line?.createdProductId) continue;
+        const built = await buildPurchaseLinePayload(
+          {
+            ...(line.productPayload || {}),
+            categoryId: line.productPayload?.category,
+            unitCodes: line.productPayload?.unitCodes,
+          },
+          line.quantity,
+          { session, branchId: purchase.branch }
+        );
+        if (built.error) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: built.error });
+        }
+        const extra = await createProductsForLine(session, {
+          linePayload: built,
+          branchId: purchase.branch,
+          acquiredFromFields: built.acquiredFromFields,
+        });
+        if (extra.error) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(extra.status || 400).json({ error: extra.error });
+        }
+        line.createdProductId = extra.createdProduct._id;
+        if (extra.createdList.length > 1) {
+          line.createdProductIds = extra.createdList.map((p) => p._id);
+        }
+        createdList.push(...extra.createdList);
+      }
+      purchase.markModified('lines');
+      refreshRootCreatedProductIds(purchase);
+    }
+
     await purchase.save({ session });
 
     await session.commitTransaction();
     session.endSession();
+
+    await postDeskPurchaseTreasuryLedger(purchase, {
+      userId: actor._id,
+      branchId: purchase.branch,
+    });
 
     if (purchaseHasDeferredTreasury(purchase)) {
       try {

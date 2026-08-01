@@ -260,7 +260,9 @@ body[dir=rtl] {
 }
 
 .cdk-overlay-pane.payment-app-fees-dialog-panel,
-.cdk-overlay-pane.purchase-treasury-dialog-panel {
+.cdk-overlay-pane.purchase-treasury-dialog-panel,
+.cdk-overlay-pane.settlement-accounts-dialog-panel,
+.cdk-overlay-pane.payment-method-account-map-dialog-panel {
   box-shadow: none;
   max-height: 90vh !important;
 }
@@ -268,7 +270,11 @@ body[dir=rtl] {
 .payment-app-fees-dialog-panel .mat-dialog-container,
 .payment-app-fees-dialog-panel .mat-mdc-dialog-container,
 .purchase-treasury-dialog-panel .mat-dialog-container,
-.purchase-treasury-dialog-panel .mat-mdc-dialog-container {
+.purchase-treasury-dialog-panel .mat-mdc-dialog-container,
+.settlement-accounts-dialog-panel .mat-dialog-container,
+.settlement-accounts-dialog-panel .mat-mdc-dialog-container,
+.payment-method-account-map-dialog-panel .mat-dialog-container,
+.payment-method-account-map-dialog-panel .mat-mdc-dialog-container {
   background: transparent;
   box-shadow: none;
   padding: 0;
@@ -279,7 +285,11 @@ body[dir=rtl] {
 .payment-app-fees-dialog-panel .mat-dialog-content,
 .payment-app-fees-dialog-panel .mat-mdc-dialog-content,
 .purchase-treasury-dialog-panel .mat-dialog-content,
-.purchase-treasury-dialog-panel .mat-mdc-dialog-content {
+.purchase-treasury-dialog-panel .mat-mdc-dialog-content,
+.settlement-accounts-dialog-panel .mat-dialog-content,
+.settlement-accounts-dialog-panel .mat-mdc-dialog-content,
+.payment-method-account-map-dialog-panel .mat-dialog-content,
+.payment-method-account-map-dialog-panel .mat-mdc-dialog-content {
   margin: 0;
   padding: 0;
   max-height: none !important;
@@ -288,7 +298,9 @@ body[dir=rtl] {
 
 /* Settings fee/treasury dialogs: cap card height and scroll inner list (beats _global_styles mat-dialog rules). */
 .payment-app-fees-dialog-panel .payment-app-fees-dialog,
-.purchase-treasury-dialog-panel .purchase-treasury-dialog {
+.purchase-treasury-dialog-panel .purchase-treasury-dialog,
+.settlement-accounts-dialog-panel .settlement-accounts-dialog,
+.payment-method-account-map-dialog-panel .payment-method-account-map-dialog {
   display: flex !important;
   flex-direction: column !important;
   max-height: min(85vh, 640px) !important;
@@ -296,14 +308,18 @@ body[dir=rtl] {
 }
 
 .payment-app-fees-dialog-panel .payment-app-fees-dialog__content,
-.purchase-treasury-dialog-panel .purchase-treasury-dialog__content {
+.purchase-treasury-dialog-panel .purchase-treasury-dialog__content,
+.settlement-accounts-dialog-panel .settlement-accounts-dialog__content,
+.payment-method-account-map-dialog-panel .payment-method-account-map-dialog__content {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow: hidden !important;
 }
 
 .payment-app-fees-dialog-panel .payment-app-fees-dialog__scroll,
-.purchase-treasury-dialog-panel .purchase-treasury-dialog__scroll {
+.purchase-treasury-dialog-panel .purchase-treasury-dialog__scroll,
+.settlement-accounts-dialog-panel .settlement-accounts-dialog__scroll,
+.payment-method-account-map-dialog-panel .payment-method-account-map-dialog__scroll {
   max-height: min(52vh, 400px) !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
@@ -313,7 +329,11 @@ body[dir=rtl] {
 .payment-app-fees-dialog-panel .payment-app-fees-dialog__title,
 .payment-app-fees-dialog-panel .payment-app-fees-dialog__actions,
 .purchase-treasury-dialog-panel .purchase-treasury-dialog__title,
-.purchase-treasury-dialog-panel .purchase-treasury-dialog__actions {
+.purchase-treasury-dialog-panel .purchase-treasury-dialog__actions,
+.settlement-accounts-dialog-panel .settlement-accounts-dialog__title,
+.settlement-accounts-dialog-panel .settlement-accounts-dialog__actions,
+.payment-method-account-map-dialog-panel .payment-method-account-map-dialog__title,
+.payment-method-account-map-dialog-panel .payment-method-account-map-dialog__actions {
   flex-shrink: 0 !important;
 }
 
@@ -366,12 +386,46 @@ body[dir=rtl] {
   justify-content: center !important;
 }
 
-.cdk-overlay-backdrop.purchase-treasury-dialog-backdrop {
+.settlement-accounts-dialog-panel .settlement-accounts-table__row,
+.settlement-accounts-dialog-panel .settlement-accounts-table__head {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+}
+
+.payment-method-account-map-dialog-panel .payment-account-map-table__row,
+.payment-method-account-map-dialog-panel .payment-account-map-table__head {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+}
+
+.cdk-overlay-backdrop.purchase-treasury-dialog-backdrop,
+.cdk-overlay-backdrop.settlement-accounts-dialog-backdrop,
+.cdk-overlay-backdrop.payment-method-account-map-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }
 
 .cdk-overlay-backdrop.payment-splits-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.treasury-transfer-dialog-panel {
+  box-shadow: none;
+}
+
+.treasury-transfer-dialog-panel .mat-dialog-container,
+.treasury-transfer-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
 }
 
 .cdk-overlay-pane.payment-splits-dialog-panel {

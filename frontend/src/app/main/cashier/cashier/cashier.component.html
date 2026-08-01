@@ -354,27 +354,108 @@
         </button>
       </div>
 
-      <div class="card mb-3 plr-3 ptb-3" *ngIf="exchangeTradeInPurchase">
+      <div class="card mb-3 plr-3 ptb-3" *ngIf="hasExchangeTradeIn()">
         <div class="flex flex-space-between flex-wrap gap-sm mb-2">
           <span class="weight-bold">{{ 'tr_exchange_active_title' | translate }}</span>
-          <button type="button" class="s-btn btn-secondary size-small" (click)="cancelExchangeFlow()">
-            {{ 'tr_exchange_cancel' | translate }}
-          </button>
+          <div class="flex gap-sm flex-wrap">
+            <button type="button" class="s-btn btn-secondary size-small" (click)="startExchangeFlow()">
+              {{ 'tr_exchange_add_another' | translate }}
+            </button>
+            <button type="button" class="s-btn btn-secondary size-small" (click)="cancelExchangeFlow()">
+              {{ 'tr_exchange_cancel' | translate }}
+            </button>
+          </div>
         </div>
         <p class="size-small text-muted m-0 mb-2">{{ 'tr_exchange_active_hint' | translate }}</p>
+        <div class="size-small mb-2" *ngFor="let line of exchangeTradeInLines()">
+          <div>
+            {{ 'tr_exchange_trade_in_item' | translate }}:
+            {{ line?.productPayload?.name }}
+            <span *ngIf="(line?.quantity || 1) > 1"> × {{ line.quantity }}</span>
+          </div>
+          <div>
+            {{ 'tr_exchange_trade_in_credit' | translate }}:
+            {{ tradeInLineCredit(line) | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+        </div>
         <div class="size-small">
-          <div>{{ 'tr_exchange_trade_in_item' | translate }}: {{ exchangeTradeInPurchase?.productPayload?.name }}</div>
-          <div>{{ 'tr_exchange_trade_in_credit' | translate }}: {{ exchangeTradeInCredit() | currency:'EGP ':'symbol':'1.2-2' }}</div>
-          <div class="weight-bold mt-1">{{ 'tr_exchange_amount_to_collect' | translate }}: {{ exchangeAmountDue() | currency:'EGP ':'symbol':'1.2-2' }}</div>
+          <div class="weight-bold">
+            {{ 'tr_exchange_trade_in_credit' | translate }}:
+            {{ exchangeTradeInCredit() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
+          <div class="weight-bold mt-1">
+            {{ 'tr_exchange_amount_to_collect' | translate }}:
+            {{ exchangeAmountDue() | currency:'EGP ':'symbol':'1.2-2' }}
+          </div>
           <div class="text-warning mt-1" *ngIf="exchangeStoreOwesCustomer() > 0">
-            {{ 'tr_exchange_store_owes_customer' | translate }}: {{ exchangeStoreOwesCustomer() | currency:'EGP ':'symbol':'1.2-2' }}
+            {{ 'tr_exchange_store_owes_customer' | translate }}:
+            {{ exchangeStoreOwesCustomer() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
         </div>
       </div>
 
       <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
 
- 
+      <div
+        class="cashier-booking-bars"
+        *ngIf="cartForeignBookingBars().length || cartMatchedDepositBars().length"
+      >
+        <div
+          class="cashier-booking-bar cashier-booking-bar--warn"
+          *ngFor="let bar of cartForeignBookingBars()"
+        >
+          <span *ngIf="bar.days <= 0">
+            {{
+              'tr_cashier_booking_bar_today'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone
+                    }
+            }}
+          </span>
+          <span *ngIf="bar.days > 0">
+            {{
+              'tr_cashier_booking_bar'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone,
+                      days: bar.days
+                    }
+            }}
+          </span>
+        </div>
+        <div
+          class="cashier-booking-bar cashier-booking-bar--deposit"
+          *ngFor="let bar of cartMatchedDepositBars()"
+        >
+          <span *ngIf="bar.fullyPaid">
+            {{
+              'tr_cashier_booking_bar_fully_paid'
+                | translate
+                  : {
+                      product: bar.productName,
+                      deposit: (bar.deposit | number:'1.2-2')
+                    }
+            }}
+          </span>
+          <span *ngIf="!bar.fullyPaid">
+            {{
+              'tr_cashier_booking_bar_deposit'
+                | translate
+                  : {
+                      product: bar.productName,
+                      deposit: (bar.deposit | number:'1.2-2'),
+                      remaining: (bar.remaining | number:'1.2-2')
+                    }
+            }}
+          </span>
+        </div>
+      </div>
+
       <table class="products-table-casheier ">
         <thead>
           <tr>
@@ -409,6 +490,10 @@
                 <span class="order-line-product__text">
                   <span
                     class="order-line-product__name order-line-product__name--clickable"
+                    [class.order-line-product__name--reserved]="lineShowsForeignBookingWarning(item)"
+                    [class.order-line-product__name--deposit-matched]="
+                      !lineShowsForeignBookingWarning(item) && lineShowsMatchedDepositInfo(item)
+                    "
                     (click)="openProductDetails(item)"
                     [attr.title]="'tr_product_details' | translate"
                   >{{ item.name }}</span>
@@ -453,7 +538,7 @@
         </tbody>
       </table>
 
-      <div class="order-summary">
+      <div class="order-summary pb-6">
         <div class="order-summary__lines">
           <div>
             {{ "tr_order_subtotal" | translate }}:
@@ -519,7 +604,16 @@
             {{ 'tr_cashier_booking_deposit_credit' | translate }}:
             −{{ bookingDepositCredit() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
-          <div class="weight-bold mt-1" *ngIf="bookingDepositCredit() > 0 || exchangeTradeInPurchase">
+          <div
+            class="size-small text-success mt-1 weight-bold"
+            *ngIf="bookingDepositCredit() > 0 && effectiveCheckoutTotal() <= 0.009"
+          >
+            {{
+              'tr_cashier_booking_fully_paid'
+                | translate: { deposit: (bookingDepositCredit() | number:'1.2-2') }
+            }}
+          </div>
+          <div class="weight-bold mt-1" *ngIf="bookingDepositCredit() > 0 || hasExchangeTradeIn()">
             {{ 'tr_cashier_amount_due_after_credits' | translate }}:
             {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>

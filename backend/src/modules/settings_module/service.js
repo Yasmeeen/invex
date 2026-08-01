@@ -1,12 +1,42 @@
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
 import { normalizePurchaseTreasuryMethods } from './treasuryMethods.js';
+import {
+  moneyAccountsToPurchaseTreasuries,
+  normalizeMoneyAccounts,
+  normalizePaymentMethodAccountMap,
+} from './moneyAccounts.js';
 
 const MAX_LOGO_LENGTH = 600000;
 
 /** One logical row: always read/update the same document (avoids split brain if multiple rows exist). */
-const getLatestSettingsDoc = () =>
-  StoreSettings.findOne().sort({ updatedAt: -1 });
+const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
+
+function serializeSettings(doc) {
+  const moneyAccounts = normalizeMoneyAccounts({
+    purchaseTreasuryMethods: doc.purchaseTreasuryMethods,
+    moneyAccounts: doc.moneyAccounts,
+  });
+  const accountKeys = new Set(moneyAccounts.map((a) => a.key));
+  const paymentMethodAccountMap = normalizePaymentMethodAccountMap(
+    doc.paymentMethodAccountMap,
+    accountKeys
+  );
+  return {
+    storeName: doc.storeName,
+    storePhoneNumber: doc.storePhoneNumber,
+    logoUrl: doc.logoUrl || '',
+    receiptLanguage: doc.receiptLanguage || 'en',
+    purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(moneyAccounts),
+    moneyAccounts,
+    paymentMethodAccountMap,
+    paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
+    returnExchangePolicy: doc.returnExchangePolicy || '',
+    showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
+    bookingPolicy: doc.bookingPolicy || '',
+    showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
+  };
+}
 
 export const getStoreSettings = async (req, res) => {
   try {
@@ -19,18 +49,7 @@ export const getStoreSettings = async (req, res) => {
         receiptLanguage: 'en',
       });
     }
-    res.status(200).json({
-      storeName: doc.storeName,
-      storePhoneNumber: doc.storePhoneNumber,
-      logoUrl: doc.logoUrl || '',
-      receiptLanguage: doc.receiptLanguage || 'en',
-      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
-      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
-      returnExchangePolicy: doc.returnExchangePolicy || '',
-      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
-      bookingPolicy: doc.bookingPolicy || '',
-      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
-    });
+    res.status(200).json(serializeSettings(doc));
   } catch (error) {
     console.error('getStoreSettings:', error);
     res.status(500).json({ error: 'Failed to load store settings' });
@@ -45,6 +64,8 @@ export const updateStoreSettings = async (req, res) => {
       logoUrl,
       receiptLanguage,
       purchaseTreasuryMethods,
+      moneyAccounts,
+      paymentMethodAccountMap,
       paymentAppFeePercents,
       returnExchangePolicy,
       showReturnExchangePolicyOnReceipt,
@@ -91,6 +112,63 @@ export const updateStoreSettings = async (req, res) => {
       }
     }
 
+    let moneyAccountsNormalized;
+    if (moneyAccounts !== undefined) {
+      if (!Array.isArray(moneyAccounts)) {
+        return res.status(400).json({ error: 'moneyAccounts must be an array' });
+      }
+      if (moneyAccounts.length > 80) {
+        return res.status(400).json({ error: 'Too many money accounts (max 80)' });
+      }
+      moneyAccountsNormalized = normalizeMoneyAccounts({
+        purchaseTreasuryMethods:
+          treasuryNormalized ??
+          (await getLatestSettingsDoc())?.purchaseTreasuryMethods,
+        moneyAccounts,
+      });
+      if (!moneyAccountsNormalized.some((x) => x.key === 'cash' && x.kind === 'cash')) {
+        return res.status(400).json({ error: 'moneyAccounts must include cash' });
+      }
+      // Keep purchaseTreasuryMethods in sync when money accounts are saved
+      treasuryNormalized = moneyAccountsToPurchaseTreasuries(moneyAccountsNormalized);
+    } else if (treasuryNormalized !== undefined) {
+      // When only treasuries updated, rebuild money accounts keeping settlement kinds
+      const existing = await getLatestSettingsDoc();
+      const prevMoney = normalizeMoneyAccounts({
+        purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
+        moneyAccounts: existing?.moneyAccounts,
+      });
+      const settlementOnly = prevMoney.filter((a) => a.kind === 'settlement');
+      moneyAccountsNormalized = normalizeMoneyAccounts({
+        purchaseTreasuryMethods: treasuryNormalized,
+        moneyAccounts: [
+          ...treasuryNormalized.map((t) => ({
+            key: t.key,
+            label: t.label,
+            kind: t.key === 'cash' ? 'cash' : 'treasury',
+          })),
+          ...settlementOnly,
+        ],
+      });
+    }
+
+    let mapNormalized;
+    if (paymentMethodAccountMap !== undefined) {
+      if (!Array.isArray(paymentMethodAccountMap)) {
+        return res.status(400).json({ error: 'paymentMethodAccountMap must be an array' });
+      }
+      const accountsForKeys =
+        moneyAccountsNormalized ||
+        normalizeMoneyAccounts({
+          purchaseTreasuryMethods:
+            treasuryNormalized ??
+            (await getLatestSettingsDoc())?.purchaseTreasuryMethods,
+          moneyAccounts: (await getLatestSettingsDoc())?.moneyAccounts,
+        });
+      const keys = new Set(accountsForKeys.map((a) => a.key));
+      mapNormalized = normalizePaymentMethodAccountMap(paymentMethodAccountMap, keys);
+    }
+
     let feesNormalized;
     if (paymentAppFeePercents !== undefined) {
       if (!Array.isArray(paymentAppFeePercents)) {
@@ -127,6 +205,8 @@ export const updateStoreSettings = async (req, res) => {
     if (logoUrl !== undefined) update.logoUrl = logoUrl;
     if (receiptLanguage !== undefined) update.receiptLanguage = receiptLangNormalized;
     if (treasuryNormalized !== undefined) update.purchaseTreasuryMethods = treasuryNormalized;
+    if (moneyAccountsNormalized !== undefined) update.moneyAccounts = moneyAccountsNormalized;
+    if (mapNormalized !== undefined) update.paymentMethodAccountMap = mapNormalized;
     if (feesNormalized !== undefined) update.paymentAppFeePercents = feesNormalized;
     if (returnExchangePolicy !== undefined) {
       update.returnExchangePolicy = returnExchangePolicy.trim().slice(0, 2000);
@@ -155,18 +235,7 @@ export const updateStoreSettings = async (req, res) => {
       }
     );
 
-    res.status(200).json({
-      storeName: doc.storeName,
-      storePhoneNumber: doc.storePhoneNumber,
-      logoUrl: doc.logoUrl || '',
-      receiptLanguage: doc.receiptLanguage || 'en',
-      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
-      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
-      returnExchangePolicy: doc.returnExchangePolicy || '',
-      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
-      bookingPolicy: doc.bookingPolicy || '',
-      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
-    });
+    res.status(200).json(serializeSettings(doc));
   } catch (error) {
     console.error('updateStoreSettings:', error);
     res.status(500).json({ error: 'Failed to update store settings' });

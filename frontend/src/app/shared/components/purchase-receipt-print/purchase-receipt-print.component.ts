@@ -62,17 +62,44 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     return s.length > 10 ? s.slice(-10).toUpperCase() : s.toUpperCase();
   }
 
-  get lineQuantity(): number {
-    return Math.max(1, Math.floor(Number(this.purchase?.quantity) || 1));
+  get receiptLines(): Array<{ productPayload: any; quantity: number }> {
+    const p = this.purchase;
+    if (!p) return [];
+    if (Array.isArray(p.lines) && p.lines.length) {
+      return p.lines
+        .map((l: any) => ({
+          productPayload: l?.productPayload,
+          quantity: Math.max(1, Math.floor(Number(l?.quantity) || 1)),
+        }))
+        .filter((l: any) => l.productPayload);
+    }
+    if (!p.productPayload) return [];
+    return [
+      {
+        productPayload: p.productPayload,
+        quantity: Math.max(1, Math.floor(Number(p.quantity) || 1)),
+      },
+    ];
   }
 
-  get unitNet(): number {
-    const n = Number(this.purchase?.productPayload?.netPrice);
+  get lineQuantity(): number {
+    return this.receiptLines.reduce((sum, l) => sum + l.quantity, 0);
+  }
+
+  lineUnitNet(line: { productPayload?: any }): number {
+    const n = Number(line?.productPayload?.netPrice);
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
   }
 
+  lineRowTotal(line: { productPayload?: any; quantity?: number }): number {
+    const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+    return Math.round(this.lineUnitNet(line) * q * 100) / 100;
+  }
+
   get lineTotal(): number {
-    return Math.round(this.unitNet * this.lineQuantity * 100) / 100;
+    return Math.round(
+      this.receiptLines.reduce((sum, line) => sum + this.lineRowTotal(line), 0) * 100
+    ) / 100;
   }
 
   get purchaseTreasuryDisplay(): string {
@@ -96,8 +123,8 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     return label || key;
   }
 
-  get attrLines(): Array<{ label: string; value: string }> {
-    const raw = this.purchase?.productPayload?.attributes;
+  attrLinesFor(payload: any): Array<{ label: string; value: string }> {
+    const raw = payload?.attributes;
     if (!raw || typeof raw !== 'object') return [];
     return Object.entries(raw).map(([k, v]) => ({
       label: String(k || '').replace(/_/g, ' '),

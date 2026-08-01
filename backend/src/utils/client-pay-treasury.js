@@ -21,6 +21,7 @@ import {
 } from './desk-purchase-deferred.js';
 import { resolveBranchForCashDrawer } from './vendor-cash-drawer.js';
 import { buildCashDrawerLedgerFields } from './client-cash-drawer.js';
+import { postTreasurySplitOutflows, safeTreasuryPost } from './treasury-ledger.js';
 
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
@@ -325,6 +326,18 @@ export async function payClientWithTreasury(
           expenseTreasurySplits: taken,
         });
       }
+
+      await safeTreasuryPost('client_payout', async () => {
+        if (!resolvedBranch) return;
+        await postTreasurySplitOutflows({
+          branchId: resolvedBranch,
+          splits: taken,
+          sourceType: 'client_payout',
+          sourceId: clientDoc._id,
+          note: payNote,
+          createdBy: userId,
+        });
+      });
 
       appliedToPrepaid = chunk;
       budget = round2(budget - chunk);

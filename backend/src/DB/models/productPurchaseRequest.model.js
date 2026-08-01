@@ -103,6 +103,46 @@ const productPurchaseRequestSchema = new mongoose.Schema(
 
     quantity: { type: Number, required: true, min: 1, default: 1 },
 
+    /**
+     * Multi-device purchase invoice lines (exchange / multi trade-in).
+     * When set, totals use all lines; productPayload+quantity mirror the first line for legacy readers.
+     */
+    lines: {
+      type: [
+        {
+          productPayload: {
+            name: { type: String, required: true, trim: true },
+            code: { type: String, required: true, trim: true },
+            unitCodes: { type: [String], default: undefined },
+            category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
+            price: { type: Number, required: true, min: 0 },
+            netPrice: { type: Number, required: true, min: 0 },
+            discount: { type: Number, required: false, default: 0, min: 0 },
+            attributes: { type: Object, default: {} },
+            imageUrl: { type: String, trim: true, default: '' },
+            notes: { type: String, trim: true, default: '' },
+            addedBy: { type: String, trim: true, default: '' },
+            acquiredFrom: {
+              partyType: { type: String, enum: ['client', 'supplier'], required: false },
+              clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: false },
+              vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: false },
+              displayName: { type: String, trim: true, default: '' },
+              phone: { type: String, trim: true, default: '' },
+              name: { type: String, trim: true, default: '' },
+              address: { type: String, trim: true, default: '' },
+            },
+          },
+          quantity: { type: Number, required: true, min: 1, default: 1 },
+          createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
+          createdProductIds: {
+            type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+            default: undefined,
+          },
+        },
+      ],
+      default: undefined,
+    },
+
     /** Store Settings purchase treasury key (`cash` = paid from physical drawer). Legacy / summary. */
     purchaseTreasuryKey: { type: String, trim: true, default: 'cash', index: true },
     /** Snapshot label at creation time (for receipts/history if settings change). */

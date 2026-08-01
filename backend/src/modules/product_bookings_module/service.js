@@ -16,6 +16,7 @@ import {
   totalNetFromPaymentSplits,
 } from '../../utils/deposit-payment-splits.js';
 import { recordClientCashDrawerReceipt } from '../../utils/client-cash-drawer.js';
+import { postPaymentMethodInflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -463,6 +464,17 @@ export const createProductBooking = async (req, res) => {
         console.warn('⚠️ booking cash drawer receipt:', drawerErr?.message || drawerErr);
       }
     }
+
+    await safeTreasuryPost('booking_deposit', async () => {
+      await postPaymentMethodInflows({
+        branchId: branchOid,
+        methodAmounts: depositPayments,
+        sourceType: 'booking_deposit',
+        sourceId: booking._id,
+        note: `Booking deposit — ${product.name || product.code || booking._id}`,
+        createdBy: userId,
+      });
+    });
 
     await recalcProductBookingTotals(pid);
 
@@ -1091,6 +1103,48 @@ export const listProductBookings = async (req, res) => {
   } catch (error) {
     console.error('❌ listProductBookings:', error.message);
     return res.status(500).json({ error: 'Failed to list bookings' });
+  }
+};
+
+/**
+ * Cashier: active reservations on a product (who holds them).
+ * Used for the red “reserved for customer X” warning at checkout — not viewer-scoped.
+ */
+export const getActiveReservationsForProduct = async (req, res) => {
+  try {
+    const productId = String(req.params.productId || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const bookings = await ProductBooking.find({
+      product: new mongoose.Types.ObjectId(productId),
+      status: 'active',
+    })
+      .sort({ bookingDate: 1, createdAt: 1 })
+      .select(
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice confirmed createdAt bookingDate'
+      )
+      .lean();
+
+    return res.json({
+      bookings: (bookings || []).map((b) => ({
+        _id: b._id,
+        productId: b.product,
+        clientId: b.client,
+        customerName: b.customerName || '',
+        customerPhone: b.customerPhone || '',
+        quantity: Math.max(1, Math.floor(Number(b.quantity) || 1)),
+        depositAmount: Math.round((Number(b.depositAmount) || 0) * 100) / 100,
+        productUnitPrice: Math.round((Number(b.productUnitPrice) || 0) * 100) / 100,
+        confirmed: Boolean(b.confirmed),
+        createdAt: b.createdAt,
+        bookingDate: b.bookingDate,
+      })),
+    });
+  } catch (error) {
+    console.error('❌ getActiveReservationsForProduct:', error.message);
+    return res.status(500).json({ error: 'Failed to load product reservations' });
   }
 };
 

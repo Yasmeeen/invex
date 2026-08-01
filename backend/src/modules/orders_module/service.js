@@ -16,12 +16,19 @@ import { recordExchangeSettlement } from '../../utils/exchange-settlement.js';
 import {
   processFullOrderRestore,
   processOrderReturn,
+  salesReturnTreasuryRefundLines,
 } from '../../utils/order-return.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import {
   consumeBookingsForSale,
   reconcileBookingsToStock,
 } from '../product_bookings_module/service.js';
+import {
+  postOrderPaymentLinesToLedger,
+  postRefundPaymentLinesToLedger,
+  postTreasurySplitOutflows,
+  safeTreasuryPost,
+} from '../../utils/treasury-ledger.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -239,6 +246,7 @@ export const createOrder = async (req, res) => {
       paymentFeeAllocations: paymentFeeAllocationsRaw,
       exchangeTradeInCreditAmount: exchangeCreditRaw,
       exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
+      exchangeProductPurchaseRequestIds: exchangePurchaseIdsRaw,
       exchangeSettlementTreasurySplits: exchangeSettlementSplitsRaw,
       bookingDepositCreditAmount: bookingDepositCreditRaw,
       bookingDepositAllocations: bookingDepositAllocationsRaw,
@@ -286,13 +294,16 @@ export const createOrder = async (req, res) => {
         finalVendorId = vendorDoc._id;
       }
     } else {
-      // Exchange: sale must use the same client as the trade-in purchase (cashier may omit client panel).
+      // Exchange: sale must use the same client as the first trade-in purchase (cashier may omit client panel).
+      const exchangeLookupIdRaw = Array.isArray(exchangePurchaseIdsRaw)
+        ? exchangePurchaseIdsRaw.find((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        : exchangePurchaseIdRaw;
       if (
         !finalClientId &&
-        exchangePurchaseIdRaw &&
-        mongoose.Types.ObjectId.isValid(String(exchangePurchaseIdRaw))
+        exchangeLookupIdRaw &&
+        mongoose.Types.ObjectId.isValid(String(exchangeLookupIdRaw))
       ) {
-        const exchangePurchase = await ProductPurchaseRequest.findById(exchangePurchaseIdRaw)
+        const exchangePurchase = await ProductPurchaseRequest.findById(exchangeLookupIdRaw)
           .select('productPayload.acquiredFrom')
           .session(session)
           .lean();
@@ -552,13 +563,24 @@ export const createOrder = async (req, res) => {
       ) / 100;
     }
 
-    let exchangeProductPurchaseRequestId;
+    const exchangePurchaseIdCandidates = [];
+    if (Array.isArray(exchangePurchaseIdsRaw)) {
+      for (const id of exchangePurchaseIdsRaw) {
+        if (mongoose.Types.ObjectId.isValid(String(id))) {
+          exchangePurchaseIdCandidates.push(String(id));
+        }
+      }
+    }
     if (
       exchangePurchaseIdRaw &&
       mongoose.Types.ObjectId.isValid(String(exchangePurchaseIdRaw))
     ) {
-      exchangeProductPurchaseRequestId = new mongoose.Types.ObjectId(String(exchangePurchaseIdRaw));
+      exchangePurchaseIdCandidates.push(String(exchangePurchaseIdRaw));
     }
+    const exchangeProductPurchaseRequestIds = [
+      ...new Set(exchangePurchaseIdCandidates),
+    ].map((id) => new mongoose.Types.ObjectId(id));
+    const exchangeProductPurchaseRequestId = exchangeProductPurchaseRequestIds[0];
 
     let paidAmount = 0;
     const payments = [];
@@ -698,6 +720,9 @@ export const createOrder = async (req, res) => {
                 ...(exchangeProductPurchaseRequestId
                   ? { exchangeProductPurchaseRequestId }
                   : {}),
+                ...(exchangeProductPurchaseRequestIds.length
+                  ? { exchangeProductPurchaseRequestIds }
+                  : {}),
               }
             : {}),
           ...(bookingDepositCreditApplied > 0
@@ -759,6 +784,7 @@ export const createOrder = async (req, res) => {
       exchangeSettlementSplitsRaw.length
     ) {
       try {
+        // Difference is one payout; record treasury on the first trade-in and link the rest.
         await recordExchangeSettlement(exchangeProductPurchaseRequestId, {
           orderId: newOrder._id,
           amount: storeOwesExchange,
@@ -766,6 +792,15 @@ export const createOrder = async (req, res) => {
           userId,
           branchId: branch,
         });
+        if (exchangeProductPurchaseRequestIds.length > 1) {
+          await ProductPurchaseRequest.updateMany(
+            {
+              _id: { $in: exchangeProductPurchaseRequestIds.slice(1) },
+              isExchangeTradeIn: true,
+            },
+            { $set: { linkedExchangeOrderId: newOrder._id } }
+          );
+        }
       } catch (settlementErr) {
         console.error('⚠️ exchange settlement:', settlementErr?.message || settlementErr);
         return res.status(400).json({
@@ -776,6 +811,18 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({
         error: 'Exchange settlement treasury is required when store owes the customer',
       });
+    } else if (exchangeProductPurchaseRequestIds.length) {
+      try {
+        await ProductPurchaseRequest.updateMany(
+          {
+            _id: { $in: exchangeProductPurchaseRequestIds },
+            isExchangeTradeIn: true,
+          },
+          { $set: { linkedExchangeOrderId: newOrder._id } }
+        );
+      } catch (linkErr) {
+        console.warn('⚠️ link exchange trade-ins:', linkErr?.message || linkErr);
+      }
     }
 
     // Stock movement logs (non-transactional audit trail)
@@ -800,6 +847,15 @@ export const createOrder = async (req, res) => {
     } catch (movementError) {
       console.error('⚠️ Failed to log sale stock movement:', movementError.message);
     }
+
+    await safeTreasuryPost('order_create', async () => {
+      await postOrderPaymentLinesToLedger({
+        branchId: branch,
+        payments: newOrder.payments || [],
+        orderId: newOrder._id,
+        createdBy: userId,
+      });
+    });
 
     await auditLog(req, {
       action: 'create',
@@ -977,6 +1033,22 @@ export const addOrderPayment = async (req, res) => {
 
     await order.save();
 
+    await safeTreasuryPost('order_payment', async () => {
+      const branchForLedger =
+        resolvedPaymentBranch || order.branch || (await resolveBranchForCashDrawer({ userId }));
+      if (!branchForLedger) return;
+      const recent = (order.payments || []).slice(-20);
+      const justAdded = recent.filter(
+        (p) => p.paidAt && Math.abs(new Date(p.paidAt).getTime() - dt.getTime()) < 2000
+      );
+      await postOrderPaymentLinesToLedger({
+        branchId: branchForLedger,
+        payments: justAdded.length ? justAdded : recent.slice(-5),
+        orderId: order._id,
+        createdBy: userId,
+      });
+    });
+
     if (
       order.partyType === 'supplier' &&
       order.vendorId &&
@@ -1111,6 +1183,31 @@ export const restoreOrder = async (req, res) => {
     }
 
     const updated = result.order;
+
+    await safeTreasuryPost('order_refund', async () => {
+      const branchForLedger =
+        updated.branch ||
+        (await resolveBranchForCashDrawer({ userId: actorUserId, branchId: body.branchId }));
+      if (!branchForLedger) return;
+      const ret = result.returnRecord;
+      await postRefundPaymentLinesToLedger({
+        branchId: branchForLedger,
+        refundPaymentSplits: ret?.refundPaymentSplits || [],
+        orderId: updated._id,
+        createdBy: actorUserId,
+        occurredAt: ret?.returnedAt || new Date(),
+      });
+      const treasuryLines = salesReturnTreasuryRefundLines(ret);
+      if (treasuryLines.length) {
+        await postTreasurySplitOutflows({
+          branchId: branchForLedger,
+          splits: treasuryLines,
+          sourceType: 'order_refund',
+          sourceId: updated._id,
+          createdBy: actorUserId,
+        });
+      }
+    });
 
     await auditLog(req, {
       action: 'restore',

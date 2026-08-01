@@ -1447,6 +1447,7 @@ private submitDeskPurchaseRequest(): void {
   }
 
   const isExchangeTradeIn = !!this.data?.exchangeFlow;
+  const appendToPurchaseId = String(this.data?.appendToExchangePurchaseId || '').trim();
   let treasurySplits: { key: string; label?: string; amount: number }[] | undefined;
   if (!isExchangeTradeIn) {
     const built = this.buildPurchaseTreasurySplitsPayload();
@@ -1457,16 +1458,22 @@ private submitDeskPurchaseRequest(): void {
   }
 
   this.isSubmitting = true;
-  this.productPurchaseRequests
-    .create({
-      userId: uid,
-      branchId,
-      quantity: qty,
-      product: deskProduct,
-      exchangeTradeIn: isExchangeTradeIn,
-      ...(treasurySplits ? { purchaseTreasurySplits: treasurySplits } : {}),
-    })
-    .subscribe({
+  const request$ = appendToPurchaseId
+    ? this.productPurchaseRequests.addLine(appendToPurchaseId, {
+        userId: uid,
+        quantity: qty,
+        product: deskProduct,
+      })
+    : this.productPurchaseRequests.create({
+        userId: uid,
+        branchId,
+        quantity: qty,
+        product: deskProduct,
+        exchangeTradeIn: isExchangeTradeIn,
+        ...(treasurySplits ? { purchaseTreasurySplits: treasurySplits } : {}),
+      });
+
+  request$.subscribe({
       next: (res: any) => {
         this.isSubmitting = false;
         const createdProducts = res?.createdProducts;

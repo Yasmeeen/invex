@@ -37,6 +37,14 @@
       <button
         type="button"
         class="s-btn btn-secondary size-body"
+        (click)="exportExcel()"
+        [disabled]="loading || exporting || totalCount === 0"
+      >
+        {{ 'tr_report_export_excel' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
         (click)="isFilterOpen = !isFilterOpen"
       >
         <i class="fa fa-filter text-primary" aria-hidden="true"></i>

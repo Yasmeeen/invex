@@ -181,8 +181,8 @@
               </span>
             </td>
             <td>{{ partyName(p) }}</td>
-            <td>{{ p?.productPayload?.name || '—' }}</td>
-            <td>{{ p?.productPayload?.code || '—' }}</td>
+            <td>{{ purchaseProductLabel(p) }}</td>
+            <td>{{ purchaseCodeLabel(p) }}</td>
             <td>{{ p?.branch?.name || '—' }}</td>
             <td>{{ lineTotal(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ totalPaid(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
@@ -260,9 +260,9 @@
             </div>
             <div class="order-card__client">{{ partyName(p) }}</div>
             <div class="order-card__meta muted">
-              {{ p?.productPayload?.name }}
-              <span class="dot" *ngIf="p?.productPayload?.code">•</span>
-              <span *ngIf="p?.productPayload?.code">{{ p?.productPayload?.code }}</span>
+              {{ purchaseProductLabel(p) }}
+              <span class="dot" *ngIf="p?.productPayload?.code && !(p?.lines?.length > 1)">•</span>
+              <span *ngIf="p?.productPayload?.code && !(p?.lines?.length > 1)">{{ p?.productPayload?.code }}</span>
             </div>
           </div>
           <span class="options-menu">

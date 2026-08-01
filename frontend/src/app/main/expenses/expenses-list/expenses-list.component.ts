@@ -14,6 +14,15 @@ import { Subscription } from 'rxjs';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import { DailyExpenseDialogComponent } from '../daily-expense-dialog/daily-expense-dialog.component';
 
+export type ExpensesTab = 'operating' | 'cash_movements';
+
+/** System types shown under «cash movements» (not operating costs / not in profit). */
+const CASH_MOVEMENT_TYPE_KEYS: Record<string, string> = {
+  client_prepaid_payout: 'tr_expense_type_client_prepaid_payout',
+  desk_purchase_deferred_paid: 'tr_expense_type_desk_purchase_deferred_paid',
+  exchange_settlement_paid: 'tr_expense_type_exchange_settlement_paid',
+};
+
 @Component({
   selector: 'app-expenses-list',
   templateUrl: './expenses-list.component.html',
@@ -26,6 +35,10 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
   isFilterOpen = true;
   paginationData: PaginationData;
   paginationPerPage = 15;
+  /** Sum of filtered expenses (all matching pages). */
+  totalAmount = 0;
+
+  activeTab: ExpensesTab = 'operating';
 
   branches: Branch[] = [];
   filterBranchId = '';
@@ -38,6 +51,7 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
     branch_id?: string;
     dateFrom?: string;
     dateTo?: string;
+    category?: ExpensesTab;
     viewerUserId: string;
   };
 
@@ -57,6 +71,7 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
     this.params = {
       page: 1,
       limit: this.paginationPerPage,
+      category: this.activeTab,
       viewerUserId: uid,
     };
 
@@ -80,11 +95,36 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
     return canPickBranchRole(this.globals.currentUser?.role);
   }
 
+  get isCashMovementsTab(): boolean {
+    return this.activeTab === 'cash_movements';
+  }
+
+  get totalAmountLabelKey(): string {
+    return this.isCashMovementsTab
+      ? 'tr_daily_expenses_total_cash_movements'
+      : 'tr_daily_expenses_total_amount';
+  }
+
+  get filteredCountKey(): string {
+    return this.isCashMovementsTab
+      ? 'tr_daily_expenses_filtered_count_movements'
+      : 'tr_daily_expenses_filtered_count';
+  }
+
+  setTab(tab: ExpensesTab): void {
+    if (this.activeTab === tab) return;
+    this.activeTab = tab;
+    this.params.category = tab;
+    this.params.page = 1;
+    this.load();
+  }
+
   applyFilters(): void {
     this.params.page = 1;
     this.params.branch_id = this.filterBranchId || undefined;
     this.params.dateFrom = this.dateFrom || undefined;
     this.params.dateTo = this.dateTo || undefined;
+    this.params.category = this.activeTab;
     this.load();
   }
 
@@ -96,11 +136,13 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
 
   load(): void {
     this.loading = true;
+    this.params.category = this.activeTab;
     this.subscriptions.push(
       this.dailyExpenses.list(this.params).subscribe({
         next: (res) => {
           this.expenses = res.expenses || [];
           const m = res.meta;
+          this.totalAmount = Number(m?.totalAmount) || 0;
           this.paginationData = {
             currentPage: m.currentPage,
             totalCount: m.totalCount,
@@ -157,10 +199,21 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       ref.afterClosed().subscribe((ok) => {
         if (ok) {
+          this.activeTab = 'operating';
+          this.params.category = 'operating';
+          this.params.page = 1;
           this.load();
         }
       })
     );
+  }
+
+  expenseTypeLabel(row: DailyExpenseDto): string {
+    const raw = String(row?.expenseType || '').trim();
+    if (!raw) return '—';
+    const key = CASH_MOVEMENT_TYPE_KEYS[raw];
+    if (key) return this.translate.instant(key);
+    return raw;
   }
 
   ngOnDestroy(): void {

@@ -40,12 +40,30 @@ function codeMatchesStored(storedCode, input) {
   return suffixMatches(productCodeSuffix(stored), scannedSuffix);
 }
 
+/** Prefer live stock, then visible rows, then highest stock, then newest row. */
+function rankLiveCandidate(a, b) {
+  const aRemoved = a.removedWhenOutOfStock ? 1 : 0;
+  const bRemoved = b.removedWhenOutOfStock ? 1 : 0;
+  if (aRemoved !== bRemoved) return aRemoved - bRemoved;
+  const aStock = Number(a.stock) || 0;
+  const bStock = Number(b.stock) || 0;
+  const aIn = aStock > 0 ? 1 : 0;
+  const bIn = bStock > 0 ? 1 : 0;
+  if (bIn !== aIn) return bIn - aIn;
+  if (bStock !== aStock) return bStock - aStock;
+  const aTs = new Date(a.updatedAt || a.createdAt || 0).getTime();
+  const bTs = new Date(b.updatedAt || b.createdAt || 0).getTime();
+  return bTs - aTs;
+}
+
 function pickBestCodeMatch(candidates, input) {
   const scanned = normalizeCode(input);
   if (!candidates?.length) return null;
   const exact = candidates.filter((c) => normalizeCode(c.code) === scanned);
   if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return exact[0];
+  if (exact.length > 1) {
+    return [...exact].sort(rankLiveCandidate)[0];
+  }
 
   const scannedSuffix = scanned.replace(/^-/, '');
   const suffixHits = candidates.filter((c) => codeMatchesStored(c.code, scanned));
@@ -55,7 +73,8 @@ function pickBestCodeMatch(candidates, input) {
   const exactSuffix = suffixHits.filter(
     (c) => productCodeSuffix(c.code) === scannedSuffix
   );
-  return exactSuffix[0] || suffixHits[0];
+  const pool = exactSuffix.length ? exactSuffix : suffixHits;
+  return [...pool].sort(rankLiveCandidate)[0];
 }
 
 function attrsToObject(attributes) {
@@ -126,7 +145,11 @@ export async function trackProductByCode(rawCode) {
   const live = pickBestCodeMatch(liveMatches, code);
 
   if (live) {
-    const { events } = await buildProductHistoryEvents(live);
+    // Merge history across source + destination clones so transfers keep pre-move events.
+    const { events } = await buildProductHistoryEvents(live, {
+      relatedProducts: liveMatches,
+      relatedProductIds: liveMatches.map((p) => p._id),
+    });
     return {
       ok: true,
       exists: true,

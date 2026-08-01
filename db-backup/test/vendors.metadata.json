@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"ledgerEntries.branch":{"$numberInt":"1"},"ledgerEntries.createdAt":{"$numberInt":"-1"}},"name":"ledgerEntries.branch_1_ledgerEntries.createdAt_-1","background":true}],"uuid":"7b9b9e39b4c8462ea603be082e0b75fc","collectionName":"vendors","type":"collection"}

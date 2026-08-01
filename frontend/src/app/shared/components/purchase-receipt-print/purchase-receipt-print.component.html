@@ -46,19 +46,22 @@
         <td>{{ 'tr_price' | receiptTranslate: st.receiptLanguage }}</td>
         <td>{{ 'tr_total' | receiptTranslate: st.receiptLanguage }}</td>
       </tr>
-      <tr>
+      <tr *ngFor="let line of receiptLines">
         <td class="item-name">
-          {{ purchase?.productPayload?.name }}
-          <div class="invoice-item-attrs" *ngIf="attrLines.length">
-            <span class="invoice-item-attr" *ngFor="let ia of attrLines">{{ ia.label }}: {{ ia.value }}</span>
+          {{ line?.productPayload?.name }}
+          <div class="invoice-item-attrs" *ngIf="attrLinesFor(line?.productPayload).length">
+            <span
+              class="invoice-item-attr"
+              *ngFor="let ia of attrLinesFor(line?.productPayload)"
+            >{{ ia.label }}: {{ ia.value }}</span>
           </div>
         </td>
-        <td>{{ lineQuantity }}</td>
+        <td>{{ line.quantity }}</td>
         <td class="money">
-          {{ formatReceiptAmount(unitNet) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          {{ formatReceiptAmount(lineUnitNet(line)) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
         <td class="money">
-          {{ formatReceiptAmount(lineTotal) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          {{ formatReceiptAmount(lineRowTotal(line)) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
     </table>

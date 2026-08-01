@@ -16,10 +16,42 @@ function coerceTreasurySplitsArray(raw) {
   return [];
 }
 
+export function getPurchaseLines(purchase) {
+  const doc =
+    purchase && typeof purchase.toObject === 'function' ? purchase.toObject() : purchase;
+  const rawLines = Array.isArray(doc?.lines) ? doc.lines : [];
+  if (rawLines.length) {
+    return rawLines
+      .map((l) => ({
+        productPayload: l?.productPayload || null,
+        quantity: Math.max(1, Math.floor(Number(l?.quantity) || 1)),
+        createdProductId: l?.createdProductId,
+        createdProductIds: Array.isArray(l?.createdProductIds) ? l.createdProductIds : undefined,
+      }))
+      .filter((l) => l.productPayload);
+  }
+  if (!doc?.productPayload) return [];
+  return [
+    {
+      productPayload: doc.productPayload,
+      quantity: Math.max(1, Math.floor(Number(doc.quantity) || 1)),
+      createdProductId: doc.createdProductId,
+      createdProductIds: Array.isArray(doc.createdProductIds) ? doc.createdProductIds : undefined,
+    },
+  ];
+}
+
 export function deskPurchaseLineTotal(purchase) {
-  const q = Math.max(1, Math.floor(Number(purchase?.quantity) || 1));
-  const net = Number(purchase?.productPayload?.netPrice) || 0;
-  return round2(net * q);
+  return round2(
+    getPurchaseLines(purchase).reduce((sum, line) => {
+      const net = Number(line?.productPayload?.netPrice) || 0;
+      return sum + net * line.quantity;
+    }, 0)
+  );
+}
+
+export function deskPurchaseItemCount(purchase) {
+  return getPurchaseLines(purchase).reduce((sum, line) => sum + line.quantity, 0);
 }
 
 /**

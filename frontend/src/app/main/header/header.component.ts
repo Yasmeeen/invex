@@ -1,5 +1,6 @@
 import { Component, ElementRef, EventEmitter, HostListener, OnInit, Output } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageSwitcherComponent } from '@shared/components/language-switcher/language-switcher.component';
 import { Globals } from 'src/app/core/globals';
@@ -44,7 +45,8 @@ export class HeaderComponent implements OnInit {
     private notificationsApi: NotificationsService,
     private notify: AppNotificationService,
     private realtime: RealtimeNotificationsService,
-    private productsService: ProductsSerivce
+    private productsService: ProductsSerivce,
+    private router: Router
   ) { }
 
   get userDisplayName(): string {
@@ -153,6 +155,13 @@ export class HeaderComponent implements OnInit {
     if (n?.type === 'product_purchase_pending') {
       return 'fa-shopping-cart';
     }
+    if (
+      n?.type === 'branch_transfer_pending' ||
+      n?.type === 'branch_transfer_approved' ||
+      n?.type === 'branch_transfer_rejected'
+    ) {
+      return 'fa-exchange';
+    }
     return 'fa-bell';
   }
 
@@ -165,6 +174,15 @@ export class HeaderComponent implements OnInit {
         data: { purchaseId, body: n.body, data: n.data },
         disableClose: true,
       });
+      return;
+    }
+
+    if (
+      n.type === 'branch_transfer_pending' ||
+      n.type === 'branch_transfer_approved' ||
+      n.type === 'branch_transfer_rejected'
+    ) {
+      void this.router.navigate(['/products/branch-transfers']);
       return;
     }
 

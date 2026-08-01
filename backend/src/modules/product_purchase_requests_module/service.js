@@ -126,6 +126,120 @@ const normalizeAttributesForCategory = async (categoryId, raw) => {
   return out;
 };
 
+/** Every category attributeDef must have a non-empty value in attrsNorm. */
+const assertRequiredCategoryAttributes = async (categoryId, attrsNorm) => {
+  const cat = await Category.findById(categoryId).select('attributeDefs').lean();
+  const defs = Array.isArray(cat?.attributeDefs) ? cat.attributeDefs : [];
+  for (const d of defs) {
+    const key = normalizeAttrKey(d?.key);
+    if (!key) continue;
+    const label = String(d?.label || key).trim() || key;
+    const val = String(attrsNorm?.[key] ?? '').trim();
+    if (!val) {
+      return { error: `Category attribute "${label}" is required` };
+    }
+  }
+  return { ok: true };
+};
+
+/**
+ * Optional per-unit price / discount / attributes for multi-code purchases.
+ * Returns null when not provided (all units share product-level fields).
+ */
+async function resolveUnitDetails(product, categoryId, q, shared) {
+  const raw = Array.isArray(product?.unitDetails) ? product.unitDetails : null;
+  if (!raw || !raw.length) {
+    return null;
+  }
+  if (raw.length !== q) {
+    return { error: 'unitDetails length must match quantity' };
+  }
+  const details = [];
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i] && typeof raw[i] === 'object' ? raw[i] : {};
+    const code = String(row.code ?? '').trim();
+    if (!code) {
+      return { error: 'Each unitDetail requires a code' };
+    }
+    const priceNum = Number(row.price);
+    const netNum = Number(row.netPrice);
+    if (Number.isNaN(priceNum) || priceNum < 0 || Number.isNaN(netNum) || netNum < 0) {
+      return { error: `Valid price and netPrice are required for unit ${i + 1}` };
+    }
+    const discountRaw =
+      row.discount === undefined || row.discount === null || row.discount === ''
+        ? shared.discount
+        : Number(row.discount);
+    if (Number.isNaN(discountRaw) || discountRaw < 0 || discountRaw > 100) {
+      return { error: `Invalid discount for unit ${i + 1}` };
+    }
+    const attrsNorm = await normalizeAttributesForCategory(
+      String(categoryId),
+      row.attributes != null ? row.attributes : shared.attributes
+    );
+    if (attrsNorm === null) {
+      return { error: `attributes must be an object for unit ${i + 1}` };
+    }
+    const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
+    if (!attrsReq.ok) {
+      return { error: `${attrsReq.error} (unit ${i + 1})` };
+    }
+    details.push({
+      code,
+      price: Math.round(priceNum * 100) / 100,
+      netPrice: Math.round(netNum * 100) / 100,
+      discount: Math.round(Number(discountRaw) * 100) / 100,
+      attributes: attrsNorm,
+      imageUrl: normalizeImageUrl(row.imageUrl) || normalizeImageUrl(shared.imageUrl) || '',
+    });
+  }
+  const seen = new Set(details.map((d) => d.code.toUpperCase()));
+  if (seen.size !== details.length) {
+    return { error: 'Duplicate codes in unitDetails' };
+  }
+  for (const d of details) {
+    const chk = await validateProductCodeForCategory(String(categoryId), d.code);
+    if (!chk.ok) {
+      return { error: chk.error };
+    }
+  }
+  return { unitDetails: details, unitCodes: details.map((d) => d.code) };
+}
+
+function unitFieldsFromPayload(payload, index, fallbackCode) {
+  const details = Array.isArray(payload?.unitDetails) ? payload.unitDetails : null;
+  if (details && details[index]) {
+    const d = details[index];
+    return {
+      code: String(d.code || fallbackCode || '').trim(),
+      price: Number(d.price) || 0,
+      netPrice: Number(d.netPrice) || 0,
+      discount: Number(d.discount) || 0,
+      attributes:
+        d.attributes && typeof d.attributes === 'object' && !Array.isArray(d.attributes)
+          ? d.attributes
+          : payload.attributes || {},
+      imageUrl: normalizeImageUrl(d.imageUrl) || normalizeImageUrl(payload?.imageUrl) || '',
+    };
+  }
+  return {
+    code: String(fallbackCode || '').trim(),
+    price: Number(payload?.price) || 0,
+    netPrice: Number(payload?.netPrice) || 0,
+    discount: Number(payload?.discount) || 0,
+    attributes: payload?.attributes || {},
+    imageUrl: normalizeImageUrl(payload?.imageUrl) || '',
+  };
+}
+
+function lineTotalFromNetAndDetails(netNum, q, unitDetails) {
+  if (Array.isArray(unitDetails) && unitDetails.length === q) {
+    const sum = unitDetails.reduce((acc, d) => acc + (Number(d.netPrice) || 0), 0);
+    return Math.round(sum * 100) / 100;
+  }
+  return Math.round(Number(netNum) * q * 100) / 100;
+}
+
 function isAutoApproverRole(role) {
   const r = String(role || '').trim();
   return r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager';
@@ -285,12 +399,25 @@ export const createProductPurchaseRequest = async (req, res) => {
     const name = String(product?.name || '').trim();
     const code = String(product?.code || '').trim();
     const categoryId = product?.categoryId || product?.category;
-    const priceNum = Number(product?.price);
-    const netNum = Number(product?.netPrice);
+    const hasUnitDetails =
+      Array.isArray(product?.unitDetails) && product.unitDetails.length > 0;
+    const firstUnit = hasUnitDetails ? product.unitDetails[0] : null;
+    let priceNum = Number(
+      firstUnit && (product?.price === undefined || product?.price === null || product?.price === '')
+        ? firstUnit.price
+        : product?.price
+    );
+    let netNum = Number(
+      firstUnit && (product?.netPrice === undefined || product?.netPrice === null || product?.netPrice === '')
+        ? firstUnit.netPrice
+        : product?.netPrice
+    );
     const notes = String(product?.notes || '').trim().slice(0, 500);
-    const discountNum =
+    let discountNum =
       product?.discount === undefined || product?.discount === null || product?.discount === ''
-        ? 0
+        ? firstUnit && firstUnit.discount !== undefined && firstUnit.discount !== null && firstUnit.discount !== ''
+          ? Number(firstUnit.discount)
+          : 0
         : Number(product?.discount);
     const imageUrlNorm = normalizeImageUrl(product?.imageUrl);
 
@@ -315,7 +442,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       return res.status(400).json({ error: 'Invalid discount' });
     }
 
-    const attrsNorm = await normalizeAttributesForCategory(String(categoryId), product?.attributes);
+    let attrsNorm = await normalizeAttributesForCategory(String(categoryId), product?.attributes);
     if (attrsNorm === null) {
       await session.abortTransaction();
       session.endSession();
@@ -326,42 +453,83 @@ export const createProductPurchaseRequest = async (req, res) => {
     const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
 
     let unitCodesNorm = [];
+    let unitDetailsNorm = null;
     if (categoryIsMulti && q > 1) {
-      const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
-      unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
-      if (unitCodesNorm.length !== q) {
-        try {
-          unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
-        } catch (e) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(400).json({ error: e?.message || 'Cannot allocate codes' });
-        }
-      }
-      const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
-      if (seen.size !== unitCodesNorm.length) {
+      const resolvedDetails = await resolveUnitDetails(product, categoryId, q, {
+        price: priceNum,
+        netPrice: netNum,
+        discount: discountNum,
+        attributes: attrsNorm,
+        imageUrl: imageUrlNorm,
+      });
+      if (resolvedDetails?.error) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ error: 'Duplicate codes in unitCodes' });
+        return res.status(400).json({ error: resolvedDetails.error });
       }
-      for (const c of unitCodesNorm) {
-        const chk = await validateProductCodeForCategory(String(categoryId), c);
-        if (!chk.ok) {
+      if (resolvedDetails?.unitDetails) {
+        unitDetailsNorm = resolvedDetails.unitDetails;
+        unitCodesNorm = resolvedDetails.unitCodes;
+        attrsNorm = unitDetailsNorm[0]?.attributes || attrsNorm;
+      } else {
+        const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
+        if (!attrsReq.ok) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(400).json({ error: chk.error });
+          return res.status(400).json({ error: attrsReq.error });
         }
+        const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
+        unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+        if (unitCodesNorm.length !== q) {
+          try {
+            unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
+          } catch (e) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: e?.message || 'Cannot allocate codes' });
+          }
+        }
+        const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
+        if (seen.size !== unitCodesNorm.length) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: 'Duplicate codes in unitCodes' });
+        }
+        for (const c of unitCodesNorm) {
+          const chk = await validateProductCodeForCategory(String(categoryId), c);
+          if (!chk.ok) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: chk.error });
+          }
+        }
+      }
+    } else {
+      const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
+      if (!attrsReq.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: attrsReq.error });
       }
     }
 
     const addedByNorm = normalizeAddedBy(product?.addedBy);
+    const rootPrice = unitDetailsNorm
+      ? unitDetailsNorm[0].price
+      : Math.round(priceNum * 100) / 100;
+    const rootNet = unitDetailsNorm
+      ? unitDetailsNorm[0].netPrice
+      : Math.round(netNum * 100) / 100;
+    const rootDiscount = unitDetailsNorm
+      ? unitDetailsNorm[0].discount
+      : Math.round(discountNum * 100) / 100;
     const payload = {
       name,
       code: categoryIsMulti && q > 1 ? unitCodesNorm[0] : code,
       category: new mongoose.Types.ObjectId(String(categoryId)),
-      price: Math.round(priceNum * 100) / 100,
-      netPrice: Math.round(netNum * 100) / 100,
-      discount: Math.round(discountNum * 100) / 100,
+      price: rootPrice,
+      netPrice: rootNet,
+      discount: rootDiscount,
       attributes: attrsNorm,
       imageUrl: imageUrlNorm,
       notes,
@@ -369,6 +537,9 @@ export const createProductPurchaseRequest = async (req, res) => {
     };
     if (categoryIsMulti && q > 1) {
       payload.unitCodes = unitCodesNorm;
+      if (unitDetailsNorm) {
+        payload.unitDetails = unitDetailsNorm;
+      }
     }
     if (product?.acquiredFrom && typeof product.acquiredFrom === 'object') {
       payload.acquiredFrom = product.acquiredFrom;
@@ -394,7 +565,7 @@ export const createProductPurchaseRequest = async (req, res) => {
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
     const tMap = treasuryMethodMap(treasuryMethods);
-    const lineTotal = Math.round(netNum * q * 100) / 100;
+    const lineTotal = lineTotalFromNetAndDetails(netNum, q, unitDetailsNorm);
     const treasuryNorm = normalizePurchaseTreasuryInput({
       purchaseTreasurySplits: treasurySplitsRaw,
       purchaseTreasuryKey: treasuryKeyRaw,
@@ -455,21 +626,23 @@ export const createProductPurchaseRequest = async (req, res) => {
           return res.status(409).json({ error: free.error });
         }
         const createdList = [];
-        for (const unitCode of unitCodesNorm) {
+        for (let ui = 0; ui < unitCodesNorm.length; ui++) {
+          const unitCode = unitCodesNorm[ui];
+          const uf = unitFieldsFromPayload(payload, ui, unitCode);
           const [prodRow] = await Product.create(
             [
               {
                 name,
-                code: unitCode,
-                price: payload.price,
-                netPrice: payload.netPrice,
+                code: uf.code || unitCode,
+                price: uf.price,
+                netPrice: uf.netPrice,
                 stock: 1,
-                discount: payload.discount,
+                discount: uf.discount,
                 category: payload.category,
                 branch: branchId,
                 inWarehouse: false,
-                imageUrl: payload.imageUrl,
-                attributes: payload.attributes,
+                imageUrl: uf.imageUrl || payload.imageUrl || '',
+                attributes: uf.attributes,
                 ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
                 ...acquiredFromFields,
               },
@@ -498,7 +671,9 @@ export const createProductPurchaseRequest = async (req, res) => {
           }
         }
 
-        for (const prodRow of createdList) {
+        for (let ui = 0; ui < createdList.length; ui++) {
+          const prodRow = createdList[ui];
+          const uf = unitFieldsFromPayload(payload, ui, prodRow.code);
           try {
             await StockMovement.create({
               movementType: 'purchase',
@@ -508,8 +683,8 @@ export const createProductPurchaseRequest = async (req, res) => {
               fromBranchId: null,
               toBranchId: branchId,
               quantity: 1,
-              unitPrice: payload.netPrice,
-              totalValue: Math.round(payload.netPrice * 100) / 100,
+              unitPrice: uf.netPrice,
+              totalValue: Math.round(uf.netPrice * 100) / 100,
               referenceType: 'productPurchaseRequest',
               referenceId: created._id,
               notes: `Product purchase (desk, auto-approved, multi-code)`,
@@ -764,12 +939,25 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
   const name = String(product?.name || '').trim();
   const code = String(product?.code || '').trim();
   const categoryId = product?.categoryId || product?.category;
-  const priceNum = Number(product?.price);
-  const netNum = Number(product?.netPrice);
+  const hasUnitDetails =
+    Array.isArray(product?.unitDetails) && product.unitDetails.length > 0;
+  const firstUnit = hasUnitDetails ? product.unitDetails[0] : null;
+  let priceNum = Number(
+    firstUnit && (product?.price === undefined || product?.price === null || product?.price === '')
+      ? firstUnit.price
+      : product?.price
+  );
+  let netNum = Number(
+    firstUnit && (product?.netPrice === undefined || product?.netPrice === null || product?.netPrice === '')
+      ? firstUnit.netPrice
+      : product?.netPrice
+  );
   const notes = String(product?.notes || '').trim().slice(0, 500);
-  const discountNum =
+  let discountNum =
     product?.discount === undefined || product?.discount === null || product?.discount === ''
-      ? 0
+      ? firstUnit && firstUnit.discount !== undefined && firstUnit.discount !== null && firstUnit.discount !== ''
+        ? Number(firstUnit.discount)
+        : 0
       : Number(product?.discount);
   const imageUrlNorm = normalizeImageUrl(product?.imageUrl);
 
@@ -786,7 +974,7 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
     return { error: 'Invalid discount' };
   }
 
-  const attrsNorm = await normalizeAttributesForCategory(String(categoryId), product?.attributes);
+  let attrsNorm = await normalizeAttributesForCategory(String(categoryId), product?.attributes);
   if (attrsNorm === null) {
     return { error: 'attributes must be an object' };
   }
@@ -798,23 +986,52 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
   const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
 
   let unitCodesNorm = [];
+  let unitDetailsNorm = null;
   if (categoryIsMulti && q > 1) {
-    const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
-    unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
-    if (unitCodesNorm.length !== q) {
-      try {
-        unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
-      } catch (e) {
-        return { error: e?.message || 'Cannot allocate codes' };
+    const resolvedDetails = await resolveUnitDetails(product, categoryId, q, {
+      price: priceNum,
+      netPrice: netNum,
+      discount: discountNum,
+      attributes: attrsNorm,
+      imageUrl: imageUrlNorm,
+    });
+    if (resolvedDetails?.error) {
+      return { error: resolvedDetails.error };
+    }
+    if (resolvedDetails?.unitDetails) {
+      unitDetailsNorm = resolvedDetails.unitDetails;
+      unitCodesNorm = resolvedDetails.unitCodes;
+      attrsNorm = unitDetailsNorm[0]?.attributes || attrsNorm;
+      priceNum = unitDetailsNorm[0].price;
+      netNum = unitDetailsNorm[0].netPrice;
+      discountNum = unitDetailsNorm[0].discount;
+    } else {
+      const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
+      if (!attrsReq.ok) {
+        return { error: attrsReq.error };
+      }
+      const raw = Array.isArray(product?.unitCodes) ? product.unitCodes : [];
+      unitCodesNorm = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+      if (unitCodesNorm.length !== q) {
+        try {
+          unitCodesNorm = await allocateSequentialProductCodes(String(categoryId), q);
+        } catch (e) {
+          return { error: e?.message || 'Cannot allocate codes' };
+        }
+      }
+      const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
+      if (seen.size !== unitCodesNorm.length) {
+        return { error: 'Duplicate codes in unitCodes' };
+      }
+      for (const c of unitCodesNorm) {
+        const chk = await validateProductCodeForCategory(String(categoryId), c);
+        if (!chk.ok) return { error: chk.error };
       }
     }
-    const seen = new Set(unitCodesNorm.map((c) => c.toUpperCase()));
-    if (seen.size !== unitCodesNorm.length) {
-      return { error: 'Duplicate codes in unitCodes' };
-    }
-    for (const c of unitCodesNorm) {
-      const chk = await validateProductCodeForCategory(String(categoryId), c);
-      if (!chk.ok) return { error: chk.error };
+  } else {
+    const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
+    if (!attrsReq.ok) {
+      return { error: attrsReq.error };
     }
   }
 
@@ -833,6 +1050,9 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
   };
   if (categoryIsMulti && q > 1) {
     payload.unitCodes = unitCodesNorm;
+    if (unitDetailsNorm) {
+      payload.unitDetails = unitDetailsNorm;
+    }
   }
   if (product?.acquiredFrom && typeof product.acquiredFrom === 'object') {
     payload.acquiredFrom = product.acquiredFrom;
@@ -859,6 +1079,7 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
     payload,
     categoryIsMulti,
     unitCodesNorm,
+    unitDetailsNorm,
     acquiredFromFields,
     categoryId: String(categoryId),
   };
@@ -876,21 +1097,23 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
     if (!free.ok) {
       return { error: free.error, status: 409 };
     }
-    for (const unitCode of unitCodesNorm) {
+    for (let ui = 0; ui < unitCodesNorm.length; ui++) {
+      const unitCode = unitCodesNorm[ui];
+      const uf = unitFieldsFromPayload(payload, ui, unitCode);
       const [prodRow] = await Product.create(
         [
           {
             name,
-            code: unitCode,
-            price: payload.price,
-            netPrice: payload.netPrice,
+            code: uf.code || unitCode,
+            price: uf.price,
+            netPrice: uf.netPrice,
             stock: 1,
-            discount: payload.discount,
+            discount: uf.discount,
             category: payload.category,
             branch: branchId,
             inWarehouse: false,
-            imageUrl: payload.imageUrl,
-            attributes: payload.attributes,
+            imageUrl: uf.imageUrl || payload.imageUrl || '',
+            attributes: uf.attributes,
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
             ...acquiredFromFields,
           },
@@ -1048,7 +1271,9 @@ export const addProductPurchaseLine = async (req, res) => {
     session.endSession();
 
     if (createdList.length) {
-      for (const prodRow of createdList) {
+      for (let ui = 0; ui < createdList.length; ui++) {
+        const prodRow = createdList[ui];
+        const uf = unitFieldsFromPayload(built.payload, ui, prodRow.code);
         try {
           await StockMovement.create({
             movementType: 'purchase',
@@ -1058,10 +1283,10 @@ export const addProductPurchaseLine = async (req, res) => {
             fromBranchId: null,
             toBranchId: branchId,
             quantity: createdList.length > 1 ? 1 : built.q,
-            unitPrice: built.payload.netPrice,
+            unitPrice: uf.netPrice,
             totalValue:
               Math.round(
-                built.payload.netPrice * (createdList.length > 1 ? 1 : built.q) * 100
+                uf.netPrice * (createdList.length > 1 ? 1 : built.q) * 100
               ) / 100,
             referenceType: 'productPurchaseRequest',
             referenceId: purchase._id,
@@ -1178,25 +1403,56 @@ export const approveProductPurchaseRequest = async (req, res) => {
     let createdList = [];
 
     if (categoryIsMulti && q > 1) {
-      const raw = Array.isArray(pp.unitCodes) ? pp.unitCodes : [];
-      const codes = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
-      if (codes.length !== q) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: 'Purchase is missing unit codes for multi-code category' });
-      }
-      const seen = new Set(codes.map((c) => c.toUpperCase()));
-      if (seen.size !== codes.length) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: 'Duplicate codes on purchase request' });
-      }
-      for (const c of codes) {
-        const chk = await validateProductCodeForCategory(categoryIdStr, c);
-        if (!chk.ok) {
+      const rawDetails = Array.isArray(pp.unitDetails) ? pp.unitDetails : null;
+      let codes = [];
+      let detailsForCreate = null;
+      if (rawDetails?.length === q) {
+        const resolved = await resolveUnitDetails(
+          { unitDetails: rawDetails },
+          categoryIdStr,
+          q,
+          {
+            price: Number(pp.price) || 0,
+            netPrice: Number(pp.netPrice) || 0,
+            discount: Number(pp.discount) || 0,
+            attributes: attrsNorm,
+            imageUrl: normalizeImageUrl(pp.imageUrl),
+          }
+        );
+        if (resolved?.error) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(400).json({ error: chk.error });
+          return res.status(400).json({ error: resolved.error });
+        }
+        detailsForCreate = resolved.unitDetails;
+        codes = resolved.unitCodes;
+      } else {
+        const attrsReq = await assertRequiredCategoryAttributes(categoryIdStr, attrsNorm);
+        if (!attrsReq.ok) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: attrsReq.error });
+        }
+        const raw = Array.isArray(pp.unitCodes) ? pp.unitCodes : [];
+        codes = raw.map((x) => String(x ?? '').trim()).filter(Boolean);
+        if (codes.length !== q) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: 'Purchase is missing unit codes for multi-code category' });
+        }
+        const seen = new Set(codes.map((c) => c.toUpperCase()));
+        if (seen.size !== codes.length) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: 'Duplicate codes on purchase request' });
+        }
+        for (const c of codes) {
+          const chk = await validateProductCodeForCategory(categoryIdStr, c);
+          if (!chk.ok) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({ error: chk.error });
+          }
         }
       }
       const free = await assertCodesNotUsedInStorage(codes, purchase.branch, false);
@@ -1205,21 +1461,28 @@ export const approveProductPurchaseRequest = async (req, res) => {
         session.endSession();
         return res.status(409).json({ error: free.error });
       }
-      for (const unitCode of codes) {
+      const payloadForUnits = {
+        ...pp,
+        attributes: attrsNorm,
+        ...(detailsForCreate ? { unitDetails: detailsForCreate } : {}),
+      };
+      for (let ui = 0; ui < codes.length; ui++) {
+        const unitCode = codes[ui];
+        const uf = unitFieldsFromPayload(payloadForUnits, ui, unitCode);
         const [pRow] = await Product.create(
           [
             {
               name: pp.name,
-              code: unitCode,
-              price: Number(pp.price) || 0,
-              netPrice: Number(pp.netPrice) || 0,
+              code: uf.code || unitCode,
+              price: uf.price,
+              netPrice: uf.netPrice,
               stock: 1,
-              discount: Number(pp.discount) || 0,
+              discount: uf.discount,
               category: pp.category,
               branch: purchase.branch,
               inWarehouse: false,
-              imageUrl: normalizeImageUrl(pp.imageUrl),
-              attributes: attrsNorm,
+              imageUrl: uf.imageUrl || normalizeImageUrl(pp.imageUrl) || '',
+              attributes: uf.attributes,
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
               ...acquiredFromFields,
             },
@@ -1230,6 +1493,12 @@ export const approveProductPurchaseRequest = async (req, res) => {
       }
       prod = createdList[0];
     } else {
+      const attrsReq = await assertRequiredCategoryAttributes(categoryIdStr, attrsNorm);
+      if (!attrsReq.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: attrsReq.error });
+      }
       const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
       if (existing) {
         if (existing.removedWhenOutOfStock) {
@@ -1358,7 +1627,9 @@ export const approveProductPurchaseRequest = async (req, res) => {
 
     try {
       if (createdList.length > 1) {
-        for (const pRow of createdList) {
+        for (let ui = 0; ui < createdList.length; ui++) {
+          const pRow = createdList[ui];
+          const uf = unitFieldsFromPayload(pp, ui, pRow.code);
           await StockMovement.create({
             movementType: 'purchase',
             productId: pRow._id,
@@ -1367,8 +1638,8 @@ export const approveProductPurchaseRequest = async (req, res) => {
             fromBranchId: null,
             toBranchId: purchase.branch,
             quantity: 1,
-            unitPrice: Number(pp.netPrice) || 0,
-            totalValue: Math.round((Number(pp.netPrice) || 0) * 100) / 100,
+            unitPrice: uf.netPrice,
+            totalValue: Math.round(uf.netPrice * 100) / 100,
             referenceType: 'productPurchaseRequest',
             referenceId: purchase._id,
             notes: `Product purchase approved (multi-code)`,

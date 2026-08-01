@@ -43,7 +43,7 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
   styleUrls: ['./create-edit-product.component.scss']
 })
 export class CreateEditProductComponent implements OnInit, OnDestroy {
-  activeTab: 'basic' | 'extra' = 'basic';
+  activeTab: 'basic' | 'units' | 'payment' | 'extra' = 'basic';
   sourcePartyForm: FormGroup;
   sourcePartyType: OrderPartyType = 'client';
   isExistingSourceClient = false;
@@ -74,6 +74,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   selectedCategory: Category | null = null;
   categoryAttributeDefs: Array<{ key: string; label: string; options: Array<{ value: string; label: string }> }> = [];
   attributeValues: Record<string, string> = {};
+  /** Show validation errors on category attribute inputs after a failed submit. */
+  attributesAttempted = false;
   private previousCategoryIdForEdit: string | null = null;
   private subscriptions: Subscription[] = [];
   isCodeGenerated = false;
@@ -81,12 +83,30 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   showPriceOnBarcode = true;
   /** When category.multiCodePerPiece and quantity > 1: one editable code per unit (new product only). */
   multiUnitCodes: string[] = [];
+  /**
+   * When multi-unit and user chooses different data per code:
+   * parallel to multiUnitCodes — price / net / discount / attributes per piece.
+   */
+  multiUnitVariants: Array<{
+    price: number | '';
+    netPrice: number | '';
+    discount: number | '';
+    attributes: Record<string, string>;
+    imageUrl: string;
+  }> = [];
+  /**
+   * Multi-code qty > 1: do all units share sale/purchase/discount/specs?
+   * true = enter once (default); false = per unit.
+   */
+  unitsShareSameData = true;
   /** Ignore stale barcode API responses when stock quantity changes quickly. */
   private multiUnitCodesGenId = 0;
   private stockQtyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
+  /** Index of unit currently uploading an image, or null. */
+  uploadingUnitImageIndex: number | null = null;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
   deskPurchaseBranchLabel = '';
   /** Selected purchase treasury keys (multi, like cashier payment methods). */
@@ -167,6 +187,13 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   get deskPurchaseTotalCost(): number {
+    if (this.isPerUnitVariantMode) {
+      const sum = this.multiUnitVariants.reduce((acc, row) => {
+        const n = Number(row?.netPrice);
+        return acc + (Number.isFinite(n) && n >= 0 ? n : 0);
+      }, 0);
+      return Math.round(sum * 100) / 100;
+    }
     const net = Number(this.basicInfoForm?.value?.netPrice);
     if (!Number.isFinite(net) || net < 0) {
       return 0;
@@ -256,6 +283,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   private buildPurchaseTreasurySplitsPayload():
     | { key: string; label: string; amount: number }[]
     | null {
+    const fail = (): null => {
+      return null;
+    };
     const splits = this.selectedDeskTreasuryKeys
       .map((key) => ({
         key,
@@ -268,7 +298,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         this.translateService.instant('tr_desk_purchase_treasury_required'),
         'error'
       );
-      return null;
+      return fail();
     }
     const total = this.deskPurchaseTotalCost;
     if (total <= 0) {
@@ -276,21 +306,21 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         this.translateService.instant('tr_desk_purchase_net_required'),
         'error'
       );
-      return null;
+      return fail();
     }
     if (this.deskTreasuryOverAllocated()) {
       this.appNotificationService.push(
         this.translateService.instant('tr_desk_purchase_treasury_over'),
         'error'
       );
-      return null;
+      return fail();
     }
     if (Math.abs(this.deskTreasurySplitsTotal() - total) > 0.01) {
       this.appNotificationService.push(
         this.translateService.instant('tr_desk_purchase_treasury_mismatch'),
         'error'
       );
-      return null;
+      return fail();
     }
     return splits;
   }
@@ -303,6 +333,40 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   get cashDeskPurchase(): boolean {
     return !!this.data?.cashDeskPurchase;
+  }
+
+  get showUnitsTab(): boolean {
+    /** Create flow: device data (code, prices, image, attrs) always lives on tab 2. */
+    return !this.isEdit;
+  }
+
+  get showPaymentTab(): boolean {
+    return this.cashDeskPurchase && !this.data?.exchangeFlow;
+  }
+
+  private ensureActiveTabValid(): void {
+    if (this.activeTab === 'units' && !this.showUnitsTab) {
+      this.activeTab = 'basic';
+    }
+    if (this.activeTab === 'payment' && !this.showPaymentTab) {
+      this.activeTab = 'basic';
+    }
+  }
+
+  /** After quantity is entered on create, move user to the device-data tab. */
+  private maybeGoToDeviceTabAfterQuantity(): void {
+    if (this.isEdit) {
+      return;
+    }
+    const raw = this.basicInfoForm?.value?.stock;
+    if (raw === '' || raw == null) {
+      return;
+    }
+    const n = Number(raw);
+    if (Number.isNaN(n) || n < 1) {
+      return;
+    }
+    this.activeTab = 'units';
   }
 
   /** Popup title: desk purchase vs exchange trade-in vs default. */
@@ -339,8 +403,288 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return !this.isEdit && this.isMultiCodeCategory && this.getStockQty() > 1;
   }
 
+  /** Multi-unit mode with different price/discount/specs per code. */
+  get isPerUnitVariantMode(): boolean {
+    return this.isMultiUnitMode && this.unitsShareSameData === false;
+  }
+
   trackByUnitIndex(i: number): number {
     return i;
+  }
+
+  onUnitsShareSameDataChange(same: boolean): void {
+    this.unitsShareSameData = !!same;
+    if (!this.unitsShareSameData) {
+      this.seedMultiUnitVariantsFromShared();
+    } else {
+      this.applyFirstVariantToSharedFields();
+      this.multiUnitVariants = [];
+    }
+    this.onDeskTreasuryCostInputsChanged();
+  }
+
+  private emptyUnitVariant(): {
+    price: number | '';
+    netPrice: number | '';
+    discount: number | '';
+    attributes: Record<string, string>;
+    imageUrl: string;
+  } {
+    const fv = this.basicInfoForm?.value;
+    const priceRaw = fv?.price;
+    const netRaw = fv?.netPrice;
+    const discRaw = fv?.discount;
+    return {
+      price: priceRaw === '' || priceRaw == null || Number.isNaN(Number(priceRaw)) ? '' : Number(priceRaw),
+      netPrice: netRaw === '' || netRaw == null || Number.isNaN(Number(netRaw)) ? '' : Number(netRaw),
+      discount:
+        discRaw === '' || discRaw == null || Number.isNaN(Number(discRaw)) ? '' : Number(discRaw),
+      attributes: { ...(this.attributeValues || {}) },
+      imageUrl: String(this.productImageUrl || '').trim(),
+    };
+  }
+
+  private seedMultiUnitVariantsFromShared(): void {
+    const q = this.getStockQty();
+    const base = this.emptyUnitVariant();
+    const next = [];
+    for (let i = 0; i < q; i++) {
+      const prev = this.multiUnitVariants[i];
+      next.push(
+        prev
+          ? {
+              price: prev.price,
+              netPrice: prev.netPrice,
+              discount: prev.discount,
+              attributes: { ...(prev.attributes || {}) },
+              imageUrl: String(prev.imageUrl || '').trim() || base.imageUrl,
+            }
+          : {
+              price: base.price,
+              netPrice: base.netPrice,
+              discount: base.discount,
+              attributes: { ...base.attributes },
+              imageUrl: base.imageUrl,
+            }
+      );
+    }
+    this.multiUnitVariants = next;
+  }
+
+  private syncMultiUnitVariantsLength(): void {
+    if (!this.isPerUnitVariantMode) {
+      return;
+    }
+    const q = this.getStockQty();
+    if (this.multiUnitVariants.length === q) {
+      return;
+    }
+    this.seedMultiUnitVariantsFromShared();
+  }
+
+  private applyFirstVariantToSharedFields(): void {
+    const first = this.multiUnitVariants[0];
+    if (!first || !this.basicInfoForm?.form) {
+      return;
+    }
+    const patch: Record<string, unknown> = {};
+    if (first.price !== '' && first.price != null) {
+      patch.price = first.price;
+    }
+    if (first.netPrice !== '' && first.netPrice != null) {
+      patch.netPrice = first.netPrice;
+    }
+    if (first.discount !== '' && first.discount != null) {
+      patch.discount = first.discount;
+    }
+    if (Object.keys(patch).length) {
+      this.basicInfoForm.form.patchValue(patch);
+    }
+    if (first.attributes) {
+      this.attributeValues = { ...first.attributes };
+    }
+    if (first.imageUrl) {
+      this.productImageUrl = String(first.imageUrl).trim();
+    }
+  }
+
+  copyUnitVariantFromPrevious(index: number): void {
+    if (index <= 0 || !this.multiUnitVariants[index - 1]) {
+      return;
+    }
+    const src = this.multiUnitVariants[index - 1];
+    this.multiUnitVariants[index] = {
+      price: src.price,
+      netPrice: src.netPrice,
+      discount: src.discount,
+      attributes: { ...(src.attributes || {}) },
+      imageUrl: String(src.imageUrl || '').trim(),
+    };
+    this.onDeskTreasuryCostInputsChanged();
+  }
+
+  onUnitVariantCostChanged(): void {
+    this.onDeskTreasuryCostInputsChanged();
+  }
+
+  private buildAttributesPayloadFromMap(map: Record<string, string> | null | undefined): Record<string, string> {
+    const allowed = new Set(this.categoryAttributeDefs.map((d) => d.key));
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(map || {})) {
+      const key = this.normalizeAttrKey(k);
+      if (!allowed.has(key)) continue;
+      const val = String(v ?? '').trim();
+      if (!val) continue;
+      out[key] = val;
+    }
+    return out;
+  }
+
+  isAttributeMissing(key: string): boolean {
+    if (!this.attributesAttempted) {
+      return false;
+    }
+    return !String(this.attributeValues?.[key] ?? '').trim();
+  }
+
+  isUnitAttributeMissing(unitIndex: number, key: string): boolean {
+    if (!this.attributesAttempted) {
+      return false;
+    }
+    const map = this.multiUnitVariants?.[unitIndex]?.attributes;
+    return !String(map?.[key] ?? '').trim();
+  }
+
+  private mapHasAllCategoryAttributes(map: Record<string, string> | null | undefined): boolean {
+    if (!this.categoryAttributeDefs.length) {
+      return true;
+    }
+    for (const d of this.categoryAttributeDefs) {
+      if (!String(map?.[d.key] ?? '').trim()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private firstMissingAttributeLabel(map: Record<string, string> | null | undefined): string {
+    for (const d of this.categoryAttributeDefs) {
+      if (!String(map?.[d.key] ?? '').trim()) {
+        return d.label || d.key;
+      }
+    }
+    return '';
+  }
+
+  /** All category attribute defs must be filled before save. */
+  private validateCategoryAttributesRequired(): boolean {
+    if (!this.categoryAttributeDefs.length) {
+      this.attributesAttempted = false;
+      return true;
+    }
+    this.attributesAttempted = true;
+
+    if (this.isPerUnitVariantMode) {
+      const count = Math.max(this.multiUnitCodes.length, this.multiUnitVariants.length);
+      for (let i = 0; i < count; i++) {
+        const row = this.multiUnitVariants[i];
+        if (!this.mapHasAllCategoryAttributes(row?.attributes)) {
+          const label = this.firstMissingAttributeLabel(row?.attributes);
+          this.appNotificationService.push(
+            this.translateService.instant('tr_category_attribute_required_unit', {
+              label,
+              n: i + 1,
+            }),
+            'error'
+          );
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (!this.mapHasAllCategoryAttributes(this.attributeValues)) {
+      const label = this.firstMissingAttributeLabel(this.attributeValues);
+      this.appNotificationService.push(
+        this.translateService.instant('tr_category_attribute_required', { label }),
+        'error'
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private getValidatedUnitDetails():
+    | Array<{
+        code: string;
+        price: number;
+        netPrice: number;
+        discount: number;
+        attributes: Record<string, string>;
+        imageUrl: string;
+      }>
+    | null {
+    if (!this.isPerUnitVariantMode) {
+      return null;
+    }
+    const codes = this.getValidatedMultiUnitCodes();
+    if (!codes) {
+      return null;
+    }
+    if (this.multiUnitVariants.length !== codes.length) {
+      this.seedMultiUnitVariantsFromShared();
+    }
+    const details = [];
+    const sharedImage = String(this.productImageUrl || '').trim();
+    for (let i = 0; i < codes.length; i++) {
+      const row = this.multiUnitVariants[i] || this.emptyUnitVariant();
+      const price = Number(row.price);
+      if (row.price === '' || row.price == null || Number.isNaN(price) || price < 0) {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_unit_price_required', { n: i + 1 }),
+          'error'
+        );
+        return null;
+      }
+      const discountRaw =
+        row.discount === '' || row.discount == null ? 0 : Number(row.discount);
+      if (Number.isNaN(discountRaw) || discountRaw < 0 || discountRaw > 100) {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_unit_discount_invalid', { n: i + 1 }),
+          'error'
+        );
+        return null;
+      }
+      let netPrice: number;
+      if (row.netPrice === '' || row.netPrice == null) {
+        if (this.cashDeskPurchase) {
+          this.appNotificationService.push(
+            this.translateService.instant('tr_product_unit_net_required', { n: i + 1 }),
+            'error'
+          );
+          return null;
+        }
+        netPrice = Math.round(price * (1 - discountRaw / 100) * 100) / 100;
+      } else {
+        netPrice = Number(row.netPrice);
+        if (Number.isNaN(netPrice) || netPrice < 0) {
+          this.appNotificationService.push(
+            this.translateService.instant('tr_product_unit_net_required', { n: i + 1 }),
+            'error'
+          );
+          return null;
+        }
+      }
+      details.push({
+        code: codes[i],
+        price: Math.round(price * 100) / 100,
+        netPrice: Math.round(netPrice * 100) / 100,
+        discount: Math.round(discountRaw * 100) / 100,
+        attributes: this.buildAttributesPayloadFromMap(row.attributes),
+        imageUrl: String(row.imageUrl || '').trim() || sharedImage,
+      });
+    }
+    return details;
   }
 
   private syncPrimaryCodeFromMultiUnits(): void {
@@ -378,25 +722,41 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   private applyStockQuantityToMultiUnitCodes(): void {
     this.stockQtyDebounceTimer = null;
-    if (this.isEdit || !this.isMultiCodeCategory) {
+    if (this.isEdit) {
+      return;
+    }
+    if (!this.isMultiCodeCategory) {
       this.multiUnitCodes = [];
+      this.multiUnitVariants = [];
+      this.unitsShareSameData = true;
+      this.ensureActiveTabValid();
+      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
     const q = this.getStockQty();
     if (q <= 1) {
       this.multiUnitCodes = [];
+      this.multiUnitVariants = [];
+      this.unitsShareSameData = true;
+      this.ensureActiveTabValid();
+      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
 
     if (this.multiUnitCodes.length > q) {
       this.multiUnitCodes = this.multiUnitCodes.slice(0, q);
       this.syncPrimaryCodeFromMultiUnits();
+      this.syncMultiUnitVariantsLength();
+      this.onDeskTreasuryCostInputsChanged();
+      this.ensureActiveTabValid();
+      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
 
     if (this.multiUnitCodes.length < q) {
       const cat = this.selectedCategory;
       if (!cat?._id || !this.hasCategoryCode(cat)) {
+        this.maybeGoToDeviceTabAfterQuantity();
         return;
       }
       const genId = ++this.multiUnitCodesGenId;
@@ -415,7 +775,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
               this.multiUnitCodes.push('');
             }
             this.syncPrimaryCodeFromMultiUnits();
+            this.syncMultiUnitVariantsLength();
+            this.onDeskTreasuryCostInputsChanged();
             this.isCodeGenerated = true;
+            this.ensureActiveTabValid();
+            this.maybeGoToDeviceTabAfterQuantity();
           },
           error: (err: any) => {
             if (genId !== this.multiUnitCodesGenId) {
@@ -425,12 +789,16 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
               err?.error?.error ||
               this.translateService.instant('tr_barcode_generate_failed');
             this.appNotificationService.push(msg, 'error');
+            this.maybeGoToDeviceTabAfterQuantity();
           },
         });
       return;
     }
 
     this.syncPrimaryCodeFromMultiUnits();
+    this.syncMultiUnitVariantsLength();
+    this.ensureActiveTabValid();
+    this.maybeGoToDeviceTabAfterQuantity();
   }
 
   /** Replace every unit code with a fresh block from the server (current quantity). */
@@ -454,6 +822,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           this.multiUnitCodes.push('');
         }
         this.syncPrimaryCodeFromMultiUnits();
+        this.syncMultiUnitVariantsLength();
+        this.onDeskTreasuryCostInputsChanged();
         this.isCodeGenerated = true;
         if (showToast) {
           this.appNotificationService.push(
@@ -639,6 +1009,42 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Print stickers when each unit has its own price / attribute values. */
+  private printBarcodeStickersPerUnit(
+    productName: string,
+    units: Array<{ code: string; price: number; attributes: Record<string, string> }>,
+    onDone?: () => void
+  ): void {
+    const clean = (units || []).filter((u) => String(u?.code || '').trim());
+    if (!clean.length) {
+      onDone?.();
+      return;
+    }
+    const reqs: Observable<string>[] = clean.map((u) => {
+      const bv = productBarcodeAttributeValues(this.selectedCategory!, u.attributes || {});
+      const printPrice = this.showPriceOnBarcode ? u.price : undefined;
+      return this.productsSerivce.getBarcodeImage(
+        String(u.code).trim(),
+        productName,
+        bv,
+        printPrice
+      ) as Observable<string>;
+    });
+    forkJoin(reqs).subscribe({
+      next: (parts: string[]) => {
+        this.printHtml(this.mergeBarcodePrintDocuments(parts));
+        onDone?.();
+      },
+      error: () => {
+        this.appNotificationService.push(
+          this.translateService.instant('tr_barcode_generate_failed'),
+          'error'
+        );
+        onDone?.();
+      },
+    });
+  }
+
   private refreshCategoryDropdownItems(): void {
     if (!this.categories?.length) {
       this.categoryDropdownItems = [];
@@ -729,6 +1135,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       next[nk] = String(v ?? '');
     }
     this.attributeValues = next;
+    this.attributesAttempted = false;
   }
 
   private buildAttributesPayload(): Record<string, string> {
@@ -1117,9 +1524,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.translateService.instant('tr_fill_required_fields'),
       'error'
     );
-    if (this.activeTab !== 'basic') {
-      this.activeTab = 'basic';
-    }
   }
 
   private validateSourcePartyOptional(): boolean {
@@ -1136,7 +1540,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           this.translateService.instant('tr_client_phone_invalid'),
           'error'
         );
-        this.activeTab = 'extra';
         return false;
       }
       if (!this.isExistingSourceClient && !this.isExistingSourceVendor && !name) {
@@ -1145,7 +1548,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           this.translateService.instant('tr_product_source_name_required'),
           'error'
         );
-        this.activeTab = 'extra';
         return false;
       }
     }
@@ -1191,6 +1593,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         this.isCodeGenerated = false;
       }
       this.multiUnitCodes = [];
+      this.multiUnitVariants = [];
+      this.unitsShareSameData = true;
+      this.ensureActiveTabValid();
       return;
     }
     if (!this.hasCategoryCode(cat)) {
@@ -1199,13 +1604,19 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         this.isCodeGenerated = false;
       }
       this.multiUnitCodes = [];
+      this.multiUnitVariants = [];
+      this.unitsShareSameData = true;
+      this.ensureActiveTabValid();
       return;
     }
     if (!this.isEdit) {
       this.codeValue = '';
       this.isCodeGenerated = false;
       this.multiUnitCodes = [];
+      this.multiUnitVariants = [];
+      this.unitsShareSameData = true;
       this.regenerateCodeFromCategory();
+      this.ensureActiveTabValid();
       return;
     }
     const newId = String(cat._id);
@@ -1213,6 +1624,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.regenerateCodeFromCategory();
     }
     this.previousCategoryIdForEdit = newId;
+    this.ensureActiveTabValid();
   }
 
   private regenerateCodeFromCategory(): void {
@@ -1307,6 +1719,64 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     this.productImageUrl = '';
   }
 
+  isUploadingUnitImage(index: number): boolean {
+    return this.uploadingUnitImageIndex === index;
+  }
+
+  onUnitProductImageSelected(index: number, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.multiUnitVariants[index]) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.appNotificationService.push(this.translateService.instant('tr_product_image_invalid_type'), 'error');
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.appNotificationService.push(this.translateService.instant('tr_product_image_too_large'), 'error');
+      input.value = '';
+      return;
+    }
+    if (!this.isCloudinaryConfigured()) {
+      this.appNotificationService.push(this.translateService.instant('tr_cloudinary_not_configured'), 'error');
+      input.value = '';
+      return;
+    }
+    this.uploadingUnitImageIndex = index;
+    this.subscriptions.push(
+      this.cloudinaryUpload.uploadProductImage(file).subscribe(
+        (url) => {
+          this.uploadingUnitImageIndex = null;
+          if (this.multiUnitVariants[index]) {
+            this.multiUnitVariants[index] = {
+              ...this.multiUnitVariants[index],
+              imageUrl: url,
+            };
+          }
+          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_ok'), 'success');
+          input.value = '';
+        },
+        () => {
+          this.uploadingUnitImageIndex = null;
+          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_failed'), 'error');
+          input.value = '';
+        }
+      )
+    );
+  }
+
+  clearUnitProductImage(index: number): void {
+    if (!this.multiUnitVariants[index]) {
+      return;
+    }
+    this.multiUnitVariants[index] = {
+      ...this.multiUnitVariants[index],
+      imageUrl: '',
+    };
+  }
+
 
 
 
@@ -1350,13 +1820,22 @@ generateBarcode() {
 }
 
 private submitDeskPurchaseRequest(): void {
-  if (this.isUploadingImage) {
+  if (this.isUploadingImage || this.uploadingUnitImageIndex !== null) {
     return;
   }
   this.syncDeskPurchaseTreasuryKey();
-  if (!this.basicInfoForm.valid) {
+  if (!this.basicInfoForm.valid && !this.isPerUnitVariantMode) {
     this.notifyRequiredFieldsMissing();
     return;
+  }
+  if (!this.basicInfoForm.valid && this.isPerUnitVariantMode) {
+    // Shared price/net fields are optional in per-unit mode; still require name/stock/category.
+    const nameOk = String(this.basicInfoForm.value?.name || '').trim();
+    const stockOk = Number(this.basicInfoForm.value?.stock) >= 1;
+    if (!nameOk || !stockOk) {
+      this.notifyRequiredFieldsMissing();
+      return;
+    }
   }
   if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
     this.appNotificationService.push(
@@ -1367,7 +1846,24 @@ private submitDeskPurchaseRequest(): void {
   }
   const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
   let deskMultiUnits: string[] | null = null;
-  if (this.isMultiUnitMode) {
+  let deskUnitDetails:
+    | Array<{
+        code: string;
+        price: number;
+        netPrice: number;
+        discount: number;
+        attributes: Record<string, string>;
+        imageUrl: string;
+      }>
+    | null = null;
+
+  if (this.isPerUnitVariantMode) {
+    deskUnitDetails = this.getValidatedUnitDetails();
+    if (!deskUnitDetails) {
+      return;
+    }
+    deskMultiUnits = deskUnitDetails.map((d) => d.code);
+  } else if (this.isMultiUnitMode) {
     deskMultiUnits = this.getValidatedMultiUnitCodes();
     if (!deskMultiUnits) {
       return;
@@ -1384,8 +1880,18 @@ private submitDeskPurchaseRequest(): void {
   }
 
   const fv = this.basicInfoForm.value;
-  const netNum = Number(fv.netPrice);
-  if (fv.netPrice === '' || fv.netPrice == null || Number.isNaN(netNum) || netNum < 0) {
+  let priceNum = Number(fv.price);
+  let netNum = Number(fv.netPrice);
+  let discountNum =
+    fv.discount === undefined || fv.discount === null || fv.discount === '' ? 0 : Number(fv.discount);
+  let attributesPayload = this.buildAttributesPayload();
+
+  if (deskUnitDetails?.length) {
+    priceNum = deskUnitDetails[0].price;
+    netNum = deskUnitDetails[0].netPrice;
+    discountNum = deskUnitDetails[0].discount;
+    attributesPayload = deskUnitDetails[0].attributes;
+  } else if (fv.netPrice === '' || fv.netPrice == null || Number.isNaN(netNum) || netNum < 0) {
     this.appNotificationService.push(
       this.translateService.instant('tr_desk_purchase_net_required'),
       'error'
@@ -1416,8 +1922,6 @@ private submitDeskPurchaseRequest(): void {
   this.syncDeskPurchaseTreasuryKey();
 
   const qty = Math.max(1, Math.floor(Number(fv.stock) || 1));
-  const discountNum =
-    fv.discount === undefined || fv.discount === null || fv.discount === '' ? 0 : Number(fv.discount);
 
   const deskCode = deskMultiUnits?.length
     ? deskMultiUnits[0]
@@ -1427,15 +1931,18 @@ private submitDeskPurchaseRequest(): void {
     name: String(fv.name || '').trim(),
     code: deskCode,
     categoryId: String(this.selectedCategory._id),
-    price: Math.round(Number(fv.price) * 100) / 100,
+    price: Math.round(priceNum * 100) / 100,
     netPrice: Math.round(netNum * 100) / 100,
     discount: Number.isFinite(discountNum) ? Math.round(discountNum * 100) / 100 : 0,
-    attributes: this.buildAttributesPayload(),
+    attributes: attributesPayload,
     imageUrl: this.productImageUrl || '',
     notes: '',
   };
   if (deskMultiUnits?.length) {
     deskProduct.unitCodes = [...deskMultiUnits];
+  }
+  if (deskUnitDetails?.length) {
+    deskProduct.unitDetails = deskUnitDetails.map((d) => ({ ...d }));
   }
   const acquiredFrom = this.buildAcquiredFromPayload();
   if (acquiredFrom) {
@@ -1478,18 +1985,32 @@ private submitDeskPurchaseRequest(): void {
         this.isSubmitting = false;
         const createdProducts = res?.createdProducts;
         const nameStr = String(fv.name || '').trim();
-        const bv = productBarcodeAttributeValues(this.selectedCategory!, this.buildAttributesPayload());
         const finish = () => this.dialogRef.close({ submitted: true, deskPurchaseResult: res });
 
-        const deskPrintPrice = this.getBarcodePrintPrice(fv.price);
-
         if (Array.isArray(createdProducts) && createdProducts.length > 1) {
+          if (deskUnitDetails?.length) {
+            this.printBarcodeStickersPerUnit(
+              nameStr,
+              deskUnitDetails,
+              finish
+            );
+            return;
+          }
+          const bv = productBarcodeAttributeValues(this.selectedCategory!, attributesPayload);
+          const deskPrintPrice = this.getBarcodePrintPrice(priceNum);
           const codes = createdProducts.map((p: any) => String(p?.code || '').trim()).filter(Boolean);
           this.printBarcodeStickers(nameStr, codes, bv, finish, deskPrintPrice);
           return;
         }
         const single = res?.createdProduct?.code ? String(res.createdProduct.code).trim() : '';
         if (single) {
+          const bv = productBarcodeAttributeValues(
+            this.selectedCategory!,
+            deskUnitDetails?.[0]?.attributes || attributesPayload
+          );
+          const deskPrintPrice = this.getBarcodePrintPrice(
+            deskUnitDetails?.[0]?.price ?? priceNum
+          );
           this.productsSerivce.getBarcodeImage(single, nameStr, bv, deskPrintPrice).subscribe({
             next: (html: any) => {
               this.printHtml(html);
@@ -1507,15 +2028,23 @@ private submitDeskPurchaseRequest(): void {
         this.appNotificationService.push(msg, 'error');
       },
     });
-}
+  }
 
 createProduct() {
-  if (this.isUploadingImage) {
+  if (this.isUploadingImage || this.uploadingUnitImageIndex !== null) {
     return;
   }
-  if (!this.basicInfoForm.valid) {
+  if (!this.basicInfoForm.valid && !this.isPerUnitVariantMode) {
     this.notifyRequiredFieldsMissing();
     return;
+  }
+  if (!this.basicInfoForm.valid && this.isPerUnitVariantMode) {
+    const nameOk = String(this.basicInfoForm.value?.name || '').trim();
+    const stockOk = Number(this.basicInfoForm.value?.stock) >= 1;
+    if (!nameOk || !stockOk) {
+      this.notifyRequiredFieldsMissing();
+      return;
+    }
   }
   if (!this.selectedCategory || !this.hasCategoryCode(this.selectedCategory)) {
     this.appNotificationService.push(
@@ -1526,7 +2055,24 @@ createProduct() {
   }
   const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
   let createMultiUnits: string[] | null = null;
-  if (this.isMultiUnitMode) {
+  let createUnitDetails:
+    | Array<{
+        code: string;
+        price: number;
+        netPrice: number;
+        discount: number;
+        attributes: Record<string, string>;
+        imageUrl: string;
+      }>
+    | null = null;
+
+  if (this.isPerUnitVariantMode) {
+    createUnitDetails = this.getValidatedUnitDetails();
+    if (!createUnitDetails) {
+      return;
+    }
+    createMultiUnits = createUnitDetails.map((d) => d.code);
+  } else if (this.isMultiUnitMode) {
     createMultiUnits = this.getValidatedMultiUnitCodes();
     if (!createMultiUnits) {
       return;
@@ -1570,6 +2116,13 @@ createProduct() {
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
   };
+  if (createUnitDetails?.length) {
+    payload.price = createUnitDetails[0].price;
+    payload.netPrice = createUnitDetails[0].netPrice;
+    payload.discount = createUnitDetails[0].discount;
+    payload.attributes = createUnitDetails[0].attributes;
+    payload.unitDetails = createUnitDetails.map((d) => ({ ...d }));
+  }
   if (createMultiUnits?.length) {
     payload.unitCodes = [...createMultiUnits];
   }
@@ -1592,10 +2145,6 @@ createProduct() {
     (res: any) => {
       this.appNotificationService.push('✅ المنتج تم إضافته', 'success');
 
-      const bv = productBarcodeAttributeValues(
-        this.selectedCategory,
-        payload.attributes
-      );
       const names = String(payload.name || '').trim();
       const codes =
         Array.isArray(res?.createdProducts) && res.createdProducts.length > 1
@@ -1604,19 +2153,27 @@ createProduct() {
             ? [String(res.createdProduct.code).trim()]
             : [];
 
-      const printPrice = this.getBarcodePrintPrice(payload.price);
-      if (codes.length > 1) {
-        this.printBarcodeStickers(names, codes, bv, () => this.closeModal(), printPrice);
-      } else if (codes.length === 1) {
-        this.productsSerivce.getBarcodeImage(codes[0], names, bv, printPrice).subscribe({
-          next: (html: any) => {
-            this.printHtml(html);
-            this.closeModal();
-          },
-          error: () => this.closeModal(),
-        });
+      if (createUnitDetails?.length && codes.length > 1) {
+        this.printBarcodeStickersPerUnit(names, createUnitDetails, () => this.closeModal());
       } else {
-        this.closeModal();
+        const bv = productBarcodeAttributeValues(
+          this.selectedCategory,
+          payload.attributes
+        );
+        const printPrice = this.getBarcodePrintPrice(payload.price);
+        if (codes.length > 1) {
+          this.printBarcodeStickers(names, codes, bv, () => this.closeModal(), printPrice);
+        } else if (codes.length === 1) {
+          this.productsSerivce.getBarcodeImage(codes[0], names, bv, printPrice).subscribe({
+            next: (html: any) => {
+              this.printHtml(html);
+              this.closeModal();
+            },
+            error: () => this.closeModal(),
+          });
+        } else {
+          this.closeModal();
+        }
       }
     },
     (error) => {
@@ -1652,7 +2209,7 @@ printHtml(html: string) {
 
 
 updateProduct() {
-  if (this.isUploadingImage) {
+  if (this.isUploadingImage || this.uploadingUnitImageIndex !== null) {
     return;
   }
   this.product = this.basicInfoForm.value;
@@ -1773,6 +2330,9 @@ updateProduct() {
   submitForm(){
     this.markBasicInfoFormSubmitted();
     if (!this.validateSourcePartyOptional()) {
+      return;
+    }
+    if (!this.validateCategoryAttributesRequired()) {
       return;
     }
     if(this.isEdit){

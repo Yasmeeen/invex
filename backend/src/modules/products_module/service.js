@@ -37,6 +37,23 @@ async function sumActiveBookedQuantityProducts(productOid) {
   return agg?.total || 0;
 }
 
+/**
+ * After a full transfer out: only soft-hide if the category deletes on zero stock.
+ * Categories that "keep product after out of stock" stay visible at stock 0 for restocking.
+ */
+async function applyZeroStockAfterTransfer(sourceProduct) {
+  if (Number(sourceProduct.stock) > 0) return;
+  sourceProduct.stock = 0;
+  const cat = sourceProduct.category
+    ? await Category.findById(sourceProduct.category).select('deleteProductWhenOutOfStock').lean()
+    : null;
+  if (cat?.deleteProductWhenOutOfStock) {
+    sourceProduct.removedWhenOutOfStock = true;
+  } else {
+    sourceProduct.removedWhenOutOfStock = false;
+  }
+}
+
 async function loadUserForBranchTransfer(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
   return User.findById(userId).select('name role branch').lean();
@@ -270,6 +287,22 @@ const normalizeAttributesForCategory = async (categoryId, raw) => {
     out[key] = val.slice(0, 500);
   }
   return out;
+};
+
+/** Every category attributeDef must have a non-empty value in attrsNorm. */
+const assertRequiredCategoryAttributes = async (categoryId, attrsNorm) => {
+  const cat = await Category.findById(categoryId).select('attributeDefs').lean();
+  const defs = Array.isArray(cat?.attributeDefs) ? cat.attributeDefs : [];
+  for (const d of defs) {
+    const key = normalizeAttrKey(d?.key);
+    if (!key) continue;
+    const label = String(d?.label || key).trim() || key;
+    const val = String(attrsNorm?.[key] ?? '').trim();
+    if (!val) {
+      return { error: `Category attribute "${label}" is required` };
+    }
+  }
+  return { ok: true };
 };
 
 /** Safe branch ObjectId from query string (rejects literal "undefined", invalid ids). */
@@ -508,6 +541,11 @@ export const importProductsFromExcelRows = async (req, res) => {
       const attrs = await normalizeAttributesForCategory(String(cat._id), r.attributes);
       if (attrs === null) {
         errors.push({ rowNumber, sheetName, field: 'attributes', code, message: 'attributes must be an object' });
+        continue;
+      }
+      const attrsReq = await assertRequiredCategoryAttributes(String(cat._id), attrs);
+      if (!attrsReq.ok) {
+        errors.push({ rowNumber, sheetName, field: 'attributes', code, message: attrsReq.error });
         continue;
       }
 
@@ -1100,7 +1138,65 @@ export const createProduct = async (req, res) => {
 
     if (categoryMultiCode && unitCount > 1) {
       let codes = [];
-      if (Array.isArray(req.body.unitCodes) && req.body.unitCodes.length) {
+      let unitDetailsNorm = null;
+      const rawDetails = Array.isArray(req.body.unitDetails) ? req.body.unitDetails : null;
+      if (rawDetails?.length === unitCount) {
+        const details = [];
+        for (let i = 0; i < rawDetails.length; i++) {
+          const row = rawDetails[i] && typeof rawDetails[i] === 'object' ? rawDetails[i] : {};
+          const c = String(row.code ?? '').trim();
+          if (!c) {
+            return res.status(400).json({ error: `unitDetails[${i}] requires a code` });
+          }
+          const p = Number(row.price);
+          const n = Number(row.netPrice);
+          if (Number.isNaN(p) || p < 0 || Number.isNaN(n) || n < 0) {
+            return res.status(400).json({ error: `Valid price and netPrice required for unit ${i + 1}` });
+          }
+          const dRaw =
+            row.discount === undefined || row.discount === null || row.discount === ''
+              ? discountNum
+              : Number(row.discount);
+          if (Number.isNaN(dRaw) || dRaw < 0 || dRaw > 100) {
+            return res.status(400).json({ error: `Invalid discount for unit ${i + 1}` });
+          }
+          const unitAttrs = await normalizeAttributesForCategory(
+            categoryId,
+            row.attributes != null ? row.attributes : attrs
+          );
+          if (unitAttrs === null) {
+            return res.status(400).json({ error: `attributes must be an object for unit ${i + 1}` });
+          }
+          const unitAttrsReq = await assertRequiredCategoryAttributes(categoryId, unitAttrs);
+          if (!unitAttrsReq.ok) {
+            return res.status(400).json({ error: `${unitAttrsReq.error} (unit ${i + 1})` });
+          }
+          details.push({
+            code: c,
+            price: Math.round(p * 100) / 100,
+            netPrice: Math.round(n * 100) / 100,
+            discount: Math.round(dRaw * 100) / 100,
+            attributes: unitAttrs,
+            imageUrl: normalizeImageUrl(row.imageUrl) || imageUrlNorm || '',
+          });
+        }
+        const seenD = new Set(details.map((x) => x.code.toUpperCase()));
+        if (seenD.size !== details.length) {
+          return res.status(400).json({ error: 'Duplicate codes in unitDetails' });
+        }
+        for (const d of details) {
+          const chk = await validateProductCodeForCategory(categoryId, d.code);
+          if (!chk.ok) {
+            return res.status(400).json({ error: chk.error });
+          }
+        }
+        unitDetailsNorm = details;
+        codes = details.map((d) => d.code);
+      } else if (Array.isArray(req.body.unitCodes) && req.body.unitCodes.length) {
+        const attrsReq = await assertRequiredCategoryAttributes(categoryId, attrs);
+        if (!attrsReq.ok) {
+          return res.status(400).json({ error: attrsReq.error });
+        }
         codes = req.body.unitCodes.map((x) => String(x ?? '').trim()).filter(Boolean);
         if (codes.length !== unitCount) {
           return res.status(400).json({ error: 'unitCodes length must match stock quantity' });
@@ -1116,6 +1212,10 @@ export const createProduct = async (req, res) => {
           }
         }
       } else {
+        const attrsReq = await assertRequiredCategoryAttributes(categoryId, attrs);
+        if (!attrsReq.ok) {
+          return res.status(400).json({ error: attrsReq.error });
+        }
         try {
           codes = await allocateSequentialProductCodes(categoryId, unitCount);
         } catch (e) {
@@ -1123,25 +1223,48 @@ export const createProduct = async (req, res) => {
         }
       }
 
+      const pickUnit = (index, fallbackCode) => {
+        if (unitDetailsNorm?.[index]) {
+          const d = unitDetailsNorm[index];
+          return {
+            code: d.code || fallbackCode,
+            price: d.price,
+            netPrice: d.netPrice,
+            discount: d.discount,
+            attributes: d.attributes,
+            imageUrl: normalizeImageUrl(d.imageUrl) || imageUrlNorm || '',
+          };
+        }
+        return {
+          code: fallbackCode,
+          price: priceNum,
+          netPrice: netNum,
+          discount: discountNum,
+          attributes: attrs,
+          imageUrl: imageUrlNorm || '',
+        };
+      };
+
       if (isWarehouse) {
         const free = await assertCodesNotUsedInStorage(codes, null, true);
         if (!free.ok) {
           return res.status(409).json({ error: free.error });
         }
         const createdProducts = [];
-        for (const c of codes) {
+        for (let i = 0; i < codes.length; i++) {
+          const uf = pickUnit(i, codes[i]);
           const p = await Product.create({
             name,
-            code: c,
-            price: priceNum,
-            netPrice: netNum,
+            code: uf.code,
+            price: uf.price,
+            netPrice: uf.netPrice,
             stock: 1,
-            discount: discountNum,
+            discount: uf.discount,
             category: categoryId,
             branch: null,
             inWarehouse: true,
-            imageUrl: imageUrlNorm,
-            attributes: attrs,
+            imageUrl: uf.imageUrl || imageUrlNorm,
+            attributes: uf.attributes,
             addedBy: addedByNorm,
             ...acquiredFromFields,
           });
@@ -1178,19 +1301,20 @@ export const createProduct = async (req, res) => {
         return res.status(409).json({ error: free.error });
       }
       const createdProducts = [];
-      for (const c of codes) {
+      for (let i = 0; i < codes.length; i++) {
+        const uf = pickUnit(i, codes[i]);
         const p = await Product.create({
           name,
-          code: c,
-          price: priceNum,
-          netPrice: netNum,
+          code: uf.code,
+          price: uf.price,
+          netPrice: uf.netPrice,
           stock: 1,
-          discount: discountNum,
+          discount: uf.discount,
           category: categoryId,
           branch: branchOid,
           inWarehouse: false,
-          imageUrl: imageUrlNorm,
-          attributes: attrs,
+          imageUrl: uf.imageUrl || imageUrlNorm,
+          attributes: uf.attributes,
           addedBy: addedByNorm,
           ...acquiredFromFields,
         });
@@ -1214,6 +1338,11 @@ export const createProduct = async (req, res) => {
         createdProducts,
         createdProduct: createdProducts[0],
       });
+    }
+
+    const attrsReq = await assertRequiredCategoryAttributes(categoryId, attrs);
+    if (!attrsReq.ok) {
+      return res.status(400).json({ error: attrsReq.error });
     }
 
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
@@ -1367,6 +1496,10 @@ export const updateProduct = async (req, res) => {
     const attrs = await normalizeAttributesForCategory(categoryId, attributes);
     if (attrs === null) {
       return res.status(400).json({ error: 'attributes must be an object' });
+    }
+    const attrsReq = await assertRequiredCategoryAttributes(categoryId, attrs);
+    if (!attrsReq.ok) {
+      return res.status(400).json({ error: attrsReq.error });
     }
 
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
@@ -1782,11 +1915,7 @@ export const approveBranchTransfer = async (req, res) => {
 
     sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
     sourceProduct.stock = stock - qty;
-    // Hide empty source row so the same serial doesn't appear twice in product search.
-    if (Number(sourceProduct.stock) <= 0) {
-      sourceProduct.stock = 0;
-      sourceProduct.removedWhenOutOfStock = true;
-    }
+    await applyZeroStockAfterTransfer(sourceProduct);
     await sourceProduct.save({ session });
 
     const toBranchId = transfer.toBranch;
@@ -2300,10 +2429,7 @@ export const transferProductStock = async (req, res) => {
 
     // Decrease stock at source (warehouse or branch)
     sourceProduct.stock = Number(sourceProduct.stock) - transferQty;
-    if (Number(sourceProduct.stock) <= 0) {
-      sourceProduct.stock = 0;
-      sourceProduct.removedWhenOutOfStock = true;
-    }
+    await applyZeroStockAfterTransfer(sourceProduct);
     await sourceProduct.save({ session });
 
     // Increase stock in destination branch if same code exists there, otherwise create one.
@@ -2589,6 +2715,8 @@ export const getProductSerialTrack = async (req, res) => {
       exists: result.exists,
       status: result.status,
       product: result.product,
+      locations: result.locations || [],
+      totalStock: result.totalStock ?? result.product?.stock ?? 0,
       events: result.events,
     });
   } catch (error) {

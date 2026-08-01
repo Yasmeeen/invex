@@ -81,6 +81,22 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       code: { type: String, required: true, trim: true },
       /** When category.multiCodePerPiece and quantity > 1: one code per unit (same length as quantity). */
       unitCodes: { type: [String], default: undefined },
+      /**
+       * When multi-code units do not share the same sale/purchase/discount/attributes:
+       * one entry per unit (same length as quantity). Overrides product-level fields per code.
+       */
+      unitDetails: {
+        type: [
+          {
+            code: { type: String, required: true, trim: true },
+            price: { type: Number, required: true, min: 0 },
+            netPrice: { type: Number, required: true, min: 0 },
+            discount: { type: Number, required: false, default: 0, min: 0 },
+            attributes: { type: Object, default: {} },
+          },
+        ],
+        default: undefined,
+      },
       category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
       price: { type: Number, required: true, min: 0 },
       /** Stored as product.netPrice. */
@@ -114,6 +130,18 @@ const productPurchaseRequestSchema = new mongoose.Schema(
             name: { type: String, required: true, trim: true },
             code: { type: String, required: true, trim: true },
             unitCodes: { type: [String], default: undefined },
+            unitDetails: {
+              type: [
+                {
+                  code: { type: String, required: true, trim: true },
+                  price: { type: Number, required: true, min: 0 },
+                  netPrice: { type: Number, required: true, min: 0 },
+                  discount: { type: Number, required: false, default: 0, min: 0 },
+                  attributes: { type: Object, default: {} },
+                },
+              ],
+              default: undefined,
+            },
             category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
             price: { type: Number, required: true, min: 0 },
             netPrice: { type: Number, required: true, min: 0 },

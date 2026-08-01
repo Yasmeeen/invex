@@ -285,12 +285,41 @@ export class SerialTrackComponent implements OnInit {
   }
 
   productLocation(): string {
+    const locations = this.locationRows();
+    if (locations.length > 1) {
+      return this.translate.instant('tr_serial_track_locations_count', {
+        count: locations.length,
+      });
+    }
     const p = this.result?.product;
     if (!p) return '—';
     if (p.inWarehouse) {
       return this.translate.instant('tr_warehouse');
     }
     return p.branch?.name || '—';
+  }
+
+  totalStock(): number {
+    if (this.result?.totalStock != null) {
+      return Number(this.result.totalStock) || 0;
+    }
+    return this.locationRows().reduce((sum, row) => sum + (Number(row.stock) || 0), 0);
+  }
+
+  locationRows(): NonNullable<ProductSerialTrackResponse['locations']> {
+    const rows = this.result?.locations || [];
+    return rows.filter((row) => !row.removedWhenOutOfStock);
+  }
+
+  hasMultipleLocations(): boolean {
+    return this.locationRows().length > 1;
+  }
+
+  locationLabel(row: NonNullable<ProductSerialTrackResponse['locations']>[number]): string {
+    if (row.inWarehouse) {
+      return this.translate.instant('tr_warehouse');
+    }
+    return row.branchName || '—';
   }
 
   statusLabel(): string {

@@ -84,11 +84,20 @@ export class ProductPurchaseApprovalDialogComponent implements OnInit {
       const pp = p.productPayload;
       const branchName = p.branch?.name || '';
       const unitCodes = Array.isArray(pp.unitCodes) ? pp.unitCodes.map((x: any) => String(x ?? '').trim()).filter(Boolean) : [];
+      const unitDetails = Array.isArray(pp.unitDetails)
+        ? pp.unitDetails.map((u: any) => ({
+            code: String(u?.code ?? '').trim(),
+            price: u?.price,
+            netPrice: u?.netPrice,
+            discount: u?.discount,
+          }))
+        : [];
       return {
         product: {
           name: pp.name,
           code: pp.code,
           unitCodes,
+          unitDetails,
           price: pp.price,
           netPrice: pp.netPrice,
         },

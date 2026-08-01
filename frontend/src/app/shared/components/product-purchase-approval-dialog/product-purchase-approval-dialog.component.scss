@@ -44,3 +44,12 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
 }
+
+.unit-detail-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}

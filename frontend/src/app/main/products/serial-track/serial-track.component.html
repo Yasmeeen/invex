@@ -94,7 +94,7 @@
         </div>
         <div class="col-md-3 col-6 mb-2">
           <span class="meta-label">{{ 'tr_stock' | translate }}</span>
-          <strong>{{ isRemoved() ? 0 : result.product.stock }}</strong>
+          <strong>{{ isRemoved() ? 0 : totalStock() }}</strong>
         </div>
         <div class="col-md-3 col-6 mb-2" *ngIf="result.product.category?.name">
           <span class="meta-label">{{ 'tr_category' | translate }}</span>
@@ -124,6 +124,40 @@
         >
           <span class="meta-label">{{ attr.key }}</span>
           <strong>{{ attr.value }}</strong>
+        </div>
+      </div>
+
+      <div class="serial-track-locations mb-4" *ngIf="locationRows().length">
+        <h3 class="size-body mb-2">{{ 'tr_serial_track_stock_by_branch' | translate }}</h3>
+        <div class="table-container">
+          <table class="s-table table serial-track-locations-table">
+            <thead>
+              <tr>
+                <th>{{ 'tr_branch' | translate }}</th>
+                <th>{{ 'tr_stock' | translate }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of locationRows()">
+                <td>{{ locationLabel(row) }}</td>
+                <td>
+                  <strong>{{ row.stock }}</strong>
+                  <span
+                    class="location-stock-hint"
+                    *ngIf="row.stock === 0"
+                  >
+                    — {{ 'tr_serial_track_stock_zero_hint' | translate }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot *ngIf="hasMultipleLocations()">
+              <tr>
+                <td>{{ 'tr_serial_track_total_stock' | translate }}</td>
+                <td><strong>{{ totalStock() }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 

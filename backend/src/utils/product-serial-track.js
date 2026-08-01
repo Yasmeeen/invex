@@ -115,6 +115,45 @@ function stockStatus(product, exists) {
   return 'out_of_stock';
 }
 
+function formatLocationRow(product) {
+  const stock = Number(product.stock) || 0;
+  const removed = !!product.removedWhenOutOfStock;
+  return {
+    productId: product._id,
+    stock,
+    inWarehouse: !!product.inWarehouse,
+    branchId: product.branch?._id || product.branch || null,
+    branchName: product.inWarehouse
+      ? ''
+      : String(product.branch?.name || '').trim(),
+    removedWhenOutOfStock: removed,
+  };
+}
+
+function buildLocations(matches) {
+  const rows = (matches || []).map(formatLocationRow);
+  rows.sort((a, b) => {
+    if (!!a.removedWhenOutOfStock !== !!b.removedWhenOutOfStock) {
+      return a.removedWhenOutOfStock ? 1 : -1;
+    }
+    if (b.stock !== a.stock) return b.stock - a.stock;
+    return String(a.branchName || '').localeCompare(String(b.branchName || ''), 'ar');
+  });
+  const totalStock = rows.reduce(
+    (sum, r) => sum + (r.removedWhenOutOfStock ? 0 : r.stock),
+    0
+  );
+  return { locations: rows, totalStock };
+}
+
+function overallStockStatus(matches, exists) {
+  if (!exists || !matches?.length) return 'removed_from_stock';
+  const visible = matches.filter((p) => !p.removedWhenOutOfStock);
+  if (!visible.length) return 'removed_from_stock';
+  if (visible.some((p) => Number(p.stock) > 0)) return 'in_stock';
+  return 'out_of_stock';
+}
+
 /**
  * Resolve a unit/serial code to product details + history.
  * Works even when the product row was hard-deleted (sold / returned / manual delete).
@@ -142,19 +181,27 @@ export async function trackProductByCode(rawCode) {
     .lean();
 
   const liveMatches = (liveProducts || []).filter((p) => codeMatchesStored(p.code, code));
-  const live = pickBestCodeMatch(liveMatches, code);
+  // Prefer exact code rows for multi-branch quantity breakdown (e.g. SCREEN-002).
+  const exactMatches = liveMatches.filter(
+    (p) => normalizeCode(p.code) === normalized
+  );
+  const locationMatches = exactMatches.length ? exactMatches : liveMatches;
+  const live = pickBestCodeMatch(locationMatches, code) || pickBestCodeMatch(liveMatches, code);
 
   if (live) {
+    const { locations, totalStock } = buildLocations(locationMatches);
     // Merge history across source + destination clones so transfers keep pre-move events.
     const { events } = await buildProductHistoryEvents(live, {
-      relatedProducts: liveMatches,
-      relatedProductIds: liveMatches.map((p) => p._id),
+      relatedProducts: locationMatches,
+      relatedProductIds: locationMatches.map((p) => p._id),
     });
     return {
       ok: true,
       exists: true,
-      status: stockStatus(live, true),
-      product: formatProductPayload(live),
+      status: overallStockStatus(locationMatches, true),
+      product: formatProductPayload(live, { stock: totalStock }),
+      locations,
+      totalStock,
       events,
     };
   }
@@ -380,6 +427,8 @@ export async function trackProductByCode(rawCode) {
     product: formatProductPayload(synthetic, {
       removedFromStock: true,
     }),
+    locations: [],
+    totalStock: 0,
     events,
   };
 }

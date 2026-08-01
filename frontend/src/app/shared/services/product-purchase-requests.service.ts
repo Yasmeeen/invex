@@ -10,6 +10,15 @@ export interface PurchaseTreasurySplit {
   amount: number;
 }
 
+export interface DeskPurchaseUnitDetail {
+  code: string;
+  price: number;
+  netPrice: number;
+  discount?: number;
+  attributes?: Record<string, string>;
+  imageUrl?: string;
+}
+
 export interface DeskPurchaseProductPayload {
   name: string;
   code: string;
@@ -24,6 +33,8 @@ export interface DeskPurchaseProductPayload {
   addedBy?: string;
   /** When category uses multi-code per piece and quantity > 1 */
   unitCodes?: string[];
+  /** When units do not share price/discount/attributes — one entry per unit */
+  unitDetails?: DeskPurchaseUnitDetail[];
   acquiredFrom?: ProductAcquiredFrom | null;
 }
 

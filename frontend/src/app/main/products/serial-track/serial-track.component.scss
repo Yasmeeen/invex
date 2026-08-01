@@ -107,3 +107,21 @@
     color: #991b1b;
   }
 }
+
+.serial-track-locations {
+  .serial-track-locations-table {
+    max-width: 520px;
+  }
+
+  .location-stock-hint {
+    margin-inline-start: 6px;
+    color: #6b7280;
+    font-size: 0.85rem;
+    font-weight: 400;
+  }
+
+  tfoot td {
+    border-top: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+}

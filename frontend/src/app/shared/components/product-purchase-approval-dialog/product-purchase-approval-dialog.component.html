@@ -48,9 +48,28 @@
           <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
           <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
         </div>
-        <div class="col-12 mb-2" *ngIf="(d?.product?.unitCodes?.length ?? 0) > 1">
+        <div class="col-12 mb-2" *ngIf="(d?.product?.unitCodes?.length ?? 0) > 1 && !(d?.product?.unitDetails?.length > 1)">
           <div class="size-small text-muted">{{ 'tr_product_unit_codes_title' | translate }}</div>
           <div class="weight-bold text-break">{{ d?.product?.unitCodes?.join(', ') }}</div>
+        </div>
+        <div class="col-12 mb-2" *ngIf="(d?.product?.unitDetails?.length ?? 0) > 1">
+          <div class="size-small text-muted mb-1">{{ 'tr_product_unit_details_title' | translate }}</div>
+          <div class="size-small mb-2" *ngFor="let u of d.product.unitDetails; let i = index">
+            <div class="flex flex-middle">
+              <img
+                *ngIf="u.imageUrl"
+                [src]="u.imageUrl"
+                alt=""
+                class="unit-detail-thumb mr-2"
+              />
+              <div>
+                <span class="weight-bold">{{ u.code }}</span>
+                — {{ 'tr_sell_price' | translate }}: {{ u.price }}
+                · {{ 'tr_net_price' | translate }}: {{ u.netPrice }}
+                <ng-container *ngIf="u.discount"> · {{ 'tr_discount' | translate }}: {{ u.discount }}%</ng-container>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="col-md-6 mb-2">
           <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>

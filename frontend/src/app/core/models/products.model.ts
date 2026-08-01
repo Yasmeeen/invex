@@ -323,9 +323,20 @@ export type ProductSerialTrackStatus =
   | 'out_of_stock'
   | 'removed_from_stock';
 
+export interface ProductSerialTrackLocation {
+  productId: string;
+  stock: number;
+  inWarehouse?: boolean;
+  branchId?: string | null;
+  branchName?: string;
+  removedWhenOutOfStock?: boolean;
+}
+
 export interface ProductSerialTrackResponse extends ProductHistoryResponse {
   exists: boolean;
   status: ProductSerialTrackStatus;
+  totalStock?: number;
+  locations?: ProductSerialTrackLocation[];
   product: ProductHistoryResponse['product'] & {
     removedFromStock?: boolean;
     price?: number;

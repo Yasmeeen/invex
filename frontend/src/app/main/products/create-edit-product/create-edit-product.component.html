@@ -34,6 +34,26 @@
                     {{ 'tr_product_tab_basic' | translate }}
                   </button>
                 </li>
+                <li *ngIf="showUnitsTab">
+                  <button
+                    type="button"
+                    class="product-form-tabs__btn"
+                    [class.product-form-tabs__btn--active]="activeTab === 'units'"
+                    (click)="activeTab = 'units'"
+                  >
+                    {{ 'tr_product_tab_units' | translate }}
+                  </button>
+                </li>
+                <li *ngIf="showPaymentTab">
+                  <button
+                    type="button"
+                    class="product-form-tabs__btn"
+                    [class.product-form-tabs__btn--active]="activeTab === 'payment'"
+                    (click)="activeTab = 'payment'"
+                  >
+                    {{ 'tr_product_tab_payment' | translate }}
+                  </button>
+                </li>
                 <li>
                   <button
                     type="button"
@@ -151,60 +171,23 @@
                     </div>
                   </div>
 
-                  <!-- Product code (multi-code category + qty > 1 ⇒ one code per unit) -->
-                  <div class="col-md-12">
-                    <ng-container *ngIf="isMultiUnitMode">
-                      <input type="hidden" name="code" [(ngModel)]="codeValue" />
-                      <div class="form-group">
-                        <label>{{ 'tr_product_unit_codes_title' | translate }}</label>
-                        <p class="text-muted size-small m-0 mb-2">
-                          {{ 'tr_category_multi_code_hint' | translate }}
-                        </p>
-                        <p class="text-muted size-small m-0 mb-3">
-                          {{ 'tr_product_unit_codes_editable_hint' | translate }}
-                        </p>
-                        <div class="multi-unit-codes__list">
-                          <div
-                            class="form-group multi-unit-codes__row"
-                            *ngFor="let _u of multiUnitCodes; let i = index; trackBy: trackByUnitIndex"
-                          >
-                            <label class="size-small steel m-0 mb-1">{{
-                              'tr_product_unit_code_piece' | translate: { n: i + 1 }
-                            }}</label>
-                            <input
-                              type="text"
-                              class="s-control"
-                              [(ngModel)]="multiUnitCodes[i]"
-                              [ngModelOptions]="{ standalone: true }"
-                              [readonly]="!isProductCodeEnabled"
-                              [attr.placeholder]="'tr_product_code_placeholder' | translate"
-                              (blur)="onMultiUnitCodeBlur(i)"
-                            />
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          class="s-btn btn-secondary mt-2"
-                          [disabled]="!isProductCodeEnabled"
-                          (click)="refreshMultiUnitCodes(true)"
-                        >
-                          {{ 'tr_product_regenerate_unit_codes' | translate }}
-                        </button>
-                      </div>
-                    </ng-container>
+                  <!-- Create: device data lives on tab 2. Edit: keep full form here. -->
+                  <div class="col-md-12" *ngIf="!isEdit">
+                    <div class="form-group multi-unit-tab-hint">
+                      <p class="text-muted size-small m-0">
+                        {{ 'tr_product_tab_units_hint' | translate }}
+                      </p>
+                    </div>
+                  </div>
 
+                  <ng-container *ngIf="isEdit">
+                  <!-- Product code (edit) -->
+                  <div class="col-md-12">
                     <div
-                      *ngIf="!isMultiUnitMode"
                       class="form-group"
                       [class.has-error]="code.invalid && basicInfoForm.submitted"
                     >
                       <label>{{ 'tr_code' | translate }}</label>
-                      <p
-                        class="text-muted size-small m-0 mb-2"
-                        *ngIf="!isEdit && !isProductCodeEnabled"
-                      >
-                        {{ 'tr_select_category_first_code' | translate }}
-                      </p>
                       <div class="code-scan-container">
                         <input
                           type="text"
@@ -251,9 +234,7 @@
                     </div>
                   </div>
 
-                  <!-- Price -->
                   <div class="col-md-6">
-        
                     <div
                       class="form-group"
                       [class.has-error]="price.invalid && basicInfoForm.submitted"
@@ -313,7 +294,6 @@
                     </div>
                   </div>
 
-                  <!-- Discount -->
                   <div class="col-md-6">
                     <div
                       class="form-group"
@@ -330,6 +310,7 @@
                       />
                     </div>
                   </div>
+                  </ng-container>
 
                   <div class="col-md-6">
                     <div class="form-group">
@@ -344,7 +325,7 @@
                     </div>
                   </div>
 
-                  <!-- Product image (Cloudinary) -->
+                  <ng-container *ngIf="isEdit">
                   <div class="col-md-12">
                     <div class="form-group product-image-field">
                       <label>{{ 'tr_product_image' | translate }}</label>
@@ -367,7 +348,7 @@
                         </div>
                         <div class="product-image-actions">
                           <input
-                            id="product-image-file-input"
+                            id="product-image-file-input-edit"
                             type="file"
                             accept="image/*"
                             class="product-image-file-input"
@@ -376,7 +357,7 @@
                             hidden
                           />
                           <label
-                            for="product-image-file-input"
+                            for="product-image-file-input-edit"
                             class="s-btn btn-secondary product-image-upload-label mb-0"
                             [class.disabled]="isUploadingImage || !isCloudinaryConfigured()"
                           >
@@ -387,6 +368,7 @@
                       </div>
                     </div>
                   </div>
+                  </ng-container>
 
                   <div class="col-md-12" *ngIf="isBranchManagerNewProduct">
                     <p class="text-muted size-small m-0">
@@ -402,7 +384,530 @@
                     </p>
                   </div>
 
-                  <div class="col-md-12 mt-4 desk-treasury-splits" *ngIf="cashDeskPurchase && !data?.exchangeFlow">
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
+                    <div class="form-group">
+                      <label>{{ 'tr_product_storage' | translate }}</label>
+                      <div class="storage-choice">
+                        <label class="storage-option">
+                          <input
+                            type="radio"
+                            name="storageMode"
+                            [checked]="!storeInWarehouse"
+                            (change)="setStorageMode(false)"
+                          />
+                          <span>{{ 'tr_storage_branch' | translate }}</span>
+                        </label>
+                        <label class="storage-option">
+                          <input
+                            type="radio"
+                            name="storageMode"
+                            [checked]="storeInWarehouse"
+                            (change)="setStorageMode(true)"
+                          />
+                          <span>{{ 'tr_warehouse' | translate }}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Branch -->
+                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse && !cashDeskPurchase">
+                    <div
+                      class="form-group"
+                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_branch' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          placeholder="{{ 'tr_select' | translate }}"
+                          bindLabel="name"
+                          [clearable]="false"
+                          appendTo="#create-edit-product-modal-root"
+                          ngModel
+                          #branch="ngModel"
+                          name="branch"
+                          [items]="branches"
+                          [required]="!storeInWarehouse"
+                        ></ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="branch.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_branch_required' | translate }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-12" *ngIf="isEdit && categoryAttributeDefs?.length">
+                    <div class="border-top pt-3 mt-3">
+                      <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
+                      <div class="row">
+                        <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
+                          <div class="form-group" [class.has-error]="isAttributeMissing(d.key)">
+                            <label>{{ d.label }} *</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="attributeValues[d.key]"
+                              [ngModelOptions]="{ standalone: true }"
+                              required
+                              autocomplete="off"
+                            />
+                            <span
+                              class="text-error size-small validator"
+                              *ngIf="isAttributeMissing(d.key)"
+                            >
+                              {{ 'tr_category_attribute_required' | translate: { label: d.label } }}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+
+                <div class="row" [hidden]="activeTab !== 'units'">
+                  <div class="col-md-12" *ngIf="!isEdit">
+                    <!-- Single-unit code -->
+                    <div
+                      *ngIf="!isMultiUnitMode"
+                      class="form-group"
+                      [class.has-error]="code.invalid && basicInfoForm.submitted"
+                    >
+                      <label>{{ 'tr_code' | translate }}</label>
+                      <p
+                        class="text-muted size-small m-0 mb-2"
+                        *ngIf="!isProductCodeEnabled"
+                      >
+                        {{ 'tr_select_category_first_code' | translate }}
+                      </p>
+                      <div class="code-scan-container">
+                        <input
+                          type="text"
+                          name="code"
+                          [(ngModel)]="codeValue"
+                          [readonly]="!isProductCodeEnabled"
+                          [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                          (blur)="enforceProductCodePrefix()"
+                          #code="ngModel"
+                          required
+                          class="s-control"
+                          [class.code-field-readonly]="!isProductCodeEnabled"
+                        />
+                        <button
+                          type="button"
+                          class="scan-btn"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="toggleCamera()"
+                        >
+                          <i class="fa fa-camera" aria-hidden="true"></i>
+                          {{ 'tr_product_scan_qr' | translate }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary ml-2"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="generateBarcode()"
+                        >
+                          {{ 'tr_product_generate_barcode' | translate }}
+                        </button>
+                      </div>
+
+                      <div *ngIf="isCameraActive" class="camera-overlay">
+                        <video id="video" width="300" height="300"></video>
+                      </div>
+
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="code.invalid && basicInfoForm.submitted"
+                      >
+                        {{ 'tr_code_required' | translate }}
+                      </span>
+                    </div>
+
+                    <ng-container *ngIf="isMultiUnitMode">
+                      <input type="hidden" name="code" [(ngModel)]="codeValue" />
+
+                      <div class="form-group multi-unit-same-data">
+                        <label class="mb-2">{{ 'tr_product_units_same_data_question' | translate }}</label>
+                        <p class="text-muted size-small m-0 mb-2">
+                          {{ 'tr_product_units_same_data_hint' | translate }}
+                        </p>
+                        <div class="party-type-toggle">
+                          <label class="mr-3">
+                            <input
+                              type="radio"
+                              name="unitsShareSameData"
+                              [checked]="unitsShareSameData === true"
+                              (change)="onUnitsShareSameDataChange(true)"
+                            />
+                            {{ 'tr_product_units_same_data_yes' | translate }}
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name="unitsShareSameData"
+                              [checked]="unitsShareSameData === false"
+                              (change)="onUnitsShareSameDataChange(false)"
+                            />
+                            {{ 'tr_product_units_same_data_no' | translate }}
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="form-group" *ngIf="!isPerUnitVariantMode">
+                        <label>{{ 'tr_product_unit_codes_title' | translate }}</label>
+                        <p class="text-muted size-small m-0 mb-2">
+                          {{ 'tr_category_multi_code_hint' | translate }}
+                        </p>
+                        <p class="text-muted size-small m-0 mb-3">
+                          {{ 'tr_product_unit_codes_editable_hint' | translate }}
+                        </p>
+                        <div class="multi-unit-codes__list">
+                          <div
+                            class="form-group multi-unit-codes__row"
+                            *ngFor="let _u of multiUnitCodes; let i = index; trackBy: trackByUnitIndex"
+                          >
+                            <label class="size-small steel m-0 mb-1">{{
+                              'tr_product_unit_code_piece' | translate: { n: i + 1 }
+                            }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="multiUnitCodes[i]"
+                              [ngModelOptions]="{ standalone: true }"
+                              [readonly]="!isProductCodeEnabled"
+                              [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                              (blur)="onMultiUnitCodeBlur(i)"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary mt-2"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="refreshMultiUnitCodes(true)"
+                        >
+                          {{ 'tr_product_regenerate_unit_codes' | translate }}
+                        </button>
+                      </div>
+
+                      <div class="form-group" *ngIf="isPerUnitVariantMode">
+                        <label class="checkbox-row m-0 mb-3">
+                          <input
+                            type="checkbox"
+                            name="showPriceOnBarcode"
+                            [(ngModel)]="showPriceOnBarcode"
+                          />
+                          <span>{{ 'tr_product_show_price_on_barcode' | translate }}</span>
+                        </label>
+                        <label>{{ 'tr_product_unit_details_title' | translate }}</label>
+                        <p class="text-muted size-small m-0 mb-3">
+                          {{ 'tr_product_unit_details_hint' | translate }}
+                        </p>
+                        <div class="multi-unit-details__list">
+                          <div
+                            class="multi-unit-details__card"
+                            *ngFor="let _u of multiUnitCodes; let i = index; trackBy: trackByUnitIndex"
+                          >
+                            <div class="multi-unit-details__card-head">
+                              <strong>{{ 'tr_product_unit_code_piece' | translate: { n: i + 1 } }}</strong>
+                              <button
+                                *ngIf="i > 0"
+                                type="button"
+                                class="s-btn btn-secondary size-small"
+                                (click)="copyUnitVariantFromPrevious(i)"
+                              >
+                                {{ 'tr_product_unit_copy_previous' | translate }}
+                              </button>
+                            </div>
+                            <div class="row" *ngIf="multiUnitVariants[i]">
+                              <div class="col-md-12">
+                                <div class="form-group">
+                                  <label class="size-small">{{ 'tr_code' | translate }}</label>
+                                  <input
+                                    type="text"
+                                    class="s-control"
+                                    [(ngModel)]="multiUnitCodes[i]"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    [readonly]="!isProductCodeEnabled"
+                                    [attr.placeholder]="'tr_product_code_placeholder' | translate"
+                                    (blur)="onMultiUnitCodeBlur(i)"
+                                  />
+                                </div>
+                              </div>
+                              <div class="col-md-6">
+                                <div class="form-group">
+                                  <label class="size-small">{{ 'tr_sell_price' | translate }} *</label>
+                                  <input
+                                    type="number"
+                                    class="s-control"
+                                    [(ngModel)]="multiUnitVariants[i].price"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (ngModelChange)="onUnitVariantCostChanged()"
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <div class="col-md-6">
+                                <div class="form-group">
+                                  <label class="size-small">{{ 'tr_net_price' | translate }}</label>
+                                  <input
+                                    type="number"
+                                    class="s-control"
+                                    [(ngModel)]="multiUnitVariants[i].netPrice"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    (ngModelChange)="onUnitVariantCostChanged()"
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <div class="col-md-6">
+                                <div class="form-group">
+                                  <label class="size-small">{{ 'tr_discount' | translate }}</label>
+                                  <input
+                                    type="number"
+                                    class="s-control"
+                                    [(ngModel)]="multiUnitVariants[i].discount"
+                                    [ngModelOptions]="{ standalone: true }"
+                                    min="0"
+                                    max="100"
+                                  />
+                                </div>
+                              </div>
+                              <div class="col-md-12">
+                                <div class="form-group product-image-field">
+                                  <label class="size-small">{{ 'tr_product_image' | translate }}</label>
+                                  <div class="product-image-row">
+                                    <div class="product-image-preview" *ngIf="multiUnitVariants[i].imageUrl">
+                                      <img [src]="multiUnitVariants[i].imageUrl" alt="" />
+                                      <button
+                                        type="button"
+                                        class="s-btn btn-secondary size-small product-image-remove"
+                                        (click)="clearUnitProductImage(i)"
+                                      >
+                                        {{ 'tr_remove_logo' | translate }}
+                                      </button>
+                                    </div>
+                                    <div class="product-image-placeholder" *ngIf="!multiUnitVariants[i].imageUrl">
+                                      <i class="fa fa-picture-o" aria-hidden="true"></i>
+                                    </div>
+                                    <div class="product-image-actions">
+                                      <input
+                                        [attr.id]="'product-unit-image-file-input-' + i"
+                                        type="file"
+                                        accept="image/*"
+                                        class="product-image-file-input"
+                                        [disabled]="isUploadingUnitImage(i) || !isCloudinaryConfigured()"
+                                        (change)="onUnitProductImageSelected(i, $event)"
+                                        hidden
+                                      />
+                                      <label
+                                        [attr.for]="'product-unit-image-file-input-' + i"
+                                        class="s-btn btn-secondary product-image-upload-label mb-0"
+                                        [class.disabled]="isUploadingUnitImage(i) || !isCloudinaryConfigured()"
+                                      >
+                                        <span *ngIf="!isUploadingUnitImage(i)">{{ 'tr_choose_image' | translate }}</span>
+                                        <span *ngIf="isUploadingUnitImage(i)">{{ 'tr_image_uploading' | translate }}</span>
+                                      </label>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <ng-container *ngIf="categoryAttributeDefs?.length && multiUnitVariants[i]">
+                                <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
+                                  <div class="form-group" [class.has-error]="isUnitAttributeMissing(i, d.key)">
+                                    <label class="size-small">{{ d.label }} *</label>
+                                    <input
+                                      type="text"
+                                      class="s-control"
+                                      [(ngModel)]="multiUnitVariants[i].attributes[d.key]"
+                                      [ngModelOptions]="{ standalone: true }"
+                                      required
+                                      autocomplete="off"
+                                    />
+                                    <span
+                                      class="text-error size-small validator"
+                                      *ngIf="isUnitAttributeMissing(i, d.key)"
+                                    >
+                                      {{ 'tr_category_attribute_required' | translate: { label: d.label } }}
+                                    </span>
+                                  </div>
+                                </div>
+                              </ng-container>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary mt-2"
+                          [disabled]="!isProductCodeEnabled"
+                          (click)="refreshMultiUnitCodes(true)"
+                        >
+                          {{ 'tr_product_regenerate_unit_codes' | translate }}
+                        </button>
+                      </div>
+                    </ng-container>
+
+                    <!-- Shared device data (qty 1 or multi same-data) -->
+                    <div class="row" *ngIf="!isPerUnitVariantMode">
+                      <div class="col-md-12 mt-2 mb-2" *ngIf="isMultiUnitMode">
+                        <h4 class="m-0">{{ 'tr_product_tab_units_shared_data' | translate }}</h4>
+                        <p class="text-muted size-small m-0 mt-1">{{ 'tr_product_tab_units_shared_data_hint' | translate }}</p>
+                      </div>
+                      <div class="col-md-6">
+                        <div
+                          class="form-group"
+                          [class.has-error]="price.invalid && basicInfoForm.submitted"
+                        >
+                          <label>{{ 'tr_sell_price' | translate }}</label>
+                          <input
+                            type="number"
+                            class="s-control"
+                            name="price"
+                            #price="ngModel"
+                            ngModel
+                            required
+                          />
+                          <span
+                            class="text-error size-small validator"
+                            *ngIf="price.invalid && basicInfoForm.submitted"
+                          >
+                            {{ 'tr_price_required' | translate }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="form-group">
+                          <label class="checkbox-row m-0 mt-4 pt-2">
+                            <input
+                              type="checkbox"
+                              name="showPriceOnBarcode"
+                              [(ngModel)]="showPriceOnBarcode"
+                            />
+                            <span>{{ 'tr_product_show_price_on_barcode' | translate }}</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div
+                          class="form-group"
+                          [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
+                        >
+                          <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ 'tr_net_price_optional' | translate }}</span></label>
+                          <input
+                            type="number"
+                            class="s-control"
+                            name="netPrice"
+                            #netPrice="ngModel"
+                            ngModel
+                            min="0"
+                            (ngModelChange)="onDeskTreasuryCostInputsChanged()"
+                          />
+                          <span
+                            class="text-error size-small validator"
+                            *ngIf="netPrice.invalid && basicInfoForm.submitted && netPrice.errors?.min"
+                          >
+                            {{ 'tr_net_price_invalid' | translate }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div
+                          class="form-group"
+                          [class.has-error]="discount.invalid && basicInfoForm.submitted"
+                        >
+                          <label>{{ 'tr_discount' | translate }}</label>
+                          <input
+                            type="number"
+                            class="s-control"
+                            name="discount"
+                            placeholder="{{ 'tr_discount_percentage' | translate }}"
+                            #discount="ngModel"
+                            ngModel
+                          />
+                        </div>
+                      </div>
+                      <div class="col-md-12">
+                        <div class="form-group product-image-field">
+                          <label>{{ 'tr_product_image' | translate }}</label>
+                          <p class="text-muted size-small m-0 mb-2" *ngIf="!isCloudinaryConfigured()">
+                            {{ 'tr_cloudinary_not_configured' | translate }}
+                          </p>
+                          <div class="product-image-row">
+                            <div class="product-image-preview" *ngIf="productImageUrl">
+                              <img [src]="productImageUrl" alt="" />
+                              <button
+                                type="button"
+                                class="s-btn btn-secondary size-small product-image-remove"
+                                (click)="clearProductImage()"
+                              >
+                                {{ 'tr_remove_logo' | translate }}
+                              </button>
+                            </div>
+                            <div class="product-image-placeholder" *ngIf="!productImageUrl">
+                              <i class="fa fa-picture-o" aria-hidden="true"></i>
+                            </div>
+                            <div class="product-image-actions">
+                              <input
+                                id="product-image-file-input"
+                                type="file"
+                                accept="image/*"
+                                class="product-image-file-input"
+                                [disabled]="isUploadingImage || !isCloudinaryConfigured()"
+                                (change)="onProductImageSelected($event)"
+                                hidden
+                              />
+                              <label
+                                for="product-image-file-input"
+                                class="s-btn btn-secondary product-image-upload-label mb-0"
+                                [class.disabled]="isUploadingImage || !isCloudinaryConfigured()"
+                              >
+                                <span *ngIf="!isUploadingImage">{{ 'tr_choose_image' | translate }}</span>
+                                <span *ngIf="isUploadingImage">{{ 'tr_image_uploading' | translate }}</span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
+                        <div class="border-top pt-3 mt-2">
+                          <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
+                          <div class="row">
+                            <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
+                              <div class="form-group" [class.has-error]="isAttributeMissing(d.key)">
+                                <label>{{ d.label }} *</label>
+                                <input
+                                  type="text"
+                                  class="s-control"
+                                  [(ngModel)]="attributeValues[d.key]"
+                                  [ngModelOptions]="{ standalone: true }"
+                                  required
+                                  autocomplete="off"
+                                />
+                                <span
+                                  class="text-error size-small validator"
+                                  *ngIf="isAttributeMissing(d.key)"
+                                >
+                                  {{ 'tr_category_attribute_required' | translate: { label: d.label } }}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row" [hidden]="activeTab !== 'payment'">
+                  <div class="col-md-12 desk-treasury-splits">
                     <div class="form-group">
                       <label>{{ 'tr_purchase_treasury_method_multi' | translate }}</label>
                       <div class="input-with-icon bg-white">
@@ -486,86 +991,7 @@
                     </p>
                   </div>
 
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !cashDeskPurchase">
-                    <div class="form-group">
-                      <label>{{ 'tr_product_storage' | translate }}</label>
-                      <div class="storage-choice">
-                        <label class="storage-option">
-                          <input
-                            type="radio"
-                            name="storageMode"
-                            [checked]="!storeInWarehouse"
-                            (change)="setStorageMode(false)"
-                          />
-                          <span>{{ 'tr_storage_branch' | translate }}</span>
-                        </label>
-                        <label class="storage-option">
-                          <input
-                            type="radio"
-                            name="storageMode"
-                            [checked]="storeInWarehouse"
-                            (change)="setStorageMode(true)"
-                          />
-                          <span>{{ 'tr_warehouse' | translate }}</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Branch -->
-                  <div class="col-md-6" *ngIf="!isBranchManagerNewProduct && !storeInWarehouse && !cashDeskPurchase">
-                    <div
-                      class="form-group"
-                      [class.has-error]="branch.invalid && basicInfoForm.submitted"
-                    >
-                      <label>{{ 'tr_branch' | translate }}</label>
-                      <div class="input-with-icon bg-white">
-                        <ng-select
-                          class="s-control s-select"
-                          placeholder="{{ 'tr_select' | translate }}"
-                          bindLabel="name"
-                          [clearable]="false"
-                          appendTo="#create-edit-product-modal-root"
-                          ngModel
-                          #branch="ngModel"
-                          name="branch"
-                          [items]="branches"
-                          [required]="!storeInWarehouse"
-                        ></ng-select>
-                        <i class="fa fa-caret-down input-icon"></i>
-                      </div>
-                      <span
-                        class="text-error size-small validator"
-                        *ngIf="branch.invalid && basicInfoForm.submitted"
-                      >
-                        {{ 'tr_branch_required' | translate }}
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- Dynamic category attributes (last; two fields per row) -->
-                  <div class="col-md-12" *ngIf="categoryAttributeDefs?.length">
-                    <div class="border-top pt-3 mt-3">
-                      <h4 class="m-0 mb-3">{{ 'tr_category_attributes' | translate }}</h4>
-                      <div class="row">
-                        <div class="col-md-6" *ngFor="let d of categoryAttributeDefs">
-                          <div class="form-group">
-                            <label>{{ d.label }}</label>
-                            <input
-                              type="text"
-                              class="s-control"
-                              [(ngModel)]="attributeValues[d.key]"
-                              [ngModelOptions]="{ standalone: true }"
-                              autocomplete="off"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                 </div>
-
                 <div class="row" [hidden]="activeTab !== 'extra'">
                   <div class="col-md-12">
                     <div class="party-type-toggle mb-3">
@@ -690,7 +1116,7 @@
           (click)="submitForm()"
           class="s-btn btn-primary"
           type="submit"
-          [disabled]="isUploadingImage || isSubmitting"
+          [disabled]="isUploadingImage || uploadingUnitImageIndex !== null || isSubmitting"
         >
           {{ cashDeskPurchase ? ('tr_product_purchase_submit' | translate) : ('tr_save' | translate) }}
         </button>

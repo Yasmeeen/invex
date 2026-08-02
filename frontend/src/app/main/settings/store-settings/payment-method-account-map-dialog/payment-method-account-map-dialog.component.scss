@@ -1,33 +1,15 @@
 @import '../settings-dialog-shared.scss';
 
-.payment-account-map-table__head,
-.payment-account-map-table__row {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
+.payment-account-map-table__head--wide,
+.payment-account-map-table__row--wide {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(110px, 1fr) minmax(110px, 1.1fr) minmax(110px, 1.1fr);
+  gap: 0.5rem;
   align-items: center;
-  gap: 0.75rem;
   width: 100%;
 }
 
 .payment-account-map-table__method {
-  flex: 0 0 9rem;
-  width: 9rem;
   font-size: 0.9rem;
-  min-width: 0;
-}
-
-.payment-account-map-table__row > .s-control {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.payment-account-map-table__head > span:nth-child(1) {
-  flex: 0 0 9rem;
-  width: 9rem;
-}
-
-.payment-account-map-table__head > span:nth-child(2) {
-  flex: 1 1 auto;
   min-width: 0;
 }

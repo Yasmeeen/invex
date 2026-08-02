@@ -13,6 +13,8 @@ export interface TreasuryTransferDialogData {
   branchId: string;
   accounts?: MoneyAccountBalance[];
   isSettlement?: boolean;
+  /** Amount-only settle using linked bank from payment map. */
+  quickSettle?: boolean;
   preferFrom?: string;
 }
 
@@ -28,6 +30,7 @@ export class TreasuryTransferDialogComponent implements OnInit {
   note = '';
   saving = false;
   accountOptions: { key: string; label: string; kind: string }[] = [];
+  linkedBankLabel = '';
 
   constructor(
     private dialogRef: MatDialogRef<TreasuryTransferDialogComponent>,
@@ -69,26 +72,84 @@ export class TreasuryTransferDialogComponent implements OnInit {
     if (this.data.preferFrom) {
       this.fromAccountKey = this.data.preferFrom;
     }
+
+    if (this.data.quickSettle) {
+      const map = this.storeSettings.snapshot.paymentMethodAccountMap || [];
+      const row = map.find(
+        (r) => r.accountKey === this.fromAccountKey && r.mode === 'settlement' && r.settlementBankAccountKey
+      );
+      const bankKey = row?.settlementBankAccountKey || '';
+      const bank = this.accountOptions.find((a) => a.key === bankKey) ||
+        money.find((a) => a.key === bankKey);
+      this.linkedBankLabel = bank?.label || bankKey || this.translate.instant('tr_payment_settlement_bank_none');
+      this.toAccountKey = bankKey;
+      return;
+    }
+
     if (this.data.isSettlement && !this.toAccountKey) {
-      const bank = this.accountOptions.find((a) => a.kind === 'treasury' && a.key !== 'cash');
-      if (bank) this.toAccountKey = bank.key;
+      const map = this.storeSettings.snapshot.paymentMethodAccountMap || [];
+      const row = map.find(
+        (r) =>
+          r.accountKey === this.fromAccountKey &&
+          r.mode === 'settlement' &&
+          r.settlementBankAccountKey
+      );
+      if (row?.settlementBankAccountKey) {
+        this.toAccountKey = row.settlementBankAccountKey;
+      } else {
+        const bank = this.accountOptions.find((a) => a.kind === 'treasury' && a.key !== 'cash');
+        if (bank) this.toAccountKey = bank.key;
+      }
     }
   }
 
   get titleKey(): string {
+    if (this.data.quickSettle) return 'tr_treasury_quick_settle';
     return this.data.isSettlement ? 'tr_treasury_settlement' : 'tr_treasury_transfer';
+  }
+
+  get isQuickSettle(): boolean {
+    return !!this.data.quickSettle;
   }
 
   submit(): void {
     const uid = this.globals.currentUser?._id;
     const amt = Number(this.amount);
     if (!uid || !this.data.branchId) return;
-    if (!this.fromAccountKey || !this.toAccountKey || this.fromAccountKey === this.toAccountKey) {
-      this.notify.push(this.translate.instant('tr_treasury_transfer_accounts_invalid'), 'error');
-      return;
-    }
     if (!Number.isFinite(amt) || amt <= 0) {
       this.notify.push(this.translate.instant('tr_treasury_amount_invalid'), 'error');
+      return;
+    }
+
+    if (this.data.quickSettle) {
+      if (!this.fromAccountKey) return;
+      this.saving = true;
+      this.treasury
+        .settleAccount(this.fromAccountKey, {
+          userId: uid,
+          branch: this.data.branchId,
+          amount: amt,
+          note: this.note,
+        })
+        .subscribe({
+          next: () => {
+            this.saving = false;
+            this.notify.push(this.translate.instant('tr_treasury_transfer_success'), 'success');
+            this.dialogRef.close(true);
+          },
+          error: (err) => {
+            this.saving = false;
+            this.notify.push(
+              err?.error?.error || this.translate.instant('tr_unexpected_error_message'),
+              'error'
+            );
+          },
+        });
+      return;
+    }
+
+    if (!this.fromAccountKey || !this.toAccountKey || this.fromAccountKey === this.toAccountKey) {
+      this.notify.push(this.translate.instant('tr_treasury_transfer_accounts_invalid'), 'error');
       return;
     }
     this.saving = true;

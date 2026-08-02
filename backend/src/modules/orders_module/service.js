@@ -862,6 +862,7 @@ export const createOrder = async (req, res) => {
       module: 'orders',
       entityType: 'Order',
       entityId: newOrder?._id,
+      entityLabel: newOrder?.orderNumber != null ? `#${newOrder.orderNumber}` : undefined,
       message: `Order created #${newOrder?.orderNumber ?? ''}`.trim(),
       metadata: {
         orderNumber: newOrder?.orderNumber,
@@ -1081,8 +1082,16 @@ export const addOrderPayment = async (req, res) => {
       module: 'orders',
       entityType: 'Order',
       entityId: order._id,
+      entityLabel: order?.orderNumber != null ? `#${order.orderNumber}` : undefined,
       message: `Order payment ${applied}`,
-      metadata: { amount: applied, amountPaid: order.amountPaid, totalPrice: total },
+      metadata: {
+        orderNumber: order?.orderNumber,
+        amount: applied,
+        amountPaid: order.amountPaid,
+        totalPrice: total,
+        status: order?.status,
+        paymentStatus: order?.paymentStatus,
+      },
     });
 
     res.json({ message: '✅ Payment added', order });
@@ -1214,6 +1223,7 @@ export const restoreOrder = async (req, res) => {
       module: 'orders',
       entityType: 'Order',
       entityId: updated?._id,
+      entityLabel: updated?.orderNumber != null ? `#${updated.orderNumber}` : undefined,
       message: `Order return #${updated?.orderNumber ?? ''}`.trim(),
       metadata: {
         orderNumber: updated?.orderNumber,
@@ -1255,8 +1265,13 @@ export const deleteOrder = async (req, res) => {
       module: 'orders',
       entityType: 'Order',
       entityId: deletedOrder?._id,
+      entityLabel: deletedOrder?.orderNumber != null ? `#${deletedOrder.orderNumber}` : undefined,
       message: `Order deleted #${deletedOrder?.orderNumber ?? ''}`.trim(),
-      metadata: { orderNumber: deletedOrder?.orderNumber, branch: deletedOrder?.branch },
+      metadata: {
+        orderNumber: deletedOrder?.orderNumber,
+        branch: deletedOrder?.branch,
+        status: deletedOrder?.status,
+      },
       before: {
         orderNumber: deletedOrder?.orderNumber,
         totalPrice: deletedOrder?.totalPrice,

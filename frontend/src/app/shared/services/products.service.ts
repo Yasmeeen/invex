@@ -167,8 +167,10 @@ updateProduct(product: Product, productId: string): Observable<Product> {
   );
 }
 
-deleteProduct(productId: string) {
-  return this.http.delete( PRODUCT_DELETE_PRODUCT_URL + '/' + productId).pipe(
+deleteProduct(productId: string, userId?: string) {
+  const params: Record<string, string> = {};
+  if (userId) params.userId = String(userId);
+  return this.http.delete( PRODUCT_DELETE_PRODUCT_URL + '/' + productId, { params }).pipe(
     tap({
       error: (errorResponse: Error) => {
         this.appNotificationService.push('Delete Product Failed', 'error');

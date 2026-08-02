@@ -6,17 +6,24 @@ import { Observable } from 'rxjs';
 export type AuditLogRow = {
   _id: string;
   createdAt: string;
+  actorUserId?: string;
   actorName?: string;
   actorRole?: string;
   action: string;
   module?: string;
   entityType?: string;
   entityId?: string;
+  entityLabel?: string;
   path?: string;
   method?: string;
   statusCode?: number;
+  businessStatus?: string;
+  httpStatusKey?: string;
   ip?: string;
   message?: string;
+  metadata?: Record<string, unknown>;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
 };
 
 export type AuditLogsResponse = {
@@ -32,4 +39,3 @@ export class AuditsService {
     return this.http.get<AuditLogsResponse>(AUDITS_URL, { params });
   }
 }
-

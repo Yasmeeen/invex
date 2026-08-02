@@ -1,11 +1,12 @@
 import { Component, OnInit, Optional } from '@angular/core';
 import { MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
-import { PAYMENT_METHOD_OPTIONS } from '@shared/constants/payment-method-options';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import {
   MoneyAccount,
   PaymentMethodAccountMapRow,
+  PaymentMethodCatalogRow,
+  PaymentMethodMapMode,
   StoreSettingsService,
 } from '@shared/services/store-settings.service';
 
@@ -13,6 +14,9 @@ interface MapUiRow {
   method: string;
   label: string;
   accountKey: string;
+  mode: PaymentMethodMapMode;
+  settlementBankAccountKey: string;
+  effectMode: string;
 }
 
 @Component({
@@ -23,6 +27,7 @@ interface MapUiRow {
 export class PaymentMethodAccountMapDialogComponent implements OnInit {
   rows: MapUiRow[] = [];
   accounts: MoneyAccount[] = [];
+  bankAccounts: MoneyAccount[] = [];
   saving = false;
 
   constructor(
@@ -40,19 +45,43 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
     this.accounts = this.storeSettingsService.snapshot.moneyAccounts?.length
       ? [...this.storeSettingsService.snapshot.moneyAccounts]
       : [{ key: 'cash', label: 'Cash', kind: 'cash' }];
+    this.bankAccounts = this.accounts.filter((a) => a.kind === 'treasury' || a.kind === 'cash');
 
     const saved = this.storeSettingsService.snapshot.paymentMethodAccountMap || [];
-    const savedMap = new Map(saved.map((r) => [r.method, r.accountKey]));
+    const savedMap = new Map(saved.map((r) => [r.method, r]));
 
-    const methods = PAYMENT_METHOD_OPTIONS.filter(
-      (m) => m.id !== 'mixed' && m.id !== 'credit'
+    const catalog = (this.storeSettingsService.snapshot.paymentMethodsCatalog || []).filter(
+      (m) => m.key !== 'mixed' && m.key !== 'credit' && m.effectMode !== 'none'
     );
 
-    this.rows = methods.map((m) => ({
-      method: m.id,
-      label: this.translate.instant(m.labelKey),
-      accountKey: savedMap.get(m.id) || (m.id === 'cash' ? 'cash' : ''),
-    }));
+    const methods: PaymentMethodCatalogRow[] = catalog.length
+      ? catalog
+      : [{ key: 'cash', label: 'Cash', showIn: 'both', effectMode: 'instant', feePercent: 0 }];
+
+    this.rows = methods.map((m) => {
+      const prev = savedMap.get(m.key);
+      const defaultMode: PaymentMethodMapMode =
+        m.effectMode === 'settlement' || prev?.mode === 'settlement' ? 'settlement' : 'instant';
+      return {
+        method: m.key,
+        label: m.label || m.key,
+        accountKey: prev?.accountKey || (m.key === 'cash' ? 'cash' : ''),
+        mode: m.key === 'cash' ? 'instant' : defaultMode,
+        settlementBankAccountKey: prev?.settlementBankAccountKey || '',
+        effectMode: m.effectMode,
+      };
+    });
+  }
+
+  onModeChange(row: MapUiRow): void {
+    if (row.method === 'cash') {
+      row.mode = 'instant';
+      row.settlementBankAccountKey = '';
+      return;
+    }
+    if (row.mode !== 'settlement') {
+      row.settlementBankAccountKey = '';
+    }
   }
 
   cancel(): void {
@@ -65,6 +94,9 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
       .map((r) => ({
         method: r.method,
         accountKey: r.method === 'cash' ? 'cash' : r.accountKey,
+        mode: r.method === 'cash' ? 'instant' : r.mode,
+        settlementBankAccountKey:
+          r.mode === 'settlement' ? r.settlementBankAccountKey || '' : '',
       }));
     this.saving = true;
     this.storeSettingsService.update({ paymentMethodAccountMap }).subscribe({

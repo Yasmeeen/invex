@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogModule } from '@angular/material/dialog';
 import { SharedModule } from '@shared/shared.module';
 import { PurchaseTreasuryDialogModule } from '../settings/store-settings/purchase-treasury-dialog/purchase-treasury-dialog.module';
-import { SettlementAccountsDialogModule } from '../settings/store-settings/settlement-accounts-dialog/settlement-accounts-dialog.module';
+import { PaymentAppFeesDialogModule } from '../settings/store-settings/payment-app-fees-dialog/payment-app-fees-dialog.module';
 import { PaymentMethodAccountMapDialogModule } from '../settings/store-settings/payment-method-account-map-dialog/payment-method-account-map-dialog.module';
 import { TreasuryAccountsListComponent } from './treasury-accounts-list/treasury-accounts-list.component';
 import { TreasuryAccountDetailComponent } from './treasury-account-detail/treasury-account-detail.component';
@@ -21,9 +21,9 @@ const routes: Routes = [
     data: { mode: 'treasuries' },
   },
   {
-    path: 'config/settlement',
+    path: 'config/payment-methods',
     component: TreasuryConfigPageComponent,
-    data: { mode: 'settlement' },
+    data: { mode: 'payment-methods' },
   },
   {
     path: 'config/payment-map',
@@ -47,7 +47,7 @@ const routes: Routes = [
     SharedModule,
     MatDialogModule,
     PurchaseTreasuryDialogModule,
-    SettlementAccountsDialogModule,
+    PaymentAppFeesDialogModule,
     PaymentMethodAccountMapDialogModule,
     RouterModule.forChild(routes),
   ],

@@ -24,6 +24,9 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
   branchId = '';
   label = '';
   kind: MoneyAccountKind = 'treasury';
+  channel = '';
+  accountNumber = '';
+  phone = '';
   expectedBalance = 0;
   openingBalance = 0;
   entries: TreasuryLedgerEntry[] = [];
@@ -84,6 +87,9 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
           next: (res) => {
             this.label = res.account?.label || this.accountKey;
             this.kind = res.account?.kind || 'treasury';
+            this.channel = res.account?.channel || '';
+            this.accountNumber = res.account?.accountNumber || '';
+            this.phone = res.account?.phone || '';
             this.expectedBalance = res.expectedBalance;
             this.openingBalance = res.openingBalance;
           },
@@ -171,6 +177,23 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
       data: {
         branchId: this.branchId,
         isSettlement,
+        preferFrom: this.accountKey,
+      },
+    });
+    this.subscriptions.push(
+      ref.afterClosed().subscribe((ok) => {
+        if (ok) this.loadAll();
+      })
+    );
+  }
+
+  openQuickSettle(): void {
+    const ref = this.dialog.open(TreasuryTransferDialogComponent, {
+      width: '420px',
+      panelClass: 'treasury-transfer-dialog-panel',
+      data: {
+        branchId: this.branchId,
+        quickSettle: true,
         preferFrom: this.accountKey,
       },
     });

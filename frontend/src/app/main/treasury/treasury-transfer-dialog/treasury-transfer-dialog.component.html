@@ -1,21 +1,33 @@
 <div class="dialog-pad">
   <h3 class="mb-3">{{ titleKey | translate }}</h3>
 
-  <div class="form-group">
-    <label>{{ 'tr_treasury_from' | translate }}</label>
-    <select class="s-control width-100" [(ngModel)]="fromAccountKey">
-      <option value="">—</option>
-      <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
-    </select>
-  </div>
+  <ng-container *ngIf="isQuickSettle; else fullTransfer">
+    <p class="text-muted size-caption mb-3">{{ 'tr_treasury_quick_settle_hint' | translate }}</p>
+    <div class="form-group">
+      <label>{{ 'tr_payment_settlement_bank' | translate }}</label>
+      <div class="s-control width-100" style="display: flex; align-items: center; background: #f7f7f7">
+        {{ linkedBankLabel || '—' }}
+      </div>
+    </div>
+  </ng-container>
 
-  <div class="form-group">
-    <label>{{ 'tr_treasury_to' | translate }}</label>
-    <select class="s-control width-100" [(ngModel)]="toAccountKey">
-      <option value="">—</option>
-      <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
-    </select>
-  </div>
+  <ng-template #fullTransfer>
+    <div class="form-group">
+      <label>{{ 'tr_treasury_from' | translate }}</label>
+      <select class="s-control width-100" [(ngModel)]="fromAccountKey">
+        <option value="">—</option>
+        <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>{{ 'tr_treasury_to' | translate }}</label>
+      <select class="s-control width-100" [(ngModel)]="toAccountKey">
+        <option value="">—</option>
+        <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
+      </select>
+    </div>
+  </ng-template>
 
   <div class="form-group">
     <label>{{ 'tr_daily_expense_amount' | translate }}</label>

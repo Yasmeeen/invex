@@ -208,7 +208,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private rebuildPaymentMethods(): void {
     this.paymentMethods = buildCashierPaymentMethods(
       this.storeSettings.snapshot.paymentAppFeePercents,
-      this.translate
+      this.translate,
+      this.storeSettings.snapshot.paymentMethodsCatalog
     );
     this.cdr.markForCheck();
   }

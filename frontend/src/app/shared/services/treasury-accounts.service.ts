@@ -9,6 +9,9 @@ export interface MoneyAccountBalance {
   key: string;
   label: string;
   kind: MoneyAccountKind;
+  channel?: 'bank' | 'wallet' | '';
+  accountNumber?: string;
+  phone?: string;
   openingBalance: number;
   inTotal: number;
   outTotal: number;
@@ -62,7 +65,14 @@ export class TreasuryAccountsService {
     until?: string;
   }): Observable<{
     branch: string;
-    account: { key: string; label: string; kind: MoneyAccountKind };
+    account: {
+      key: string;
+      label: string;
+      kind: MoneyAccountKind;
+      channel?: string;
+      accountNumber?: string;
+      phone?: string;
+    };
     openingBalance: number;
     inTotal: number;
     outTotal: number;
@@ -125,6 +135,16 @@ export class TreasuryAccountsService {
   ): Observable<any> {
     return this.http.post(
       `${TREASURY_URL}/accounts/${encodeURIComponent(key)}/opening-balance`,
+      body
+    );
+  }
+
+  settleAccount(
+    key: string,
+    body: { userId: string; branch: string; amount: number; note?: string }
+  ): Observable<any> {
+    return this.http.post(
+      `${TREASURY_URL}/accounts/${encodeURIComponent(key)}/settle`,
       body
     );
   }

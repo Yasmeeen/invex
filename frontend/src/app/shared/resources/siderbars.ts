@@ -70,14 +70,14 @@ export const AdminSidebar = [
         icon: 'fa fa-balance-scale icon',
       },
       {
-        name: 'tr_purchase_treasury_settings_title',
+        name: 'tr_money_accounts_settings_title',
         routerLink: '/treasury/config/treasuries',
         icon: 'fa fa-university icon',
       },
       {
-        name: 'tr_settlement_accounts_title',
-        routerLink: '/treasury/config/settlement',
-        icon: 'fa fa-mobile icon',
+        name: 'tr_payment_methods_catalog_title',
+        routerLink: '/treasury/config/payment-methods',
+        icon: 'fa fa-credit-card icon',
       },
       {
         name: 'tr_payment_account_map_title',
@@ -162,7 +162,7 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
 );
 
 /** Branch Manager: like Co Admin but no branches, settings, or users.
- *  Treasury config (treasuries / settlement / payment map) is admin-only.
+ *  Treasury config (accounts / payment methods / payment map) is admin-only.
  */
 export const BranchManagerSidebar = CoAdminSidebar.filter(
   (item) =>

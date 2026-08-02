@@ -532,7 +532,9 @@ export class ProductsListComponent implements OnInit {
       if (result != 'delete') {
         return;
       }
-      this.productsService.deleteProduct(productId).subscribe(() => {
+      this.productsService
+        .deleteProduct(productId, this.globals.currentUser?._id)
+        .subscribe(() => {
         this.params.page = 1;
           this.getproducts()
   

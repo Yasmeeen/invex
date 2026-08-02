@@ -1696,11 +1696,16 @@ export const approveProductPurchaseRequest = async (req, res) => {
       module: 'product_purchase_requests',
       entityType: 'ProductPurchaseRequest',
       entityId: purchase?._id,
-      message: 'Product purchase request approved',
+      entityLabel:
+        prod?.code && prod?.name ? `${prod.code} — ${prod.name}` : prod?.code || prod?.name,
+      message: `Product purchase request approved ${prod?.code || ''}`.trim(),
       metadata: {
         productId: prod._id,
+        productCode: prod?.code,
+        productName: prod?.name,
         quantity: q,
         branchId: purchase.branch,
+        status: 'approved',
         ...(createdList.length > 1 ? { productIds: createdList.map((p) => String(p._id)) } : {}),
       },
     });
@@ -1793,8 +1798,16 @@ export const rejectProductPurchaseRequest = async (req, res) => {
       module: 'product_purchase_requests',
       entityType: 'ProductPurchaseRequest',
       entityId: purchase?._id,
+      entityLabel: purchase?.productPayload?.code
+        ? String(purchase.productPayload.code)
+        : undefined,
       message: 'Product purchase request rejected',
-      metadata: { branchId: purchase.branch },
+      metadata: {
+        branchId: purchase.branch,
+        productCode: purchase?.productPayload?.code,
+        productName: purchase?.productPayload?.name,
+        status: 'rejected',
+      },
     });
 
     return res.json({ message: '✅ Rejected', purchase });

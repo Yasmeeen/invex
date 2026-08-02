@@ -4,7 +4,10 @@ import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
 import TreasuryAccountOpening from '../../DB/models/treasuryAccountOpening.model.js';
-import { getEffectiveMoneyAccountsFromDb } from '../settings_module/moneyAccounts.js';
+import {
+  getEffectiveMoneyAccountsFromDb,
+  settlementBankForAccount,
+} from '../settings_module/moneyAccounts.js';
 import {
   computeAccountExpectedBalance,
   recordTreasuryTransfer,
@@ -85,6 +88,9 @@ export const listTreasuryAccounts = async (req, res) => {
         key: acc.key,
         label: acc.label,
         kind: acc.kind,
+        channel: acc.channel || '',
+        accountNumber: acc.accountNumber || '',
+        phone: acc.phone || '',
         ...bal,
         lastMovement: last
           ? {
@@ -245,6 +251,70 @@ export const createTreasuryTransfer = async (req, res) => {
   } catch (error) {
     console.error('createTreasuryTransfer:', error);
     res.status(500).json({ error: 'Failed to create transfer' });
+  }
+};
+
+/**
+ * Settlement shortcut: move amount from settlement receivable → linked bank
+ * (settlementBankAccountKey from paymentMethodAccountMap).
+ */
+export const settleSettlementAccount = async (req, res) => {
+  try {
+    const { userId, branch, amount, note } = req.body || {};
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const key = String(req.params.key || '')
+      .trim()
+      .toLowerCase();
+    const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
+    const account = moneyAccounts.find((a) => a.key === key);
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    if (account.kind !== 'settlement') {
+      return res.status(400).json({ error: 'Only settlement accounts can use quick settle' });
+    }
+
+    const toAccountKey = settlementBankForAccount(paymentMethodAccountMap, key);
+    if (!toAccountKey) {
+      return res.status(400).json({
+        error: 'No settlement bank linked for this app. Set it in payment method → account map.',
+      });
+    }
+
+    const result = await recordTreasuryTransfer({
+      branchId: resolved.branchId,
+      fromAccountKey: key,
+      toAccountKey,
+      amount,
+      sourceType: 'settlement',
+      note: String(note || '').trim().slice(0, 2000) || `تسوية ${account.label}`,
+      createdBy: userId,
+    });
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    const fromBal = await computeAccountExpectedBalance(resolved.branchId, key);
+    const toBal = await computeAccountExpectedBalance(resolved.branchId, toAccountKey);
+
+    res.status(201).json({
+      fromAccountKey: key,
+      toAccountKey,
+      amount: round2(amount),
+      fromExpectedBalance: fromBal.expectedBalance,
+      toExpectedBalance: toBal.expectedBalance,
+      transferGroupId: result.transferGroupId,
+    });
+  } catch (error) {
+    console.error('settleSettlementAccount:', error);
+    res.status(500).json({ error: 'Failed to settle account' });
   }
 };
 

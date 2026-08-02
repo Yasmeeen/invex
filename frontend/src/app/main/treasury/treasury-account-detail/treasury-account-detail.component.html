@@ -10,8 +10,16 @@
       <button type="button" class="s-btn btn-secondary size-body" *ngIf="canSetOpening" (click)="openOpening()">
         {{ 'tr_treasury_set_opening' | translate }}
       </button>
-      <button type="button" class="s-btn btn-primary size-body" (click)="openTransfer(isSettlement)">
-        {{ (isSettlement ? 'tr_treasury_settlement' : 'tr_treasury_transfer') | translate }}
+      <button
+        type="button"
+        class="s-btn btn-primary size-body"
+        *ngIf="isSettlement"
+        (click)="openQuickSettle()"
+      >
+        {{ 'tr_treasury_quick_settle' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary size-body" (click)="openTransfer(isSettlement)">
+        {{ (isSettlement ? 'tr_treasury_settlement_manual' : 'tr_treasury_transfer') | translate }}
       </button>
     </div>
   </h2>
@@ -24,6 +32,14 @@
     <div>
       <div class="text-muted size-caption">{{ 'tr_treasury_expected' | translate }}</div>
       <div class="size-h5 fw-bold">{{ expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
+    </div>
+    <div *ngIf="channel === 'bank' && accountNumber">
+      <div class="text-muted size-caption">{{ 'tr_money_account_number' | translate }}</div>
+      <div class="size-h5">{{ accountNumber }}</div>
+    </div>
+    <div *ngIf="channel === 'wallet' && phone">
+      <div class="text-muted size-caption">{{ 'tr_money_account_phone' | translate }}</div>
+      <div class="size-h5">{{ phone }}</div>
     </div>
   </div>
 

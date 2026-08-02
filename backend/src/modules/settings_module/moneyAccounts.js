@@ -21,28 +21,65 @@ export const DEFAULT_SETTLEMENT_ACCOUNTS = [
 
 /** Default payment method → account mapping (cash always → cash). */
 export const DEFAULT_PAYMENT_METHOD_ACCOUNT_MAP = [
-  { method: 'cash', accountKey: 'cash' },
-  { method: 'visa', accountKey: 'bank_ahli' },
-  { method: 'mastercard', accountKey: 'bank_ahli' },
-  { method: 'meeza', accountKey: 'bank_ahli' },
-  { method: 'vodafone_cash', accountKey: 'vodafone_cash' },
-  { method: 'instapay', accountKey: 'bank_misr' },
-  { method: 'etisalat_cash', accountKey: 'etisalat_cash' },
-  { method: 'valu', accountKey: 'valu' },
-  { method: 'aman', accountKey: 'aman' },
-  { method: 'halan', accountKey: 'halan' },
-  { method: 'tru', accountKey: 'tru' },
-  { method: 'sohoula', accountKey: 'sohoula' },
-  { method: 'maylo_seven', accountKey: 'maylo_seven' },
-  { method: 'forsa', accountKey: 'forsa' },
-  { method: 'fawry', accountKey: 'fawry' },
+  { method: 'cash', accountKey: 'cash', mode: 'instant' },
+  { method: 'visa', accountKey: 'bank_ahli', mode: 'instant' },
+  { method: 'mastercard', accountKey: 'bank_ahli', mode: 'instant' },
+  { method: 'meeza', accountKey: 'bank_ahli', mode: 'instant' },
+  { method: 'vodafone_cash', accountKey: 'vodafone_cash', mode: 'instant' },
+  { method: 'instapay', accountKey: 'bank_misr', mode: 'instant' },
+  { method: 'etisalat_cash', accountKey: 'etisalat_cash', mode: 'instant' },
+  { method: 'valu', accountKey: 'valu', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'aman', accountKey: 'aman', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'halan', accountKey: 'halan', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'tru', accountKey: 'tru', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'sohoula', accountKey: 'sohoula', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'maylo_seven', accountKey: 'maylo_seven', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'forsa', accountKey: 'forsa', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
+  { method: 'fawry', accountKey: 'fawry', mode: 'settlement', settlementBankAccountKey: 'bank_ahli' },
 ];
+
+const SETTLEMENT_DEFAULT_KEYS = new Set(DEFAULT_SETTLEMENT_ACCOUNTS.map((a) => a.key));
 
 function normalizeKey(raw) {
   return String(raw ?? '')
     .trim()
     .toLowerCase()
     .slice(0, 40);
+}
+
+/** Guess bank vs wallet from key when channel not set (migration only). */
+export function inferAccountChannel(key) {
+  const k = normalizeKey(key);
+  if (!k || k === 'cash') return '';
+  if (
+    k.includes('vodafone') ||
+    k.includes('etisalat') ||
+    k.includes('orange') ||
+    k.includes('wallet') ||
+    k.includes('_cash') ||
+    k.endsWith('cash')
+  ) {
+    return 'wallet';
+  }
+  if (k.includes('bank') || k.includes('instapay')) {
+    return 'bank';
+  }
+  return 'bank';
+}
+
+function normalizeChannel(kind, key, rawChannel) {
+  if (kind === 'cash' || kind === 'settlement') return '';
+  const c = String(rawChannel || '')
+    .trim()
+    .toLowerCase();
+  if (c === 'bank' || c === 'wallet') return c;
+  return inferAccountChannel(key);
+}
+
+function normalizeOptionalRef(raw, maxLen) {
+  return String(raw ?? '')
+    .trim()
+    .slice(0, maxLen);
 }
 
 /**
@@ -53,8 +90,14 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
   const treasuries = normalizePurchaseTreasuryMethods(purchaseTreasuryMethods);
   const seen = new Set();
   const out = [];
+  const rawMoney = Array.isArray(moneyAccounts) ? moneyAccounts : [];
+  const extrasByKey = new Map();
+  for (const row of rawMoney) {
+    const k = normalizeKey(row?.key);
+    if (k) extrasByKey.set(k, row);
+  }
 
-  const push = (key, label, kind) => {
+  const push = (key, label, kind, extras = {}) => {
     const k = normalizeKey(key);
     if (!k || !KEY_PATTERN.test(k) || seen.has(k)) return;
     const lbl = String(label || '').trim().slice(0, 120) || k;
@@ -63,15 +106,26 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
     if (!ACCOUNT_KINDS.has(kindNorm)) {
       kindNorm = k === 'cash' ? 'cash' : 'treasury';
     }
+    const channel = normalizeChannel(kindNorm, k, extras.channel);
+    const accountNumber =
+      channel === 'bank' ? normalizeOptionalRef(extras.accountNumber, 80) : '';
+    const phone = channel === 'wallet' ? normalizeOptionalRef(extras.phone, 40) : '';
     seen.add(k);
-    out.push({ key: k, label: lbl, kind: kindNorm });
+    out.push({
+      key: k,
+      label: lbl,
+      kind: kindNorm,
+      channel,
+      accountNumber,
+      phone,
+    });
   };
 
   for (const row of treasuries) {
-    push(row.key, row.label, row.key === 'cash' ? 'cash' : 'treasury');
+    const extra = extrasByKey.get(normalizeKey(row.key)) || {};
+    push(row.key, row.label, row.key === 'cash' ? 'cash' : 'treasury', extra);
   }
 
-  const rawMoney = Array.isArray(moneyAccounts) ? moneyAccounts : [];
   if (rawMoney.length === 0) {
     for (const row of DEFAULT_SETTLEMENT_ACCOUNTS) {
       push(row.key, row.label, 'settlement');
@@ -80,15 +134,40 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
     for (const row of rawMoney) {
       const kind = String(row?.kind || '').trim().toLowerCase();
       if (kind === 'settlement' || (!kind && !treasuries.some((t) => t.key === normalizeKey(row?.key)))) {
-        push(row?.key, row?.label, kind === 'settlement' ? 'settlement' : kind || 'settlement');
+        push(row?.key, row?.label, kind === 'settlement' ? 'settlement' : kind || 'settlement', row);
       } else if (kind === 'treasury' || kind === 'cash') {
-        push(row?.key, row?.label, kind);
+        // Already pushed from treasuries when present; fill missing treasury-only rows
+        const k = normalizeKey(row?.key);
+        if (k && !seen.has(k)) {
+          push(row?.key, row?.label, kind, row);
+        } else if (k && seen.has(k)) {
+          // Refresh label/extras from moneyAccounts when both sources have the key
+          const idx = out.findIndex((x) => x.key === k);
+          if (idx >= 0 && kind === 'treasury') {
+            const channel = normalizeChannel('treasury', k, row.channel);
+            out[idx] = {
+              ...out[idx],
+              label: String(row?.label || out[idx].label).trim().slice(0, 120) || out[idx].label,
+              channel,
+              accountNumber:
+                channel === 'bank' ? normalizeOptionalRef(row.accountNumber, 80) : '',
+              phone: channel === 'wallet' ? normalizeOptionalRef(row.phone, 40) : '',
+            };
+          }
+        }
       }
     }
   }
 
   if (!out.some((x) => x.key === 'cash')) {
-    out.unshift({ key: 'cash', label: 'نقدي', kind: 'cash' });
+    out.unshift({
+      key: 'cash',
+      label: 'نقدي',
+      kind: 'cash',
+      channel: '',
+      accountNumber: '',
+      phone: '',
+    });
   }
 
   return out;
@@ -109,10 +188,14 @@ export function moneyAccountsToPurchaseTreasuries(moneyAccounts) {
 /**
  * Normalize paymentMethod → accountKey map.
  * `cash` always maps to `cash`. Empty / missing accountKey means unmapped (no ledger impact).
- * Methods with accountKey '' are dropped.
+ * Methods with accountKey '' are dropped. `credit` / `mixed` never mapped.
  */
-export function normalizePaymentMethodAccountMap(rawList, validAccountKeys) {
+export function normalizePaymentMethodAccountMap(rawList, validAccountKeys, accountsByKey) {
   const valid = validAccountKeys instanceof Set ? validAccountKeys : new Set(validAccountKeys || []);
+  const accMap =
+    accountsByKey instanceof Map
+      ? accountsByKey
+      : new Map((Array.isArray(accountsByKey) ? accountsByKey : []).map((a) => [a.key, a]));
   const seen = new Set();
   const out = [];
 
@@ -130,12 +213,44 @@ export function normalizePaymentMethodAccountMap(rawList, validAccountKeys) {
     if (method === 'cash') accountKey = 'cash';
     if (!accountKey) continue;
     if (valid.size > 0 && !valid.has(accountKey)) continue;
+
+    let mode = String(row?.mode || '')
+      .trim()
+      .toLowerCase();
+    if (mode !== 'instant' && mode !== 'settlement') {
+      const acc = accMap.get(accountKey);
+      if (acc?.kind === 'settlement' || SETTLEMENT_DEFAULT_KEYS.has(accountKey) || SETTLEMENT_DEFAULT_KEYS.has(method)) {
+        mode = 'settlement';
+      } else {
+        mode = 'instant';
+      }
+    }
+    if (method === 'cash') mode = 'instant';
+
+    let settlementBankAccountKey = normalizeKey(row?.settlementBankAccountKey);
+    if (mode !== 'settlement') {
+      settlementBankAccountKey = '';
+    } else if (
+      settlementBankAccountKey &&
+      valid.size > 0 &&
+      !valid.has(settlementBankAccountKey)
+    ) {
+      settlementBankAccountKey = '';
+    } else if (settlementBankAccountKey === accountKey) {
+      settlementBankAccountKey = '';
+    }
+
     seen.add(method);
-    out.push({ method, accountKey });
+    out.push({
+      method,
+      accountKey,
+      mode,
+      settlementBankAccountKey: settlementBankAccountKey || '',
+    });
   }
 
   if (!out.some((x) => x.method === 'cash')) {
-    out.unshift({ method: 'cash', accountKey: 'cash' });
+    out.unshift({ method: 'cash', accountKey: 'cash', mode: 'instant', settlementBankAccountKey: '' });
   }
 
   out.sort((a, b) => a.method.localeCompare(b.method));
@@ -151,6 +266,18 @@ export function paymentMethodToAccountMap(mapRows) {
   return m;
 }
 
+/** Find settlement bank for a settlement account key from the payment map. */
+export function settlementBankForAccount(mapRows, settlementAccountKey) {
+  const key = normalizeKey(settlementAccountKey);
+  if (!key) return '';
+  for (const row of mapRows || []) {
+    if (row.accountKey === key && row.mode === 'settlement' && row.settlementBankAccountKey) {
+      return row.settlementBankAccountKey;
+    }
+  }
+  return '';
+}
+
 export async function getEffectiveMoneyAccountsFromDb() {
   const doc = await StoreSettings.findOne()
     .sort({ updatedAt: -1 })
@@ -163,7 +290,8 @@ export async function getEffectiveMoneyAccountsFromDb() {
   const keys = new Set(moneyAccounts.map((a) => a.key));
   const paymentMethodAccountMap = normalizePaymentMethodAccountMap(
     doc?.paymentMethodAccountMap,
-    keys
+    keys,
+    moneyAccounts
   );
   return { moneyAccounts, paymentMethodAccountMap };
 }

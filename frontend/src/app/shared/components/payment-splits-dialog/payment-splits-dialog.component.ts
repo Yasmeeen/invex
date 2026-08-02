@@ -98,7 +98,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   private rebuildPaymentMethods(): void {
     const all = buildCashierPaymentMethods(
       this.storeSettings.snapshot.paymentAppFeePercents,
-      this.translate
+      this.translate,
+      this.storeSettings.snapshot.paymentMethodsCatalog
     );
     this.paymentMethods =
       this.mode === 'installment' || this.mode === 'deposit'

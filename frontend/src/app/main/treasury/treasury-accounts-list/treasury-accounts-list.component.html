@@ -78,7 +78,10 @@
         </thead>
         <tbody>
           <tr *ngFor="let acc of accounts" class="treasury-row" (click)="openAccount(acc)">
-            <td>{{ acc.label }}</td>
+            <td>
+              <div>{{ acc.label }}</div>
+              <div class="text-muted size-caption" *ngIf="accountRef(acc) as ref">{{ ref }}</div>
+            </td>
             <td>{{ kindLabel(acc.kind) }}</td>
             <td>{{ acc.openingBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td class="fw-bold">{{ acc.expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
@@ -114,7 +117,10 @@
           </div>
           <div class="treasury-card__title">
             <div class="treasury-card__name">{{ acc.label }}</div>
-            <div class="treasury-card__meta muted">{{ kindLabel(acc.kind) }}</div>
+            <div class="treasury-card__meta muted">
+              {{ kindLabel(acc.kind) }}
+              <ng-container *ngIf="accountRef(acc) as ref"> · {{ ref }}</ng-container>
+            </div>
           </div>
         </div>
 

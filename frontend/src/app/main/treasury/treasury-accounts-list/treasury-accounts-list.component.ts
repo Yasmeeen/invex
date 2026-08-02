@@ -120,6 +120,16 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
     return 'fa-university';
   }
 
+  accountRef(acc: MoneyAccountBalance): string {
+    if (acc?.channel === 'bank' && acc.accountNumber) {
+      return `${this.translate.instant('tr_money_account_number_short')}: ${acc.accountNumber}`;
+    }
+    if (acc?.channel === 'wallet' && acc.phone) {
+      return `${this.translate.instant('tr_money_account_phone_short')}: ${acc.phone}`;
+    }
+    return '';
+  }
+
   openAccount(acc: MoneyAccountBalance): void {
     this.router.navigate(['/treasury', acc.key], {
       queryParams: { branch: this.filterBranchId },

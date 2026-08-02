@@ -160,7 +160,9 @@ export class InventoryListComponent implements OnInit {
     if (!this.canDeleteFromWarehouse) {
       return;
     }
-    this.productsService.deleteProduct(productId).subscribe(() => {
+    this.productsService
+      .deleteProduct(productId, this.globals.currentUser?._id)
+      .subscribe(() => {
       this.params.page = 1;
         this.getproducts()
 

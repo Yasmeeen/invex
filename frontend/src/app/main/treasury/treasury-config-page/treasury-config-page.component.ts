@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
-export type TreasuryConfigMode = 'treasuries' | 'settlement' | 'payment-map';
+export type TreasuryConfigMode = 'treasuries' | 'payment-methods' | 'payment-map';
 
 @Component({
   selector: 'app-treasury-config-page',
@@ -15,7 +15,7 @@ export class TreasuryConfigPageComponent implements OnInit {
 
   ngOnInit(): void {
     const m = String(this.route.snapshot.data?.['mode'] || '').trim() as TreasuryConfigMode;
-    if (m === 'treasuries' || m === 'settlement' || m === 'payment-map') {
+    if (m === 'treasuries' || m === 'payment-methods' || m === 'payment-map') {
       this.mode = m;
     }
   }

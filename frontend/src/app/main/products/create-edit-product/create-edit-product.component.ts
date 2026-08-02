@@ -2115,6 +2115,7 @@ createProduct() {
     inWarehouse,
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
+    userId: this.globals.currentUser?._id,
   };
   if (createUnitDetails?.length) {
     payload.price = createUnitDetails[0].price;
@@ -2260,6 +2261,7 @@ updateProduct() {
     delete payload.branch;
   }
   this.attachAcquiredFromToPayload(payload);
+  payload.userId = this.globals.currentUser?._id;
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {

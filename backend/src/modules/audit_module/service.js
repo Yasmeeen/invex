@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import AuditLog from '../../DB/models/auditLog.model.js';
 import User from '../../DB/models/user.model.js';
+import { enrichAuditRows } from './audit.enrich.js';
 
 const toDate = (value, fallback) => {
   const d = value ? new Date(value) : fallback;
@@ -20,7 +21,7 @@ const isPrivilegedRole = (role) => {
   return r === 'Super Admin' || r === 'Co Admin' || r === 'Admin';
 };
 
-/** GET /api/audits?userId=...&from=...&to=...&actorUserId=...&action=...&module=...&entityType=...&entityId=... */
+/** GET /api/audits?userId=...&from=...&to=...&actorUserId=...&actorName=...&action=...&module=...&entityType=...&entityId=...&q=... */
 export const listAuditLogs = async (req, res) => {
   try {
     // Basic protection (since no real auth middleware exists): require caller userId & privileged role.
@@ -41,18 +42,56 @@ export const listAuditLogs = async (req, res) => {
     const match = { createdAt: { $gte: from, $lte: to } };
     const actorUserId = toObjectIdOrNull(req.query.actorUserId || req.query.actor_user_id);
     if (actorUserId) match.actorUserId = actorUserId;
+
+    const actorName = String(req.query.actorName || req.query.actor_name || '').trim();
+    if (actorName) {
+      match.actorName = { $regex: actorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    }
+
     if (req.query.action) match.action = String(req.query.action).trim();
     if (req.query.module) match.module = String(req.query.module).trim();
     if (req.query.entityType) match.entityType = String(req.query.entityType).trim();
-    if (req.query.entityId) match.entityId = String(req.query.entityId).trim();
+
+    const entityId = String(req.query.entityId || req.query.entity_id || '').trim();
+    const q = String(req.query.q || req.query.search || '').trim();
+
+    if (entityId && !q) {
+      // Allow filtering by Mongo id, order number, product code, or stored label
+      const or = [
+        { entityId },
+        { entityLabel: { $regex: entityId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { 'metadata.orderNumber': Number.isFinite(Number(entityId)) ? Number(entityId) : entityId },
+        { 'metadata.productCode': { $regex: entityId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { message: { $regex: entityId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+      ];
+      match.$or = or;
+    }
+
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const or = [
+        { actorName: { $regex: safe, $options: 'i' } },
+        { entityLabel: { $regex: safe, $options: 'i' } },
+        { message: { $regex: safe, $options: 'i' } },
+        { entityId: q },
+        { 'metadata.productCode': { $regex: safe, $options: 'i' } },
+        { 'metadata.productName': { $regex: safe, $options: 'i' } },
+      ];
+      if (Number.isFinite(Number(q))) {
+        or.push({ 'metadata.orderNumber': Number(q) });
+      }
+      match.$and = [...(match.$and || []), { $or: or }];
+    }
 
     const [rows, total] = await Promise.all([
       AuditLog.find(match).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       AuditLog.countDocuments(match),
     ]);
 
+    const enriched = await enrichAuditRows(rows);
+
     res.json({
-      rows,
+      rows: enriched,
       meta: {
         page,
         limit,
@@ -65,4 +104,3 @@ export const listAuditLogs = async (req, res) => {
     res.status(500).json({ error: 'Failed to list audit logs' });
   }
 };
-

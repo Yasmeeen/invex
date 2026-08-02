@@ -533,15 +533,23 @@ export const createProductBooking = async (req, res) => {
       module: 'bookings',
       entityType: 'ProductBooking',
       entityId: booking?._id,
-      message: 'Booking created',
+      message: `Booking created ${product?.code || ''}`.trim(),
+      entityLabel:
+        product?.code && product?.name
+          ? `${product.code} — ${product.name} ×${quantity}`
+          : undefined,
       metadata: {
         productId: pid,
+        productCode: product?.code,
+        productName: product?.name,
         quantity,
         pickupType,
         depositAmount: dep,
         bookingDate: booking.bookingDate,
         branchId: branchOid,
         inWarehouse: !!product.inWarehouse,
+        customerName: booking.customerName,
+        status: booking.status,
       },
       after: { status: booking.status, confirmed: booking.confirmed || false },
     });
@@ -662,9 +670,19 @@ export const confirmProductBooking = async (req, res) => {
       module: 'bookings',
       entityType: 'ProductBooking',
       entityId: booking?._id,
-      message: 'Booking confirmed',
-      metadata: { productId: booking.product, quantity: booking.quantity },
-      after: { confirmed: true, confirmedAt: booking.confirmedAt, confirmedBy: booking.confirmedBy },
+      message: `Booking confirmed ${booking.productCodeSnapshot || ''}`.trim(),
+      entityLabel:
+        booking.productCodeSnapshot && booking.productNameSnapshot
+          ? `${booking.productCodeSnapshot} — ${booking.productNameSnapshot} ×${booking.quantity}`
+          : undefined,
+      metadata: {
+        productId: booking.product,
+        productCode: booking.productCodeSnapshot,
+        productName: booking.productNameSnapshot,
+        quantity: booking.quantity,
+        status: booking.status,
+      },
+      after: { confirmed: true, confirmedAt: booking.confirmedAt, confirmedBy: booking.confirmedBy, status: booking.status },
     });
 
     return res.json({
@@ -722,8 +740,19 @@ export const cancelProductBooking = async (req, res) => {
       module: 'bookings',
       entityType: 'ProductBooking',
       entityId: booking?._id,
-      message: 'Booking cancelled',
-      metadata: { reason: booking.cancelReason || '', productId: booking.product, quantity: booking.quantity },
+      message: `Booking cancelled ${booking.productCodeSnapshot || ''}`.trim(),
+      entityLabel:
+        booking.productCodeSnapshot && booking.productNameSnapshot
+          ? `${booking.productCodeSnapshot} — ${booking.productNameSnapshot} ×${booking.quantity}`
+          : undefined,
+      metadata: {
+        reason: booking.cancelReason || '',
+        productId: booking.product,
+        productCode: booking.productCodeSnapshot,
+        productName: booking.productNameSnapshot,
+        quantity: booking.quantity,
+        status: booking.status,
+      },
       after: { status: booking.status, cancelledAt: booking.cancelledAt, cancelledBy: booking.cancelledBy },
     });
 

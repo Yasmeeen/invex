@@ -19,6 +19,8 @@ const auditLogSchema = new mongoose.Schema(
     module: { type: String, required: false, trim: true, index: true }, // e.g. products, orders, users, bookings
     entityType: { type: String, required: false, trim: true, index: true }, // e.g. Product, Order
     entityId: { type: String, required: false, trim: true, index: true }, // store as string for flexibility
+    /** Human-readable label: order #, product code — name, etc. */
+    entityLabel: { type: String, required: false, trim: true, index: true },
 
     // Request context
     method: { type: String, required: false, trim: true },

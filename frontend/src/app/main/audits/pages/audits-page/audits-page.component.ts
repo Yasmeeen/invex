@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { AuditsService, AuditLogRow } from '@shared/services/audits.service';
 
@@ -16,8 +17,8 @@ export class AuditsPageComponent implements OnInit {
   to = '';
   module = '';
   action = '';
-  actorUserId = '';
-  entityId = '';
+  actorName = '';
+  entitySearch = '';
 
   page = 1;
   limit = 50;
@@ -30,13 +31,45 @@ export class AuditsPageComponent implements OnInit {
     { key: 'action', labelKey: 'tr_audit_col_action' },
     { key: 'module', labelKey: 'tr_audit_col_module' },
     { key: 'entity', labelKey: 'tr_audit_col_entity' },
-    { key: 'path', labelKey: 'tr_audit_col_path' },
-    { key: 'statusCode', labelKey: 'tr_audit_col_status' },
+    { key: 'details', labelKey: 'tr_audit_col_details' },
+    { key: 'status', labelKey: 'tr_audit_col_status' },
+  ];
+
+  moduleOptions = [
+    { value: '', labelKey: 'tr_audit_filter_all' },
+    { value: 'orders', labelKey: 'tr_audit_module_orders' },
+    { value: 'products', labelKey: 'tr_audit_module_products' },
+    { value: 'bookings', labelKey: 'tr_audit_module_bookings' },
+    { value: 'product_purchase_requests', labelKey: 'tr_audit_module_product_purchase_requests' },
+    { value: 'auth', labelKey: 'tr_audit_module_auth' },
+  ];
+
+  actionOptions = [
+    { value: '', labelKey: 'tr_audit_filter_all' },
+    { value: 'create', labelKey: 'tr_audit_action_create' },
+    { value: 'update', labelKey: 'tr_audit_action_update' },
+    { value: 'delete', labelKey: 'tr_audit_action_delete' },
+    { value: 'payment', labelKey: 'tr_audit_action_payment' },
+    { value: 'restore', labelKey: 'tr_audit_action_restore' },
+    { value: 'confirm', labelKey: 'tr_audit_action_confirm' },
+    { value: 'cancel', labelKey: 'tr_audit_action_cancel' },
+    { value: 'approve', labelKey: 'tr_audit_action_approve' },
+    { value: 'reject', labelKey: 'tr_audit_action_reject' },
+    { value: 'login', labelKey: 'tr_audit_action_login' },
+    { value: 'logout', labelKey: 'tr_audit_action_logout' },
+    { value: 'login_failed', labelKey: 'tr_audit_action_login_failed' },
+    { value: 'branch_transfer_request', labelKey: 'tr_audit_action_branch_transfer_request' },
+    { value: 'branch_transfer_approve', labelKey: 'tr_audit_action_branch_transfer_approve' },
+    { value: 'branch_transfer_reject', labelKey: 'tr_audit_action_branch_transfer_reject' },
   ];
 
   rows: any[] = [];
 
-  constructor(private audits: AuditsService, public globals: Globals) {}
+  constructor(
+    private audits: AuditsService,
+    public globals: Globals,
+    private translate: TranslateService
+  ) {}
 
   ngOnInit(): void {
     const now = new Date();
@@ -65,8 +98,8 @@ export class AuditsPageComponent implements OnInit {
     this.to = this.toISODate(now);
     this.module = '';
     this.action = '';
-    this.actorUserId = '';
-    this.entityId = '';
+    this.actorName = '';
+    this.entitySearch = '';
     this.page = 1;
     this.load();
   }
@@ -94,23 +127,96 @@ export class AuditsPageComponent implements OnInit {
     };
     if (this.module) params.module = this.module;
     if (this.action) params.action = this.action;
-    if (this.actorUserId) params.actorUserId = this.actorUserId;
-    if (this.entityId) params.entityId = this.entityId;
+    if (this.actorName.trim()) params.actorName = this.actorName.trim();
+    if (this.entitySearch.trim()) params.entityId = this.entitySearch.trim();
     return params;
+  }
+
+  private tOr(key: string, fallback: string): string {
+    const v = this.translate.instant(key);
+    return !v || v === key ? fallback : v;
+  }
+
+  private translateAction(action?: string): string {
+    const a = String(action || '').trim();
+    if (!a) return '—';
+    return this.tOr(`tr_audit_action_${a}`, a);
+  }
+
+  private translateModule(module?: string): string {
+    const m = String(module || '').trim();
+    if (!m) return '—';
+    return this.tOr(`tr_audit_module_${m}`, m);
+  }
+
+  private translateEntityType(type?: string): string {
+    const t = String(type || '').trim();
+    if (!t) return '';
+    return this.tOr(`tr_audit_entity_${t}`, t);
+  }
+
+  private translateBusinessStatus(status?: string): string {
+    const s = String(status || '').trim();
+    if (!s) return '';
+    return this.tOr(`tr_audit_status_${s}`, s);
+  }
+
+  private translateHttpStatus(key?: string, code?: number): string {
+    if (key) {
+      const label = this.tOr(`tr_audit_http_${key}`, '');
+      if (label) return label;
+    }
+    if (code != null) return String(code);
+    return '';
+  }
+
+  private formatActor(x: AuditLogRow): string {
+    const name = String(x.actorName || '').trim();
+    const role = String(x.actorRole || '').trim();
+    if (name && role) return `${name} — ${role}`;
+    if (name) return name;
+    if (role) return role;
+    return this.tOr('tr_audit_actor_unknown', '—');
+  }
+
+  private formatEntity(x: AuditLogRow): string {
+    const label = String(x.entityLabel || '').trim();
+    const typeLabel = this.translateEntityType(x.entityType);
+    if (label && typeLabel) return `${typeLabel}: ${label}`;
+    if (label) return label;
+    if (typeLabel) return typeLabel;
+    return '—';
+  }
+
+  private formatStatus(x: AuditLogRow): string {
+    const business = this.translateBusinessStatus(x.businessStatus);
+    if (business) return business;
+    const http = this.translateHttpStatus(x.httpStatusKey, x.statusCode);
+    return http || '—';
+  }
+
+  private formatDetails(x: AuditLogRow): string {
+    const msg = String(x.message || '').trim();
+    if (msg) return msg;
+    const meta = x.metadata || {};
+    const bits: string[] = [];
+    if (meta['orderNumber'] != null) bits.push(`#${meta['orderNumber']}`);
+    if (meta['productCode']) bits.push(String(meta['productCode']));
+    if (meta['productName']) bits.push(String(meta['productName']));
+    if (meta['quantity'] != null) bits.push(`×${meta['quantity']}`);
+    return bits.length ? bits.join(' ') : '—';
   }
 
   private vmRow(x: AuditLogRow): any {
     const t = x.createdAt ? new Date(x.createdAt).toLocaleString() : '';
-    const actor = [x.actorName, x.actorRole].filter(Boolean).join(' — ');
-    const entity = [x.entityType, x.entityId].filter(Boolean).join(' #');
     return {
       createdAt: t,
-      actor: actor || '—',
-      action: x.action || '—',
-      module: x.module || '—',
-      entity: entity || '—',
-      path: x.path || '—',
-      statusCode: x.statusCode ?? '—',
+      actor: this.formatActor(x),
+      action: this.translateAction(x.action),
+      module: this.translateModule(x.module),
+      entity: this.formatEntity(x),
+      details: this.formatDetails(x),
+      status: this.formatStatus(x),
     };
   }
 
@@ -132,4 +238,3 @@ export class AuditsPageComponent implements OnInit {
     );
   }
 }
-

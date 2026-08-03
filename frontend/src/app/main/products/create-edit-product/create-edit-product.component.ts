@@ -935,6 +935,14 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         box-sizing: border-box !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
+        align-items: stretch !important;
+        padding: 0.6mm 1mm !important;
+      }
+      body.sticker-stack-print .barcode-img {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 11mm !important;
+        object-fit: fill !important;
       }
     `;
     const inner = bodies.join('');

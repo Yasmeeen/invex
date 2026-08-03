@@ -813,11 +813,11 @@ export const generateBarcodeImage = async (req, res) => {
       {
         bcid: 'code128',
         text: code,
-        scale: 3,
-        height: 8,
-        includetext: true,
-        textxalign: 'center',
-        textsize: 9,
+        scale: 4,
+        height: 10,
+        includetext: false,
+        paddingwidth: 1,
+        paddingheight: 0,
       },
       (err, png) => {
         if (err) {
@@ -832,7 +832,7 @@ export const generateBarcodeImage = async (req, res) => {
               <style>
            @page {
           size: 38mm 25mm;
-          margin: 0 3mm;
+          margin: 0;
         }
 
       html, body {
@@ -844,57 +844,85 @@ export const generateBarcodeImage = async (req, res) => {
         justify-content: center;
         align-items: center;
         box-sizing: border-box;
+        color: #000;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
 
       .sticker-name {
         width: 100%;
         max-width: 100%;
         min-height: 25mm;
+        height: 25mm;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        align-items: center;
+        align-items: stretch;
         box-sizing: border-box;
-        /* احتياطي للمتصفحات اللي ما تطبقش @page margin كويس */
-        padding: 0 2mm;
+        /* quiet zone صغير يمين/شمال عشان السكانر */
+        padding: 0.6mm 1mm;
+        color: #000;
+        font-family: Arial, Helvetica, sans-serif;
       }
 
       .product-name {
-        font-size: 8px;
-        font-weight: bold;
-        line-height: 1.1;
-        margin-bottom: 1mm;
-        max-width: 95%;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1.05;
+        margin: 0 0 0.3mm;
+        max-width: 100%;
         text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: #000;
       }
 
-      img {
-        max-width: 92%;
-        max-height: 14mm;
-        height: auto;
+      .barcode-img {
+        width: 100%;
+        max-width: 100%;
+        height: 10.5mm;
         display: block;
+        object-fit: fill;
+        image-rendering: crisp-edges;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .barcode-code {
+        font-size: 8px;
+        font-weight: 800;
+        line-height: 1.1;
+        margin-top: 0.3mm;
+        max-width: 100%;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #000;
       }
 
       .barcode-attr-line {
-        font-size: 7px;
-        line-height: 1.2;
-        margin-bottom: 0.5mm;
-        max-width: 95%;
+        font-size: 8px;
+        font-weight: 700;
+        line-height: 1.1;
+        margin: 0 0 0.3mm;
+        max-width: 100%;
         text-align: center;
-        white-space: normal;
-        word-break: break-word;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #000;
       }
 
       .barcode-price {
-        font-size: 8px;
-        font-weight: bold;
-        line-height: 1.1;
-        margin-bottom: 0.5mm;
-        max-width: 95%;
+        font-size: 9px;
+        font-weight: 900;
+        line-height: 1.05;
+        margin: 0 0 0.3mm;
+        max-width: 100%;
         text-align: center;
+        color: #000;
       }
 
 </style>
@@ -906,7 +934,8 @@ export const generateBarcodeImage = async (req, res) => {
                <div class="product-name">${name || ''}</div>
                ${barcodePriceHtml}
                ${barcodeAttrHtml}
-               <img src="data:image/png;base64,${png.toString('base64')}" alt="${escapeHtml(code)}" />
+               <img class="barcode-img" src="data:image/png;base64,${png.toString('base64')}" alt="${escapeHtml(code)}" />
+               <div class="barcode-code">${escapeHtml(code)}</div>
             </div>
            
             </body>

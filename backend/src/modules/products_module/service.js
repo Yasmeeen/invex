@@ -230,6 +230,63 @@ export async function assertCodesNotUsedInStorage(codes, branchOid, isWarehouse)
   return { ok: true };
 }
 
+/**
+ * Serial body after category prefix (e.g. UA-C1MTT0RXJ1WT → C1MTT0RXJ1WT).
+ * Falls back to the last hyphen segment when prefix is unknown.
+ */
+export function productCodeSerialBody(code, categoryPrefix = '') {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return '';
+  const p = String(categoryPrefix || '')
+    .trim()
+    .toUpperCase()
+    .replace(/-+$/g, '');
+  if (p && c.startsWith(p)) {
+    return c.slice(p.length).replace(/^-+/, '');
+  }
+  const parts = c.split('-');
+  return parts.length > 1 ? parts[parts.length - 1] : c;
+}
+
+/** Auto-allocated PREFIX-001 style — same numbers may exist across categories. */
+function isSequentialStyleSerialBody(body) {
+  return /^\d{1,4}$/.test(String(body || ''));
+}
+
+/**
+ * Block registering the same physical serial under a different category prefix
+ * (UA-C1MTT0RXJ1WT vs PEN-C1MTT0RXJ1WT). Exact same full code is left to the
+ * existing per-branch code uniqueness / soft-removed revive logic.
+ */
+export async function assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix = '', session = null, excludeProductIds = [] } = {}) {
+  const list = Array.isArray(codes) ? codes : [codes];
+  const exclude = new Set((excludeProductIds || []).map((id) => String(id)));
+  for (const raw of list) {
+    const code = String(raw ?? '').trim();
+    if (!code) continue;
+    const body = productCodeSerialBody(code, categoryPrefix);
+    if (!body || isSequentialStyleSerialBody(body)) continue;
+
+    const re = new RegExp(`(^|-)${escapeRegex(body)}$`, 'i');
+    let q = Product.find({ code: re }).select('_id code').limit(50);
+    if (session) q = q.session(session);
+    const hits = await q.lean();
+    const conflict = (hits || []).find((p) => {
+      if (exclude.has(String(p._id))) return false;
+      return String(p.code || '').trim().toUpperCase() !== code.toUpperCase();
+    });
+    if (conflict) {
+      return {
+        ok: false,
+        code: 'PRODUCT_SERIAL_ALREADY_EXISTS',
+        error: `Serial already registered as ${conflict.code}`,
+        existingCode: conflict.code,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 /** Category id from body: `{ _id }`, `{ id }`, plain id string, or ObjectId. */
 const resolveCategoryId = (category) => {
   if (category == null || category === '') return null;
@@ -1161,8 +1218,9 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: msg, code: e?.code });
     }
 
-    const catRow = await Category.findById(categoryId).select('multiCodePerPiece').lean();
+    const catRow = await Category.findById(categoryId).select('multiCodePerPiece code').lean();
     const categoryMultiCode = !!catRow?.multiCodePerPiece;
+    const categoryPrefix = catRow?.code || '';
     const unitCount = Math.max(1, Math.floor(stockNum));
 
     if (categoryMultiCode && unitCount > 1) {
@@ -1277,7 +1335,14 @@ export const createProduct = async (req, res) => {
       if (isWarehouse) {
         const free = await assertCodesNotUsedInStorage(codes, null, true);
         if (!free.ok) {
-          return res.status(409).json({ error: free.error });
+          return res.status(409).json({
+            error: free.error,
+            code: 'PRODUCT_CODE_ALREADY_EXISTS',
+          });
+        }
+        const serialFree = await assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix });
+        if (!serialFree.ok) {
+          return res.status(409).json({ error: serialFree.error, code: serialFree.code });
         }
         const createdProducts = [];
         for (let i = 0; i < codes.length; i++) {
@@ -1327,7 +1392,14 @@ export const createProduct = async (req, res) => {
       const branchOid = branch._id;
       const free = await assertCodesNotUsedInStorage(codes, branchOid, false);
       if (!free.ok) {
-        return res.status(409).json({ error: free.error });
+        return res.status(409).json({
+          error: free.error,
+          code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        });
+      }
+      const serialFree = await assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix });
+      if (!serialFree.ok) {
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
       }
       const createdProducts = [];
       for (let i = 0; i < codes.length; i++) {
@@ -1379,11 +1451,21 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: codeCheck.error });
     }
 
+    {
+      const serialFree = await assertSerialBodiesNotUsedInStorage([code], { categoryPrefix });
+      if (!serialFree.ok) {
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
+      }
+    }
+
     if (isWarehouse) {
       // Unique index is { code, branch }; warehouse uses branch: null (matches null or missing field).
       const existingWh = await Product.findOne({ code, branch: null });
       if (existingWh) {
-        return res.status(409).json({ error: 'Product code already exists in warehouse' });
+        return res.status(409).json({
+          error: 'Product code already exists in warehouse',
+          code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        });
       }
 
       const createdProduct = await Product.create({
@@ -1534,6 +1616,17 @@ export const updateProduct = async (req, res) => {
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
       return res.status(400).json({ error: codeCheck.error });
+    }
+
+    {
+      const catForPrefix = await Category.findById(categoryId).select('code').lean();
+      const serialFree = await assertSerialBodiesNotUsedInStorage([code], {
+        categoryPrefix: catForPrefix?.code || '',
+        excludeProductIds: [req.params.id],
+      });
+      if (!serialFree.ok) {
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
+      }
     }
 
     let acquiredFromSet = null;

@@ -134,7 +134,17 @@ export class ProductPurchaseApprovalDialogComponent implements OnInit {
       },
       error: (err) => {
         this.saving = false;
-        const msg = err?.error?.error || err?.error?.message || 'Failed';
+        const apiCode = err?.error?.code;
+        const msg =
+          apiCode === 'PRODUCT_CODE_CATEGORY_MISMATCH'
+            ? this.translate.instant('tr_product_code_category_mismatch')
+            : apiCode === 'PRODUCT_SERIAL_ALREADY_EXISTS'
+              ? this.translate.instant('tr_product_serial_already_exists')
+              : apiCode === 'PRODUCT_CODE_ALREADY_EXISTS'
+                ? this.translate.instant('tr_product_code_already_exists')
+                : err?.error?.error ||
+                  err?.error?.message ||
+                  this.translate.instant('tr_unexpected_error_message');
         this.notify.push(msg, 'error');
       },
     });

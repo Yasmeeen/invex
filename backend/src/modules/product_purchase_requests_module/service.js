@@ -13,6 +13,7 @@ import { resolveProductAcquiredFrom } from '../../utils/product-source-party.js'
 import {
   allocateSequentialProductCodes,
   assertCodesNotUsedInStorage,
+  assertSerialBodiesNotUsedInStorage,
   validateProductCodeForCategory,
 } from '../products_module/service.js';
 import {
@@ -66,6 +67,25 @@ const normalizeImageUrl = (raw) => {
 };
 
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
+
+/**
+ * Soft-removed products may be revived on re-purchase, but only under the same category.
+ * Overwriting category with a different one was allowing the same serial under the wrong category.
+ */
+function assertReviveCategoryMatches(existing, newCategoryId) {
+  if (!existing?.category || newCategoryId == null || newCategoryId === '') {
+    return { ok: true };
+  }
+  if (String(existing.category) !== String(newCategoryId)) {
+    return {
+      ok: false,
+      code: 'PRODUCT_CODE_CATEGORY_MISMATCH',
+      error:
+        'Product code already exists under a different category; cannot revive with a mismatched category',
+    };
+  }
+  return { ok: true };
+}
 
 /** Keep lines[0] in sync when root createdProductId(s) are set. */
 function syncFirstLineCreatedProducts(purchase, productId, productIds) {
@@ -449,8 +469,12 @@ export const createProductPurchaseRequest = async (req, res) => {
       return res.status(400).json({ error: 'attributes must be an object' });
     }
 
-    const catMultiRow = await Category.findById(String(categoryId)).select('multiCodePerPiece').session(session).lean();
+    const catMultiRow = await Category.findById(String(categoryId))
+      .select('multiCodePerPiece code')
+      .session(session)
+      .lean();
     const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+    const categoryPrefix = catMultiRow?.code || '';
 
     let unitCodesNorm = [];
     let unitDetailsNorm = null;
@@ -510,6 +534,25 @@ export const createProductPurchaseRequest = async (req, res) => {
         await session.abortTransaction();
         session.endSession();
         return res.status(400).json({ error: attrsReq.error });
+      }
+      const codeChk = await validateProductCodeForCategory(String(categoryId), code);
+      if (!codeChk.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: codeChk.error });
+      }
+    }
+
+    {
+      const codesToCheck = categoryIsMulti && q > 1 ? unitCodesNorm : [code];
+      const serialFree = await assertSerialBodiesNotUsedInStorage(codesToCheck, {
+        categoryPrefix,
+        session,
+      });
+      if (!serialFree.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
       }
     }
 
@@ -625,7 +668,10 @@ export const createProductPurchaseRequest = async (req, res) => {
         if (!free.ok) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(409).json({ error: free.error });
+          return res.status(409).json({
+            error: free.error,
+            code: 'PRODUCT_CODE_ALREADY_EXISTS',
+          });
         }
         const createdList = [];
         for (let ui = 0; ui < unitCodesNorm.length; ui++) {
@@ -724,13 +770,19 @@ export const createProductPurchaseRequest = async (req, res) => {
       const existing = await Product.findOne({ code, branch: branchId }).session(session);
       if (existing) {
         if (existing.removedWhenOutOfStock) {
+          const catMatch = assertReviveCategoryMatches(existing, payload.category);
+          if (!catMatch.ok) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(409).json({ error: catMatch.error, code: catMatch.code });
+          }
           existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
           existing.removedWhenOutOfStock = false;
           existing.name = name || existing.name;
           if (payload.price != null) existing.price = payload.price;
           if (payload.netPrice != null) existing.netPrice = payload.netPrice;
           if (payload.discount != null) existing.discount = payload.discount;
-          if (payload.category) existing.category = payload.category;
+          // Keep original category — never overwrite on revive.
           if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
           if (payload.attributes) existing.attributes = payload.attributes;
           if (payload.addedBy) existing.addedBy = payload.addedBy;
@@ -795,7 +847,10 @@ export const createProductPurchaseRequest = async (req, res) => {
 
         await session.abortTransaction();
         session.endSession();
-        return res.status(409).json({ error: 'Product code already exists in this branch' });
+        return res.status(409).json({
+          error: 'Product code already exists in this branch',
+          code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        });
       }
 
       const [prod] = await Product.create(
@@ -989,10 +1044,11 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
   }
 
   const catMultiRow = await Category.findById(String(categoryId))
-    .select('multiCodePerPiece')
+    .select('multiCodePerPiece code')
     .session(session)
     .lean();
   const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+  const categoryPrefix = catMultiRow?.code || '';
 
   let unitCodesNorm = [];
   let unitDetailsNorm = null;
@@ -1041,6 +1097,25 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
     const attrsReq = await assertRequiredCategoryAttributes(String(categoryId), attrsNorm);
     if (!attrsReq.ok) {
       return { error: attrsReq.error };
+    }
+    const codeChk = await validateProductCodeForCategory(String(categoryId), code);
+    if (!codeChk.ok) {
+      return { error: codeChk.error };
+    }
+  }
+
+  {
+    const codesToCheck = categoryIsMulti && q > 1 ? unitCodesNorm : [code];
+    const serialFree = await assertSerialBodiesNotUsedInStorage(codesToCheck, {
+      categoryPrefix,
+      session,
+    });
+    if (!serialFree.ok) {
+      return {
+        error: serialFree.error,
+        code: serialFree.code,
+        status: 409,
+      };
     }
   }
 
@@ -1104,7 +1179,11 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
   if (categoryIsMulti && q > 1) {
     const free = await assertCodesNotUsedInStorage(unitCodesNorm, branchId, false);
     if (!free.ok) {
-      return { error: free.error, status: 409 };
+      return {
+        error: free.error,
+        code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        status: 409,
+      };
     }
     for (let ui = 0; ui < unitCodesNorm.length; ui++) {
       const unitCode = unitCodesNorm[ui];
@@ -1137,13 +1216,17 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
   const existing = await Product.findOne({ code, branch: branchId }).session(session);
   if (existing) {
     if (existing.removedWhenOutOfStock) {
+      const catMatch = assertReviveCategoryMatches(existing, payload.category);
+      if (!catMatch.ok) {
+        return { error: catMatch.error, code: catMatch.code, status: 409 };
+      }
       existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
       existing.removedWhenOutOfStock = false;
       existing.name = name || existing.name;
       if (payload.price != null) existing.price = payload.price;
       if (payload.netPrice != null) existing.netPrice = payload.netPrice;
       if (payload.discount != null) existing.discount = payload.discount;
-      if (payload.category) existing.category = payload.category;
+      // Keep original category — never overwrite on revive.
       if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
       if (payload.attributes) existing.attributes = payload.attributes;
       if (payload.addedBy) existing.addedBy = payload.addedBy;
@@ -1151,7 +1234,11 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
       await existing.save({ session });
       return { createdList: [existing], createdProduct: existing };
     }
-    return { error: 'Product code already exists in this branch', status: 409 };
+    return {
+      error: 'Product code already exists in this branch',
+      code: 'PRODUCT_CODE_ALREADY_EXISTS',
+      status: 409,
+    };
   }
 
   const [prod] = await Product.create(
@@ -1250,7 +1337,7 @@ export async function finalizeExchangeTradeInPurchaseInSession(
       { session, branchId: purchase.branch }
     );
     if (built.error) {
-      return { error: built.error, code: built.code };
+      return { error: built.error, code: built.code, status: built.status };
     }
 
     const created = await createProductsForLine(session, {
@@ -1259,7 +1346,7 @@ export async function finalizeExchangeTradeInPurchaseInSession(
       acquiredFromFields: built.acquiredFromFields,
     });
     if (created.error) {
-      return { error: created.error, status: created.status };
+      return { error: created.error, code: created.code, status: created.status };
     }
 
     line.createdProductId = created.createdProduct._id;
@@ -1351,7 +1438,7 @@ export const addProductPurchaseLine = async (req, res) => {
     if (built.error) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: built.error, code: built.code });
+      return res.status(built.status || 400).json({ error: built.error, code: built.code });
     }
 
     if (!Array.isArray(purchase.lines) || !purchase.lines.length) {
@@ -1384,7 +1471,9 @@ export const addProductPurchaseLine = async (req, res) => {
       if (created.error) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(created.status || 400).json({ error: created.error });
+        return res
+          .status(created.status || 400)
+          .json({ error: created.error, ...(created.code ? { code: created.code } : {}) });
       }
       createdList = created.createdList;
       createdProduct = created.createdProduct;
@@ -1513,8 +1602,12 @@ export const approveProductPurchaseRequest = async (req, res) => {
     }
 
     const categoryIdStr = String(pp.category);
-    const catMultiRow = await Category.findById(categoryIdStr).select('multiCodePerPiece').session(session).lean();
+    const catMultiRow = await Category.findById(categoryIdStr)
+      .select('multiCodePerPiece code')
+      .session(session)
+      .lean();
     const categoryIsMulti = !!catMultiRow?.multiCodePerPiece;
+    const categoryPrefix = catMultiRow?.code || '';
 
     let acquiredFromFields = {};
     try {
@@ -1591,7 +1684,19 @@ export const approveProductPurchaseRequest = async (req, res) => {
       if (!free.ok) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(409).json({ error: free.error });
+        return res.status(409).json({
+          error: free.error,
+          code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        });
+      }
+      const serialFree = await assertSerialBodiesNotUsedInStorage(codes, {
+        categoryPrefix,
+        session,
+      });
+      if (!serialFree.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
       }
       const payloadForUnits = {
         ...pp,
@@ -1631,16 +1736,37 @@ export const approveProductPurchaseRequest = async (req, res) => {
         session.endSession();
         return res.status(400).json({ error: attrsReq.error });
       }
+      const codeChk = await validateProductCodeForCategory(categoryIdStr, code);
+      if (!codeChk.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: codeChk.error });
+      }
+      const serialFree = await assertSerialBodiesNotUsedInStorage([code], {
+        categoryPrefix,
+        session,
+      });
+      if (!serialFree.ok) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({ error: serialFree.error, code: serialFree.code });
+      }
       const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
       if (existing) {
         if (existing.removedWhenOutOfStock) {
+          const catMatch = assertReviveCategoryMatches(existing, pp.category);
+          if (!catMatch.ok) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(409).json({ error: catMatch.error, code: catMatch.code });
+          }
           existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
           existing.removedWhenOutOfStock = false;
           existing.name = pp.name || existing.name;
           if (pp.price != null) existing.price = Number(pp.price) || 0;
           if (pp.netPrice != null) existing.netPrice = Number(pp.netPrice) || 0;
           if (pp.discount != null) existing.discount = Number(pp.discount) || 0;
-          if (pp.category) existing.category = pp.category;
+          // Keep original category — never overwrite on revive.
           if (pp.imageUrl != null) existing.imageUrl = normalizeImageUrl(pp.imageUrl);
           if (attrsNorm) existing.attributes = attrsNorm;
           if (pp.addedBy) existing.addedBy = normalizeAddedBy(pp.addedBy);
@@ -1651,7 +1777,10 @@ export const approveProductPurchaseRequest = async (req, res) => {
         } else {
           await session.abortTransaction();
           session.endSession();
-          return res.status(409).json({ error: 'Product code already exists in this branch' });
+          return res.status(409).json({
+          error: 'Product code already exists in this branch',
+          code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        });
         }
       } else {
         const [pRow] = await Product.create(
@@ -1710,7 +1839,9 @@ export const approveProductPurchaseRequest = async (req, res) => {
         if (built.error) {
           await session.abortTransaction();
           session.endSession();
-          return res.status(400).json({ error: built.error });
+          return res
+            .status(built.status || 400)
+            .json({ error: built.error, ...(built.code ? { code: built.code } : {}) });
         }
         const extra = await createProductsForLine(session, {
           linePayload: built,

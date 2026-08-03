@@ -2348,10 +2348,21 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadProducts();
       this.focusBarcodeInput();
 
-    }, error=> {
-      console.log("error",error);
-      
-      this.appNotificationService.push(error.error.details, 'error');
+    }, (error: any) => {
+      console.log('error', error);
+      const apiCode = error?.error?.code;
+      const msg =
+        apiCode === 'PRODUCT_CODE_CATEGORY_MISMATCH'
+          ? this.translate.instant('tr_product_code_category_mismatch')
+          : apiCode === 'PRODUCT_SERIAL_ALREADY_EXISTS'
+            ? this.translate.instant('tr_product_serial_already_exists')
+            : apiCode === 'PRODUCT_CODE_ALREADY_EXISTS'
+              ? this.translate.instant('tr_product_code_already_exists')
+              : error?.error?.details ||
+                error?.error?.error ||
+                error?.error?.message ||
+                this.translate.instant('tr_unexpected_error_message');
+      this.appNotificationService.push(msg, 'error');
     });
   }
 

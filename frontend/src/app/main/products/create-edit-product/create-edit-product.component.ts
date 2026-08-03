@@ -2025,7 +2025,18 @@ private submitDeskPurchaseRequest(): void {
       },
       error: (error: any) => {
         this.isSubmitting = false;
-        const msg = error?.error?.details || error?.error?.error || error?.error?.message || 'Failed';
+        const apiCode = error?.error?.code;
+        const msg =
+          apiCode === 'PRODUCT_CODE_CATEGORY_MISMATCH'
+            ? this.translateService.instant('tr_product_code_category_mismatch')
+            : apiCode === 'PRODUCT_SERIAL_ALREADY_EXISTS'
+              ? this.translateService.instant('tr_product_serial_already_exists')
+              : apiCode === 'PRODUCT_CODE_ALREADY_EXISTS'
+                ? this.translateService.instant('tr_product_code_already_exists')
+                : error?.error?.details ||
+                  error?.error?.error ||
+                  error?.error?.message ||
+                  this.translateService.instant('tr_unexpected_error_message');
         this.appNotificationService.push(msg, 'error');
       },
     });
@@ -2293,7 +2304,11 @@ updateProduct() {
       const msg =
         code === 'ACTIVE_BOOKING_BLOCKS_WAREHOUSE'
           ? this.translateService.instant('tr_product_warehouse_blocked_active_booking')
-          : error?.error?.error || this.translateService.instant('tr_unexpected_error_message');
+          : code === 'PRODUCT_SERIAL_ALREADY_EXISTS'
+            ? this.translateService.instant('tr_product_serial_already_exists')
+            : code === 'PRODUCT_CODE_ALREADY_EXISTS'
+              ? this.translateService.instant('tr_product_code_already_exists')
+              : error?.error?.error || this.translateService.instant('tr_unexpected_error_message');
       this.appNotificationService.push(msg, 'error');
     }
   );

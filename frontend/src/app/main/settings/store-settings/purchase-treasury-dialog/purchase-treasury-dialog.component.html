@@ -1,100 +1,54 @@
 <div class="purchase-treasury-dialog">
   <h2 mat-dialog-title class="purchase-treasury-dialog__title">
-    {{ 'tr_money_accounts_settings_title' | translate }}
+    {{ 'tr_purchase_treasury_settings_title' | translate }}
   </h2>
 
   <div mat-dialog-content class="purchase-treasury-dialog__content">
     <div class="purchase-treasury-dialog__scroll">
-      <p class="purchase-treasury-dialog__lead">{{ 'tr_money_accounts_settings_hint' | translate }}</p>
+    <p class="purchase-treasury-dialog__lead">{{ 'tr_purchase_treasury_settings_hint' | translate }}</p>
 
-      <div class="settings-dialog-table purchase-treasury-table money-accounts-table">
-        <div class="settings-dialog-table__head money-accounts-table__head">
-          <span>{{ 'tr_purchase_treasury_display_name' | translate }}</span>
-          <span>{{ 'tr_money_account_channel' | translate }}</span>
-          <span>{{ 'tr_money_account_ref' | translate }}</span>
-          <span></span>
+    <div class="settings-dialog-table purchase-treasury-table">
+      <div class="settings-dialog-table__head purchase-treasury-table__head">
+        <span>{{ 'tr_purchase_treasury_display_name' | translate }}</span>
+        <span></span>
+      </div>
+      <div
+        class="settings-dialog-table__row purchase-treasury-table__row"
+        *ngFor="let row of treasuryRows; let i = index"
+      >
+        <div class="purchase-treasury-table__name-cell">
+          <input
+            type="text"
+            class="s-control settings-dialog-table__label"
+            [(ngModel)]="row.label"
+            [name]="'ptDisplay_' + i"
+            maxlength="120"
+            autocomplete="off"
+            [attr.placeholder]="row.key === 'cash' ? ('tr_treasury_cash' | translate) : ''"
+          />
         </div>
-        <div
-          class="settings-dialog-table__row money-accounts-table__row"
-          *ngFor="let row of treasuryRows; let i = index"
-        >
-          <div class="purchase-treasury-table__name-cell">
-            <input
-              type="text"
-              class="s-control settings-dialog-table__label"
-              [(ngModel)]="row.label"
-              [name]="'ptDisplay_' + i"
-              maxlength="120"
-              autocomplete="off"
-              [attr.placeholder]="row.key === 'cash' ? ('tr_treasury_cash' | translate) : ''"
-            />
-          </div>
-
-          <select
-            class="s-control"
-            [(ngModel)]="row.channel"
-            [name]="'ptChannel_' + i"
+        <div class="purchase-treasury-table__actions">
+          <button
+            type="button"
+            class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
+            (click)="removeRow(i)"
             [disabled]="row.key === 'cash'"
-            (ngModelChange)="onChannelChange(row)"
+            [attr.title]="'tr_remove' | translate"
           >
-            <option *ngIf="row.key === 'cash'" value="">—</option>
-            <option *ngFor="let opt of channelOptions" [value]="opt.value">
-              {{ opt.labelKey | translate }}
-            </option>
-          </select>
-
-          <div class="money-accounts-table__ref">
-            <input
-              *ngIf="row.key !== 'cash' && row.channel === 'bank'"
-              type="text"
-              class="s-control"
-              [(ngModel)]="row.accountNumber"
-              [name]="'ptAccNum_' + i"
-              maxlength="80"
-              autocomplete="off"
-              [attr.placeholder]="'tr_money_account_number_placeholder' | translate"
-            />
-            <input
-              *ngIf="row.key !== 'cash' && row.channel === 'wallet'"
-              type="tel"
-              class="s-control"
-              [(ngModel)]="row.phone"
-              [name]="'ptPhone_' + i"
-              maxlength="40"
-              autocomplete="off"
-              [attr.placeholder]="'tr_money_account_phone_placeholder' | translate"
-            />
-            <span *ngIf="row.key === 'cash'" class="text-muted size-caption">—</span>
-          </div>
-
-          <div class="purchase-treasury-table__actions">
-            <button
-              type="button"
-              class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
-              (click)="removeRow(i)"
-              [disabled]="row.key === 'cash'"
-              [attr.title]="'tr_remove' | translate"
-            >
-              <i class="fa fa-trash-o"></i>
-            </button>
-          </div>
+            <i class="fa fa-trash-o"></i>
+          </button>
         </div>
       </div>
+    </div>
 
-      <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
-        <i class="fa fa-plus mr-1"></i>{{ 'tr_purchase_treasury_add' | translate }}
-      </button>
+    <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
+      <i class="fa fa-plus mr-1"></i>{{ 'tr_purchase_treasury_add' | translate }}
+    </button>
     </div>
   </div>
 
   <div mat-dialog-actions align="end" class="purchase-treasury-dialog__actions">
-    <button
-      type="button"
-      class="s-btn btn-secondary"
-      *ngIf="isDialog"
-      (click)="cancel()"
-      [disabled]="saving"
-    >
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
       {{ 'tr_cancel' | translate }}
     </button>
     <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">

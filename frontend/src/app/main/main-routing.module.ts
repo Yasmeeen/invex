@@ -156,14 +156,6 @@ const routes: Routes = [
           allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
         },
       },
-      {
-        path: 'treasury',
-        loadChildren: () => import('./treasury/treasury.module').then((m) => m.TreasuryModule),
-        canActivate: [RoleGuard],
-        data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
-        },
-      },
 
 
       

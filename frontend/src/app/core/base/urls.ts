@@ -67,7 +67,5 @@ export const DAILY_EXPENSES_URL = BASE_URL + '/daily-expenses';
 
 export const DRAWER_CLOSE_URL = BASE_URL + '/drawer-close';
 
-export const TREASURY_URL = BASE_URL + '/treasury';
-
 // AI assistant (Vixa)
 export const AI_CHAT_URL = BASE_URL + '/ai/chat';

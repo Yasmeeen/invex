@@ -1,66 +1,12 @@
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
 import { normalizePurchaseTreasuryMethods } from './treasuryMethods.js';
-import {
-  moneyAccountsToPurchaseTreasuries,
-  normalizeMoneyAccounts,
-  normalizePaymentMethodAccountMap,
-} from './moneyAccounts.js';
-import {
-  catalogToPaymentAppFeePercents,
-  catalogToPurchaseTreasuryMethods,
-  mergeMoneyAccountsFromCatalog,
-  normalizePaymentMethodsCatalog,
-} from './paymentMethodsCatalog.js';
 
 const MAX_LOGO_LENGTH = 600000;
 
 /** One logical row: always read/update the same document (avoids split brain if multiple rows exist). */
-const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
-
-function serializeSettings(doc) {
-  const paymentMethodsCatalog = normalizePaymentMethodsCatalog({
-    paymentMethodsCatalog: doc.paymentMethodsCatalog,
-    paymentAppFeePercents: doc.paymentAppFeePercents,
-    purchaseTreasuryMethods: doc.purchaseTreasuryMethods,
-  });
-
-  let moneyAccounts = normalizeMoneyAccounts({
-    purchaseTreasuryMethods: doc.purchaseTreasuryMethods,
-    moneyAccounts: doc.moneyAccounts,
-  });
-  moneyAccounts = normalizeMoneyAccounts({
-    purchaseTreasuryMethods: catalogToPurchaseTreasuryMethods(paymentMethodsCatalog),
-    moneyAccounts: mergeMoneyAccountsFromCatalog(moneyAccounts, paymentMethodsCatalog),
-  });
-
-  const accountKeys = new Set(moneyAccounts.map((a) => a.key));
-  const paymentMethodAccountMap = normalizePaymentMethodAccountMap(
-    doc.paymentMethodAccountMap,
-    accountKeys,
-    moneyAccounts
-  );
-
-  // Prefer catalog-derived fees/treasuries so clients stay in sync after unify
-  const paymentAppFeePercents = catalogToPaymentAppFeePercents(paymentMethodsCatalog);
-  const purchaseTreasuryMethods = catalogToPurchaseTreasuryMethods(paymentMethodsCatalog);
-
-  return {
-    storeName: doc.storeName,
-    storePhoneNumber: doc.storePhoneNumber,
-    logoUrl: doc.logoUrl || '',
-    receiptLanguage: doc.receiptLanguage || 'en',
-    paymentMethodsCatalog,
-    purchaseTreasuryMethods,
-    moneyAccounts,
-    paymentMethodAccountMap,
-    paymentAppFeePercents,
-    returnExchangePolicy: doc.returnExchangePolicy || '',
-    showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
-    bookingPolicy: doc.bookingPolicy || '',
-    showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
-  };
-}
+const getLatestSettingsDoc = () =>
+  StoreSettings.findOne().sort({ updatedAt: -1 });
 
 export const getStoreSettings = async (req, res) => {
   try {
@@ -73,7 +19,18 @@ export const getStoreSettings = async (req, res) => {
         receiptLanguage: 'en',
       });
     }
-    res.status(200).json(serializeSettings(doc));
+    res.status(200).json({
+      storeName: doc.storeName,
+      storePhoneNumber: doc.storePhoneNumber,
+      logoUrl: doc.logoUrl || '',
+      receiptLanguage: doc.receiptLanguage || 'en',
+      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
+      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
+      returnExchangePolicy: doc.returnExchangePolicy || '',
+      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
+      bookingPolicy: doc.bookingPolicy || '',
+      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
+    });
   } catch (error) {
     console.error('getStoreSettings:', error);
     res.status(500).json({ error: 'Failed to load store settings' });
@@ -88,10 +45,7 @@ export const updateStoreSettings = async (req, res) => {
       logoUrl,
       receiptLanguage,
       purchaseTreasuryMethods,
-      moneyAccounts,
-      paymentMethodAccountMap,
       paymentAppFeePercents,
-      paymentMethodsCatalog,
       returnExchangePolicy,
       showReturnExchangePolicyOnReceipt,
       bookingPolicy,
@@ -123,28 +77,8 @@ export const updateStoreSettings = async (req, res) => {
       return res.status(400).json({ error: 'Logo image is too large (max ~450KB)' });
     }
 
-    const existing = await getLatestSettingsDoc();
-
-    let catalogNormalized;
-    if (paymentMethodsCatalog !== undefined) {
-      if (!Array.isArray(paymentMethodsCatalog)) {
-        return res.status(400).json({ error: 'paymentMethodsCatalog must be an array' });
-      }
-      if (paymentMethodsCatalog.length > 80) {
-        return res.status(400).json({ error: 'Too many payment methods (max 80)' });
-      }
-      catalogNormalized = normalizePaymentMethodsCatalog({
-        paymentMethodsCatalog,
-        paymentAppFeePercents: existing?.paymentAppFeePercents,
-        purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
-      });
-      if (!catalogNormalized.some((x) => x.key === 'cash')) {
-        return res.status(400).json({ error: 'paymentMethodsCatalog must include key "cash"' });
-      }
-    }
-
     let treasuryNormalized;
-    if (purchaseTreasuryMethods !== undefined && catalogNormalized === undefined) {
+    if (purchaseTreasuryMethods !== undefined) {
       if (!Array.isArray(purchaseTreasuryMethods)) {
         return res.status(400).json({ error: 'purchaseTreasuryMethods must be an array' });
       }
@@ -157,129 +91,8 @@ export const updateStoreSettings = async (req, res) => {
       }
     }
 
-    let moneyAccountsNormalized;
-    if (moneyAccounts !== undefined) {
-      if (!Array.isArray(moneyAccounts)) {
-        return res.status(400).json({ error: 'moneyAccounts must be an array' });
-      }
-      if (moneyAccounts.length > 80) {
-        return res.status(400).json({ error: 'Too many money accounts (max 80)' });
-      }
-      moneyAccountsNormalized = normalizeMoneyAccounts({
-        purchaseTreasuryMethods:
-          treasuryNormalized ??
-          (catalogNormalized
-            ? catalogToPurchaseTreasuryMethods(catalogNormalized)
-            : existing?.purchaseTreasuryMethods),
-        moneyAccounts,
-      });
-      if (!moneyAccountsNormalized.some((x) => x.key === 'cash' && x.kind === 'cash')) {
-        return res.status(400).json({ error: 'moneyAccounts must include cash' });
-      }
-      treasuryNormalized = moneyAccountsToPurchaseTreasuries(moneyAccountsNormalized);
-    } else if (treasuryNormalized !== undefined) {
-      const prevMoney = normalizeMoneyAccounts({
-        purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
-        moneyAccounts: existing?.moneyAccounts,
-      });
-      const prevByKey = new Map(prevMoney.map((a) => [a.key, a]));
-      const settlementOnly = prevMoney.filter((a) => a.kind === 'settlement');
-      moneyAccountsNormalized = normalizeMoneyAccounts({
-        purchaseTreasuryMethods: treasuryNormalized,
-        moneyAccounts: [
-          ...treasuryNormalized.map((t) => {
-            const prev = prevByKey.get(t.key);
-            return {
-              key: t.key,
-              label: t.label,
-              kind: t.key === 'cash' ? 'cash' : 'treasury',
-              channel: prev?.channel || '',
-              accountNumber: prev?.accountNumber || '',
-              phone: prev?.phone || '',
-            };
-          }),
-          ...settlementOnly,
-        ],
-      });
-    }
-
-    if (catalogNormalized !== undefined) {
-      const treasuriesFromCatalog = catalogToPurchaseTreasuryMethods(catalogNormalized);
-      treasuryNormalized = treasuriesFromCatalog;
-
-      const baseMoney =
-        moneyAccountsNormalized ||
-        normalizeMoneyAccounts({
-          purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
-          moneyAccounts: existing?.moneyAccounts,
-        });
-      moneyAccountsNormalized = normalizeMoneyAccounts({
-        purchaseTreasuryMethods: treasuriesFromCatalog,
-        moneyAccounts: mergeMoneyAccountsFromCatalog(baseMoney, catalogNormalized),
-      });
-    } else if (treasuryNormalized !== undefined || moneyAccountsNormalized !== undefined) {
-      // Keep unified catalog in sync when accounts/treasuries are edited alone
-      const effectiveTreasuries =
-        treasuryNormalized ||
-        moneyAccountsToPurchaseTreasuries(
-          moneyAccountsNormalized ||
-            normalizeMoneyAccounts({
-              purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
-              moneyAccounts: existing?.moneyAccounts,
-            })
-        );
-      const baseCatalog = normalizePaymentMethodsCatalog({
-        paymentMethodsCatalog: existing?.paymentMethodsCatalog,
-        paymentAppFeePercents: existing?.paymentAppFeePercents,
-        purchaseTreasuryMethods: existing?.purchaseTreasuryMethods,
-      });
-      const byKey = new Map(baseCatalog.map((r) => [r.key, { ...r }]));
-      for (const t of effectiveTreasuries) {
-        const prev = byKey.get(t.key);
-        if (!prev) {
-          byKey.set(t.key, {
-            key: t.key,
-            label: t.label,
-            showIn: t.key === 'cash' ? 'both' : 'purchase',
-            effectMode: 'instant',
-            feePercent: 0,
-          });
-        } else {
-          prev.label = t.label || prev.label;
-          if (prev.effectMode !== 'none' && prev.showIn === 'sale') {
-            prev.showIn = 'both';
-          }
-        }
-      }
-      catalogNormalized = normalizePaymentMethodsCatalog({
-        paymentMethodsCatalog: Array.from(byKey.values()),
-      });
-    }
-
-    let mapNormalized;
-    if (paymentMethodAccountMap !== undefined) {
-      if (!Array.isArray(paymentMethodAccountMap)) {
-        return res.status(400).json({ error: 'paymentMethodAccountMap must be an array' });
-      }
-      const accountsForKeys =
-        moneyAccountsNormalized ||
-        normalizeMoneyAccounts({
-          purchaseTreasuryMethods:
-            treasuryNormalized ?? existing?.purchaseTreasuryMethods,
-          moneyAccounts: existing?.moneyAccounts,
-        });
-      const keys = new Set(accountsForKeys.map((a) => a.key));
-      mapNormalized = normalizePaymentMethodAccountMap(
-        paymentMethodAccountMap,
-        keys,
-        accountsForKeys
-      );
-    }
-
     let feesNormalized;
-    if (catalogNormalized !== undefined) {
-      feesNormalized = catalogToPaymentAppFeePercents(catalogNormalized);
-    } else if (paymentAppFeePercents !== undefined) {
+    if (paymentAppFeePercents !== undefined) {
       if (!Array.isArray(paymentAppFeePercents)) {
         return res.status(400).json({ error: 'paymentAppFeePercents must be an array' });
       }
@@ -313,10 +126,7 @@ export const updateStoreSettings = async (req, res) => {
     if (storePhoneNumber !== undefined) update.storePhoneNumber = storePhoneNumber.trim().slice(0, 50);
     if (logoUrl !== undefined) update.logoUrl = logoUrl;
     if (receiptLanguage !== undefined) update.receiptLanguage = receiptLangNormalized;
-    if (catalogNormalized !== undefined) update.paymentMethodsCatalog = catalogNormalized;
     if (treasuryNormalized !== undefined) update.purchaseTreasuryMethods = treasuryNormalized;
-    if (moneyAccountsNormalized !== undefined) update.moneyAccounts = moneyAccountsNormalized;
-    if (mapNormalized !== undefined) update.paymentMethodAccountMap = mapNormalized;
     if (feesNormalized !== undefined) update.paymentAppFeePercents = feesNormalized;
     if (returnExchangePolicy !== undefined) {
       update.returnExchangePolicy = returnExchangePolicy.trim().slice(0, 2000);
@@ -331,6 +141,7 @@ export const updateStoreSettings = async (req, res) => {
       update.showBookingPolicyOnReceipt = showBookingPolicyOnReceipt;
     }
 
+    const existing = await getLatestSettingsDoc();
     const filter = existing ? { _id: existing._id } : {};
 
     const doc = await StoreSettings.findOneAndUpdate(
@@ -344,7 +155,18 @@ export const updateStoreSettings = async (req, res) => {
       }
     );
 
-    res.status(200).json(serializeSettings(doc));
+    res.status(200).json({
+      storeName: doc.storeName,
+      storePhoneNumber: doc.storePhoneNumber,
+      logoUrl: doc.logoUrl || '',
+      receiptLanguage: doc.receiptLanguage || 'en',
+      purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
+      paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
+      returnExchangePolicy: doc.returnExchangePolicy || '',
+      showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
+      bookingPolicy: doc.bookingPolicy || '',
+      showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
+    });
   } catch (error) {
     console.error('updateStoreSettings:', error);
     res.status(500).json({ error: 'Failed to update store settings' });

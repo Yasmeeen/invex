@@ -16,41 +16,6 @@ export interface PurchaseTreasuryMethod {
   label: string;
 }
 
-export type MoneyAccountKind = 'cash' | 'treasury' | 'settlement';
-export type MoneyAccountChannel = 'bank' | 'wallet' | '';
-
-export interface MoneyAccount {
-  key: string;
-  label: string;
-  kind: MoneyAccountKind;
-  /** bank vs wallet for treasury accounts. */
-  channel?: MoneyAccountChannel;
-  /** Optional bank account number. */
-  accountNumber?: string;
-  /** Optional wallet phone. */
-  phone?: string;
-}
-
-export type PaymentMethodShowIn = 'sale' | 'purchase' | 'both';
-export type PaymentMethodEffectMode = 'instant' | 'settlement' | 'none';
-export type PaymentMethodMapMode = 'instant' | 'settlement';
-
-export interface PaymentMethodCatalogRow {
-  key: string;
-  label: string;
-  showIn: PaymentMethodShowIn;
-  effectMode: PaymentMethodEffectMode;
-  /** Sale/cashier fee only. */
-  feePercent: number;
-}
-
-export interface PaymentMethodAccountMapRow {
-  method: string;
-  accountKey: string;
-  mode?: PaymentMethodMapMode;
-  settlementBankAccountKey?: string;
-}
-
 export interface PaymentAppFeePercent {
   method: string;
   label?: string;
@@ -62,14 +27,8 @@ export interface StoreSettings {
   storePhoneNumber: string;
   logoUrl: string;
   receiptLanguage: ReceiptLanguageCode;
-  /** Unified payment methods (visibility + effect + sale fee%). */
-  paymentMethodsCatalog: PaymentMethodCatalogRow[];
   /** Purchase desk treasury buckets (from API; includes cash + banks/wallets). */
   purchaseTreasuryMethods: PurchaseTreasuryMethod[];
-  /** Balance-bearing accounts including settlement apps. */
-  moneyAccounts: MoneyAccount[];
-  /** Cashier payment method → money account. */
-  paymentMethodAccountMap: PaymentMethodAccountMapRow[];
   /** Cashier: customer gross payment → invoice net (percent on top of net). */
   paymentAppFeePercents: PaymentAppFeePercent[];
   /** Return & exchange policy text (optional). */
@@ -87,17 +46,7 @@ const DEFAULTS: StoreSettings = {
   storePhoneNumber: '',
   logoUrl: '',
   receiptLanguage: 'en',
-  paymentMethodsCatalog: [
-    { key: 'cash', label: 'Cash', showIn: 'both', effectMode: 'instant', feePercent: 0 },
-    { key: 'credit', label: 'Credit', showIn: 'both', effectMode: 'none', feePercent: 0 },
-  ],
   purchaseTreasuryMethods: [{ key: 'cash', label: 'Cash' }],
-  moneyAccounts: [
-    { key: 'cash', label: 'Cash', kind: 'cash', channel: '', accountNumber: '', phone: '' },
-  ],
-  paymentMethodAccountMap: [
-    { method: 'cash', accountKey: 'cash', mode: 'instant', settlementBankAccountKey: '' },
-  ],
   paymentAppFeePercents: [],
   returnExchangePolicy: '',
   showReturnExchangePolicyOnReceipt: false,
@@ -144,117 +93,6 @@ export class StoreSettingsService {
     return out;
   }
 
-  private normalizeMoneyAccounts(raw: unknown): MoneyAccount[] {
-    if (!Array.isArray(raw)) return [...DEFAULTS.moneyAccounts];
-    const seen = new Set<string>();
-    const out: MoneyAccount[] = [];
-    for (const row of raw as MoneyAccount[]) {
-      const key = String(row?.key ?? '')
-        .trim()
-        .toLowerCase();
-      const label = String(row?.label ?? '').trim();
-      let kind = String(row?.kind ?? 'treasury').trim().toLowerCase() as MoneyAccountKind;
-      if (!key || !label || seen.has(key)) continue;
-      if (key === 'cash') kind = 'cash';
-      if (kind !== 'cash' && kind !== 'treasury' && kind !== 'settlement') kind = 'treasury';
-      let channel = String(row?.channel ?? '')
-        .trim()
-        .toLowerCase() as MoneyAccountChannel;
-      if (kind !== 'treasury' || (channel !== 'bank' && channel !== 'wallet')) {
-        channel = '';
-      }
-      const accountNumber =
-        channel === 'bank' ? String(row?.accountNumber ?? '').trim().slice(0, 80) : '';
-      const phone = channel === 'wallet' ? String(row?.phone ?? '').trim().slice(0, 40) : '';
-      seen.add(key);
-      out.push({ key, label, kind, channel, accountNumber, phone });
-    }
-    if (!out.some((a) => a.key === 'cash')) {
-      out.unshift({
-        key: 'cash',
-        label: 'Cash',
-        kind: 'cash',
-        channel: '',
-        accountNumber: '',
-        phone: '',
-      });
-    }
-    return out;
-  }
-
-  private normalizePaymentMethodsCatalog(raw: unknown): PaymentMethodCatalogRow[] {
-    if (!Array.isArray(raw) || !raw.length) return [...DEFAULTS.paymentMethodsCatalog];
-    const seen = new Set<string>();
-    const out: PaymentMethodCatalogRow[] = [];
-    for (const row of raw as PaymentMethodCatalogRow[]) {
-      const key = String(row?.key ?? '')
-        .trim()
-        .toLowerCase();
-      const label = String(row?.label ?? '').trim();
-      if (!key || !label || seen.has(key) || key === 'mixed') continue;
-      let showIn = String(row?.showIn || 'sale').toLowerCase() as PaymentMethodShowIn;
-      if (showIn !== 'sale' && showIn !== 'purchase' && showIn !== 'both') showIn = 'sale';
-      let effectMode = String(row?.effectMode || 'instant').toLowerCase() as PaymentMethodEffectMode;
-      if (effectMode !== 'instant' && effectMode !== 'settlement' && effectMode !== 'none') {
-        effectMode = 'instant';
-      }
-      if (key === 'credit') effectMode = 'none';
-      if (key === 'cash') effectMode = 'instant';
-      let feePercent = Number(row?.feePercent);
-      if (!Number.isFinite(feePercent)) feePercent = 0;
-      feePercent = Math.max(0, Math.min(100, feePercent));
-      if (key === 'cash' || key === 'credit' || effectMode === 'none') feePercent = 0;
-      seen.add(key);
-      out.push({ key, label, showIn, effectMode, feePercent });
-    }
-    if (!out.some((r) => r.key === 'cash')) {
-      out.unshift({
-        key: 'cash',
-        label: 'Cash',
-        showIn: 'both',
-        effectMode: 'instant',
-        feePercent: 0,
-      });
-    }
-    return out;
-  }
-
-  private normalizePaymentMethodAccountMap(raw: unknown): PaymentMethodAccountMapRow[] {
-    if (!Array.isArray(raw)) return [...DEFAULTS.paymentMethodAccountMap];
-    const seen = new Set<string>();
-    const out: PaymentMethodAccountMapRow[] = [];
-    for (const row of raw as PaymentMethodAccountMapRow[]) {
-      const method = String(row?.method ?? '')
-        .trim()
-        .toLowerCase();
-      let accountKey = String(row?.accountKey ?? '')
-        .trim()
-        .toLowerCase();
-      if (!method || !accountKey || seen.has(method) || method === 'credit' || method === 'mixed') {
-        continue;
-      }
-      if (method === 'cash') accountKey = 'cash';
-      let mode = String(row?.mode || 'instant').toLowerCase() as PaymentMethodMapMode;
-      if (mode !== 'instant' && mode !== 'settlement') mode = 'instant';
-      if (method === 'cash') mode = 'instant';
-      let settlementBankAccountKey = String(row?.settlementBankAccountKey ?? '')
-        .trim()
-        .toLowerCase();
-      if (mode !== 'settlement') settlementBankAccountKey = '';
-      seen.add(method);
-      out.push({ method, accountKey, mode, settlementBankAccountKey });
-    }
-    if (!out.some((r) => r.method === 'cash')) {
-      out.unshift({
-        method: 'cash',
-        accountKey: 'cash',
-        mode: 'instant',
-        settlementBankAccountKey: '',
-      });
-    }
-    return out;
-  }
-
   /** Load from API (call once after login / main layout). */
   load(): void {
     const epoch = ++this.loadEpoch;
@@ -278,12 +116,7 @@ export class StoreSettingsService {
           storePhoneNumber: data.storePhoneNumber ?? '',
           logoUrl: data.logoUrl ?? '',
           receiptLanguage,
-          paymentMethodsCatalog: this.normalizePaymentMethodsCatalog(data.paymentMethodsCatalog),
           purchaseTreasuryMethods: methods.length ? methods : DEFAULTS.purchaseTreasuryMethods,
-          moneyAccounts: this.normalizeMoneyAccounts(data.moneyAccounts),
-          paymentMethodAccountMap: this.normalizePaymentMethodAccountMap(
-            data.paymentMethodAccountMap
-          ),
           paymentAppFeePercents: this.normalizePaymentAppFeePercents(data.paymentAppFeePercents),
           returnExchangePolicy: data.returnExchangePolicy ?? '',
           showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
@@ -358,26 +191,11 @@ export class StoreSettingsService {
           data.paymentAppFeePercents !== undefined && data.paymentAppFeePercents !== null
             ? this.normalizePaymentAppFeePercents(data.paymentAppFeePercents)
             : this._settings.value.paymentAppFeePercents;
-        const mergedMoney =
-          data.moneyAccounts !== undefined && data.moneyAccounts !== null
-            ? this.normalizeMoneyAccounts(data.moneyAccounts)
-            : this._settings.value.moneyAccounts;
-        const mergedMap =
-          data.paymentMethodAccountMap !== undefined && data.paymentMethodAccountMap !== null
-            ? this.normalizePaymentMethodAccountMap(data.paymentMethodAccountMap)
-            : this._settings.value.paymentMethodAccountMap;
-        const mergedCatalog =
-          data.paymentMethodsCatalog !== undefined && data.paymentMethodsCatalog !== null
-            ? this.normalizePaymentMethodsCatalog(data.paymentMethodsCatalog)
-            : this._settings.value.paymentMethodsCatalog;
         this._settings.next({
           ...this._settings.value,
           ...data,
           receiptLanguage,
-          paymentMethodsCatalog: mergedCatalog,
           purchaseTreasuryMethods: mergedMethods?.length ? mergedMethods : DEFAULTS.purchaseTreasuryMethods,
-          moneyAccounts: mergedMoney,
-          paymentMethodAccountMap: mergedMap,
           paymentAppFeePercents: mergedFees,
         });
         this.ensureReceiptTranslationPacks();

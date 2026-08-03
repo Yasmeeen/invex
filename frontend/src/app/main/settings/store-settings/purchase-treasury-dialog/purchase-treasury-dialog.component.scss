@@ -1,13 +1,1 @@
 @import '../settings-dialog-shared.scss';
-
-.money-accounts-table__head,
-.money-accounts-table__row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1.3fr) minmax(100px, 0.9fr) minmax(120px, 1.2fr) 40px;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.money-accounts-table__ref {
-  min-width: 0;
-}

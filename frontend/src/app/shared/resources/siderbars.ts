@@ -59,33 +59,6 @@ export const AdminSidebar = [
     routerLink: '/drawer-close',
     icon: 'fa fa-inbox icon',
   },
-  {
-    name: 'tr_treasury_menu',
-    routerLink: 'null',
-    icon: 'fa fa-university icon',
-    children: [
-      {
-        name: 'tr_treasury_balances',
-        routerLink: '/treasury',
-        icon: 'fa fa-balance-scale icon',
-      },
-      {
-        name: 'tr_money_accounts_settings_title',
-        routerLink: '/treasury/config/treasuries',
-        icon: 'fa fa-university icon',
-      },
-      {
-        name: 'tr_payment_methods_catalog_title',
-        routerLink: '/treasury/config/payment-methods',
-        icon: 'fa fa-credit-card icon',
-      },
-      {
-        name: 'tr_payment_account_map_title',
-        routerLink: '/treasury/config/payment-map',
-        icon: 'fa fa-link icon',
-      },
-    ],
-  },
 
   {
     name: 'tr_purchases',
@@ -161,24 +134,14 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
   }
 );
 
-/** Branch Manager: like Co Admin but no branches, settings, or users.
- *  Treasury config (accounts / payment methods / payment map) is admin-only.
- */
+/** Branch Manager: like Co Admin but no branches, settings, or users. */
 export const BranchManagerSidebar = CoAdminSidebar.filter(
   (item) =>
     item.routerLink !== '/branches' &&
     item.routerLink !== '/settings' &&
     item.routerLink !== '/users' &&
     item.routerLink !== '/audits'
-).map((item) => {
-  if (item.name === 'tr_treasury_menu' && item.children?.length) {
-    return {
-      ...item,
-      children: item.children.filter((c) => c.routerLink === '/treasury'),
-    };
-  }
-  return item;
-});
+);
 
 export const Cashier = [
 
@@ -201,11 +164,6 @@ export const Cashier = [
     name: 'tr_drawer_close_history_menu',
     routerLink: '/drawer-close',
     icon: 'fa fa-inbox icon',
-  },
-  {
-    name: 'tr_treasury_menu',
-    routerLink: '/treasury',
-    icon: 'fa fa-university icon',
   },
   {
     name: 'tr_vixa',

@@ -1,96 +1,62 @@
 <div class="payment-app-fees-dialog">
   <h2 mat-dialog-title class="payment-app-fees-dialog__title">
-    {{ 'tr_payment_methods_catalog_title' | translate }}
+    {{ 'tr_payment_methods_fees_title' | translate }}
   </h2>
 
   <div mat-dialog-content class="payment-app-fees-dialog__content">
     <div class="payment-app-fees-dialog__scroll">
-      <p class="payment-app-fees-dialog__lead">{{ 'tr_payment_methods_catalog_hint' | translate }}</p>
+    <p class="payment-app-fees-dialog__lead">{{ 'tr_payment_methods_fees_hint' | translate }}</p>
 
-      <div class="settings-dialog-table payment-methods-catalog-table">
-        <div class="settings-dialog-table__head payment-methods-catalog-table__head">
-          <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
-          <span>{{ 'tr_pay_show_in' | translate }}</span>
-          <span>{{ 'tr_pay_effect' | translate }}</span>
-          <span>{{ 'tr_payment_methods_fees_col_percent' | translate }}</span>
-          <span></span>
+    <div class="settings-dialog-table payment-methods-fees-table">
+      <div class="settings-dialog-table__head payment-methods-fees-table__head">
+        <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
+        <span>{{ 'tr_payment_methods_fees_col_percent' | translate }}</span>
+        <span></span>
+      </div>
+      <div class="settings-dialog-table__row payment-methods-fees-table__row mb-2" *ngFor="let row of feeRows; let i = index">
+        <div class="payment-methods-fees-table__method">
+          <input
+            type="text"
+            class="s-control settings-dialog-table__label"
+            [(ngModel)]="row.label"
+            [name]="'payMethodLabel_' + i"
+            maxlength="120"
+            autocomplete="off"
+            [attr.placeholder]="'tr_payment_methods_fees_method_placeholder' | translate"
+          />
         </div>
-        <div
-          class="settings-dialog-table__row payment-methods-catalog-table__row mb-2"
-          *ngFor="let row of rows; let i = index"
-        >
-          <div class="payment-methods-catalog-table__method">
-            <input
-              type="text"
-              class="s-control settings-dialog-table__label"
-              [(ngModel)]="row.label"
-              [name]="'payMethodLabel_' + i"
-              maxlength="120"
-              autocomplete="off"
-              [attr.placeholder]="'tr_payment_methods_fees_method_placeholder' | translate"
-            />
-          </div>
-          <select
-            class="s-control"
-            [(ngModel)]="row.showIn"
-            [name]="'payShowIn_' + i"
+        <div class="payment-methods-fees-table__percent-cell">
+          <input
+            type="number"
+            class="s-control payment-methods-fees-table__percent"
+            [(ngModel)]="row.percent"
+            [name]="'payMethodPct_' + i"
+            min="0"
+            max="100"
+            step="0.01"
+          />
+        </div>
+        <div class="payment-methods-fees-table__actions">
+          <button
+            type="button"
+            class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
+            (click)="removeRow(i)"
+            [attr.title]="'tr_remove' | translate"
           >
-            <option *ngFor="let opt of showInOptions" [value]="opt.value">
-              {{ opt.labelKey | translate }}
-            </option>
-          </select>
-          <select
-            class="s-control"
-            [(ngModel)]="row.effectMode"
-            [name]="'payEffect_' + i"
-            [disabled]="row.key === 'cash' || row.key === 'credit'"
-            (ngModelChange)="onEffectChange(row)"
-          >
-            <option *ngFor="let opt of effectOptions" [value]="opt.value">
-              {{ opt.labelKey | translate }}
-            </option>
-          </select>
-          <div class="payment-methods-fees-table__percent-cell">
-            <input
-              type="number"
-              class="s-control payment-methods-fees-table__percent"
-              [(ngModel)]="row.feePercent"
-              [name]="'payMethodPct_' + i"
-              min="0"
-              max="100"
-              step="0.01"
-              [disabled]="!isFeeEditable(row)"
-              [attr.title]="'tr_pay_fee_sale_only_hint' | translate"
-            />
-          </div>
-          <div class="payment-methods-fees-table__actions">
-            <button
-              type="button"
-              class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
-              (click)="removeRow(i)"
-              [disabled]="row.key === 'cash' || row.key === 'credit'"
-              [attr.title]="'tr_remove' | translate"
-            >
-              <i class="fa fa-trash-o"></i>
-            </button>
-          </div>
+            <i class="fa fa-trash-o"></i>
+          </button>
         </div>
       </div>
+    </div>
 
-      <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
-        <i class="fa fa-plus mr-1"></i>{{ 'tr_payment_methods_fees_add' | translate }}
-      </button>
+    <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
+      <i class="fa fa-plus mr-1"></i>{{ 'tr_payment_methods_fees_add' | translate }}
+    </button>
     </div>
   </div>
 
   <div mat-dialog-actions align="end" class="payment-app-fees-dialog__actions">
-    <button
-      type="button"
-      class="s-btn btn-secondary"
-      *ngIf="isDialog"
-      (click)="cancel()"
-      [disabled]="saving"
-    >
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
       {{ 'tr_cancel' | translate }}
     </button>
     <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">

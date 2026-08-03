@@ -20,7 +20,6 @@ import aiRoutes from './modules/ai_module/router.js';
 import productPurchaseRequestsRoutes from './modules/product_purchase_requests_module/router.js';
 import dailyExpensesRoutes from './modules/daily_expenses_module/router.js';
 import drawerCloseRoutes from './modules/drawer_close_module/router.js';
-import treasuryAccountsRoutes from './modules/treasury_accounts_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -67,7 +66,6 @@ const bootstrap = (app, express) => {
   app.use('/api/product-purchase-requests', productPurchaseRequestsRoutes);
   app.use('/api/daily-expenses', dailyExpensesRoutes);
   app.use('/api/drawer-close', drawerCloseRoutes);
-  app.use('/api/treasury', treasuryAccountsRoutes);
 
   return app;
 };

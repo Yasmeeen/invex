@@ -2155,7 +2155,7 @@ export const approveBranchTransfer = async (req, res) => {
   }
 };
 
-/** Body: userId, rejectReason? */
+/** Body: userId, rejectReason (required) */
 export const rejectBranchTransfer = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -2168,6 +2168,11 @@ export const rejectBranchTransfer = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!rejectReason) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'rejectReason is required' });
     }
     if (!mongoose.Types.ObjectId.isValid(String(id))) {
       await session.abortTransaction();
@@ -2390,7 +2395,11 @@ export const listBranchTransfers = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('product', 'name code stock branch inWarehouse transferReservedQuantity category')
+        .populate({
+          path: 'product',
+          select: 'name code stock branch inWarehouse transferReservedQuantity category',
+          populate: { path: 'category', select: 'name deleteProductWhenOutOfStock' },
+        })
         .populate('destinationProduct', 'name code')
         .populate('fromBranch', 'name')
         .populate('toBranch', 'name')

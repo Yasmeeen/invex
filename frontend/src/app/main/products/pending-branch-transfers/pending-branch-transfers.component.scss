@@ -82,8 +82,43 @@
   }
 }
 
-.reject-panel .justify-end {
-  justify-content: flex-end;
+.reject-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.reject-modal {
+  width: 100%;
+  max-width: 460px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.reject-modal__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.reject-modal__message {
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.reject-modal__details {
+  margin: 0 0 1rem;
+  padding-inline-start: 1.15rem;
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .gap-2 {
@@ -96,4 +131,16 @@
 
 .d-block {
   display: block;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
 }

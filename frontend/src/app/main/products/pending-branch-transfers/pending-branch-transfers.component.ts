@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -8,6 +9,7 @@ import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch, Category } from '@core/models/products.model';
 import { formatCairoDateTime, formatCairoYMD } from '@core/utils/date-tz.util';
 import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { CategoriesServce } from '@shared/services/categories.service';
@@ -71,7 +73,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private exportService: ReportExportService,
     private globals: Globals,
-    private router: Router
+    private router: Router,
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -349,16 +352,99 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   }
 
   startReject(t: BranchTransferItem): void {
+    if (this.actingId) {
+      return;
+    }
     this.rejectTransfer = t;
     this.rejectReason = '';
   }
 
   cancelReject(): void {
+    if (this.actingId) {
+      return;
+    }
     this.rejectTransfer = null;
     this.rejectReason = '';
   }
 
   approve(t: BranchTransferItem): void {
+    if (this.actingId) {
+      return;
+    }
+    this.dialog
+      .open(ConfirmationDialogComponent, {
+        width: '450px',
+        data: {
+          title: this.translate.instant('tr_confirmation_message'),
+          message: this.translate.instant('tr_branch_transfer_approve_confirm_message'),
+          details: this.transferConfirmDetails(t),
+          buttons: [
+            {
+              label: this.translate.instant('tr_action.cancel'),
+              actionCallback: 'cancel',
+              type: 'btn-secondary',
+            },
+            {
+              label: this.translate.instant('tr_branch_transfer_approve'),
+              actionCallback: 'confirm',
+              type: 'btn-primary',
+            },
+          ],
+        },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result === 'confirm') {
+          this.doApprove(t);
+        }
+      });
+  }
+
+  private transferConfirmDetails(t: BranchTransferItem): string[] {
+    const details = [
+      `${this.translate.instant('tr_product_name')}: ${t.product?.name || '—'}`,
+      `${this.translate.instant('tr_branch_transfer_from')}: ${t.fromBranch?.name || '—'}`,
+      `${this.translate.instant('tr_branch_transfer_to_branch')}: ${t.toBranch?.name || '—'}`,
+      `${this.translate.instant('tr_branch_transfer_quantity')}: ${t.quantity ?? 0}`,
+    ];
+    const stockOutcome = this.sourceStockOutcomeNote(t);
+    if (stockOutcome) {
+      details.push(stockOutcome);
+    }
+    return details;
+  }
+
+  /**
+   * Explain source-branch product fate per category setting when stock hits 0
+   * (keep visible at 0 vs soft-hide / remove from lists).
+   */
+  private sourceStockOutcomeNote(t: BranchTransferItem): string | null {
+    if (!t.product) {
+      return null;
+    }
+    const cat = t.product.category;
+    const deleteWhenEmpty =
+      !!cat && typeof cat === 'object' && !!cat.deleteProductWhenOutOfStock;
+    const stock = Math.max(0, Number(t.product.stock) || 0);
+    const qty = Math.max(0, Number(t.quantity) || 0);
+    const willDepleteNow = qty > 0 && stock - qty <= 0;
+
+    if (willDepleteNow) {
+      return this.translate.instant(
+        deleteWhenEmpty
+          ? 'tr_branch_transfer_approve_source_will_remove'
+          : 'tr_branch_transfer_approve_source_will_keep_zero'
+      );
+    }
+    return this.translate.instant(
+      deleteWhenEmpty
+        ? 'tr_branch_transfer_approve_category_removes_on_empty'
+        : 'tr_branch_transfer_approve_category_keeps_at_zero'
+    );
+  }
+
+  private doApprove(t: BranchTransferItem): void {
     const user = this.auth.getUserFromLocalStorage();
     const uid = user?._id != null ? String(user._id) : '';
     if (!uid || this.actingId) {
@@ -383,11 +469,16 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     const t = this.rejectTransfer;
     const user = this.auth.getUserFromLocalStorage();
     const uid = user?._id != null ? String(user._id) : '';
+    const reason = this.rejectReason.trim();
     if (!t || !uid || this.actingId) {
       return;
     }
+    if (!reason) {
+      this.notify.push(this.translate.instant('tr_branch_transfer_reject_reason_required'), 'error');
+      return;
+    }
     this.actingId = t._id;
-    this.products.rejectBranchTransfer(t._id, uid, this.rejectReason.trim()).subscribe({
+    this.products.rejectBranchTransfer(t._id, uid, reason).subscribe({
       next: () => {
         this.actingId = null;
         this.cancelReject();

@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { ProductsRoutingModule } from './products-routing.module';
 import { ProductsListComponent } from './products-list/products-list.component';
@@ -36,6 +37,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     SharedModule,
     CreateEditProductModule,
     PaymentSplitsDialogModule,
+    MatDialogModule,
     TranslateModule.forChild(),
   ],
   providers: [

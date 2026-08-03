@@ -62,7 +62,16 @@ export type BranchTransferItem = {
   rejectReason?: string;
   createdAt?: string;
   resolvedAt?: string;
-  product?: { name?: string; code?: string };
+  product?: {
+    name?: string;
+    code?: string;
+    stock?: number;
+    category?: {
+      _id?: string;
+      name?: string;
+      deleteProductWhenOutOfStock?: boolean;
+    } | string;
+  };
   fromBranch?: { _id?: string; name?: string };
   toBranch?: { _id?: string; name?: string };
   initiatedBy?: { name?: string };

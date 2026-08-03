@@ -108,6 +108,10 @@
           <span class="meta-label">{{ 'tr_price' | translate }}</span>
           <strong>{{ result.product.price }} EGP</strong>
         </div>
+        <div class="col-md-3 col-6 mb-2" *ngIf="result.product.netPrice != null">
+          <span class="meta-label">{{ 'tr_net_price' | translate }}</span>
+          <strong>{{ result.product.netPrice }} EGP</strong>
+        </div>
         <div
           class="col-md-3 col-6 mb-2"
           *ngIf="result.product.acquiredFrom?.displayName"

@@ -298,6 +298,46 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.confirmedPaymentForTotal = null;
   }
 
+  /**
+   * Keep cashier-confirmed payment methods when client phone lookup / bookings refresh.
+   * Only wipe or rescale when the amount due actually changes (e.g. booking deposit credit).
+   */
+  private reconcileConfirmedPaymentWithCheckoutTotal(): void {
+    if (!this.confirmedPayment || this.confirmedPaymentForTotal == null) {
+      return;
+    }
+    const total = this.effectiveCheckoutTotal();
+    if (Math.abs(this.confirmedPaymentForTotal - total) < 0.01) {
+      return;
+    }
+
+    const splits = (this.confirmedPayment.paymentSplits || []).filter(
+      (s) => (Number(s.amount) || 0) > 0 && String(s.method || '').trim()
+    );
+    const single = splits.length === 1 ? splits[0] : null;
+    const method = String(single?.method || '')
+      .trim()
+      .toLowerCase();
+
+    // Single non-credit method: keep Instapay/visa/… and update the amount.
+    if (single && method && method !== 'credit') {
+      const feeSources = (this.confirmedPayment.feeAllocations || []).map((f) => ({
+        forMethod: f.forMethod,
+        paidVia: f.paidVia === f.forMethod ? 'same' : f.paidVia,
+      }));
+      this.confirmedPayment = buildPaymentSplitsResult(
+        [{ method, amount: total }],
+        feeSources,
+        this.storeSettings.snapshot.paymentAppFeePercents
+      );
+      this.confirmedPaymentForTotal = total;
+      return;
+    }
+
+    // Multi-split / credit: amounts are no longer valid — cashier must reconfirm.
+    this.invalidateConfirmedPayment();
+  }
+
   startExchangeFlow(): void {
     this.openDeskPurchaseProductDialog({ mode: 'exchange' });
   }
@@ -654,14 +694,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private loadClientActiveBookings(): void {
     if (this.partyType !== 'client') {
       this.clientActiveBookings = [];
-      this.invalidateConfirmedPayment();
+      this.reconcileConfirmedPaymentWithCheckoutTotal();
       return;
     }
     const phone = String(this.clientForm?.get('phone')?.value || '').trim();
     const clientId = this.selectedClientId || '';
     if (!phone && !clientId) {
       this.clientActiveBookings = [];
-      this.invalidateConfirmedPayment();
+      this.reconcileConfirmedPaymentWithCheckoutTotal();
       return;
     }
     const token = ++this.clientBookingsLoadToken;
@@ -672,13 +712,13 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         next: (res) => {
           if (token !== this.clientBookingsLoadToken) return;
           this.clientActiveBookings = Array.isArray(res?.bookings) ? res.bookings : [];
-          this.invalidateConfirmedPayment();
+          this.reconcileConfirmedPaymentWithCheckoutTotal();
           this.notifyMatchedBookingDeposit();
         },
         error: () => {
           if (token !== this.clientBookingsLoadToken) return;
           this.clientActiveBookings = [];
-          this.invalidateConfirmedPayment();
+          this.reconcileConfirmedPaymentWithCheckoutTotal();
         },
       });
   }
@@ -713,6 +753,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private clearClientActiveBookings(): void {
     this.clientBookingsLoadToken++;
     this.clientActiveBookings = [];
+    this.reconcileConfirmedPaymentWithCheckoutTotal();
   }
 
   private orderLineProductId(item: any): string {

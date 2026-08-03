@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, Input } from '@angular/core';
+
+export type ReportCellPart = {
+  text: string;
+  routerLink?: string | any[];
+  queryParams?: Record<string, string>;
+};
 
 @Component({
   selector: 'app-report-table',
@@ -6,12 +12,16 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   styleUrls: ['./report-table.component.scss'],
 })
 export class ReportTableComponent {
-  @Input() columns: { key: string; labelKey: string; format?: 'money' }[] = [];
+  @Input() columns: { key: string; labelKey: string; format?: 'money' | 'parts' }[] = [];
   @Input() rows: any[] = [];
   /** Larger padding / row height (used for bookings table). */
   @Input() roomy = false;
 
   previewUrl: string | null = null;
+
+  isParts(v: any): v is ReportCellPart[] {
+    return Array.isArray(v) && v.every((p) => p && typeof p === 'object' && 'text' in p);
+  }
 
   isUrl(v: any): boolean {
     const s = String(v ?? '').trim();
@@ -37,4 +47,3 @@ export class ReportTableComponent {
     this.previewUrl = null;
   }
 }
-

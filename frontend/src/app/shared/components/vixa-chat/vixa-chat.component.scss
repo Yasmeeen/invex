@@ -2,7 +2,8 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 9999;
+  /* Below mobile sidebar / Material overlays; above page content */
+  z-index: 40;
   font-family: inherit;
 
   &--drag-enabled {
@@ -398,6 +399,36 @@
   &__send[disabled] {
     opacity: 0.65;
     cursor: not-allowed;
+  }
+}
+
+/* Mobile: keep chat below the topbar so hamburger / menus stay clickable */
+@media (max-width: 991px) {
+  .vixa:not(.vixa--page) {
+    .vixa__panel {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      top: 64px;
+      bottom: 10px;
+      width: auto;
+      height: auto;
+      max-width: none;
+      max-height: none;
+      border-radius: 14px;
+    }
+
+    .vixa__fab {
+      z-index: 1;
+    }
+  }
+}
+
+/* While the app drawer is open, get Vixa out of the way */
+:host-context(body.sidebar-active) {
+  .vixa:not(.vixa--page) {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 

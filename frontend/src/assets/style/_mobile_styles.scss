@@ -2,6 +2,46 @@
 
 .title-with-btn {
     padding-bottom: 1.5rem;
+    align-items: stretch;
+    gap: 0.75rem;
+
+    .page-title {
+        width: 100%;
+        line-height: 1.35;
+    }
+
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: 100%;
+        gap: 0.5rem;
+
+        > button,
+        > .s-btn {
+            margin: 0 !important;
+            border-radius: 4px !important;
+            border-width: 1px !important;
+            flex: 1 1 calc(50% - 0.25rem);
+            min-width: 0;
+            text-align: center;
+            white-space: nowrap;
+        }
+    }
+
+    /* Compact view toggles / icon-only groups stay tight */
+    .btn-group.products-toolbar__view,
+    .products-toolbar__view.btn-group {
+        width: auto;
+        flex: 0 0 auto;
+
+        > button,
+        > .s-btn {
+            flex: 0 0 auto;
+            min-width: 2.375rem;
+            padding-inline: 0.65rem;
+        }
+    }
 }
 
 .btn-block-mob {

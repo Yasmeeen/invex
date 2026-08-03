@@ -8,61 +8,69 @@
     <span class="page-title">
       <span class="text-primary">{{totalNumberOfProducts}}-</span>
       {{ "tr_products" | translate }}</span>
-    <div class="btn-group">
-      <button
-        type="button"
-        class="s-btn  size-body"
-        [class.btn-primary]="viewMode === 'table'"
-        [class.btn-secondary]="viewMode !== 'table'"
-        (click)="setViewMode('table')"
-      >
-        <i class="fa fa-table" aria-hidden="true"></i>
-      </button>
-      <button
-        type="button"
-        class="s-btn size-body"
-        [class.btn-secondary]="viewMode !== 'cards'"
-        [class.btn-primary]="viewMode === 'cards'"
-        (click)="setViewMode('cards')"
-      >
-        <i class="fa fa-th-large" aria-hidden="true"></i>
-      </button>
-      <button
-        *ngIf="canAddProduct"
-        class="s-btn btn-secondary"
-        (click)="openImportDialog()"
-      >
-        {{ 'tr_upload_excel_sheet' | translate }}
-      </button>
-      <button
-        *ngIf="canAddProduct"
-        class="s-btn btn-primary"
-        (click)="createOrEditproduct(false)"
-      >
-        {{ "tr_add_product" | translate }}
-      </button>
-      <button
-        class="s-btn btn-secondary size-body"
-        (click)="isFilterOpen = !isFilterOpen"
-      >
-        <i class="fa fa-filter text-primary" aria-hidden="false"></i>
-      </button>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body"
-        (click)="openProductsInventoryAudit()"
-      >
-        <i class="fa fa-clipboard text-primary" aria-hidden="true"></i>
-        {{ 'tr_products_inventory_audit' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body"
-        (click)="openSerialTrack()"
-      >
-        <i class="fa fa-barcode text-primary" aria-hidden="true"></i>
-        {{ 'tr_serial_track' | translate }}
-      </button>
+    <div class="products-toolbar">
+      <div class="btn-group products-toolbar__view">
+        <button
+          type="button"
+          class="s-btn size-body"
+          [class.btn-primary]="viewMode === 'table'"
+          [class.btn-secondary]="viewMode !== 'table'"
+          (click)="setViewMode('table')"
+        >
+          <i class="fa fa-table" aria-hidden="true"></i>
+        </button>
+        <button
+          type="button"
+          class="s-btn size-body"
+          [class.btn-secondary]="viewMode !== 'cards'"
+          [class.btn-primary]="viewMode === 'cards'"
+          (click)="setViewMode('cards')"
+        >
+          <i class="fa fa-th-large" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="products-toolbar__actions">
+        <button
+          *ngIf="canAddProduct"
+          type="button"
+          class="s-btn btn-secondary"
+          (click)="openImportDialog()"
+        >
+          <i class="fa fa-upload" aria-hidden="true"></i>
+          {{ 'tr_upload_excel_sheet' | translate }}
+        </button>
+        <button
+          *ngIf="canAddProduct"
+          type="button"
+          class="s-btn btn-primary"
+          (click)="createOrEditproduct(false)"
+        >
+          {{ "tr_add_product" | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body products-toolbar__icon-btn"
+          (click)="isFilterOpen = !isFilterOpen"
+        >
+          <i class="fa fa-filter text-primary" aria-hidden="false"></i>
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body"
+          (click)="openProductsInventoryAudit()"
+        >
+          <i class="fa fa-clipboard text-primary" aria-hidden="true"></i>
+          {{ 'tr_products_inventory_audit' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body"
+          (click)="openSerialTrack()"
+        >
+          <i class="fa fa-barcode text-primary" aria-hidden="true"></i>
+          {{ 'tr_serial_track' | translate }}
+        </button>
+      </div>
     </div>
   </h2>
 

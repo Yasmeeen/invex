@@ -45,7 +45,7 @@
           [placeholder]="'tr_audit_filter_entity_placeholder' | translate"
         />
       </div>
-      <div class="col-md-9 mb-2 d-flex align-items-end justify-content-end gap-2">
+      <div class="col-md-9 mb-2 audits-filters__actions">
         <button class="s-btn btn-secondary" type="button" (click)="clearFilters()">
           {{ 'tr_clear' | translate }}
         </button>
@@ -56,19 +56,20 @@
     </div>
   </div>
 
-  <div class="mt-3">
+  <div class="mt-3 audits-table-wrap">
     <div class="text-muted size-small mb-2" *ngIf="!loading">
       {{ 'tr_audit_total' | translate }}: {{ totalCount }}
     </div>
-    <app-report-table [columns]="columns" [rows]="rows"></app-report-table>
+    <app-report-table [columns]="columns" [rows]="rows" [roomy]="true"></app-report-table>
   </div>
 
-  <div class="reports-page__pagination mt-2" *ngIf="totalPages > 1">
+  <div class="reports-page__pagination mt-2" *ngIf="totalCount > 0">
     <button type="button" class="s-btn btn-secondary btn-sm" [disabled]="page <= 1" (click)="prev()">
       {{ 'tr_previous' | translate }}
     </button>
     <span class="size-small text-muted">
       {{ 'tr_page' | translate }} {{ page }} / {{ totalPages }}
+      · {{ 'tr_audit_total' | translate }}: {{ totalCount }}
     </span>
     <button type="button" class="s-btn btn-secondary btn-sm" [disabled]="page >= totalPages" (click)="next()">
       {{ 'tr_next' | translate }}

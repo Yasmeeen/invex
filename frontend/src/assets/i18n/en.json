@@ -386,7 +386,7 @@
   "tr_product_tab_basic": "Basic info",
   "tr_product_tab_units": "Device details",
   "tr_product_tab_payment": "Payment & treasury",
-  "tr_product_tab_units_hint": "After you enter the quantity, you will move to the Device details tab to enter the code, prices, image, and attributes.",
+  "tr_product_tab_units_hint": "After you enter the quantity, open the Device details tab to enter the code, prices, image, and attributes.",
   "tr_product_tab_units_open": "Go to device details",
   "tr_product_tab_units_shared_data": "Shared data for all codes",
   "tr_product_tab_units_shared_data_hint": "The same prices, discount, image, and attributes apply to every unit.",

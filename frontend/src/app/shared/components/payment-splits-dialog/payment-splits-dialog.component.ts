@@ -176,11 +176,14 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     }
     const id = this.selectedPayMethods[0];
     const cur = Number(this.payAmounts[id]);
-    if (!Number.isFinite(cur) || cur <= 0) {
-      if (this.isCreditPayMethod(id)) {
+    if (this.isCreditPayMethod(id)) {
+      if (!Number.isFinite(cur) || cur < 0) {
         this.payAmounts = { ...this.payAmounts, credit: 0 };
-        return;
       }
+      return;
+    }
+    // Keep single method in sync with invoice total (avoids freezing at first typed digit).
+    if (!Number.isFinite(cur) || Math.abs(cur - this.invoiceNetTotal) > 0.001) {
       this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, this.invoiceNetTotal) };
     }
   }

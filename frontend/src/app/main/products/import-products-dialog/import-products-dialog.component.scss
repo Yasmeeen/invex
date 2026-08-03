@@ -90,5 +90,40 @@
     padding: 10px 12px;
     font-size: 12px;
   }
+
+  @media (max-width: 767px) {
+    .import-errors__header {
+      flex-direction: column;
+      align-items: stretch;
+
+      .s-btn {
+        width: 100%;
+        text-align: center;
+      }
+    }
+
+    .import-errors__title {
+      flex-wrap: wrap;
+    }
+
+    .error-row {
+      grid-template-columns: 1fr;
+      gap: 2px;
+      padding: 8px 0;
+    }
+
+    .error-cell {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
+
+    .error-cell.sheet,
+    .error-cell.row,
+    .error-cell.field {
+      font-weight: 600;
+      color: #64748b;
+    }
+  }
 }
 

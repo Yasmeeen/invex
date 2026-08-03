@@ -275,9 +275,17 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     const key = this.selectedDeskTreasuryKeys[0];
     const total = this.deskPurchaseTotalCost;
     const cur = Number(this.deskTreasuryAmounts[key]);
-    if (!Number.isFinite(cur) || cur <= 0) {
+    // Always keep the single selected treasury in sync with the purchase total.
+    // Otherwise typing netPrice digit-by-digit (9 → 90 → 900 → 9000) freezes cash at the first positive value.
+    if (!Number.isFinite(cur) || Math.abs(cur - total) > 0.001) {
       this.deskTreasuryAmounts = { ...this.deskTreasuryAmounts, [key]: Math.max(0, total) };
     }
+  }
+
+  /** Call when opening the payment tab so cash/treasury amounts match current prices. */
+  onPaymentTabOpened(): void {
+    this.syncDeskPurchaseTreasuryKey();
+    this.ensureDefaultDeskTreasuryAmounts();
   }
 
   private buildPurchaseTreasurySplitsPayload():
@@ -351,22 +359,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.activeTab === 'payment' && !this.showPaymentTab) {
       this.activeTab = 'basic';
     }
-  }
-
-  /** After quantity is entered on create, move user to the device-data tab. */
-  private maybeGoToDeviceTabAfterQuantity(): void {
-    if (this.isEdit) {
-      return;
-    }
-    const raw = this.basicInfoForm?.value?.stock;
-    if (raw === '' || raw == null) {
-      return;
-    }
-    const n = Number(raw);
-    if (Number.isNaN(n) || n < 1) {
-      return;
-    }
-    this.activeTab = 'units';
   }
 
   /** Popup title: desk purchase vs exchange trade-in vs default. */
@@ -730,7 +722,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.multiUnitVariants = [];
       this.unitsShareSameData = true;
       this.ensureActiveTabValid();
-      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
     const q = this.getStockQty();
@@ -739,7 +730,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.multiUnitVariants = [];
       this.unitsShareSameData = true;
       this.ensureActiveTabValid();
-      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
 
@@ -749,14 +739,12 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.syncMultiUnitVariantsLength();
       this.onDeskTreasuryCostInputsChanged();
       this.ensureActiveTabValid();
-      this.maybeGoToDeviceTabAfterQuantity();
       return;
     }
 
     if (this.multiUnitCodes.length < q) {
       const cat = this.selectedCategory;
       if (!cat?._id || !this.hasCategoryCode(cat)) {
-        this.maybeGoToDeviceTabAfterQuantity();
         return;
       }
       const genId = ++this.multiUnitCodesGenId;
@@ -779,7 +767,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
             this.onDeskTreasuryCostInputsChanged();
             this.isCodeGenerated = true;
             this.ensureActiveTabValid();
-            this.maybeGoToDeviceTabAfterQuantity();
           },
           error: (err: any) => {
             if (genId !== this.multiUnitCodesGenId) {
@@ -789,7 +776,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
               err?.error?.error ||
               this.translateService.instant('tr_barcode_generate_failed');
             this.appNotificationService.push(msg, 'error');
-            this.maybeGoToDeviceTabAfterQuantity();
           },
         });
       return;
@@ -798,7 +784,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     this.syncPrimaryCodeFromMultiUnits();
     this.syncMultiUnitVariantsLength();
     this.ensureActiveTabValid();
-    this.maybeGoToDeviceTabAfterQuantity();
   }
 
   /** Replace every unit code with a fresh block from the server (current quantity). */
@@ -1706,9 +1691,13 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_ok'), 'success');
           input.value = '';
         },
-        () => {
+        (err) => {
           this.isUploadingImage = false;
-          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_failed'), 'error');
+          const msg =
+            err?.error?.error ||
+            err?.error?.message ||
+            this.translateService.instant('tr_product_image_upload_failed');
+          this.appNotificationService.push(msg, 'error');
           input.value = '';
         }
       )
@@ -1758,9 +1747,13 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_ok'), 'success');
           input.value = '';
         },
-        () => {
+        (err) => {
           this.uploadingUnitImageIndex = null;
-          this.appNotificationService.push(this.translateService.instant('tr_product_image_upload_failed'), 'error');
+          const msg =
+            err?.error?.error ||
+            err?.error?.message ||
+            this.translateService.instant('tr_product_image_upload_failed');
+          this.appNotificationService.push(msg, 'error');
           input.value = '';
         }
       )

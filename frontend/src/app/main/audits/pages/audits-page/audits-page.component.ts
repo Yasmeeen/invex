@@ -2,8 +2,16 @@ import { Component, OnInit } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { AuditsService, AuditLogRow } from '@shared/services/audits.service';
+import { ReportCellPart } from '../../../reports/components/report-table/report-table.component';
 
-type Col = { key: string; labelKey: string };
+type Col = { key: string; labelKey: string; format?: 'money' | 'parts' };
+
+const PRODUCT_ENTITY_TYPES = new Set([
+  'Product',
+  'ProductBooking',
+  'ProductPurchaseRequest',
+  'ProductBranchTransfer',
+]);
 
 @Component({
   selector: 'app-audits-page',
@@ -30,7 +38,7 @@ export class AuditsPageComponent implements OnInit {
     { key: 'actor', labelKey: 'tr_audit_col_actor' },
     { key: 'action', labelKey: 'tr_audit_col_action' },
     { key: 'module', labelKey: 'tr_audit_col_module' },
-    { key: 'entity', labelKey: 'tr_audit_col_entity' },
+    { key: 'entity', labelKey: 'tr_audit_col_entity', format: 'parts' },
     { key: 'details', labelKey: 'tr_audit_col_details' },
     { key: 'status', labelKey: 'tr_audit_col_status' },
   ];
@@ -92,10 +100,8 @@ export class AuditsPageComponent implements OnInit {
   }
 
   clearFilters(): void {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.from = this.toISODate(start);
-    this.to = this.toISODate(now);
+    this.from = '';
+    this.to = '';
     this.module = '';
     this.action = '';
     this.actorName = '';
@@ -122,9 +128,21 @@ export class AuditsPageComponent implements OnInit {
       userId: uid ? String(uid) : '',
       page: String(this.page),
       limit: String(this.limit),
-      from: this.from,
-      to: this.to,
     };
+
+    const from = String(this.from || '').trim();
+    const to = String(this.to || '').trim();
+    if (from || to) {
+      if (from) params.from = from;
+      if (to) params.to = to;
+    } else {
+      // Empty dates = all history (not current month). Wide range also works if
+      // an older API still requires from/to and defaults missing values to this month.
+      params.allDates = '1';
+      params.from = '2000-01-01';
+      params.to = this.toISODate(new Date());
+    }
+
     if (this.module) params.module = this.module;
     if (this.action) params.action = this.action;
     if (this.actorName.trim()) params.actorName = this.actorName.trim();
@@ -179,13 +197,88 @@ export class AuditsPageComponent implements OnInit {
     return this.tOr('tr_audit_actor_unknown', '—');
   }
 
-  private formatEntity(x: AuditLogRow): string {
-    const label = String(x.entityLabel || '').trim();
+  private asRecord(v: unknown): Record<string, unknown> {
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  }
+
+  private pickProductCodes(x: AuditLogRow): string[] {
+    const meta = this.asRecord(x.metadata);
+    const after = this.asRecord(x.after);
+    const before = this.asRecord(x.before);
+    const out: string[] = [];
+    const push = (v: unknown) => {
+      const s = String(v ?? '').trim();
+      if (s && !out.includes(s)) out.push(s);
+    };
+
+    push(meta['productCode']);
+    push(after['code']);
+    push(before['code']);
+
+    const multi = after['codes'] || meta['productCodes'];
+    if (Array.isArray(multi)) {
+      for (const c of multi) push(c);
+    }
+
+    if (!out.length && PRODUCT_ENTITY_TYPES.has(String(x.entityType || ''))) {
+      const label = String(x.entityLabel || '').trim();
+      if (label && !label.startsWith('#')) {
+        const sep = label.indexOf(' — ');
+        if (sep > 0) push(label.slice(0, sep).trim());
+      }
+    }
+
+    return out;
+  }
+
+  private serialTrackPart(code: string): ReportCellPart {
+    return {
+      text: code,
+      routerLink: ['/products/serial-track'],
+      queryParams: { code },
+    };
+  }
+
+  private formatEntityCell(x: AuditLogRow): ReportCellPart[] {
     const typeLabel = this.translateEntityType(x.entityType);
-    if (label && typeLabel) return `${typeLabel}: ${label}`;
-    if (label) return label;
-    if (typeLabel) return typeLabel;
-    return '—';
+    const label = String(x.entityLabel || '').trim();
+    const codes = this.pickProductCodes(x);
+
+    if (!codes.length) {
+      const plain =
+        label && typeLabel
+          ? `${typeLabel}: ${label}`
+          : label || typeLabel || '—';
+      return [{ text: plain }];
+    }
+
+    const parts: ReportCellPart[] = [];
+    if (typeLabel) parts.push({ text: `${typeLabel}: ` });
+
+    if (codes.length > 1) {
+      codes.forEach((c, i) => {
+        if (i) parts.push({ text: ', ' });
+        parts.push(this.serialTrackPart(c));
+      });
+      const name = String(
+        this.asRecord(x.metadata)['productName'] ||
+          this.asRecord(x.after)['name'] ||
+          this.asRecord(x.before)['name'] ||
+          ''
+      ).trim();
+      if (name) parts.push({ text: ` — ${name}` });
+      return parts;
+    }
+
+    const code = codes[0];
+    parts.push(this.serialTrackPart(code));
+    if (label.startsWith(code)) {
+      const rest = label.slice(code.length);
+      if (rest) parts.push({ text: rest });
+    } else if (label && label !== code) {
+      parts.push({ text: ` — ${label}` });
+    }
+    return parts;
   }
 
   private formatStatus(x: AuditLogRow): string {
@@ -198,7 +291,7 @@ export class AuditsPageComponent implements OnInit {
   private formatDetails(x: AuditLogRow): string {
     const msg = String(x.message || '').trim();
     if (msg) return msg;
-    const meta = x.metadata || {};
+    const meta = this.asRecord(x.metadata);
     const bits: string[] = [];
     if (meta['orderNumber'] != null) bits.push(`#${meta['orderNumber']}`);
     if (meta['productCode']) bits.push(String(meta['productCode']));
@@ -214,7 +307,7 @@ export class AuditsPageComponent implements OnInit {
       actor: this.formatActor(x),
       action: this.translateAction(x.action),
       module: this.translateModule(x.module),
-      entity: this.formatEntity(x),
+      entity: this.formatEntityCell(x),
       details: this.formatDetails(x),
       status: this.formatStatus(x),
     };

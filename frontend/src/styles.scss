@@ -466,6 +466,24 @@ body[dir=rtl] {
   -webkit-overflow-scrolling: touch;
 }
 
+.cdk-overlay-pane.product-inventory-audit-dialog-panel {
+  max-width: 96vw !important;
+  width: min(1100px, 96vw) !important;
+}
+
+.product-inventory-audit-dialog-panel .mat-dialog-container {
+  padding: 0 !important;
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+@media (max-width: 767px) {
+  .cdk-overlay-pane.product-inventory-audit-dialog-panel {
+    width: 96vw !important;
+    max-width: 96vw !important;
+  }
+}
+
 @media (min-width: 992px){
     @import 'desktop_styles';
 }

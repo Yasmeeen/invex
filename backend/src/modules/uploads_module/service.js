@@ -132,11 +132,24 @@ export const uploadProductImage = async (req, res) => {
     const uploaded = await cloudinary.uploader.upload(fileDataUrl, {
       folder: resolveCloudinaryFolder(folder),
       resource_type: 'image',
+      timeout: 120000,
     });
 
     return res.status(200).json({ secure_url: uploaded.secure_url });
   } catch (error) {
     console.error('uploadProductImage:', error);
-    return res.status(500).json({ error: 'Failed to upload image' });
+    const cloudMsg =
+      error?.error?.message ||
+      error?.message ||
+      (typeof error === 'string' ? error : '');
+    const isTimeout =
+      error?.name === 'TimeoutError' ||
+      error?.http_code === 499 ||
+      /timeout/i.test(String(cloudMsg));
+    return res.status(isTimeout ? 504 : 500).json({
+      error: isTimeout
+        ? 'Image upload timed out. Check your internet connection and try a smaller image.'
+        : cloudMsg || 'Failed to upload image',
+    });
   }
 };

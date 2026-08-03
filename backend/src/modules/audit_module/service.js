@@ -31,15 +31,32 @@ export const listAuditLogs = async (req, res) => {
     if (!caller || !isPrivilegedRole(caller.role)) return res.status(403).json({ error: 'Forbidden' });
 
     const now = new Date();
-    const from = toDate(req.query.from, new Date(now.getFullYear(), now.getMonth(), 1));
-    const to = toDate(req.query.to, now);
-    to.setHours(23, 59, 59, 999);
+    const allDates =
+      String(req.query.allDates || req.query.all_dates || '').trim() === '1';
+    const hasFrom = String(req.query.from || '').trim() !== '';
+    const hasTo = String(req.query.to || '').trim() !== '';
+
+    // allDates / both empty → no createdAt filter (full history).
+    // Never silently fall back to "current month" when dates are cleared.
+    let from = null;
+    let to = null;
+    if (!allDates && (hasFrom || hasTo)) {
+      from = hasFrom ? toDate(req.query.from, null) : null;
+      to = hasTo ? toDate(req.query.to, null) : null;
+      if (to) to.setHours(23, 59, 59, 999);
+    }
 
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
     const skip = (page - 1) * limit;
 
-    const match = { createdAt: { $gte: from, $lte: to } };
+    const match = {};
+    if (from || to) {
+      match.createdAt = {};
+      if (from) match.createdAt.$gte = from;
+      if (to) match.createdAt.$lte = to;
+      else match.createdAt.$lte = now;
+    }
     const actorUserId = toObjectIdOrNull(req.query.actorUserId || req.query.actor_user_id);
     if (actorUserId) match.actorUserId = actorUserId;
 

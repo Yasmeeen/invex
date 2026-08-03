@@ -4,51 +4,54 @@
       <span class="text-primary" *ngIf="totalCount">{{ totalCount }}-</span>
       {{ 'tr_branch_transfers_pending' | translate }}
     </span>
-    <div class="btn-group">
-      <button type="button" class="s-btn btn-secondary size-body" (click)="goToProducts()">
-        {{ 'tr_products' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn size-small"
-        [class.btn-primary]="statusFilter === 'pending'"
-        [class.btn-secondary]="statusFilter !== 'pending'"
-        (click)="setFilter('pending')"
-      >
-        {{ 'tr_branch_transfer_status_pending' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn size-small"
-        [class.btn-primary]="statusFilter === 'all'"
-        [class.btn-secondary]="statusFilter !== 'all'"
-        (click)="setFilter('all')"
-      >
-        {{ 'tr_branch_transfers_all' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body"
-        (click)="load()"
-        [disabled]="loading"
-      >
-        {{ 'tr_branch_transfers_refresh' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body"
-        (click)="exportExcel()"
-        [disabled]="loading || exporting || totalCount === 0"
-      >
-        {{ 'tr_report_export_excel' | translate }}
-      </button>
-      <button
-        type="button"
-        class="s-btn btn-secondary size-body"
-        (click)="isFilterOpen = !isFilterOpen"
-      >
-        <i class="fa fa-filter text-primary" aria-hidden="true"></i>
-      </button>
+    <div class="products-toolbar">
+      <div class="products-toolbar__actions">
+        <button type="button" class="s-btn btn-secondary size-body" (click)="goToProducts()">
+          {{ 'tr_products' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn size-small"
+          [class.btn-primary]="statusFilter === 'pending'"
+          [class.btn-secondary]="statusFilter !== 'pending'"
+          (click)="setFilter('pending')"
+        >
+          {{ 'tr_branch_transfer_status_pending' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn size-small"
+          [class.btn-primary]="statusFilter === 'all'"
+          [class.btn-secondary]="statusFilter !== 'all'"
+          (click)="setFilter('all')"
+        >
+          {{ 'tr_branch_transfers_all' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body"
+          (click)="load()"
+          [disabled]="loading"
+        >
+          {{ 'tr_branch_transfers_refresh' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body"
+          (click)="exportExcel()"
+          [disabled]="loading || exporting || totalCount === 0"
+        >
+          <i class="fa fa-file-excel-o" aria-hidden="true"></i>
+          {{ 'tr_report_export_excel' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary size-body products-toolbar__icon-btn"
+          (click)="isFilterOpen = !isFilterOpen"
+        >
+          <i class="fa fa-filter text-primary" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
   </h2>
 

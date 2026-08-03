@@ -244,12 +244,27 @@ export class VixaChatComponent implements OnInit, OnDestroy {
     if (this.open) this.close();
   }
 
+  @HostListener('document:app-sidebar-open')
+  onSidebarOpen(): void {
+    if (this.mode === 'floating' && this.open) {
+      this.close();
+    }
+  }
+
   @HostListener('document:click', ['$event'])
   onDocClick(ev: MouseEvent): void {
     if (!this.open) return;
     if (this.mode === 'page') return;
     const t = ev.target as HTMLElement | null;
     if (!t) return;
+    // Don't steal clicks meant for the app menu / drawer.
+    if (
+      t.closest('.app-topbar__menu-btn') ||
+      t.closest('.main-sidebar') ||
+      t.closest('.sidebar-background')
+    ) {
+      return;
+    }
     const inside = t.closest('.vixa');
     if (!inside) {
       this.close();

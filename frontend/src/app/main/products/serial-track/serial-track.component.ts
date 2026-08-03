@@ -1,5 +1,5 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   ProductHistoryEvent,
   ProductSerialTrackResponse,
@@ -11,6 +11,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { Subscription } from 'rxjs';
 
 export type SerialTrackDetailPart = {
   text: string;
@@ -31,7 +32,7 @@ type EventRow = {
   templateUrl: './serial-track.component.html',
   styleUrls: ['./serial-track.component.scss'],
 })
-export class SerialTrackComponent implements OnInit {
+export class SerialTrackComponent implements OnInit, OnDestroy {
   @ViewChild('codeInput') codeInput?: ElementRef<HTMLInputElement>;
 
   code = '';
@@ -42,6 +43,9 @@ export class SerialTrackComponent implements OnInit {
   eventRows: EventRow[] = [];
   showProductsLink = true;
 
+  private querySub?: Subscription;
+  private lastAutoCode = '';
+
   constructor(
     private productsService: ProductsSerivce,
     private ordersService: OrdersSerivce,
@@ -49,12 +53,29 @@ export class SerialTrackComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private router: Router,
+    private route: ActivatedRoute,
     private globals: Globals
   ) {}
 
   ngOnInit(): void {
     this.showProductsLink = this.globals.currentUser?.role !== 'Cashier';
-    setTimeout(() => this.focusCodeInput(), 0);
+    this.querySub = this.route.queryParamMap.subscribe((params) => {
+      const code = String(params.get('code') || '').trim();
+      if (code) {
+        if (code !== this.lastAutoCode || !this.searched) {
+          this.lastAutoCode = code;
+          this.code = code;
+          this.search();
+        }
+        return;
+      }
+      this.lastAutoCode = '';
+      setTimeout(() => this.focusCodeInput(), 0);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
   }
 
   goToProducts(): void {
@@ -66,6 +87,10 @@ export class SerialTrackComponent implements OnInit {
     this.result = null;
     this.eventRows = [];
     this.searched = false;
+    this.lastAutoCode = '';
+    if (this.route.snapshot.queryParamMap.get('code')) {
+      this.router.navigate(['/products/serial-track'], { queryParams: {} });
+    }
     setTimeout(() => this.focusCodeInput(), 0);
   }
 

@@ -1,7 +1,7 @@
 <div class="product-inventory-audit-dialog bg-white plr-4 ptb-4">
-  <div class="flex flex-space-between flex-middle mb-3">
-    <h3 class="m-0">{{ 'tr_products_inventory_audit_title' | translate }}</h3>
-    <div class="audit-header-actions flex flex-middle">
+  <div class="audit-dialog-header">
+    <h3>{{ 'tr_products_inventory_audit_title' | translate }}</h3>
+    <div class="audit-header-actions">
       <span class="options-menu audit-export-menu" *ngIf="!loading && audit">
         <button
           type="button"
@@ -65,45 +65,107 @@
       <p>{{ 'tr_empty_state' | translate }}</p>
     </div>
 
-    <div class="table-container" *ngIf="audit.byLocation?.length">
-      <table class="s-table table layout-fixed product-inventory-audit-table">
-        <thead>
-          <tr>
-            <th>{{ 'tr_location' | translate }}</th>
-            <th>{{ 'tr_products_inventory_audit_products_count' | translate }}</th>
-            <th>{{ 'tr_stock' | translate }}</th>
-            <th>{{ 'tr_booked' | translate }}</th>
-            <th>{{ 'tr_available' | translate }}</th>
-            <th *ngIf="showNetPrice">{{ 'tr_report_col_inventory_capital' | translate }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let row of audit.byLocation">
-            <td>
-              <span
-                *ngIf="row.inWarehouse"
-                class="location-badge location-badge--warehouse"
-              >{{ locationLabel(row) }}</span>
-              <span *ngIf="!row.inWarehouse">{{ locationLabel(row) }}</span>
-            </td>
-            <td>{{ row.productsCount }}</td>
-            <td>{{ row.totalStock }}</td>
-            <td>{{ row.totalBooked }}</td>
-            <td>{{ row.totalAvailable }}</td>
-            <td *ngIf="showNetPrice">{{ (row.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr class="audit-table-total">
-            <td><strong>{{ 'tr_total' | translate }}</strong></td>
-            <td><strong>{{ audit.totals.productsCount }}</strong></td>
-            <td><strong>{{ audit.totals.totalStock }}</strong></td>
-            <td><strong>{{ audit.totals.totalBooked }}</strong></td>
-            <td><strong>{{ audit.totals.totalAvailable }}</strong></td>
-            <td *ngIf="showNetPrice"><strong>{{ (audit.totals.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
+    <ng-container *ngIf="audit.byLocation?.length">
+      <div class="audit-table-wrap table-container">
+        <table class="s-table table product-inventory-audit-table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_location' | translate }}</th>
+              <th>{{ 'tr_products_inventory_audit_products_count' | translate }}</th>
+              <th>{{ 'tr_stock' | translate }}</th>
+              <th>{{ 'tr_booked' | translate }}</th>
+              <th>{{ 'tr_available' | translate }}</th>
+              <th *ngIf="showNetPrice">{{ 'tr_report_col_inventory_capital' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of audit.byLocation">
+              <td>
+                <span
+                  *ngIf="row.inWarehouse"
+                  class="location-badge location-badge--warehouse"
+                >{{ locationLabel(row) }}</span>
+                <span *ngIf="!row.inWarehouse">{{ locationLabel(row) }}</span>
+              </td>
+              <td>{{ row.productsCount }}</td>
+              <td>{{ row.totalStock }}</td>
+              <td>{{ row.totalBooked }}</td>
+              <td>{{ row.totalAvailable }}</td>
+              <td *ngIf="showNetPrice">{{ (row.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="audit-table-total">
+              <td><strong>{{ 'tr_total' | translate }}</strong></td>
+              <td><strong>{{ audit.totals.productsCount }}</strong></td>
+              <td><strong>{{ audit.totals.totalStock }}</strong></td>
+              <td><strong>{{ audit.totals.totalBooked }}</strong></td>
+              <td><strong>{{ audit.totals.totalAvailable }}</strong></td>
+              <td *ngIf="showNetPrice"><strong>{{ (audit.totals.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="audit-location-cards">
+        <div class="audit-location-card" *ngFor="let row of audit.byLocation">
+          <div class="audit-location-card__title">
+            <span
+              *ngIf="row.inWarehouse"
+              class="location-badge location-badge--warehouse"
+            >{{ locationLabel(row) }}</span>
+            <span *ngIf="!row.inWarehouse">{{ locationLabel(row) }}</span>
+          </div>
+          <div class="audit-location-card__grid">
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_products_inventory_audit_products_count' | translate }}</span>
+              <span class="audit-location-card__value">{{ row.productsCount }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_stock' | translate }}</span>
+              <span class="audit-location-card__value">{{ row.totalStock }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_booked' | translate }}</span>
+              <span class="audit-location-card__value">{{ row.totalBooked }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_available' | translate }}</span>
+              <span class="audit-location-card__value">{{ row.totalAvailable }}</span>
+            </div>
+            <div class="audit-location-card__item" *ngIf="showNetPrice">
+              <span class="audit-location-card__label">{{ 'tr_report_col_inventory_capital' | translate }}</span>
+              <span class="audit-location-card__value">{{ (row.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="audit-location-card audit-location-card--total">
+          <div class="audit-location-card__title">{{ 'tr_total' | translate }}</div>
+          <div class="audit-location-card__grid">
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_products_inventory_audit_products_count' | translate }}</span>
+              <span class="audit-location-card__value">{{ audit.totals.productsCount }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_stock' | translate }}</span>
+              <span class="audit-location-card__value">{{ audit.totals.totalStock }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_booked' | translate }}</span>
+              <span class="audit-location-card__value">{{ audit.totals.totalBooked }}</span>
+            </div>
+            <div class="audit-location-card__item">
+              <span class="audit-location-card__label">{{ 'tr_available' | translate }}</span>
+              <span class="audit-location-card__value">{{ audit.totals.totalAvailable }}</span>
+            </div>
+            <div class="audit-location-card__item" *ngIf="showNetPrice">
+              <span class="audit-location-card__label">{{ 'tr_report_col_inventory_capital' | translate }}</span>
+              <span class="audit-location-card__value">{{ (audit.totals.inventoryCapital ?? 0) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
   </ng-container>
 </div>

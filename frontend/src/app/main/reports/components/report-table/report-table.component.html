@@ -36,11 +36,24 @@
             </ng-container>
 
             <ng-container *ngSwitchDefault>
-              <ng-container *ngIf="col.format === 'money'; else plainCell">
+              <ng-container *ngIf="col.format === 'money'; else notMoney">
                 {{ row[col.key] | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
               </ng-container>
-              <ng-template #plainCell>
-                {{ row[col.key] }}
+              <ng-template #notMoney>
+                <ng-container *ngIf="col.format === 'parts' && isParts(row[col.key]); else plainCell">
+                  <ng-container *ngFor="let part of row[col.key]">
+                    <a
+                      *ngIf="part.routerLink"
+                      class="report-cell-link"
+                      [routerLink]="part.routerLink"
+                      [queryParams]="part.queryParams || null"
+                    >{{ part.text }}</a>
+                    <ng-container *ngIf="!part.routerLink">{{ part.text }}</ng-container>
+                  </ng-container>
+                </ng-container>
+                <ng-template #plainCell>
+                  {{ row[col.key] }}
+                </ng-template>
               </ng-template>
             </ng-container>
           </ng-container>

@@ -255,6 +255,7 @@ export class ProductsListComponent implements OnInit {
       width: '1100px',
       maxWidth: '96vw',
       maxHeight: '92vh',
+      panelClass: 'product-inventory-audit-dialog-panel',
       data: { filterParams, searchLabel },
     });
   }

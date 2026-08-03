@@ -61,6 +61,67 @@
   font-size: 12px;
 }
 
+.report-cell-link {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    color: #115e59;
+  }
+}
+
+@media (max-width: 767px) {
+  .reports-table {
+    padding: 0.75rem !important;
+    -webkit-overflow-scrolling: touch;
+
+    table {
+      table-layout: auto;
+      min-width: 720px;
+    }
+
+    th,
+    td {
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    th[data-col='details'],
+    td[data-col='details'],
+    th[data-col='entity'],
+    td[data-col='entity'] {
+      white-space: normal;
+      min-width: 140px;
+      max-width: 220px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    td[data-col='depositProof'] {
+      white-space: normal;
+    }
+  }
+
+  .report-img-download {
+    display: block;
+    margin: 6px 0 0;
+  }
+
+  .report-img-modal__actions {
+    flex-wrap: wrap;
+    justify-content: stretch;
+
+    .s-btn,
+    a.s-btn {
+      flex: 1 1 auto;
+      text-align: center;
+    }
+  }
+}
+
 .report-img-modal {
   position: fixed;
   inset: 0;

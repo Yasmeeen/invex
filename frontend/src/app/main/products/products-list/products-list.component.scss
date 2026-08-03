@@ -1,3 +1,82 @@
+.products-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.products-toolbar__view {
+  flex-shrink: 0;
+}
+
+.products-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+
+  .s-btn {
+    margin: 0;
+    border-radius: 4px;
+    border-width: 1px;
+    white-space: nowrap;
+
+    i,
+    .fa {
+      margin-inline-end: 0.35rem;
+    }
+  }
+
+  .products-toolbar__icon-btn {
+    i,
+    .fa {
+      margin-inline-end: 0;
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .title-with-btn {
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .page-title {
+    width: 100%;
+  }
+
+  .products-toolbar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .products-toolbar__view {
+    flex: 0 0 auto;
+  }
+
+  .products-toolbar__actions {
+    width: 100%;
+
+    .s-btn {
+      flex: 1 1 calc(50% - 0.25rem);
+      min-width: 0;
+      text-align: center;
+      padding-inline: 0.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .products-toolbar__icon-btn {
+      flex: 0 0 auto;
+      min-width: 2.375rem;
+      padding-inline: 0.65rem;
+    }
+  }
+}
+
 .location-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -70,6 +149,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 2rem;
+}
+
+@media (max-width: 767px) {
+  .products-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .product-card {

@@ -3,5 +3,46 @@
     border: 1px solid #e8ede9;
     border-radius: 14px;
   }
+
+  .audits-filters__actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .audits-table-wrap {
+    min-width: 0;
+  }
 }
 
+@media (max-width: 767px) {
+  .audits-page {
+    .audits-filters {
+      padding: 1rem !important;
+    }
+
+    .audits-filters__actions {
+      width: 100%;
+      justify-content: stretch;
+      margin-top: 0.25rem;
+
+      .s-btn {
+        flex: 1 1 calc(50% - 0.25rem);
+        text-align: center;
+      }
+    }
+
+    .reports-page__pagination {
+      justify-content: center;
+      gap: 0.5rem;
+      text-align: center;
+
+      span {
+        width: 100%;
+        order: -1;
+      }
+    }
+  }
+}

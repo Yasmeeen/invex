@@ -546,7 +546,7 @@ $shell-icon-active: darken($shell-icon, 6%);
             height: 100vh;
             background-color: rgba(0, 0, 0, 0.5);
             position: fixed;
-            z-index: 8;
+            z-index: 1040;
             top: 0;
             left: 0;
         }
@@ -561,7 +561,7 @@ $shell-icon-active: darken($shell-icon, 6%);
             height: 100vh !important;
             min-height: 100vh !important;
             margin: 0;
-            z-index: 11;
+            z-index: 1050;
             #{$start}: 0;
             #{$end}: auto;
             margin-#{$start}: -100vw;

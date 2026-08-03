@@ -267,6 +267,7 @@ export class HeaderComponent implements OnInit {
 
   openSidebar() {
     document.body.classList.add('sidebar-active');
+    document.dispatchEvent(new CustomEvent('app-sidebar-open'));
   }
 
   onMenuClick(): void {

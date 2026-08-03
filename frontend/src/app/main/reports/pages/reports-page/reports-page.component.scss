@@ -30,7 +30,32 @@
 
 .reports-page__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  max-width: 100%;
+
+  .s-btn {
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 767px) {
+  .reports-page__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .reports-page__actions {
+    width: 100%;
+
+    .s-btn {
+      flex: 1 1 calc(50% - 0.25rem);
+      min-width: 0;
+      text-align: center;
+      padding-inline: 0.5rem;
+    }
+  }
 }
 
 /* Fixed card width (~4 per row on wide layouts); single card no longer stretches full width. */

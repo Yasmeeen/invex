@@ -1,13 +1,32 @@
 .product-inventory-audit-dialog {
   max-height: 88vh;
   overflow-y: auto;
-  min-width: min(1040px, 94vw);
+  overflow-x: hidden;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
+.audit-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  h3 {
+    margin: 0;
+    min-width: 0;
+    line-height: 1.3;
+  }
+}
+
 .audit-header-actions {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .audit-export-menu {
@@ -30,6 +49,7 @@
   padding: 10px 12px;
   border-radius: 6px;
   background: #f3f4f6;
+  word-break: break-word;
 
   &__label {
     color: #6b7280;
@@ -44,6 +64,10 @@
     color: #6b7280;
     margin-bottom: 2px;
   }
+
+  .col-6 {
+    margin-bottom: 0.75rem;
+  }
 }
 
 .audit-section-title {
@@ -51,9 +75,128 @@
   margin: 0 0 12px;
 }
 
+.audit-table-wrap {
+  position: relative;
+  min-height: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+
+  &.table-container {
+    min-height: 0;
+  }
+}
+
 .product-inventory-audit-table {
+  width: 100%;
+  min-width: 560px;
+  margin: 0;
+
+  th,
+  td {
+    white-space: nowrap;
+  }
+
+  th:first-child,
+  td:first-child {
+    white-space: normal;
+    min-width: 140px;
+  }
+
   tfoot .audit-table-total td {
     border-top: 2px solid #e5e7eb;
     background: #f9fafb;
+  }
+}
+
+.location-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.location-badge--warehouse {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+/* Mobile card layout for location rows */
+.audit-location-cards {
+  display: none;
+}
+
+.audit-location-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  margin-bottom: 0.75rem;
+
+  &--total {
+    background: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  &__title {
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+    color: #111827;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem 0.75rem;
+  }
+
+  &__item {
+    min-width: 0;
+  }
+
+  &__label {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+
+  &__value {
+    font-weight: 700;
+    color: #111827;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 767px) {
+  .product-inventory-audit-dialog {
+    padding: 12px !important;
+    max-height: 92vh;
+  }
+
+  .audit-dialog-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audit-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+
+    .audit-export-menu .s-btn {
+      max-width: 100%;
+    }
+  }
+
+  .audit-table-wrap {
+    display: none;
+  }
+
+  .audit-location-cards {
+    display: block;
   }
 }

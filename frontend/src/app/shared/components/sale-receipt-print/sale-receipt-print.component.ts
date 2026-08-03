@@ -8,6 +8,12 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { OrderPartyType } from '@core/models/products.model';
+import {
+  isPayLaterMethod,
+  isPayLaterSettled,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+} from '@core/utils/order-display.util';
 import { TranslateService } from '@ngx-translate/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
@@ -110,6 +116,22 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
   receiptExchangeCollected(): number {
     const v = Number(this.order?.amountPaid);
     return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  isCreditSale(): boolean {
+    return isPayLaterMethod(this.order?.paymentMethod);
+  }
+
+  isCreditFullySettled(): boolean {
+    return isPayLaterSettled(this.order);
+  }
+
+  receiptCreditPaid(): number {
+    return orderDisplayPaid(this.order);
+  }
+
+  receiptCreditRemaining(): number {
+    return orderDisplayRemaining(this.order);
   }
 
   receiptPaidPayments(): Array<{ method?: string; amount: number; feeForMethod?: string }> {

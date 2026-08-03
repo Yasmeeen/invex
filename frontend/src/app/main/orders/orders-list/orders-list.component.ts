@@ -26,6 +26,8 @@ import {
   canReturnOrder as canReturnOrderCheck,
   hasOrderReturns,
   isPayLaterMethod,
+  isPayLaterOutstanding,
+  isPayLaterSettled,
   orderDisplayPaid,
   orderDisplayRemaining,
 } from '@core/utils/order-display.util';
@@ -133,6 +135,16 @@ export class OrdersListComponent implements OnInit {
   /** بيع بالآجل (paymentMethod = credit). */
   isPayLaterOrder(order: Order): boolean {
     return isPayLaterMethod(order?.paymentMethod);
+  }
+
+  /** بيع بالآجل وما زال عليه متبقي. */
+  isPayLaterOutstandingOrder(order: Order): boolean {
+    return isPayLaterOutstanding(order);
+  }
+
+  /** بيع بالآجل وتم السداد بالكامل. */
+  isPayLaterSettledOrder(order: Order): boolean {
+    return isPayLaterSettled(order);
   }
 
   canPayOrder(order: Order): boolean {

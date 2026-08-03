@@ -41,14 +41,12 @@
             width: 8rem;
         }
         &:nth-child(14){
-            width: 8rem;
+            width: 16rem;
         }
         &:nth-child(15){
-            width: 8rem;
-        }
-        &:nth-child(16){
             width: 2rem;
         }
+      
   
  
      }
@@ -76,6 +74,18 @@
     background: #fef3c7;
     color: #b45309;
   }
+}
+
+.settled-badge {
+  display: inline-block;
+  margin-inline-start: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+  white-space: nowrap;
 }
 
 .invoices-subsection__heading .page-title {
@@ -123,6 +133,32 @@
   }
 }
 
+/** بيع بالآجل بعد السداد الكامل — تمييز أخضر */
+.order-card--pay-later-settled {
+  background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 52%);
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: 0 10px 28px rgba(34, 197, 94, 0.1);
+
+  .order-card__icon {
+    background: rgba(34, 197, 94, 0.14);
+    border-color: rgba(34, 197, 94, 0.28);
+    color: #15803d;
+  }
+
+  .stat {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.2);
+  }
+
+  .order-card__products {
+    border-top-color: rgba(34, 197, 94, 0.2);
+  }
+
+  .order-card__product-line + .order-card__product-line {
+    border-top-color: rgba(34, 197, 94, 0.15);
+  }
+}
+
 .orders-table tbody tr.order-row--pay-later {
   background: rgba(255, 251, 235, 0.9);
 
@@ -133,6 +169,18 @@
 
 .orders-table tbody tr.order-row--pay-later:hover {
   background: rgba(254, 243, 199, 0.95);
+}
+
+.orders-table tbody tr.order-row--pay-later-settled {
+  background: rgba(240, 253, 244, 0.95);
+
+  td {
+    border-top-color: rgba(34, 197, 94, 0.15);
+  }
+}
+
+.orders-table tbody tr.order-row--pay-later-settled:hover {
+  background: rgba(220, 252, 231, 0.95);
 }
 
 .order-card__top {

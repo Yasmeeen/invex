@@ -13,6 +13,7 @@ import moment from 'moment-timezone';
 import { auditLog } from '../audit_module/audit.service.js';
 import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
 import { recordExchangeSettlement } from '../../utils/exchange-settlement.js';
+import { finalizeExchangeTradeInPurchaseInSession } from '../product_purchase_requests_module/service.js';
 import {
   processFullOrderRestore,
   processOrderReturn,
@@ -724,7 +725,14 @@ export const createOrder = async (req, res) => {
                   ? { exchangeProductPurchaseRequestIds }
                   : {}),
               }
-            : {}),
+            : exchangeProductPurchaseRequestIds.length
+              ? {
+                  ...(exchangeProductPurchaseRequestId
+                    ? { exchangeProductPurchaseRequestId }
+                    : {}),
+                  exchangeProductPurchaseRequestIds,
+                }
+              : {}),
           ...(bookingDepositCreditApplied > 0
             ? {
                 bookingDepositCreditAmount: bookingDepositCreditApplied,
@@ -742,6 +750,29 @@ export const createOrder = async (req, res) => {
       ],
       { session }
     );
+
+    // Finalize exchange trade-ins (create products/stock) only when the sale commits.
+    const exchangePurchaseStockMovements = [];
+    if (exchangeProductPurchaseRequestIds.length) {
+      for (const purchaseId of exchangeProductPurchaseRequestIds) {
+        const finalized = await finalizeExchangeTradeInPurchaseInSession(
+          session,
+          purchaseId,
+          { userId, orderId: newOrder._id }
+        );
+        if (finalized?.error) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(finalized.status || 400).json({
+            error: finalized.error || 'Failed to finalize exchange trade-in',
+            ...(finalized.code ? { code: finalized.code } : {}),
+          });
+        }
+        if (Array.isArray(finalized?.stockMovementRows) && finalized.stockMovementRows.length) {
+          exchangePurchaseStockMovements.push(...finalized.stockMovementRows);
+        }
+      }
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -792,15 +823,6 @@ export const createOrder = async (req, res) => {
           userId,
           branchId: branch,
         });
-        if (exchangeProductPurchaseRequestIds.length > 1) {
-          await ProductPurchaseRequest.updateMany(
-            {
-              _id: { $in: exchangeProductPurchaseRequestIds.slice(1) },
-              isExchangeTradeIn: true,
-            },
-            { $set: { linkedExchangeOrderId: newOrder._id } }
-          );
-        }
       } catch (settlementErr) {
         console.error('⚠️ exchange settlement:', settlementErr?.message || settlementErr);
         return res.status(400).json({
@@ -811,18 +833,6 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({
         error: 'Exchange settlement treasury is required when store owes the customer',
       });
-    } else if (exchangeProductPurchaseRequestIds.length) {
-      try {
-        await ProductPurchaseRequest.updateMany(
-          {
-            _id: { $in: exchangeProductPurchaseRequestIds },
-            isExchangeTradeIn: true,
-          },
-          { $set: { linkedExchangeOrderId: newOrder._id } }
-        );
-      } catch (linkErr) {
-        console.warn('⚠️ link exchange trade-ins:', linkErr?.message || linkErr);
-      }
     }
 
     // Stock movement logs (non-transactional audit trail)
@@ -841,6 +851,9 @@ export const createOrder = async (req, res) => {
         referenceId: newOrder._id,
         notes: `Order #${newOrder.orderNumber}`,
       }));
+      if (exchangePurchaseStockMovements.length) {
+        movementDocs.push(...exchangePurchaseStockMovements);
+      }
       if (movementDocs.length) {
         await StockMovement.insertMany(movementDocs);
       }

@@ -561,7 +561,9 @@ export const createProductPurchaseRequest = async (req, res) => {
       return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
     }
 
-    const autoApprove = isAutoApproverRole(actor.role);
+    // Exchange trade-ins stay pending until cashier completes Pay (createOrder).
+    // Auto-approve would create products/stock immediately and orphan them on cancel.
+    const autoApprove = !exchangeTradeIn && isAutoApproverRole(actor.role);
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
     const tMap = treasuryMethodMap(treasuryMethods);
@@ -876,36 +878,39 @@ export const createProductPurchaseRequest = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    try {
-      const recipientIds = await collectApproverUserIds(branchId);
-      const codeSummary =
-        categoryIsMulti && q > 1 && unitCodesNorm.length ? unitCodesNorm.join(', ') : code;
-      const notification = await Notification.create({
-        type: 'product_purchase_pending',
-        title: 'Product purchase pending approval',
-        body: `${name} (${codeSummary}) — ${q} unit(s) · Branch: ${branch?.name || 'Branch'}`,
-        data: {
-          purchaseId: created._id,
-          branchId,
-          branchName: branch?.name || null,
-          createdById: actor._id,
-          createdByName: actor?.name || null,
-          product: {
-            name,
-            code: codeSummary,
-            categoryId: String(categoryId),
-            price: payload.price,
-            netPrice: payload.netPrice,
-            ...(categoryIsMulti && q > 1 && unitCodesNorm.length ? { unitCodes: unitCodesNorm } : {}),
+    // Exchange drafts await checkout — do not notify managers as pending approvals.
+    if (!exchangeTradeIn) {
+      try {
+        const recipientIds = await collectApproverUserIds(branchId);
+        const codeSummary =
+          categoryIsMulti && q > 1 && unitCodesNorm.length ? unitCodesNorm.join(', ') : code;
+        const notification = await Notification.create({
+          type: 'product_purchase_pending',
+          title: 'Product purchase pending approval',
+          body: `${name} (${codeSummary}) — ${q} unit(s) · Branch: ${branch?.name || 'Branch'}`,
+          data: {
+            purchaseId: created._id,
+            branchId,
+            branchName: branch?.name || null,
+            createdById: actor._id,
+            createdByName: actor?.name || null,
+            product: {
+              name,
+              code: codeSummary,
+              categoryId: String(categoryId),
+              price: payload.price,
+              netPrice: payload.netPrice,
+              ...(categoryIsMulti && q > 1 && unitCodesNorm.length ? { unitCodes: unitCodesNorm } : {}),
+            },
+            quantity: q,
           },
-          quantity: q,
-        },
-        recipients: recipientIds,
-        readBy: [],
-      });
-      emitToUsers(recipientIds, 'notification:new', { notification });
-    } catch (e) {
-      console.warn('⚠️ product purchase notification:', e?.message || e);
+          recipients: recipientIds,
+          readBy: [],
+        });
+        emitToUsers(recipientIds, 'notification:new', { notification });
+      } catch (e) {
+        console.warn('⚠️ product purchase notification:', e?.message || e);
+      }
     }
 
     await auditLog(req, {
@@ -913,13 +918,17 @@ export const createProductPurchaseRequest = async (req, res) => {
       module: 'product_purchase_requests',
       entityType: 'ProductPurchaseRequest',
       entityId: created?._id,
-      message: 'Product purchase request created (pending approval)',
-      metadata: { branchId, productCode: code, quantity: q },
+      message: exchangeTradeIn
+        ? 'Exchange trade-in draft created (pending checkout)'
+        : 'Product purchase request created (pending approval)',
+      metadata: { branchId, productCode: code, quantity: q, exchangeTradeIn: !!exchangeTradeIn },
     });
 
     const purchaseOut = await leanPurchaseForResponse(created._id);
     return res.status(201).json({
-      message: '✅ Purchase created (pending approval)',
+      message: exchangeTradeIn
+        ? '✅ Exchange trade-in draft created'
+        : '✅ Purchase created (pending approval)',
       purchase: purchaseOut || (created.toObject ? created.toObject() : created),
       createdProduct,
     });
@@ -1166,6 +1175,129 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
     { session }
   );
   return { createdList: [prod], createdProduct: prod };
+}
+
+/**
+ * Approve a pending exchange trade-in and create stock inside an existing Mongo session.
+ * Called from createOrder at Pay so inventory is not committed until checkout completes.
+ * Legacy already-approved trade-ins are only linked to the order.
+ */
+export async function finalizeExchangeTradeInPurchaseInSession(
+  session,
+  purchaseId,
+  { userId, orderId } = {}
+) {
+  if (!purchaseId || !mongoose.Types.ObjectId.isValid(String(purchaseId))) {
+    return { error: 'Invalid exchange trade-in purchase id' };
+  }
+  if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+    return { error: 'Order id is required to finalize exchange trade-in' };
+  }
+
+  const purchase = await ProductPurchaseRequest.findById(purchaseId).session(session);
+  if (!purchase) {
+    return { error: 'Exchange trade-in purchase not found' };
+  }
+  if (!purchase.isExchangeTradeIn) {
+    return { error: 'Purchase is not an exchange trade-in' };
+  }
+  if (
+    purchase.linkedExchangeOrderId &&
+    String(purchase.linkedExchangeOrderId) !== String(orderId)
+  ) {
+    return { error: 'Exchange trade-in already linked to another order' };
+  }
+
+  const orderOid = new mongoose.Types.ObjectId(String(orderId));
+  const actorOid =
+    userId && mongoose.Types.ObjectId.isValid(String(userId))
+      ? new mongoose.Types.ObjectId(String(userId))
+      : null;
+
+  if (purchase.status === 'approved') {
+    purchase.linkedExchangeOrderId = orderOid;
+    await purchase.save({ session });
+    return { purchase, stockMovementRows: [], alreadyApproved: true };
+  }
+
+  if (purchase.status !== 'pending') {
+    return { error: 'Exchange trade-in cannot be finalized' };
+  }
+
+  if (!Array.isArray(purchase.lines) || !purchase.lines.length) {
+    purchase.lines = [
+      {
+        productPayload: purchase.productPayload,
+        quantity: Math.max(1, Math.floor(Number(purchase.quantity) || 1)),
+      },
+    ];
+  }
+
+  const stockMovementRows = [];
+
+  for (let i = 0; i < purchase.lines.length; i++) {
+    const line = purchase.lines[i];
+    if (line?.createdProductId) continue;
+
+    const built = await buildPurchaseLinePayload(
+      {
+        ...(line.productPayload || {}),
+        categoryId: line.productPayload?.category,
+        unitCodes: line.productPayload?.unitCodes,
+        unitDetails: line.productPayload?.unitDetails,
+      },
+      line.quantity,
+      { session, branchId: purchase.branch }
+    );
+    if (built.error) {
+      return { error: built.error, code: built.code };
+    }
+
+    const created = await createProductsForLine(session, {
+      linePayload: built,
+      branchId: purchase.branch,
+      acquiredFromFields: built.acquiredFromFields,
+    });
+    if (created.error) {
+      return { error: created.error, status: created.status };
+    }
+
+    line.createdProductId = created.createdProduct._id;
+    if (created.createdList.length > 1) {
+      line.createdProductIds = created.createdList.map((p) => p._id);
+    }
+
+    for (let ui = 0; ui < created.createdList.length; ui++) {
+      const prodRow = created.createdList[ui];
+      const uf = unitFieldsFromPayload(built.payload, ui, prodRow.code);
+      const qty = created.createdList.length > 1 ? 1 : built.q;
+      stockMovementRows.push({
+        movementType: 'purchase',
+        productId: prodRow._id,
+        productName: prodRow.name,
+        branchId: purchase.branch,
+        fromBranchId: null,
+        toBranchId: purchase.branch,
+        quantity: qty,
+        unitPrice: uf.netPrice,
+        totalValue: Math.round(uf.netPrice * qty * 100) / 100,
+        referenceType: 'productPurchaseRequest',
+        referenceId: purchase._id,
+        notes: 'Exchange trade-in finalized at checkout',
+      });
+    }
+  }
+
+  purchase.markModified('lines');
+  refreshRootCreatedProductIds(purchase);
+  purchase.status = 'approved';
+  if (actorOid) purchase.resolvedBy = actorOid;
+  purchase.resolvedAt = new Date();
+  purchase.resolutionNote = 'Finalized at exchange checkout';
+  purchase.linkedExchangeOrderId = orderOid;
+  await purchase.save({ session });
+
+  return { purchase, stockMovementRows, alreadyApproved: false };
 }
 
 /**
@@ -1755,11 +1887,17 @@ export const rejectProductPurchaseRequest = async (req, res) => {
       return res.status(404).json({ error: 'Pending purchase not found' });
     }
 
+    const isCreator =
+      String(dereferenceDocId(purchase.createdBy)) === String(actor._id);
+    const canCancelOwnExchangeDraft =
+      !!purchase.isExchangeTradeIn && isCreator && purchase.status === 'pending';
+
     const isAllowed =
       actor.role === 'Super Admin' ||
       actor.role === 'Co Admin' ||
       (actor.role === 'Branch Manager' &&
-        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch)));
+        String(dereferenceDocId(actor.branch)) === String(dereferenceDocId(purchase.branch))) ||
+      canCancelOwnExchangeDraft;
     if (!isAllowed) {
       await session.abortTransaction();
       session.endSession();
@@ -1801,12 +1939,15 @@ export const rejectProductPurchaseRequest = async (req, res) => {
       entityLabel: purchase?.productPayload?.code
         ? String(purchase.productPayload.code)
         : undefined,
-      message: 'Product purchase request rejected',
+      message: purchase.isExchangeTradeIn
+        ? 'Exchange trade-in draft cancelled'
+        : 'Product purchase request rejected',
       metadata: {
         branchId: purchase.branch,
         productCode: purchase?.productPayload?.code,
         productName: purchase?.productPayload?.name,
         status: 'rejected',
+        exchangeTradeIn: !!purchase.isExchangeTradeIn,
       },
     });
 

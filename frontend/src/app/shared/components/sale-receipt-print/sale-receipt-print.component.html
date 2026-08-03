@@ -132,6 +132,21 @@
           {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
+      <tr *ngIf="isCreditSale()">
+        <td>{{ 'tr_pay_credit' | receiptTranslate: st.receiptLanguage }} — {{ 'tr_paid' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptCreditPaid()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="isCreditSale() && !isCreditFullySettled()">
+        <td>{{ 'tr_remaining' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptCreditRemaining()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold" *ngIf="isCreditFullySettled()">
+        <td colspan="2" class="center">{{ 'tr_credit_fully_settled' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
     </table>
 
     <table

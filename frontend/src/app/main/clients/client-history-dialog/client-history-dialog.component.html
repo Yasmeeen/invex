@@ -294,11 +294,14 @@
               <span *ngIf="orderRemaining(o) > 0" class="text-error">
                 {{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
               </span>
-              <span *ngIf="orderRemaining(o) <= 0">—</span>
+              <span class="text-success weight-bold" *ngIf="isCreditFullySettled(o)">
+                {{ 'tr_credit_fully_settled' | translate }}
+              </span>
+              <span *ngIf="orderRemaining(o) <= 0 && !isCreditFullySettled(o)">—</span>
             </td>
             <td>{{ o.pointsEarned ?? 0 }}</td>
             <td>{{ paymentMethodLabel(o.paymentMethod) }}</td>
-            <td class="col-status">{{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus) }}</td>
+            <td class="col-status">{{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus, o) }}</td>
             <td>{{ o.createdAt | date:'short' }}</td>
             <td>
               <button

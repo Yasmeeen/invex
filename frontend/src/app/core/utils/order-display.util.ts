@@ -47,6 +47,16 @@ export function orderDisplayRemaining(order: Order | null | undefined): number {
   return Math.max(0, Math.round((total - paidStored) * 100) / 100);
 }
 
+/** Credit invoice with no remaining balance (fully settled). */
+export function isPayLaterSettled(order: Order | null | undefined): boolean {
+  return isPayLaterMethod(order?.paymentMethod) && orderDisplayRemaining(order) <= 0;
+}
+
+/** Credit invoice still owed (unpaid or partial). */
+export function isPayLaterOutstanding(order: Order | null | undefined): boolean {
+  return isPayLaterMethod(order?.paymentMethod) && orderDisplayRemaining(order) > 0;
+}
+
 /** Normalize product id on order line items (string / ObjectId / `{ _id }`). */
 export function lineProductId(raw: unknown): string {
   return normalizeMongoId(raw) || String(raw ?? '').trim();

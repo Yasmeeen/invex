@@ -43,7 +43,10 @@ import {
   DeskPurchaseDeferredPaymentDialogComponent,
   ExchangeSettlementTreasuryResult,
 } from '../../orders/desk-purchase-deferred-payment-dialog/desk-purchase-deferred-payment-dialog.component';
-import { PurchaseTreasurySplit } from '@shared/services/product-purchase-requests.service';
+import {
+  ProductPurchaseRequestsService,
+  PurchaseTreasurySplit,
+} from '@shared/services/product-purchase-requests.service';
 import { DailyExpenseDialogComponent } from '../../expenses/daily-expense-dialog/daily-expense-dialog.component';
 import { DrawerCloseDialogComponent } from '../../drawer-close/drawer-close-dialog/drawer-close-dialog.component';
 import { DrawerCloseService } from '@shared/services/drawer-close.service';
@@ -161,7 +164,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private barcodeScanTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private productsSerivce: ProductsSerivce, 
+    private productsSerivce: ProductsSerivce,
     private ordersSerivce: OrdersSerivce,
     private vendorsSerivce: VendorsSerivce,
     private dialog: MatDialog,
@@ -176,6 +179,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private productBookings: ProductBookingsService,
     private bookingReprint: BookingReprintService,
     private invoiceReprint: InvoiceReprintService,
+    private productPurchaseRequests: ProductPurchaseRequestsService,
     private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
@@ -343,10 +347,35 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   cancelExchangeFlow(): void {
-    this.exchangeTradeInPurchase = null;
-    this.pendingExchangeSettlement = null;
-    this.refreshExchangePaymentDefaults();
-    this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+    const purchaseId = this.exchangeTradeInPurchase?._id
+      ? String(this.exchangeTradeInPurchase._id)
+      : '';
+    const userId = this.curentUser?._id ? String(this.curentUser._id) : '';
+
+    const clearLocal = () => {
+      this.exchangeTradeInPurchase = null;
+      this.pendingExchangeSettlement = null;
+      this.refreshExchangePaymentDefaults();
+      this.translate.get('tr_exchange_cancelled').subscribe((msg) => this.appNotificationService.push(msg, 'success'));
+    };
+
+    if (!purchaseId || !userId) {
+      clearLocal();
+      return;
+    }
+
+    this.productPurchaseRequests
+      .reject(purchaseId, {
+        userId,
+        resolutionNote: 'Cancelled at cashier before checkout',
+      })
+      .subscribe({
+        next: () => clearLocal(),
+        error: () => {
+          // Still clear the desk; draft may already be rejected or legacy-approved.
+          clearLocal();
+        },
+      });
   }
 
   hasExchangeTradeIn(): boolean {
@@ -566,7 +595,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         this.refreshExchangePaymentDefaults();
         const msgKey = body?.createdProduct ? 'tr_exchange_trade_in_ok_auto' : 'tr_exchange_trade_in_ok_pending';
         this.translate.get(msgKey).subscribe((msg) => this.appNotificationService.push(msg, 'success'));
-        this.loadProducts();
+        // Trade-in stock is deferred until Pay — no product grid refresh needed yet.
         return;
       }
 
@@ -2259,12 +2288,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       orderData.vendorId = this.selectedVendorId;
     }
 
-    if (exchangeCredit > 0) {
-      orderData.exchangeTradeInCreditAmount = exchangeCredit;
-      if (exchangePurchaseId) {
-        orderData.exchangeProductPurchaseRequestId = exchangePurchaseId;
-        orderData.exchangeProductPurchaseRequestIds = [exchangePurchaseId];
+    if (this.hasExchangeTradeIn() && exchangePurchaseId) {
+      if (exchangeCredit > 0) {
+        orderData.exchangeTradeInCreditAmount = exchangeCredit;
       }
+      orderData.exchangeProductPurchaseRequestId = exchangePurchaseId;
+      orderData.exchangeProductPurchaseRequestIds = [exchangePurchaseId];
     }
 
     const bookingAllocations = this.bookingDepositAllocations();
@@ -2294,8 +2323,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       Math.round((receiptSubtotal - receiptInvoiceDisc) * 100) / 100;
 
     this.ordersSerivce.createOrder(orderData).subscribe((res: any) => {
-      const pendingPurchaseReceipt =
-        exchangeCredit > 0 ? this.exchangeTradeInPurchase : null;
+      const pendingPurchaseReceipt = this.exchangeTradeInPurchase;
       this.exchangeTradeInPurchase = null;
 
       const base = res?.newOrder ?? {};

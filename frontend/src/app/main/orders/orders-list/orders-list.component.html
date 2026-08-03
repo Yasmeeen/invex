@@ -318,7 +318,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let order of ordersList" [class.order-row--pay-later]="isPayLaterOrder(order)">
+            <tr
+              *ngFor="let order of ordersList"
+              [class.order-row--pay-later]="isPayLaterOutstandingOrder(order)"
+              [class.order-row--pay-later-settled]="isPayLaterSettledOrder(order)"
+            >
               <td>{{ order.orderNumber }}</td>
               <td>
                 <span
@@ -348,7 +352,14 @@
               </td>
               <td>{{ order.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
-              <td>{{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <span class="settled-badge" *ngIf="isPayLaterSettledOrder(order)">
+                  {{ "tr_credit_fully_settled" | translate }}
+                </span>
+                <ng-container *ngIf="!isPayLaterSettledOrder(order)">
+                  {{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </ng-container>
+              </td>
               <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
               <td>{{ createdAtCairo(order) }}</td>
               <td>{{ order.status }}</td>
@@ -407,7 +418,8 @@
         <div
           class="order-card"
           *ngFor="let order of ordersList"
-          [class.order-card--pay-later]="isPayLaterOrder(order)"
+          [class.order-card--pay-later]="isPayLaterOutstandingOrder(order)"
+          [class.order-card--pay-later-settled]="isPayLaterSettledOrder(order)"
         >
           <div class="order-card__top">
             <div class="order-card__icon">
@@ -421,6 +433,9 @@
                   [class.party-badge--supplier]="orderPartyType(order) === 'supplier'"
                 >
                   {{ orderPartyTypeLabel(order) }}
+                </span>
+                <span class="settled-badge" *ngIf="isPayLaterSettledOrder(order)">
+                  {{ "tr_credit_fully_settled" | translate }}
                 </span>
               </div>
               <div class="order-card__client">{{ order.clientName }}</div>
@@ -480,8 +495,11 @@
             </div>
             <div class="stat">
               <div class="stat__label">{{ 'tr_remaining' | translate }}</div>
-              <div class="stat__value">
+              <div class="stat__value" *ngIf="!isPayLaterSettledOrder(order)">
                 {{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+              <div class="stat__value" *ngIf="isPayLaterSettledOrder(order)">
+                <span class="settled-badge">{{ "tr_credit_fully_settled" | translate }}</span>
               </div>
             </div>
             <div class="stat">

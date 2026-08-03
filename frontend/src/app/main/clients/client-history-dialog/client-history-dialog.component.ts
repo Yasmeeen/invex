@@ -2,7 +2,12 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { Order, Branch } from '@core/models/products.model';
-import { isPayLaterMethod } from '@core/utils/order-display.util';
+import {
+  isPayLaterMethod,
+  isPayLaterSettled,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+} from '@core/utils/order-display.util';
 import {
   Client,
   ClientHistoryOrderRow,
@@ -17,7 +22,6 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { AccountHistoryPdfService } from '@shared/services/account-history-pdf.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { UserSerivce } from '@shared/services/user.service';
-import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
@@ -253,7 +257,14 @@ export class ClientHistoryDialogComponent implements OnInit {
     return order.remaining ?? orderDisplayRemaining(order as any);
   }
 
-  paymentStatusLabel(status?: string): string {
+  isCreditFullySettled(order: ClientHistoryOrderRow): boolean {
+    return isPayLaterSettled(order as any);
+  }
+
+  paymentStatusLabel(status?: string, order?: ClientHistoryOrderRow): string {
+    if (order && this.isCreditFullySettled(order) && order.status !== 'restored') {
+      return this.translate.instant('tr_credit_fully_settled');
+    }
     switch (status) {
       case 'paid':
         return this.translate.instant('tr_paid');

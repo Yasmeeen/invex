@@ -668,6 +668,8 @@
   "tr_serial_track_locations_count": "{{count}} مواقع",
   "tr_product_transfer_reserved_hint": "{{n}} وحدة محجوزة لنقل نشط إلى فرع آخر حتى يوافق مدير الفرع المستلم.",
   "tr_product_transfer_reserved_short": "نقل {{n}}",
+  "tr_product_booking_reserved_short": "محجوز {{n}}",
+  "tr_product_booking_reserved_hint": "{{n}} وحدة محجوزة لعميل — غير متاحة للبيع أو الحجز لغير صاحب الحجز.",
   "tr_branch_transfer_dialog_hint": "المخزون يبقى في فرع المصدر حتى يؤكد مدير الفرع المستلم الاستلام. البيع والحجز لا يستخدمان الكمية المحجوزة.",
   "tr_branch_transfer_to_branch": "الفرع المستلم",
   "tr_branch_transfer_quantity": "الكمية",

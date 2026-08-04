@@ -296,34 +296,37 @@
                   />
                   <span class="products-list__name-column">
                     <span
-                      *ngIf="bookedQty(product) > 0"
-                      class="booking-badge"
-                      [attr.title]="
-                        'tr_booking_stock_badge'
-                          | translate
-                            : { booked: bookedQty(product), stock: product.stock }
-                      "
+                      class="products-list__name-badges"
+                      *ngIf="bookedQty(product) > 0 || transferReservedQty(product) > 0"
                     >
-                      <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
-                      <span class="booking-badge__text">{{
-                        'tr_booking_stock_badge'
-                          | translate
-                            : { booked: bookedQty(product), stock: product.stock }
-                      }}</span>
-                    </span>
-                    <span
-                      *ngIf="transferReservedQty(product) > 0"
-                      class="transfer-badge"
-                      [attr.title]="
-                        'tr_product_transfer_reserved_hint'
-                          | translate : { n: transferReservedQty(product) }
-                      "
-                    >
-                      <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
-                      {{
-                        'tr_product_transfer_reserved_short'
-                          | translate : { n: transferReservedQty(product) }
-                      }}
+                      <span
+                        *ngIf="bookedQty(product) > 0"
+                        class="booking-badge"
+                        [attr.title]="
+                          'tr_product_booking_reserved_hint'
+                            | translate : { n: bookedQty(product) }
+                        "
+                      >
+                        <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
+                        {{
+                          'tr_product_booking_reserved_short'
+                            | translate : { n: bookedQty(product) }
+                        }}
+                      </span>
+                      <span
+                        *ngIf="transferReservedQty(product) > 0"
+                        class="transfer-badge"
+                        [attr.title]="
+                          'tr_product_transfer_reserved_hint'
+                            | translate : { n: transferReservedQty(product) }
+                        "
+                      >
+                        <i class="fa fa-exchange transfer-badge__icon" aria-hidden="true"></i>
+                        {{
+                          'tr_product_transfer_reserved_short'
+                            | translate : { n: transferReservedQty(product) }
+                        }}
+                      </span>
                     </span>
                     <span class="products-list__name-text">{{ product.name }}</span>
                   </span>
@@ -417,6 +420,20 @@
 
             <div class="product-card__title">
               <div class="product-card__name">
+                <span
+                  *ngIf="bookedQty(product) > 0"
+                  class="booking-badge"
+                  [attr.title]="
+                    'tr_product_booking_reserved_hint'
+                      | translate : { n: bookedQty(product) }
+                  "
+                >
+                  <i class="fa fa-bookmark booking-badge__icon" aria-hidden="true"></i>
+                  {{
+                    'tr_product_booking_reserved_short'
+                      | translate : { n: bookedQty(product) }
+                  }}
+                </span>
                 <span
                   *ngIf="transferReservedQty(product) > 0"
                   class="transfer-badge"

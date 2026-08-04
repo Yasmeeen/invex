@@ -564,6 +564,8 @@
   "tr_product_transfer_branch": "In Filiale transferieren",
   "tr_product_transfer_reserved_hint": "{{n}} Einheit(en) für einen laufenden Filialtransfer reserviert, bis die Zielfiliale den Empfang bestätigt.",
   "tr_product_transfer_reserved_short": "Transfer {{n}}",
+  "tr_product_booking_reserved_short": "Reserviert {{n}}",
+  "tr_product_booking_reserved_hint": "{{n}} Einheit(en) für einen Kunden reserviert — nicht für Verkauf oder Buchung durch andere verfügbar.",
   "tr_branch_transfer_dialog_hint": "Der Bestand bleibt in der Quellfiliale, bis die Zielfiliale den Empfang bestätigt. Verkauf und Reservierungen nutzen die reservierte Menge nicht.",
   "tr_branch_transfer_to_branch": "Zielfiliale",
   "tr_branch_transfer_quantity": "Menge",

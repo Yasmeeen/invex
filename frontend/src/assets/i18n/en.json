@@ -634,6 +634,8 @@
   "tr_serial_track_locations_count": "{{count}} locations",
   "tr_product_transfer_reserved_hint": "{{n}} unit(s) reserved for an outgoing branch transfer until the destination approves receipt.",
   "tr_product_transfer_reserved_short": "Transfer {{n}}",
+  "tr_product_booking_reserved_short": "Booked {{n}}",
+  "tr_product_booking_reserved_hint": "{{n}} unit(s) reserved for a customer — not available to sell or book for others.",
   "tr_branch_transfer_dialog_hint": "Stock stays at the source branch until the destination manager confirms receipt. Sales and bookings cannot use reserved units.",
   "tr_branch_transfer_to_branch": "Destination branch",
   "tr_branch_transfer_quantity": "Quantity",

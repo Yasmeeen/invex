@@ -564,6 +564,8 @@
   "tr_product_transfer_branch": "Transférer vers une succursale",
   "tr_product_transfer_reserved_hint": "{{n}} unité(s) réservée(s) pour un transfert en cours jusqu’à confirmation par la succursale destinataire.",
   "tr_product_transfer_reserved_short": "Transfert {{n}}",
+  "tr_product_booking_reserved_short": "Réservé {{n}}",
+  "tr_product_booking_reserved_hint": "{{n}} unité(s) réservée(s) pour un client — non disponibles à la vente ou à la réservation pour d’autres.",
   "tr_branch_transfer_dialog_hint": "Le stock reste à la succursale d’origine jusqu’à confirmation de réception par le gestionnaire de destination. Les ventes et réservations ne peuvent pas utiliser la quantité réservée.",
   "tr_branch_transfer_to_branch": "Succursale de destination",
   "tr_branch_transfer_quantity": "Quantité",

@@ -284,42 +284,8 @@ img{
 
 }
 
-@page {
-  size: 40mm 25mm;
-  margin: 0;
-}
-
-.barcode-continer {
-  width: 40mm;
-  height: 25mm;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-}
-
-.product-name {
-  font-size: 8px;
-  font-weight: bold;
-  line-height: 1.1;
-  margin-bottom: 1mm;
-  max-width: 38mm;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.barcode-continer img {
-  width: 38mm;
-  height: auto;
-}
+/* Barcode labels print in a separate window (API HTML) — do NOT set @page here;
+   a global @page leaks into booking/sale receipts and clips them to label size. */
 
 .products-list__name-cell {
   display: flex;

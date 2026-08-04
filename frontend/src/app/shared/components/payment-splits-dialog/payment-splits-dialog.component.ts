@@ -171,6 +171,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   private ensureDefaultNetAmounts(): void {
+    // Deposit amounts are free-form (invoiceNetTotal is 0); do not overwrite user input.
+    if (this.mode === 'deposit') {
+      return;
+    }
     if (this.selectedPayMethods.length !== 1) {
       return;
     }

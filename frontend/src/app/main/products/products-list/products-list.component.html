@@ -219,6 +219,41 @@
           </div>
         </div>
       </div>
+      <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_search_supplier' | translate }}</label>
+          <ng-select
+            class="s-control s-select products-filter-ng-select width-100"
+            [items]="vendorSearchItems"
+            [typeahead]="vendorTypeahead$"
+            [loading]="vendorsLoading"
+            bindLabel="label"
+            bindValue="_id"
+            [(ngModel)]="selectedSupplierId"
+            (ngModelChange)="onSupplierIdChange($event)"
+            (open)="onVendorSelectOpen()"
+            name="supplierId"
+            [placeholder]="'tr_search_supplier_placeholder' | translate"
+            [clearable]="true"
+            [searchable]="true"
+            appendTo="body"
+            notFoundText="{{ 'tr_no_items_found' | translate }}"
+          >
+            <ng-template ng-option-tmp let-item="item">
+              <div class="weight-medium">{{ item.nameOfcompany }}</div>
+              <div class="size-small text-muted">
+                {{ item.name }}
+                <span *ngIf="item.phone"> · {{ item.phone }}</span>
+              </div>
+            </ng-template>
+            <ng-template ng-label-tmp let-item="item">
+              {{ item.nameOfcompany }}
+              <span *ngIf="item.name"> — {{ item.name }}</span>
+              <span *ngIf="item.phone"> · {{ item.phone }}</span>
+            </ng-template>
+          </ng-select>
+        </div>
+      </div>
     </div>
   </div>
 

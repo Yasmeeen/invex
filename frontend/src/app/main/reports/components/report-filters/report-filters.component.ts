@@ -94,7 +94,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
       this.loadSalespeople();
-      if (this.reportType === 'products') {
+      if (this.reportType === 'products' || this.reportType === 'sales') {
         this.loadCategories();
       }
     }
@@ -284,11 +284,11 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
       customer_phone: (this.filters.customer_phone || '').trim(),
       groupBy: this.filters.groupBy || 'daily',
     };
-    if (this.reportType === 'products') {
+    if (this.reportType === 'products' || this.reportType === 'sales') {
       base.category_id = this.filters.category_id ? String(this.filters.category_id) : '';
-      if (this.filters.supplier_id) {
-        base.supplier_id = String(this.filters.supplier_id);
-      }
+    }
+    if (this.reportType === 'products' && this.filters.supplier_id) {
+      base.supplier_id = String(this.filters.supplier_id);
     }
     if (this.reportType === 'sales' || this.reportType === 'profit') {
       base.seller_name = this.filters.seller_name ? String(this.filters.seller_name) : '';

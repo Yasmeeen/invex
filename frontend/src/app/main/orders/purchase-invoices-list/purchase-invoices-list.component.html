@@ -87,6 +87,26 @@
           </div>
         </div>
       </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_receipt_purchase_treasury' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="treasuryFilterOptions"
+              bindLabel="label"
+              bindValue="key"
+              [clearable]="true"
+              [(ngModel)]="selectedTreasuryKey"
+              name="purchaseTreasuryFilter"
+              placeholder="{{ 'tr_all_purchase_treasuries' | translate }}"
+              (change)="onTreasuryFilterChange()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="row mt-2">
       <div class="col-md-3">
@@ -167,7 +187,8 @@
         <tbody>
           <tr
             *ngFor="let p of purchasesList"
-            [class.purchase-row--deferred]="isDeferredPurchase(p)"
+            [class.purchase-row--deferred]="isDeferredOutstandingPurchase(p)"
+            [class.purchase-row--deferred-settled]="isDeferredSettledPurchase(p)"
           >
             <td>{{ purchaseRef(p) }}</td>
             <td>
@@ -187,8 +208,13 @@
             <td>{{ lineTotal(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>{{ totalPaid(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
             <td>
-              <span *ngIf="remaining(p) > 0">{{ remaining(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
-              <span *ngIf="remaining(p) <= 0">—</span>
+              <span class="settled-badge" *ngIf="isDeferredSettledPurchase(p)">
+                {{ 'tr_credit_fully_settled' | translate }}
+              </span>
+              <ng-container *ngIf="!isDeferredSettledPurchase(p)">
+                <span *ngIf="remaining(p) > 0">{{ remaining(p) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
+                <span *ngIf="remaining(p) <= 0">—</span>
+              </ng-container>
             </td>
             <td>{{ treasuryDisplay(p) }}</td>
             <td>{{ statusLabel(p?.status) }}</td>
@@ -240,7 +266,8 @@
       <div
         class="order-card purchase-card"
         *ngFor="let p of purchasesList"
-        [class.order-card--pay-later]="isDeferredPurchase(p)"
+        [class.order-card--pay-later]="isDeferredOutstandingPurchase(p)"
+        [class.order-card--pay-later-settled]="isDeferredSettledPurchase(p)"
       >
         <div class="order-card__top">
           <div class="order-card__icon">
@@ -256,6 +283,9 @@
                 "
               >
                 {{ partyTypeLabel(p) }}
+              </span>
+              <span class="settled-badge" *ngIf="isDeferredSettledPurchase(p)">
+                {{ 'tr_credit_fully_settled' | translate }}
               </span>
             </div>
             <div class="order-card__client">{{ partyName(p) }}</div>
@@ -314,11 +344,14 @@
           </div>
           <div class="stat">
             <div class="stat__label">{{ 'tr_remaining' | translate }}</div>
-            <div class="stat__value">
+            <div class="stat__value" *ngIf="!isDeferredSettledPurchase(p)">
               <ng-container *ngIf="remaining(p) > 0; else noRem">
                 {{ remaining(p) | currency:'EGP ':'symbol':'1.2-2' }}
               </ng-container>
               <ng-template #noRem>—</ng-template>
+            </div>
+            <div class="stat__value" *ngIf="isDeferredSettledPurchase(p)">
+              <span class="settled-badge">{{ 'tr_credit_fully_settled' | translate }}</span>
             </div>
           </div>
           <div class="stat">

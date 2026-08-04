@@ -12,6 +12,7 @@ import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import { buildPhoneSearchCandidates, digitsOnly } from '../../utils/phone-utils.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
+  expandDeskPurchaseDetailLines,
   resolvePurchaseTreasurySplits,
 } from '../../utils/purchase-treasury-splits.js';
 import { NON_OPERATING_DAILY_EXPENSE_TYPES } from '../../utils/daily-expense-categories.js';
@@ -330,7 +331,12 @@ export const getSalesReport = async (req, res) => {
     };
     if (f.branchId) baseMatch.branch = f.branchId;
     appendOrderCustomerFilters(baseMatch, f);
-    if (f.productId) baseMatch['products.productId'] = f.productId;
+    if (f.productId) {
+      baseMatch['products.productId'] = f.productId;
+    } else if (f.categoryId) {
+      const categoryProductIds = await Product.find({ category: f.categoryId }).distinct('_id');
+      baseMatch['products.productId'] = { $in: categoryProductIds };
+    }
     if (f.sellerName) baseMatch.sellerName = f.sellerName;
 
     const [summary] = await Order.aggregate([
@@ -925,7 +931,7 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
 
     const rows = await ProductPurchaseRequest.find(match)
       .select(
-        'createdAt quantity productPayload purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits branch'
+        'createdAt quantity productPayload lines purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits branch isExchangeTradeIn exchangeSettlementSplits'
       )
       .populate('branch', 'name')
       .sort({ createdAt: -1 })
@@ -950,24 +956,10 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
       }))
       .sort((a, b) => String(a.treasuryKey).localeCompare(String(b.treasuryKey)));
 
-    const lines = rows.map((r) => {
-      const q = Math.max(1, Math.floor(Number(r.quantity) || 1));
-      const net = round2(Number(r.productPayload?.netPrice || 0));
-      const lineTotal = round2(net * q);
-      const splits = resolvePurchaseTreasurySplits(r);
-      const k = String(r.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
-      return {
-        createdAt: r.createdAt,
-        branchName: r.branch?.name || '',
-        productName: r.productPayload?.name || '',
-        quantity: q,
-        unitCost: net,
-        lineTotal,
-        treasuryKey: k,
-        treasuryLabel: String(r.purchaseTreasuryLabel || '').trim() || k,
-        treasurySplits: splits,
-      };
-    });
+    /** One detail row per device when bulk multi-code / different unitDetails. */
+    const lines = rows.flatMap((r) =>
+      expandDeskPurchaseDetailLines(r, { branchName: r.branch?.name || '' })
+    );
 
     return res.json({
       filters: f,

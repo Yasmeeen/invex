@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { PaginationData } from '@core/models/users-interfaces.model';
@@ -18,6 +18,8 @@ import { InvoiceReturnDialogComponent } from '../invoice-return-dialog/invoice-r
 import { InvoiceReturnDetailsDialogComponent } from '../invoice-return-details-dialog/invoice-return-details-dialog.component';
 import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import { canReturnPurchase as canReturnPurchaseCheck, hasPurchaseReturns } from '@core/utils/order-display.util';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { Subscription } from 'rxjs';
 
 const DEFERRED_KEY = 'deferred';
 
@@ -26,7 +28,7 @@ const DEFERRED_KEY = 'deferred';
   templateUrl: './purchase-invoices-list.component.html',
   styleUrls: ['./purchase-invoices-list.component.scss'],
 })
-export class PurchaseInvoicesListComponent implements OnInit {
+export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
   loading = true;
   isFilterOpen = true;
   purchasesList: any[] = [];
@@ -40,11 +42,14 @@ export class PurchaseInvoicesListComponent implements OnInit {
   searchTimeout: any;
   selectedStatus: string | null = null;
   selectedBranchId: string | null = null;
+  selectedTreasuryKey: string | null = null;
   listFromDate: Date | null = null;
   listToDate: Date | null = null;
   branches: Branch[] = [];
+  treasuryFilterOptions: { key: string; label: string }[] = [];
   curentUser: any;
   viewMode: 'table' | 'cards' = 'cards';
+  private settingsSub: Subscription;
 
   readonly statusOptions = [
     { value: null, labelKey: 'tr_all' },
@@ -61,7 +66,8 @@ export class PurchaseInvoicesListComponent implements OnInit {
     private notify: AppNotificationService,
     private dialog: MatDialog,
     private invoiceReprint: InvoiceReprintService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private storeSettings: StoreSettingsService
   ) {}
 
   ngOnInit(): void {
@@ -77,8 +83,33 @@ export class PurchaseInvoicesListComponent implements OnInit {
       this.isFilterOpen = true;
     }
 
+    this.syncTreasuryFilterOptions();
+    this.settingsSub = this.storeSettings.settings$.subscribe(() => this.syncTreasuryFilterOptions());
     this.getBranches();
     this.loadPurchases();
+  }
+
+  ngOnDestroy(): void {
+    this.settingsSub?.unsubscribe();
+  }
+
+  private syncTreasuryFilterOptions(): void {
+    const raw = this.storeSettings.snapshot.purchaseTreasuryMethods;
+    const methods = Array.isArray(raw) && raw.length ? raw : [{ key: 'cash', label: 'Cash' }];
+    const options = methods
+      .map((m) => ({
+        key: String(m?.key || '')
+          .trim()
+          .toLowerCase(),
+        label: String(m?.label || m?.key || '').trim(),
+      }))
+      .filter((o) => o.key && o.key !== DEFERRED_KEY);
+    const deferredLabel =
+      this.translate.instant('tr_payment_deferred') || 'Deferred';
+    this.treasuryFilterOptions = [
+      ...options,
+      { key: DEFERRED_KEY, label: deferredLabel },
+    ];
   }
 
   setViewMode(mode: 'table' | 'cards'): void {
@@ -117,6 +148,9 @@ export class PurchaseInvoicesListComponent implements OnInit {
     }
     if (this.listToDate) {
       q.to = formatCairoYMD(this.listToDate);
+    }
+    if (this.selectedTreasuryKey) {
+      q.purchaseTreasuryKey = this.selectedTreasuryKey;
     }
 
     this.loading = true;
@@ -269,6 +303,22 @@ export class PurchaseInvoicesListComponent implements OnInit {
     return 0;
   }
 
+  /** Non-deferred treasury paid at purchase time (cash/bank portion on mixed invoices). */
+  paidNowAmount(p: any): number {
+    const splits = Array.isArray(p?.purchaseTreasurySplits) ? p.purchaseTreasurySplits : [];
+    if (splits.length) {
+      return (
+        Math.round(
+          splits
+            .filter((s: any) => String(s?.key || '').toLowerCase() !== DEFERRED_KEY)
+            .reduce((a: number, s: any) => a + (Number(s?.amount) || 0), 0) * 100
+        ) / 100
+      );
+    }
+    if (this.hasDeferredTreasury(p)) return 0;
+    return this.lineTotal(p);
+  }
+
   totalPaid(p: any): number {
     if (!this.hasDeferredTreasury(p)) {
       return p?.status === 'approved' ? this.lineTotal(p) : 0;
@@ -276,20 +326,36 @@ export class PurchaseInvoicesListComponent implements OnInit {
     if (p?.status !== 'approved') {
       return 0;
     }
-    const remaining = this.remaining(p);
-    return Math.round((this.deferredAmount(p) - remaining) * 100) / 100;
+    return Math.round((Number(p?.amountPaid) || 0) * 100) / 100;
   }
 
   remaining(p: any): number {
     if (!this.hasDeferredTreasury(p) || p?.status !== 'approved') {
       return 0;
     }
-    const paid = Number(p?.amountPaid) || 0;
-    return Math.max(0, Math.round((this.deferredAmount(p) - paid) * 100) / 100);
+    const deferred = this.deferredAmount(p);
+    const paidNow = this.paidNowAmount(p);
+    const totalPaid = Number(p?.amountPaid) || 0;
+    const deferredPaid = Math.max(0, Math.round((totalPaid - paidNow) * 100) / 100);
+    return Math.max(0, Math.round((deferred - deferredPaid) * 100) / 100);
   }
 
   isDeferredPurchase(p: any): boolean {
     return this.hasDeferredTreasury(p);
+  }
+
+  /** Deferred purchase still outstanding (amber highlight — same as sales credit). */
+  isDeferredOutstandingPurchase(p: any): boolean {
+    return this.hasDeferredTreasury(p) && this.remaining(p) > 0.005;
+  }
+
+  /** Deferred purchase fully settled (green badge — same as sales credit). */
+  isDeferredSettledPurchase(p: any): boolean {
+    return (
+      this.hasDeferredTreasury(p) &&
+      p?.status === 'approved' &&
+      this.remaining(p) <= 0.005
+    );
   }
 
   partyTypeLabel(p: any): string {
@@ -370,6 +436,11 @@ export class PurchaseInvoicesListComponent implements OnInit {
   }
 
   onBranchChange(): void {
+    this.params.page = 1;
+    this.loadPurchases();
+  }
+
+  onTreasuryFilterChange(): void {
     this.params.page = 1;
     this.loadPurchases();
   }

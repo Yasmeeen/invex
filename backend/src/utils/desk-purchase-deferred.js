@@ -15,6 +15,7 @@ import {
   derivePurchaseTreasuryLabel,
   deskPurchaseLineTotal,
   normalizeTreasurySplitsInput,
+  paidNowTreasuryAmount,
   purchaseHasDeferredTreasury,
 } from './purchase-treasury-splits.js';
 import {
@@ -28,8 +29,37 @@ import { postTreasurySplitOutflows, safeTreasuryPost } from './treasury-ledger.j
 export function deferredDeskPurchaseRemaining(purchase) {
   if (!purchase || !purchaseHasDeferredTreasury(purchase)) return 0;
   const deferredTotal = deferredTreasuryAmount(purchase) || deskPurchaseLineTotal(purchase);
-  const paid = Number(purchase.amountPaid) || 0;
-  return Math.max(0, Math.round((deferredTotal - paid) * 100) / 100);
+  const paidNow = paidNowTreasuryAmount(purchase);
+  const totalPaid = Number(purchase.amountPaid) || 0;
+  const deferredPaid = Math.max(0, Math.round((totalPaid - paidNow) * 100) / 100);
+  return Math.max(0, Math.round((deferredTotal - deferredPaid) * 100) / 100);
+}
+
+/**
+ * After vendor deferred payment on linked PurchasingRequest, mirror amountPaid
+ * onto the desk ProductPurchaseRequest so purchase invoices show settlement.
+ * amountPaid = non-deferred splits paid at create + deferred payments on the PR.
+ */
+export async function syncDeskPurchasePaidFromLinkedRequest(purchasingRequest) {
+  if (!purchasingRequest?._id) return null;
+  const purchase = await ProductPurchaseRequest.findOne({
+    linkedPurchasingRequestId: purchasingRequest._id,
+  });
+  if (!purchase || !purchaseHasDeferredTreasury(purchase)) return null;
+
+  const paidNow = paidNowTreasuryAmount(purchase);
+  const deferredPaid = Math.round((Number(purchasingRequest.amountPaid) || 0) * 100) / 100;
+  const lineTotal = deskPurchaseLineTotal(purchase);
+  const nextPaid = Math.max(
+    0,
+    Math.min(Math.round((paidNow + deferredPaid) * 100) / 100, lineTotal)
+  );
+  if (Math.abs((Number(purchase.amountPaid) || 0) - nextPaid) < 0.005) {
+    return purchase;
+  }
+  purchase.amountPaid = nextPaid;
+  await purchase.save();
+  return purchase;
 }
 
 function deskPurchasingRequestNote(purchase) {
@@ -172,12 +202,29 @@ export async function recordDeskPurchaseDeferredPayment(
     if (!pr) {
       throw new Error('Linked purchasing request not found');
     }
-    return recordVendorDeferredPayment(pr, amountRaw, {
+    // Self-heal: PR already fully paid but desk invoice amountPaid was out of sync.
+    const prRemaining =
+      Math.max(
+        0,
+        Math.round(((Number(pr.totalAmount) || 0) - (Number(pr.amountPaid) || 0)) * 100) / 100
+      );
+    if (prRemaining <= 0) {
+      await syncDeskPurchasePaidFromLinkedRequest(pr);
+      throw new Error('Nothing remaining to pay');
+    }
+    const result = await recordVendorDeferredPayment(pr, amountRaw, {
       userId,
       branchId,
       note,
       paymentTreasurySplits: splitsRaw,
     });
+    // recordVendorDeferredPayment syncs purchase.amountPaid; reload for accurate remaining.
+    const fresh = await ProductPurchaseRequest.findById(purchaseId);
+    return {
+      ...result,
+      amountPaid: Number(fresh?.amountPaid) || result.amountPaid,
+      remaining: deferredDeskPurchaseRemaining(fresh || purchase),
+    };
   }
 
   let lineTotal = Math.round(Number(amountRaw) * 100) / 100;

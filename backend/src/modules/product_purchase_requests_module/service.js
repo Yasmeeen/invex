@@ -326,7 +326,7 @@ export const getProductPurchaseRequest = async (req, res) => {
 
 export const listProductPurchaseRequests = async (req, res) => {
   try {
-    const { status, branchId, page = 1, limit = 20, from, to } = req.query;
+    const { status, branchId, page = 1, limit = 20, from, to, purchaseTreasuryKey } = req.query;
     const p = Math.max(1, Number(page) || 1);
     const lim = Math.max(1, Math.min(50, Number(limit) || 20));
     const skip = (p - 1) * lim;
@@ -340,6 +340,16 @@ export const listProductPurchaseRequests = async (req, res) => {
     }
     if (branchId && mongoose.Types.ObjectId.isValid(String(branchId))) {
       q.branch = new mongoose.Types.ObjectId(String(branchId));
+    }
+    const treasuryKey = String(purchaseTreasuryKey || '')
+      .trim()
+      .toLowerCase();
+    if (treasuryKey) {
+      // Match single-treasury invoices or any split that used this bucket.
+      q.$or = [
+        { purchaseTreasuryKey: treasuryKey },
+        { 'purchaseTreasurySplits.key': treasuryKey },
+      ];
     }
     if (from || to) {
       const timezone = 'Africa/Cairo';

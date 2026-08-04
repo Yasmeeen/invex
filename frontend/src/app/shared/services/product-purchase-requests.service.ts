@@ -103,12 +103,15 @@ export class ProductPurchaseRequestsService {
     limit?: number;
     from?: string;
     to?: string;
+    /** Filter by purchase treasury bucket (cash, deferred, bank_…); matches key or splits. */
+    purchaseTreasuryKey?: string;
   }): Observable<any> {
     const q: Record<string, string> = {};
     if (params.status) q.status = params.status;
     if (params.branchId) q.branchId = params.branchId;
     if (params.from) q.from = params.from;
     if (params.to) q.to = params.to;
+    if (params.purchaseTreasuryKey) q.purchaseTreasuryKey = params.purchaseTreasuryKey;
     if (params.page != null) q.page = String(params.page);
     if (params.limit != null) q.limit = String(params.limit);
     return this.http.get(PRODUCT_PURCHASE_REQUESTS_URL, { params: q });

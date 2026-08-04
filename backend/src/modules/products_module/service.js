@@ -1021,6 +1021,10 @@ function buildProductsListQuery(queryParams = {}) {
     attrValue,
     includeRemoved,
     inStock,
+    supplier_id,
+    supplierId,
+    vendor_id,
+    vendorId,
   } = queryParams;
 
   const query = {};
@@ -1079,6 +1083,15 @@ function buildProductsListQuery(queryParams = {}) {
     query.branch = branchIds[0];
   } else if (branchIds.length > 1) {
     query.branch = { $in: branchIds };
+  }
+
+  const supplierIds = toObjectIds(
+    parseOidCsvList(supplier_id ?? supplierId ?? vendor_id ?? vendorId)
+  );
+  if (supplierIds.length === 1) {
+    query['acquiredFrom.vendorId'] = supplierIds[0];
+  } else if (supplierIds.length > 1) {
+    query['acquiredFrom.vendorId'] = { $in: supplierIds };
   }
 
   if (attrKey && attrValue) {

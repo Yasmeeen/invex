@@ -593,6 +593,14 @@ export async function recordVendorDeferredPayment(
     });
   });
 
+  // Keep linked desk purchase invoice in sync (invoices list uses purchase.amountPaid).
+  try {
+    const { syncDeskPurchasePaidFromLinkedRequest } = await import('./desk-purchase-deferred.js');
+    await syncDeskPurchasePaidFromLinkedRequest(request);
+  } catch (e) {
+    console.warn('⚠️ sync desk purchase paid after vendor deferred:', e?.message || e);
+  }
+
   return {
     applied,
     cashDrawerAmount,

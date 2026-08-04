@@ -1,10 +1,11 @@
 import { CategoriesServce } from './../../../shared/services/categories.service';
 import { MatDialog } from '@angular/material/dialog';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 // import { productsSerivce } from '@shared/services/products.services';
 import { PaginationData } from '@core/models/users-interfaces.model'
 // import { category, product } from '@core/models/products-interface.model'
-import { Subscription } from 'rxjs';
+import { of, Subject, Subscription } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 import { Branch, Category, Product } from '@core/models/products.model';
@@ -14,6 +15,7 @@ import {
   ProductsSerivce,
 } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
+import { VendorsSerivce } from '@shared/services/vendors.service';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { Globals } from '@core/globals';
 import {
@@ -36,7 +38,7 @@ import { Router } from '@angular/router';
   templateUrl: './products-list.component.html',
   styleUrls: ['./products-list.component.scss']
 })
-export class ProductsListComponent implements OnInit {
+export class ProductsListComponent implements OnInit, OnDestroy {
   productsLoading: boolean = true;
   isFilterOpen: boolean = true;
   paginationPerPage:number = 20;
@@ -55,6 +57,13 @@ export class ProductsListComponent implements OnInit {
   /** Multi-select branch filter (API: comma-separated `branchId`). */
   selectedBranches: string[] = [];
   branches: Branch [] = [];
+  /** Supplier (vendor) filter — API: `supplier_id` → acquiredFrom.vendorId */
+  vendorSearchItems: any[] = [];
+  selectedSupplierId: string | null = null;
+  selectedSupplierLabel = '';
+  vendorsLoading = false;
+  readonly vendorTypeahead$ = new Subject<string>();
+  private vendorTypeaheadSub?: Subscription;
   /** all | warehouse | branches */
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   /** all | with_bookings | without_bookings — maps to API `booked` */
@@ -106,6 +115,7 @@ export class ProductsListComponent implements OnInit {
     private dialog: MatDialog,
     private CategoriesServce: CategoriesServce,
     private branchesServce: BranchesServce,
+    private vendorsSerivce: VendorsSerivce,
     private globals: Globals,
     private router: Router
   ) { }
@@ -239,6 +249,9 @@ export class ProductsListComponent implements OnInit {
     } else if (this.selectedBranches?.length) {
       filterParams['branchId'] = this.selectedBranches.filter(Boolean).join(',');
     }
+    if (this.selectedSupplierId) {
+      filterParams['supplier_id'] = String(this.selectedSupplierId);
+    }
     const search = String(this.nameSearchTerm || this.params['search'] || '').trim();
     if (search) {
       filterParams['search'] = search;
@@ -282,9 +295,79 @@ export class ProductsListComponent implements OnInit {
     }
     const saved = localStorage.getItem('products.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
+    this.initVendorTypeahead();
     this.getproducts();
     this.getcategorys();
     this.getBranches();
+  }
+
+  private initVendorTypeahead(): void {
+    this.vendorTypeaheadSub = this.vendorTypeahead$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        tap(() => (this.vendorsLoading = true)),
+        switchMap((term: string) => {
+          const search = String(term || '').trim();
+          const params: Record<string, string | number> = { page: 1, limit: 25 };
+          if (search) {
+            params.search = search;
+          }
+          return this.vendorsSerivce.getVendors(params).pipe(
+            catchError(() => of({ vendors: [] })),
+            tap(() => (this.vendorsLoading = false))
+          );
+        })
+      )
+      .subscribe((res: any) => {
+        const list = Array.isArray(res?.vendors) ? res.vendors : [];
+        this.vendorSearchItems = list.map((v: any) => this.withVendorLabel(v));
+        if (
+          this.selectedSupplierId &&
+          this.selectedSupplierLabel &&
+          !this.vendorSearchItems.some(
+            (v) => String(v._id) === String(this.selectedSupplierId)
+          )
+        ) {
+          this.vendorSearchItems = [
+            {
+              _id: this.selectedSupplierId,
+              label: this.selectedSupplierLabel,
+              nameOfcompany: this.selectedSupplierLabel,
+            },
+            ...this.vendorSearchItems,
+          ];
+        }
+      });
+  }
+
+  onVendorSelectOpen(): void {
+    this.vendorTypeahead$.next('');
+  }
+
+  private withVendorLabel(vendor: any): any {
+    if (!vendor) {
+      return vendor;
+    }
+    const company = String(vendor.nameOfcompany || '').trim();
+    const name = String(vendor.name || '').trim();
+    const phone = String(vendor.phone || '').trim();
+    return {
+      ...vendor,
+      label: [company, name, phone].filter(Boolean).join(' — '),
+    };
+  }
+
+  onSupplierIdChange(vendorId: string | null): void {
+    this.selectedSupplierId = vendorId ? String(vendorId) : null;
+    if (!vendorId) {
+      this.selectedSupplierLabel = '';
+    } else {
+      const found = this.vendorSearchItems.find((v) => String(v._id) === String(vendorId));
+      this.selectedSupplierLabel = found?.label || found?.nameOfcompany || '';
+    }
+    this.params.page = 1;
+    this.getproducts();
   }
 
   openSerialTrack(): void {
@@ -400,6 +483,7 @@ export class ProductsListComponent implements OnInit {
     delete this.params['attrKey'];
     delete this.params['attrValue'];
     delete this.params['search'];
+    delete this.params['supplier_id'];
     const filterParams = this.buildProductsFilterParams();
     Object.assign(this.params, filterParams);
 
@@ -668,6 +752,7 @@ export class ProductsListComponent implements OnInit {
   
 
   ngOnDestroy() {
+    this.vendorTypeaheadSub?.unsubscribe();
     this.subscriptions.forEach(s => s && s.unsubscribe())
   }
 

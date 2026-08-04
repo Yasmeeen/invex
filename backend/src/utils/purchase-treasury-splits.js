@@ -41,13 +41,91 @@ export function getPurchaseLines(purchase) {
   ];
 }
 
+/** Line cost: sum of unitDetails.netPrice when multi-unit prices differ; else netPrice × qty. */
+export function purchaseLineNetTotal(line) {
+  const pp = line?.productPayload;
+  const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+  const details = Array.isArray(pp?.unitDetails) ? pp.unitDetails : null;
+  if (details && details.length === q) {
+    return round2(details.reduce((acc, d) => acc + (Number(d?.netPrice) || 0), 0));
+  }
+  return round2((Number(pp?.netPrice) || 0) * q);
+}
+
 export function deskPurchaseLineTotal(purchase) {
-  return round2(
-    getPurchaseLines(purchase).reduce((sum, line) => {
-      const net = Number(line?.productPayload?.netPrice) || 0;
-      return sum + net * line.quantity;
-    }, 0)
-  );
+  return round2(getPurchaseLines(purchase).reduce((sum, line) => sum + purchaseLineNetTotal(line), 0));
+}
+
+/**
+ * Expand a desk purchase into per-unit detail rows for reports
+ * (one row per multi-code unit when unitCodes / unitDetails are present).
+ */
+export function expandDeskPurchaseDetailLines(purchase, { branchName = '' } = {}) {
+  const doc =
+    purchase && typeof purchase.toObject === 'function' ? purchase.toObject() : purchase;
+  const splits = resolvePurchaseTreasurySplits(doc);
+  const k = String(doc?.purchaseTreasuryKey || 'cash').trim().toLowerCase() || 'cash';
+  const treasuryLabel = String(doc?.purchaseTreasuryLabel || '').trim() || k;
+  const base = {
+    createdAt: doc?.createdAt,
+    branchName: branchName || doc?.branch?.name || '',
+    treasuryKey: k,
+    treasuryLabel,
+    treasurySplits: splits,
+  };
+
+  const rows = [];
+  for (const line of getPurchaseLines(doc)) {
+    const pp = line.productPayload || {};
+    const q = line.quantity;
+    const name = pp.name || '';
+    const details = Array.isArray(pp.unitDetails) && pp.unitDetails.length === q ? pp.unitDetails : null;
+    const codes =
+      Array.isArray(pp.unitCodes) && pp.unitCodes.length === q
+        ? pp.unitCodes.map((c) => String(c ?? '').trim()).filter(Boolean)
+        : null;
+
+    if (details) {
+      for (const d of details) {
+        const unitCost = round2(Number(d?.netPrice) || 0);
+        rows.push({
+          ...base,
+          productName: name,
+          productCode: String(d?.code || '').trim(),
+          quantity: 1,
+          unitCost,
+          lineTotal: unitCost,
+        });
+      }
+      continue;
+    }
+
+    if (codes && codes.length === q) {
+      const unitCost = round2(Number(pp.netPrice) || 0);
+      for (const code of codes) {
+        rows.push({
+          ...base,
+          productName: name,
+          productCode: code,
+          quantity: 1,
+          unitCost,
+          lineTotal: unitCost,
+        });
+      }
+      continue;
+    }
+
+    const unitCost = round2(Number(pp.netPrice) || 0);
+    rows.push({
+      ...base,
+      productName: name,
+      productCode: String(pp.code || '').trim(),
+      quantity: q,
+      unitCost,
+      lineTotal: purchaseLineNetTotal(line),
+    });
+  }
+  return rows;
 }
 
 export function deskPurchaseItemCount(purchase) {

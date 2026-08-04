@@ -28,7 +28,7 @@
       <label>{{ 'tr_branches' | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
-    <div class="col-md-3" *ngIf="reportType === 'products'">
+    <div class="col-md-3" *ngIf="reportType === 'products' || reportType === 'sales'">
       <label>{{ 'tr_report_filter_category_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"

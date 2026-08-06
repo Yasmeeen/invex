@@ -20,6 +20,20 @@ const clientSchema = new mongoose.Schema(
       trim: true,
     },
 
+    /** Where the client originated: in-store POS vs e-commerce. */
+    source: {
+      type: String,
+      enum: ['store', 'ecommerce'],
+      default: 'store',
+      trim: true,
+    },
+    /** Label: client came from / ordered via the online e-commerce store. */
+    isEcommerceOnline: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
     branches: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -78,6 +78,12 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Units held for open e-commerce channel orders (not yet converted to a sale). */
+    ecommerceReservedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

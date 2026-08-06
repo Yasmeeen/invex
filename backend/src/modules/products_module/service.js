@@ -16,6 +16,10 @@ import {
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
+import {
+  notifyProductChanged,
+  notifyProductDeleted,
+} from '../integrations_module/catalogSync.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -1512,6 +1516,7 @@ export const createProduct = async (req, res) => {
         },
       });
 
+      notifyProductChanged(createdProduct?._id);
       return res.status(201).json({ message: '✅ Product created', createdProduct });
     }
 
@@ -1560,6 +1565,7 @@ export const createProduct = async (req, res) => {
       },
     });
 
+    notifyProductChanged(createdProduct?._id);
     res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
     console.error('❌ Error creating product:', error.message);
@@ -1806,6 +1812,7 @@ export const updateProduct = async (req, res) => {
       after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
     });
 
+    notifyProductChanged(product?._id);
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product:', error.message);
@@ -1848,6 +1855,7 @@ export const deleteProduct = async (req, res) => {
       before: { code: product?.code, name: product?.name, stock: product?.stock, branch: product?.branch, inWarehouse: product?.inWarehouse },
     });
 
+    notifyProductDeleted(product?._id);
     res.json({ message: '✅ Product deleted' });
   } catch (error) {
     console.error('❌ Error deleting product:', error.message);

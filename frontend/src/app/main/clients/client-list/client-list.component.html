@@ -98,7 +98,16 @@
             <tr *ngFor="let client of clientsList; let i = index">
               <td>{{ i + 1 }}</td>
               <td>{{ client.phoneNumber }}</td>
-              <td>{{ client.name }}</td>
+              <td>
+                {{ client.name }}
+                <span
+                  *ngIf="client.isEcommerceOnline"
+                  class="badge badge-info ml-1"
+                  style="font-size: 10px; vertical-align: middle;"
+                >
+                  {{ 'tr_client_online_ecommerce' | translate }}
+                </span>
+              </td>
               <td>{{ client.address }}</td>
               <td><div *ngFor="let branch of  client.branches ">
                 {{branch}}
@@ -146,7 +155,16 @@
               <i class="fa fa-user" aria-hidden="true"></i>
             </div>
             <div class="client-card__title">
-              <div class="client-card__name">{{ client.name || ('tr_phone_number' | translate) }}</div>
+              <div class="client-card__name">
+                {{ client.name || ('tr_phone_number' | translate) }}
+                <span
+                  *ngIf="client.isEcommerceOnline"
+                  class="badge badge-info ml-1"
+                  style="font-size: 10px;"
+                >
+                  {{ 'tr_client_online_ecommerce' | translate }}
+                </span>
+              </div>
               <div class="client-card__meta muted">
                 <span>{{ client.phoneNumber }}</span>
                 <span class="dot" *ngIf="client.address">•</span>

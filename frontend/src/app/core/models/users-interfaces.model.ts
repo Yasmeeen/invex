@@ -37,6 +37,9 @@ export class Client{
   balanceSide?: 'debit' | 'credit' | 'even' | 'none';
   netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
   clientPayableDeferred?: number;
+  /** Client originated / ordered via e-commerce storefront. */
+  source?: 'store' | 'ecommerce';
+  isEcommerceOnline?: boolean;
 }
 
 export interface ClientSettlementPreview {

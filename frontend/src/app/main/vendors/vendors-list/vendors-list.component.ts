@@ -179,21 +179,35 @@ export class VendorsListComponent implements OnInit {
 
   }
   openVendorHistory(vendor: Vendor): void {
-    this.dialog.open(VendorHistoryDialogComponent, {
-      width: '920px',
-      maxWidth: '96vw',
-      data: { vendor },
-      disableClose: false,
-    });
+    this.dialog
+      .open(VendorHistoryDialogComponent, {
+        width: '920px',
+        maxWidth: '96vw',
+        data: { vendor },
+        disableClose: false,
+      })
+      .afterClosed()
+      .subscribe((changed) => {
+        if (changed) {
+          this.getVendors();
+        }
+      });
   }
 
   openVendorDeposit(vendor: Vendor): void {
-    this.dialog.open(VendorDepositDialogComponent, {
-      width: '520px',
-      maxWidth: '96vw',
-      data: { vendor },
-      disableClose: true,
-    });
+    this.dialog
+      .open(VendorDepositDialogComponent, {
+        width: '520px',
+        maxWidth: '96vw',
+        data: { vendor, mode: 'received' },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) {
+          this.getVendors();
+        }
+      });
   }
 
   createOrEditvendor(isEdit: boolean, vendor?: Vendor){

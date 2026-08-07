@@ -42,6 +42,8 @@ export class VendorHistoryDialogComponent implements OnInit {
   paymentBranchId: string | null = null;
   showBranchPicker = false;
   branches: Branch[] = [];
+  /** True if any balance-changing action succeeded — parent list should refresh. */
+  private listNeedsRefresh = false;
 
   constructor(
     private vendors: VendorsSerivce,
@@ -212,7 +214,7 @@ export class VendorHistoryDialogComponent implements OnInit {
             this.history!.settlementPreview = res.settlementPreview;
             this.history!.canSettle = res.settlementPreview.canSettle;
           }
-          this.loadHistory();
+          this.afterBalanceChange();
         },
         error: (err) => {
           this.settling = false;
@@ -223,6 +225,11 @@ export class VendorHistoryDialogComponent implements OnInit {
           this.notify.push(msg, 'error');
         },
       });
+  }
+
+  private afterBalanceChange(): void {
+    this.listNeedsRefresh = true;
+    this.loadHistory();
   }
 
   canSetOpeningDebit(): boolean {
@@ -243,7 +250,7 @@ export class VendorHistoryDialogComponent implements OnInit {
       disableClose: true,
     });
     ref.afterClosed().subscribe((saved) => {
-      if (saved) this.loadHistory();
+      if (saved) this.afterBalanceChange();
     });
   }
 
@@ -259,13 +266,14 @@ export class VendorHistoryDialogComponent implements OnInit {
         data: {
           vendor: this.data.vendor,
           forcedBranchId: this.paymentBranchId,
+          mode: 'credit',
         },
         disableClose: true,
       })
       .afterClosed()
       .subscribe((saved) => {
         if (saved) {
-          this.loadHistory();
+          this.afterBalanceChange();
         }
       });
   }
@@ -330,7 +338,7 @@ export class VendorHistoryDialogComponent implements OnInit {
 
   goToSalesInvoice(orderNumber?: number | string | null): void {
     if (orderNumber == null || orderNumber === '') return;
-    this.ref.close(false);
+    this.ref.close(this.listNeedsRefresh);
     this.router.navigate(['/orders'], {
       queryParams: { section: 'sales', search: String(orderNumber) },
     });
@@ -339,7 +347,7 @@ export class VendorHistoryDialogComponent implements OnInit {
   goToPurchaseInvoice(purchaseId?: string | null): void {
     const id = normalizeMongoId(purchaseId);
     if (!id) return;
-    this.ref.close(false);
+    this.ref.close(this.listNeedsRefresh);
     this.router.navigate(['/orders'], {
       queryParams: { section: 'purchases', search: id },
     });
@@ -367,7 +375,7 @@ export class VendorHistoryDialogComponent implements OnInit {
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
-      if (ok) this.loadHistory();
+      if (ok) this.afterBalanceChange();
     });
   }
 
@@ -399,7 +407,7 @@ export class VendorHistoryDialogComponent implements OnInit {
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
-      if (ok) this.loadHistory();
+      if (ok) this.afterBalanceChange();
     });
   }
 
@@ -425,7 +433,7 @@ export class VendorHistoryDialogComponent implements OnInit {
 
     ref.afterClosed().subscribe((ok) => {
       if (ok) {
-        this.loadHistory();
+        this.afterBalanceChange();
       }
     });
   }
@@ -446,7 +454,7 @@ export class VendorHistoryDialogComponent implements OnInit {
 
     ref.afterClosed().subscribe((ok) => {
       if (ok) {
-        this.loadHistory();
+        this.afterBalanceChange();
       }
     });
   }
@@ -475,6 +483,6 @@ export class VendorHistoryDialogComponent implements OnInit {
   }
 
   close(): void {
-    this.ref.close(false);
+    this.ref.close(this.listNeedsRefresh);
   }
 }

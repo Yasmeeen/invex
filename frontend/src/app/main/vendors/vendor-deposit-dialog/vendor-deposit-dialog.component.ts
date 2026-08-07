@@ -17,9 +17,13 @@ import {
   paymentSplitsNetTotal,
 } from '@shared/utils/payment-app-fee.util';
 
+export type VendorDepositDialogMode = 'credit' | 'received';
+
 export type VendorDepositDialogData = {
   vendor: Vendor;
   forcedBranchId?: string | null;
+  /** `credit` = we prepaid supplier (cash out). `received` = supplier prepaid us (cash in). */
+  mode?: VendorDepositDialogMode;
 };
 
 @Component({
@@ -31,6 +35,7 @@ export class VendorDepositDialogComponent implements OnInit {
   saving = false;
   form: FormGroup;
   readonly vendor: Vendor;
+  readonly mode: VendorDepositDialogMode;
   branches: Branch[] = [];
   showBranchPicker = false;
   confirmedPayment: PaymentSplitsResult | null = null;
@@ -47,6 +52,7 @@ export class VendorDepositDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) data: VendorDepositDialogData
   ) {
     this.vendor = data.vendor;
+    this.mode = data.mode === 'received' ? 'received' : 'credit';
     const actor = this.auth.getUserFromLocalStorage();
     const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
     this.showBranchPicker = ctx.showBranchPicker;
@@ -55,6 +61,24 @@ export class VendorDepositDialogComponent implements OnInit {
       branchId: [ctx.branchId || '', this.showBranchPicker ? Validators.required : []],
       note: [''],
     });
+  }
+
+  get titleKey(): string {
+    return this.mode === 'received'
+      ? 'tr_vendor_receive_deposit'
+      : 'tr_vendor_credit_deposit';
+  }
+
+  get hintKey(): string {
+    return this.mode === 'received'
+      ? 'tr_vendor_received_deposit_payment_hint'
+      : 'tr_vendor_credit_deposit_payment_hint';
+  }
+
+  get successKey(): string {
+    return this.mode === 'received'
+      ? 'tr_vendor_received_deposit_ok'
+      : 'tr_vendor_credit_deposit_ok';
   }
 
   ngOnInit(): void {
@@ -153,29 +177,33 @@ export class VendorDepositDialogComponent implements OnInit {
 
     this.saving = true;
     const u = this.auth.getUserFromLocalStorage();
-    this.vendors
-      .addVendorDeposit(String(id), {
-        amount: netTotal,
-        paymentSplits: splits,
-        paymentFeeAllocations: this.confirmedPayment.feeAllocations,
-        note: String(v.note || '').trim(),
-        userId: u?._id,
-        branchId,
-      })
-      .subscribe({
-        next: () => {
-          this.saving = false;
-          this.notify.push(this.translate.instant('tr_vendor_credit_deposit_ok'), 'success');
-          this.ref.close(true);
-        },
-        error: (err) => {
-          this.saving = false;
-          const msg =
-            err?.error?.message ||
-            this.translate.instant('tr_unexpected_error_message');
-          this.notify.push(msg, 'error');
-        },
-      });
+    const payload = {
+      amount: netTotal,
+      paymentSplits: splits,
+      paymentFeeAllocations: this.confirmedPayment.feeAllocations,
+      note: String(v.note || '').trim(),
+      userId: u?._id,
+      branchId,
+    };
+    const request$ =
+      this.mode === 'received'
+        ? this.vendors.addVendorReceivedDeposit(String(id), payload)
+        : this.vendors.addVendorDeposit(String(id), payload);
+
+    request$.subscribe({
+      next: () => {
+        this.saving = false;
+        this.notify.push(this.translate.instant(this.successKey), 'success');
+        this.ref.close(true);
+      },
+      error: (err) => {
+        this.saving = false;
+        const msg =
+          err?.error?.message ||
+          this.translate.instant('tr_unexpected_error_message');
+        this.notify.push(msg, 'error');
+      },
+    });
   }
 
   close(): void {

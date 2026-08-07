@@ -214,7 +214,26 @@ export async function allocateSequentialProductCodes(categoryId, count, startFro
   return codes;
 }
 
-/** Ensure none of `codes` already exist in warehouse (branch null) or in `branchOid`. */
+/**
+ * True when the unit is still held in inventory (blocks re-registering that serial).
+ * Sold / soft-removed / zero-stock rows are free to re-enter (revive or new intake).
+ */
+export function productIsActivelyInStock(p) {
+  if (!p) return false;
+  if (p.removedWhenOutOfStock === true) return false;
+  return Number(p.stock) > 0;
+}
+
+/** Mongo filter: product still physically in storage for a given code location. */
+function activelyInStockCodeFilter(baseFilter) {
+  return {
+    ...baseFilter,
+    removedWhenOutOfStock: { $ne: true },
+    stock: { $gt: 0 },
+  };
+}
+
+/** Ensure none of `codes` are still in warehouse (branch null) or in `branchOid`. */
 export async function assertCodesNotUsedInStorage(codes, branchOid, isWarehouse) {
   for (const c of codes) {
     const code = String(c ?? '').trim();
@@ -222,7 +241,7 @@ export async function assertCodesNotUsedInStorage(codes, branchOid, isWarehouse)
       return { ok: false, error: 'Empty product code' };
     }
     const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
-    const ex = await Product.findOne(filter).select('_id').lean();
+    const ex = await Product.findOne(activelyInStockCodeFilter(filter)).select('_id').lean();
     if (ex) {
       return { ok: false, error: `Product code already exists: ${code}` };
     }
@@ -255,8 +274,9 @@ function isSequentialStyleSerialBody(body) {
 
 /**
  * Block registering the same physical serial under a different category prefix
- * (UA-C1MTT0RXJ1WT vs PEN-C1MTT0RXJ1WT). Exact same full code is left to the
- * existing per-branch code uniqueness / soft-removed revive logic.
+ * (UA-C1MTT0RXJ1WT vs PEN-C1MTT0RXJ1WT) while that unit is still in stock.
+ * Sold / soft-removed / zero-stock rows do not block re-entry.
+ * Exact same full code is left to per-branch uniqueness / revive logic.
  */
 export async function assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix = '', session = null, excludeProductIds = [] } = {}) {
   const list = Array.isArray(codes) ? codes : [codes];
@@ -268,7 +288,11 @@ export async function assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix
     if (!body || isSequentialStyleSerialBody(body)) continue;
 
     const re = new RegExp(`(^|-)${escapeRegex(body)}$`, 'i');
-    let q = Product.find({ code: re }).select('_id code').limit(50);
+    let q = Product.find(
+      activelyInStockCodeFilter({ code: re })
+    )
+      .select('_id code')
+      .limit(50);
     if (session) q = q.session(session);
     const hits = await q.lean();
     const conflict = (hits || []).find((p) => {
@@ -285,6 +309,96 @@ export async function assertSerialBodiesNotUsedInStorage(codes, { categoryPrefix
     }
   }
   return { ok: true };
+}
+
+/** Sold / soft-removed / zero-stock rows can be brought back into inventory. */
+function canReviveExistingProduct(existing) {
+  if (!existing) return false;
+  if (existing.removedWhenOutOfStock === true) return true;
+  return Number(existing.stock) <= 0;
+}
+
+/**
+ * Soft-removed products may be revived on re-create, but only under the same category.
+ */
+function assertReviveCategoryMatches(existing, newCategoryId) {
+  if (!existing?.category || newCategoryId == null || newCategoryId === '') {
+    return { ok: true };
+  }
+  if (String(existing.category) !== String(newCategoryId)) {
+    return {
+      ok: false,
+      code: 'PRODUCT_CODE_CATEGORY_MISMATCH',
+      error:
+        'Product code already exists under a different category; cannot revive with a mismatched category',
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Create a product or revive a sold/soft-removed row with the same {code, branch}.
+ * Returns { ok, product } or { ok: false, error, code }.
+ */
+async function createOrReviveProductRow({
+  code,
+  branchOid,
+  isWarehouse,
+  name,
+  price,
+  netPrice,
+  stock = 1,
+  discount,
+  categoryId,
+  imageUrl,
+  attributes,
+  addedBy,
+  acquiredFromFields = {},
+}) {
+  const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
+  const existing = await Product.findOne(filter);
+  if (existing) {
+    if (!canReviveExistingProduct(existing)) {
+      return {
+        ok: false,
+        code: 'PRODUCT_CODE_ALREADY_EXISTS',
+        error: isWarehouse
+          ? 'Product code already exists in warehouse'
+          : 'Product code already exists in this branch',
+      };
+    }
+    const catMatch = assertReviveCategoryMatches(existing, categoryId);
+    if (!catMatch.ok) return catMatch;
+    const addStock = Math.max(1, Math.floor(Number(stock) || 1));
+    existing.stock = Math.max(0, (Number(existing.stock) || 0) + addStock);
+    existing.removedWhenOutOfStock = false;
+    if (name) existing.name = name;
+    if (price != null) existing.price = price;
+    if (netPrice != null) existing.netPrice = netPrice;
+    if (discount != null) existing.discount = discount;
+    if (imageUrl != null) existing.imageUrl = imageUrl;
+    if (attributes) existing.attributes = attributes;
+    if (addedBy) existing.addedBy = addedBy;
+    Object.assign(existing, acquiredFromFields);
+    await existing.save();
+    return { ok: true, product: existing, revived: true };
+  }
+  const product = await Product.create({
+    name,
+    code,
+    price,
+    netPrice,
+    stock: Math.max(1, Math.floor(Number(stock) || 1)),
+    discount,
+    category: categoryId,
+    branch: isWarehouse ? null : branchOid,
+    inWarehouse: !!isWarehouse,
+    imageUrl,
+    attributes,
+    addedBy,
+    ...acquiredFromFields,
+  });
+  return { ok: true, product, revived: false };
 }
 
 /** Category id from body: `{ _id }`, `{ id }`, plain id string, or ObjectId. */
@@ -638,48 +752,32 @@ export const importProductsFromExcelRows = async (req, res) => {
 
     for (const v of valid) {
       try {
-        const code = v.payload.code;
-        if (v.inWarehouse) {
-          const existingWh = await Product.findOne({ code, branch: null }).select('_id').lean();
-          if (existingWh) {
-            createFailedCount += 1;
-            errors.push({
-              rowNumber: v.rowNumber,
-              sheetName: v.sheetName,
-              field: 'code',
-              code,
-              message: 'Product code already exists in warehouse',
-            });
-            continue;
-          }
-        } else {
-          const existingBr = await Product.findOne({ code, branch: v.branchId }).select('_id').lean();
-          if (existingBr) {
-            createFailedCount += 1;
-            errors.push({
-              rowNumber: v.rowNumber,
-              sheetName: v.sheetName,
-              field: 'code',
-              code,
-              message: 'Product code already exists in this branch',
-            });
-            continue;
-          }
-        }
-
-        const createdProduct = await Product.create({
-          name: v.payload.name,
+        const row = await createOrReviveProductRow({
           code: v.payload.code,
+          branchOid: v.branchId,
+          isWarehouse: v.inWarehouse,
+          name: v.payload.name,
           price: v.payload.price,
           netPrice: v.payload.netPrice,
           stock: v.payload.stock,
           discount: v.payload.discount ?? 0,
-          category: v.categoryId,
-          branch: v.inWarehouse ? null : v.branchId,
-          inWarehouse: v.inWarehouse,
+          categoryId: v.categoryId,
           imageUrl: v.payload.imageUrl,
           attributes: v.payload.attributes,
         });
+        if (!row.ok) {
+          createFailedCount += 1;
+          errors.push({
+            rowNumber: v.rowNumber,
+            sheetName: v.sheetName,
+            field: 'code',
+            code: v.payload.code,
+            message: row.error || 'Product code already exists',
+          });
+          continue;
+        }
+
+        const createdProduct = row.product;
 
         createdCount += 1;
 
@@ -1360,22 +1458,24 @@ export const createProduct = async (req, res) => {
         const createdProducts = [];
         for (let i = 0; i < codes.length; i++) {
           const uf = pickUnit(i, codes[i]);
-          const p = await Product.create({
-            name,
+          const row = await createOrReviveProductRow({
             code: uf.code,
+            isWarehouse: true,
+            name,
             price: uf.price,
             netPrice: uf.netPrice,
             stock: 1,
             discount: uf.discount,
-            category: categoryId,
-            branch: null,
-            inWarehouse: true,
+            categoryId,
             imageUrl: uf.imageUrl || imageUrlNorm,
             attributes: uf.attributes,
             addedBy: addedByNorm,
-            ...acquiredFromFields,
+            acquiredFromFields,
           });
-          createdProducts.push(p);
+          if (!row.ok) {
+            return res.status(409).json({ error: row.error, code: row.code });
+          }
+          createdProducts.push(row.product);
         }
         await auditLog(req, {
           action: 'create',
@@ -1417,22 +1517,25 @@ export const createProduct = async (req, res) => {
       const createdProducts = [];
       for (let i = 0; i < codes.length; i++) {
         const uf = pickUnit(i, codes[i]);
-        const p = await Product.create({
-          name,
+        const row = await createOrReviveProductRow({
           code: uf.code,
+          branchOid,
+          isWarehouse: false,
+          name,
           price: uf.price,
           netPrice: uf.netPrice,
           stock: 1,
           discount: uf.discount,
-          category: categoryId,
-          branch: branchOid,
-          inWarehouse: false,
+          categoryId,
           imageUrl: uf.imageUrl || imageUrlNorm,
           attributes: uf.attributes,
           addedBy: addedByNorm,
-          ...acquiredFromFields,
+          acquiredFromFields,
         });
-        createdProducts.push(p);
+        if (!row.ok) {
+          return res.status(409).json({ error: row.error, code: row.code });
+        }
+        createdProducts.push(row.product);
       }
       await auditLog(req, {
         action: 'create',
@@ -1473,29 +1576,24 @@ export const createProduct = async (req, res) => {
 
     if (isWarehouse) {
       // Unique index is { code, branch }; warehouse uses branch: null (matches null or missing field).
-      const existingWh = await Product.findOne({ code, branch: null });
-      if (existingWh) {
-        return res.status(409).json({
-          error: 'Product code already exists in warehouse',
-          code: 'PRODUCT_CODE_ALREADY_EXISTS',
-        });
-      }
-
-      const createdProduct = await Product.create({
-        name,
+      const row = await createOrReviveProductRow({
         code,
+        isWarehouse: true,
+        name,
         price: priceNum,
         netPrice: netNum,
         stock: stockNum,
         discount: discountNum,
-        category: categoryId,
-        branch: null,
-        inWarehouse: true,
+        categoryId,
         imageUrl: imageUrlNorm,
         attributes: attrs,
         addedBy: addedByNorm,
-        ...acquiredFromFields,
+        acquiredFromFields,
       });
+      if (!row.ok) {
+        return res.status(409).json({ error: row.error, code: row.code });
+      }
+      const createdProduct = row.product;
 
       await auditLog(req, {
         action: 'create',
@@ -1523,26 +1621,28 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: 'Invalid branch' });
     }
 
-    const existingProduct = await Product.findOne({ code, branch: branch._id });
-    if (existingProduct) {
-      return res.status(409).json({ error: 'Product code already exists in this branch' });
-    }
-
-    const createdProduct = await Product.create({
-      name,
+    const row = await createOrReviveProductRow({
       code,
+      branchOid: branch._id,
+      isWarehouse: false,
+      name,
       price: priceNum,
       netPrice: netNum,
       stock: stockNum,
       discount: discountNum,
-      category: categoryId,
-      branch: branch._id,
-      inWarehouse: false,
+      categoryId,
       imageUrl: imageUrlNorm,
       attributes: attrs,
       addedBy: addedByNorm,
-      ...acquiredFromFields,
+      acquiredFromFields,
     });
+    if (!row.ok) {
+      return res.status(409).json({
+        error: row.error,
+        code: row.code || 'PRODUCT_CODE_ALREADY_EXISTS',
+      });
+    }
+    const createdProduct = row.product;
 
     await auditLog(req, {
       action: 'create',

@@ -69,8 +69,9 @@ const normalizeImageUrl = (raw) => {
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
 
 /**
- * Soft-removed products may be revived on re-purchase, but only under the same category.
- * Overwriting category with a different one was allowing the same serial under the wrong category.
+ * Soft-removed or sold-out (stock 0) products may be revived on re-purchase,
+ * but only under the same category. Overwriting category with a different one
+ * was allowing the same serial under the wrong category.
  */
 function assertReviveCategoryMatches(existing, newCategoryId) {
   if (!existing?.category || newCategoryId == null || newCategoryId === '') {
@@ -85,6 +86,37 @@ function assertReviveCategoryMatches(existing, newCategoryId) {
     };
   }
   return { ok: true };
+}
+
+/** Sold / soft-removed / zero-stock rows can be brought back into inventory. */
+function canReviveExistingProduct(existing) {
+  if (!existing) return false;
+  if (existing.removedWhenOutOfStock === true) return true;
+  return Number(existing.stock) <= 0;
+}
+
+/**
+ * Restore a sold/soft-removed product row on re-purchase (same code + branch).
+ * Returns null on success (mutates `existing`), or an error object.
+ */
+function applyPurchaseRevive(existing, { name, payload, quantity, acquiredFromFields }) {
+  const catMatch = assertReviveCategoryMatches(existing, payload?.category);
+  if (!catMatch.ok) return catMatch;
+  const q = Math.max(1, Math.floor(Number(quantity) || 1));
+  existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
+  existing.removedWhenOutOfStock = false;
+  if (name) existing.name = name;
+  if (payload?.price != null) existing.price = payload.price;
+  if (payload?.netPrice != null) existing.netPrice = payload.netPrice;
+  if (payload?.discount != null) existing.discount = payload.discount;
+  // Keep original category — never overwrite on revive.
+  if (payload?.imageUrl != null) existing.imageUrl = payload.imageUrl;
+  if (payload?.attributes) existing.attributes = payload.attributes;
+  if (payload?.addedBy) existing.addedBy = payload.addedBy;
+  if (acquiredFromFields && typeof acquiredFromFields === 'object') {
+    Object.assign(existing, acquiredFromFields);
+  }
+  return null;
 }
 
 /** Keep lines[0] in sync when root createdProductId(s) are set. */
@@ -687,11 +719,47 @@ export const createProductPurchaseRequest = async (req, res) => {
         for (let ui = 0; ui < unitCodesNorm.length; ui++) {
           const unitCode = unitCodesNorm[ui];
           const uf = unitFieldsFromPayload(payload, ui, unitCode);
+          const unitFullCode = uf.code || unitCode;
+          const existingUnit = await Product.findOne({
+            code: unitFullCode,
+            branch: branchId,
+          }).session(session);
+          if (existingUnit) {
+            if (!canReviveExistingProduct(existingUnit)) {
+              await session.abortTransaction();
+              session.endSession();
+              return res.status(409).json({
+                error: 'Product code already exists in this branch',
+                code: 'PRODUCT_CODE_ALREADY_EXISTS',
+              });
+            }
+            const reviveErr = applyPurchaseRevive(existingUnit, {
+              name,
+              payload: {
+                ...payload,
+                price: uf.price,
+                netPrice: uf.netPrice,
+                discount: uf.discount,
+                attributes: uf.attributes,
+                imageUrl: uf.imageUrl || payload.imageUrl || '',
+              },
+              quantity: 1,
+              acquiredFromFields,
+            });
+            if (reviveErr) {
+              await session.abortTransaction();
+              session.endSession();
+              return res.status(409).json({ error: reviveErr.error, code: reviveErr.code });
+            }
+            await existingUnit.save({ session });
+            createdList.push(existingUnit);
+            continue;
+          }
           const [prodRow] = await Product.create(
             [
               {
                 name,
-                code: uf.code || unitCode,
+                code: unitFullCode,
                 price: uf.price,
                 netPrice: uf.netPrice,
                 stock: 1,
@@ -779,24 +847,18 @@ export const createProductPurchaseRequest = async (req, res) => {
 
       const existing = await Product.findOne({ code, branch: branchId }).session(session);
       if (existing) {
-        if (existing.removedWhenOutOfStock) {
-          const catMatch = assertReviveCategoryMatches(existing, payload.category);
-          if (!catMatch.ok) {
+        if (canReviveExistingProduct(existing)) {
+          const reviveErr = applyPurchaseRevive(existing, {
+            name,
+            payload,
+            quantity: q,
+            acquiredFromFields,
+          });
+          if (reviveErr) {
             await session.abortTransaction();
             session.endSession();
-            return res.status(409).json({ error: catMatch.error, code: catMatch.code });
+            return res.status(409).json({ error: reviveErr.error, code: reviveErr.code });
           }
-          existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
-          existing.removedWhenOutOfStock = false;
-          existing.name = name || existing.name;
-          if (payload.price != null) existing.price = payload.price;
-          if (payload.netPrice != null) existing.netPrice = payload.netPrice;
-          if (payload.discount != null) existing.discount = payload.discount;
-          // Keep original category — never overwrite on revive.
-          if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
-          if (payload.attributes) existing.attributes = payload.attributes;
-          if (payload.addedBy) existing.addedBy = payload.addedBy;
-          Object.assign(existing, acquiredFromFields);
           await existing.save({ session });
           createdProduct = existing;
 
@@ -1198,11 +1260,44 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
     for (let ui = 0; ui < unitCodesNorm.length; ui++) {
       const unitCode = unitCodesNorm[ui];
       const uf = unitFieldsFromPayload(payload, ui, unitCode);
+      const unitFullCode = uf.code || unitCode;
+      const existingUnit = await Product.findOne({
+        code: unitFullCode,
+        branch: branchId,
+      }).session(session);
+      if (existingUnit) {
+        if (!canReviveExistingProduct(existingUnit)) {
+          return {
+            error: 'Product code already exists in this branch',
+            code: 'PRODUCT_CODE_ALREADY_EXISTS',
+            status: 409,
+          };
+        }
+        const reviveErr = applyPurchaseRevive(existingUnit, {
+          name,
+          payload: {
+            ...payload,
+            price: uf.price,
+            netPrice: uf.netPrice,
+            discount: uf.discount,
+            attributes: uf.attributes,
+            imageUrl: uf.imageUrl || payload.imageUrl || '',
+          },
+          quantity: 1,
+          acquiredFromFields,
+        });
+        if (reviveErr) {
+          return { error: reviveErr.error, code: reviveErr.code, status: 409 };
+        }
+        await existingUnit.save({ session });
+        createdList.push(existingUnit);
+        continue;
+      }
       const [prodRow] = await Product.create(
         [
           {
             name,
-            code: uf.code || unitCode,
+            code: unitFullCode,
             price: uf.price,
             netPrice: uf.netPrice,
             stock: 1,
@@ -1225,22 +1320,16 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
 
   const existing = await Product.findOne({ code, branch: branchId }).session(session);
   if (existing) {
-    if (existing.removedWhenOutOfStock) {
-      const catMatch = assertReviveCategoryMatches(existing, payload.category);
-      if (!catMatch.ok) {
-        return { error: catMatch.error, code: catMatch.code, status: 409 };
+    if (canReviveExistingProduct(existing)) {
+      const reviveErr = applyPurchaseRevive(existing, {
+        name,
+        payload,
+        quantity: q,
+        acquiredFromFields,
+      });
+      if (reviveErr) {
+        return { error: reviveErr.error, code: reviveErr.code, status: 409 };
       }
-      existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
-      existing.removedWhenOutOfStock = false;
-      existing.name = name || existing.name;
-      if (payload.price != null) existing.price = payload.price;
-      if (payload.netPrice != null) existing.netPrice = payload.netPrice;
-      if (payload.discount != null) existing.discount = payload.discount;
-      // Keep original category — never overwrite on revive.
-      if (payload.imageUrl != null) existing.imageUrl = payload.imageUrl;
-      if (payload.attributes) existing.attributes = payload.attributes;
-      if (payload.addedBy) existing.addedBy = payload.addedBy;
-      Object.assign(existing, acquiredFromFields);
       await existing.save({ session });
       return { createdList: [existing], createdProduct: existing };
     }
@@ -1716,11 +1805,48 @@ export const approveProductPurchaseRequest = async (req, res) => {
       for (let ui = 0; ui < codes.length; ui++) {
         const unitCode = codes[ui];
         const uf = unitFieldsFromPayload(payloadForUnits, ui, unitCode);
+        const unitFullCode = uf.code || unitCode;
+        const existingUnit = await Product.findOne({
+          code: unitFullCode,
+          branch: purchase.branch,
+        }).session(session);
+        if (existingUnit) {
+          if (!canReviveExistingProduct(existingUnit)) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(409).json({
+              error: 'Product code already exists in this branch',
+              code: 'PRODUCT_CODE_ALREADY_EXISTS',
+            });
+          }
+          const reviveErr = applyPurchaseRevive(existingUnit, {
+            name: pp.name,
+            payload: {
+              ...payloadForUnits,
+              price: uf.price,
+              netPrice: uf.netPrice,
+              discount: uf.discount,
+              attributes: uf.attributes,
+              imageUrl: uf.imageUrl || normalizeImageUrl(pp.imageUrl) || '',
+              addedBy: pp.addedBy ? normalizeAddedBy(pp.addedBy) : undefined,
+            },
+            quantity: 1,
+            acquiredFromFields,
+          });
+          if (reviveErr) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(409).json({ error: reviveErr.error, code: reviveErr.code });
+          }
+          await existingUnit.save({ session });
+          createdList.push(existingUnit);
+          continue;
+        }
         const [pRow] = await Product.create(
           [
             {
               name: pp.name,
-              code: uf.code || unitCode,
+              code: unitFullCode,
               price: uf.price,
               netPrice: uf.netPrice,
               stock: 1,
@@ -1763,24 +1889,26 @@ export const approveProductPurchaseRequest = async (req, res) => {
       }
       const existing = await Product.findOne({ code, branch: purchase.branch }).session(session);
       if (existing) {
-        if (existing.removedWhenOutOfStock) {
-          const catMatch = assertReviveCategoryMatches(existing, pp.category);
-          if (!catMatch.ok) {
+        if (canReviveExistingProduct(existing)) {
+          const reviveErr = applyPurchaseRevive(existing, {
+            name: pp.name,
+            payload: {
+              category: pp.category,
+              price: pp.price != null ? Number(pp.price) || 0 : undefined,
+              netPrice: pp.netPrice != null ? Number(pp.netPrice) || 0 : undefined,
+              discount: pp.discount != null ? Number(pp.discount) || 0 : undefined,
+              imageUrl: pp.imageUrl != null ? normalizeImageUrl(pp.imageUrl) : undefined,
+              attributes: attrsNorm,
+              addedBy: pp.addedBy ? normalizeAddedBy(pp.addedBy) : undefined,
+            },
+            quantity: q,
+            acquiredFromFields,
+          });
+          if (reviveErr) {
             await session.abortTransaction();
             session.endSession();
-            return res.status(409).json({ error: catMatch.error, code: catMatch.code });
+            return res.status(409).json({ error: reviveErr.error, code: reviveErr.code });
           }
-          existing.stock = Math.max(0, (Number(existing.stock) || 0) + q);
-          existing.removedWhenOutOfStock = false;
-          existing.name = pp.name || existing.name;
-          if (pp.price != null) existing.price = Number(pp.price) || 0;
-          if (pp.netPrice != null) existing.netPrice = Number(pp.netPrice) || 0;
-          if (pp.discount != null) existing.discount = Number(pp.discount) || 0;
-          // Keep original category — never overwrite on revive.
-          if (pp.imageUrl != null) existing.imageUrl = normalizeImageUrl(pp.imageUrl);
-          if (attrsNorm) existing.attributes = attrsNorm;
-          if (pp.addedBy) existing.addedBy = normalizeAddedBy(pp.addedBy);
-          Object.assign(existing, acquiredFromFields);
           await existing.save({ session });
           prod = existing;
           createdList = [existing];

@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 import Client from '../DB/models/client.model.js';
 import ClientCashDrawerReceipt from '../DB/models/clientCashDrawerReceipt.model.js';
-import { resolveBranchForCashDrawer } from './vendor-cash-drawer.js';
+import {
+  drawerDocCreatedNearLedgerEntry,
+  resolveBranchForCashDrawer,
+} from './vendor-cash-drawer.js';
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -104,8 +107,8 @@ async function sumLegacyLedgerCashInflows(branchOid, start, end) {
         from: receiptColl,
         let: {
           cId: '$_id',
-          amt: '$ledgerEntries.amount',
           pType: '$ledgerEntries.type',
+          at: '$ledgerEntries.createdAt',
         },
         pipeline: [
           {
@@ -113,9 +116,9 @@ async function sumLegacyLedgerCashInflows(branchOid, start, end) {
               $expr: {
                 $and: [
                   { $eq: ['$client', '$$cId'] },
-                  { $eq: ['$amount', '$$amt'] },
                   { $eq: ['$paymentType', '$$pType'] },
                   { $eq: ['$branch', branchOid] },
+                  ...drawerDocCreatedNearLedgerEntry('$$at'),
                 ],
               },
             },

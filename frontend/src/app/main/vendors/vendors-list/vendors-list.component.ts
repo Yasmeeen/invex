@@ -7,10 +7,10 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { TranslateService } from '@ngx-translate/core';
 
 import { CreateEditVendorComponent } from '../create-edit-vendor/create-edit-vendor.component';
-import { VendorHistoryDialogComponent } from '../vendor-history-dialog/vendor-history-dialog.component';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { Vendor } from '@core/models/products.model';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
+import { Router } from '@angular/router';
 
 
 @Component({
@@ -64,7 +64,8 @@ export class VendorsListComponent implements OnInit {
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
     private dialog: MatDialog,
-    private vendorsSerivce: VendorsSerivce
+    private vendorsSerivce: VendorsSerivce,
+    private router: Router
   ) { }
 
   ngOnInit(): void {
@@ -179,19 +180,8 @@ export class VendorsListComponent implements OnInit {
 
   }
   openVendorHistory(vendor: Vendor): void {
-    this.dialog
-      .open(VendorHistoryDialogComponent, {
-        width: '920px',
-        maxWidth: '96vw',
-        data: { vendor },
-        disableClose: false,
-      })
-      .afterClosed()
-      .subscribe((changed) => {
-        if (changed) {
-          this.getVendors();
-        }
-      });
+    if (!vendor?._id) return;
+    this.router.navigate(['/suppliers', vendor._id, 'history']);
   }
 
   openVendorDeposit(vendor: Vendor): void {

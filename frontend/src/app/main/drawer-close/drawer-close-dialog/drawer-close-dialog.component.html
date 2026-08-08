@@ -162,6 +162,21 @@
           >
         </div>
         <div
+          class="drawer-close-dialog__row drawer-close-dialog__row--highlight drawer-close-dialog__row--in"
+          *ngIf="showClientDepositCashRow(preview)"
+        >
+          <span>{{ 'tr_drawer_close_client_deposit_cash' | translate }}</span>
+          <span
+            >+{{ clientDepositCashDrawerAmount(preview) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+            <span class="drawer-close-dialog__hint" *ngIf="preview.clientDepositCashDrawerCount"
+              >({{
+                'tr_drawer_close_client_deposit_cash_count'
+                  | translate : { count: preview.clientDepositCashDrawerCount }
+              }})</span
+            ></span
+          >
+        </div>
+        <div
           class="drawer-close-dialog__row drawer-close-dialog__row--highlight"
           *ngIf="showVendorCashInflowRow(preview)"
         >
@@ -216,6 +231,9 @@
         <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_desk_treasury' | translate }}</p>
         <p class="drawer-close-dialog__note" *ngIf="showClientCashRow(preview)">
           {{ 'tr_drawer_close_note_client_cash' | translate }}
+        </p>
+        <p class="drawer-close-dialog__note" *ngIf="showClientDepositCashRow(preview)">
+          {{ 'tr_drawer_close_note_client_deposit_cash' | translate }}
         </p>
         <p class="drawer-close-dialog__note" *ngIf="showVendorCashRow(preview)">
           {{ 'tr_drawer_close_note_vendor_cash' | translate }}

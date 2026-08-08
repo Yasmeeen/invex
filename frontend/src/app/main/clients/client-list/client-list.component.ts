@@ -4,7 +4,7 @@ import { Globals } from '@core/globals';
 import { Client, PaginationData } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
-import { ClientHistoryDialogComponent } from '../client-history-dialog/client-history-dialog.component';
+import { Router } from '@angular/router';
 import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-deposit-dialog.component';
 import { CreateEditClientComponent } from '../create-edit-client/create-edit-client.component';
 import { TranslateService } from '@ngx-translate/core';
@@ -45,6 +45,7 @@ export class ClientListComponent implements OnInit {
     private auth: AuthenticationService,
     private notificationService: AppNotificationService,
     private translate: TranslateService,
+    private router: Router,
     public globals: Globals
   ) {}
 
@@ -122,15 +123,8 @@ export class ClientListComponent implements OnInit {
   }
 
   openClientHistory(client: Client): void {
-    const actor = this.auth.getUserFromLocalStorage();
-    const ctx = resolveActorBranchContext(actor, this.globals.currentUser?.branch?._id);
-    this.dialog.open(ClientHistoryDialogComponent, {
-      width: '1200px',
-      maxWidth: '98vw',
-      maxHeight: '94vh',
-      data: { client, forcedBranchId: ctx.branchId },
-      disableClose: false,
-    });
+    if (!client?._id) return;
+    this.router.navigate(['/clients', client._id, 'history']);
   }
 
   createOrEditClient(isEdit: boolean, client?: Client): void {

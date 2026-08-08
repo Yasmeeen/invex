@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 
 import { ClientsRoutingModule } from './clients-routing.module';
 import { ClientListComponent } from './client-list/client-list.component';
-import { ClientHistoryDialogComponent } from './client-history-dialog/client-history-dialog.component';
+import { ClientHistoryComponent } from './client-history/client-history.component';
 import { ClientDepositDialogComponent } from './client-deposit-dialog/client-deposit-dialog.component';
 import { ClientOpeningDebitDialogComponent } from './client-opening-debit-dialog/client-opening-debit-dialog.component';
 import { ClientPayClientDialogModule } from './client-pay-client-dialog/client-pay-client-dialog.module';
@@ -18,7 +18,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
 @NgModule({
   declarations: [
     ClientListComponent,
-    ClientHistoryDialogComponent,
+    ClientHistoryComponent,
     ClientDepositDialogComponent,
     ClientOpeningDebitDialogComponent,
     CreateEditClientComponent,

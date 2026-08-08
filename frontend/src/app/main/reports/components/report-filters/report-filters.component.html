@@ -28,7 +28,7 @@
       <label>{{ 'tr_branches' | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
-    <div class="col-md-3" *ngIf="reportType === 'products' || reportType === 'sales'">
+    <div class="col-md-3" *ngIf="categoryFilterVisible">
       <label>{{ 'tr_report_filter_category_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -36,8 +36,10 @@
         bindLabel="name"
         bindValue="_id"
         [items]="categories"
-        [(ngModel)]="filters.category_id"
+        [(ngModel)]="filters.category_ids"
         name="reportCategory"
+        [multiple]="true"
+        [closeOnSelect]="false"
         [clearable]="true"
         [searchable]="true"
         (change)="onCategoryChange()"

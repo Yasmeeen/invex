@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 
 import { CreateEditVendorComponent } from './create-edit-vendor/create-edit-vendor.component';
 import { VendorsListComponent } from './vendors-list/vendors-list.component';
-import { VendorHistoryDialogComponent } from './vendor-history-dialog/vendor-history-dialog.component';
+import { VendorHistoryComponent } from './vendor-history/vendor-history.component';
 import { VendorDepositDialogComponent } from './vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from './vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
 import { VendorPaySupplierDialogModule } from './vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.module';
@@ -21,7 +21,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
   declarations: [
     VendorsListComponent,
     CreateEditVendorComponent,
-    VendorHistoryDialogComponent,
+    VendorHistoryComponent,
     VendorDepositDialogComponent,
     VendorOpeningDebitDialogComponent,
   ],

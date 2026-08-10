@@ -300,8 +300,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   private mapTransferExportRow(t: BranchTransferItem): Record<string, string | number> {
     return {
-      [this.translate.instant('tr_product_name')]: t.product?.name || '',
-      [this.translate.instant('tr_code')]: t.product?.code || '',
+      [this.translate.instant('tr_product_name')]: this.transferProductName(t),
+      [this.translate.instant('tr_code')]: this.transferProductCode(t),
       [this.translate.instant('tr_branch_transfer_from')]: t.fromBranch?.name || '',
       [this.translate.instant('tr_branch_transfer_to_branch')]: t.toBranch?.name || '',
       [this.translate.instant('tr_branch_transfer_quantity')]: t.quantity ?? 0,
@@ -313,6 +313,20 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
       [this.translate.instant('tr_branch_transfer_date')]: this.formatTransferDate(t.createdAt) || '',
       [this.translate.instant('tr_branch_transfer_by')]: t.initiatedBy?.name || '',
     };
+  }
+
+  transferProductName(t: BranchTransferItem | null | undefined): string {
+    if (!t) {
+      return '';
+    }
+    return String(t.product?.name || t.productNameSnapshot || '').trim();
+  }
+
+  transferProductCode(t: BranchTransferItem | null | undefined): string {
+    if (!t) {
+      return '';
+    }
+    return String(t.product?.code || t.productCodeSnapshot || '').trim();
   }
 
   canResolve(transfer: BranchTransferItem): boolean {
@@ -405,7 +419,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   private transferConfirmDetails(t: BranchTransferItem): string[] {
     const details = [
-      `${this.translate.instant('tr_product_name')}: ${t.product?.name || '—'}`,
+      `${this.translate.instant('tr_product_name')}: ${this.transferProductName(t) || '—'}`,
       `${this.translate.instant('tr_branch_transfer_from')}: ${t.fromBranch?.name || '—'}`,
       `${this.translate.instant('tr_branch_transfer_to_branch')}: ${t.toBranch?.name || '—'}`,
       `${this.translate.instant('tr_branch_transfer_quantity')}: ${t.quantity ?? 0}`,

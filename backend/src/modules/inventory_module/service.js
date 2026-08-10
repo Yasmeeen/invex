@@ -1,4 +1,5 @@
 import Product from '../../DB/models/product.model.js';
+import ProductBranchTransfer from '../../DB/models/productBranchTransfer.model.js';
 
 // Get all products (with pagination and optional search)
 export const getProducts = async (req, res) => {
@@ -127,6 +128,35 @@ export const updateProduct = async (req, res) => {
 // Delete product
 export const deleteProduct = async (req, res) => {
   try {
+    const existing = await Product.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    try {
+      const snapName = String(existing.name || '').trim();
+      const snapCode = String(existing.code || '').trim();
+      if (snapName || snapCode) {
+        await ProductBranchTransfer.updateMany(
+          {
+            product: existing._id,
+            $or: [
+              { productNameSnapshot: { $in: [null, ''] } },
+              { productCodeSnapshot: { $in: [null, ''] } },
+            ],
+          },
+          {
+            $set: {
+              ...(snapName ? { productNameSnapshot: snapName } : {}),
+              ...(snapCode ? { productCodeSnapshot: snapCode } : {}),
+            },
+          }
+        );
+      }
+    } catch (snapErr) {
+      console.warn('⚠️ transfer snapshot backfill on inventory delete:', snapErr?.message || snapErr);
+    }
+
     const product = await Product.findByIdAndDelete(req.params.id);
 
     if (!product) {

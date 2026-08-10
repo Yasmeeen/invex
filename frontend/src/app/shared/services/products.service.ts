@@ -62,6 +62,8 @@ export type BranchTransferItem = {
   rejectReason?: string;
   createdAt?: string;
   resolvedAt?: string;
+  productNameSnapshot?: string;
+  productCodeSnapshot?: string;
   product?: {
     name?: string;
     code?: string;

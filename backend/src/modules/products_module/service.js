@@ -1933,6 +1933,31 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
+    // Keep transfer list readable after hard-delete (esp. rejected/approved history).
+    try {
+      const snapName = String(existing.name || '').trim();
+      const snapCode = String(existing.code || '').trim();
+      if (snapName || snapCode) {
+        await ProductBranchTransfer.updateMany(
+          {
+            product: existing._id,
+            $or: [
+              { productNameSnapshot: { $in: [null, ''] } },
+              { productCodeSnapshot: { $in: [null, ''] } },
+            ],
+          },
+          {
+            $set: {
+              ...(snapName ? { productNameSnapshot: snapName } : {}),
+              ...(snapCode ? { productCodeSnapshot: snapCode } : {}),
+            },
+          }
+        );
+      }
+    } catch (snapErr) {
+      console.warn('⚠️ transfer snapshot backfill on delete:', snapErr?.message || snapErr);
+    }
+
     const product = await Product.findByIdAndDelete(req.params.id);
 
     if (!product) {
@@ -2198,6 +2223,12 @@ export const approveBranchTransfer = async (req, res) => {
 
     transfer.status = 'approved';
     transfer.destinationProduct = destinationProduct._id;
+    if (!String(transfer.productNameSnapshot || '').trim()) {
+      transfer.productNameSnapshot = String(sourceProduct.name || '').trim();
+    }
+    if (!String(transfer.productCodeSnapshot || '').trim()) {
+      transfer.productCodeSnapshot = String(sourceProduct.code || '').trim();
+    }
     transfer.resolvedBy = userId;
     transfer.resolvedAt = new Date();
     await transfer.save({ session });
@@ -2327,6 +2358,12 @@ export const rejectBranchTransfer = async (req, res) => {
     sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
     await sourceProduct.save({ session });
 
+    if (!String(transfer.productNameSnapshot || '').trim()) {
+      transfer.productNameSnapshot = String(sourceProduct.name || '').trim();
+    }
+    if (!String(transfer.productCodeSnapshot || '').trim()) {
+      transfer.productCodeSnapshot = String(sourceProduct.code || '').trim();
+    }
     transfer.status = 'rejected';
     transfer.resolvedBy = userId;
     transfer.resolvedAt = new Date();
@@ -2338,15 +2375,18 @@ export const rejectBranchTransfer = async (req, res) => {
 
     try {
       const initiatorId = transfer.initiatedBy;
+      const pname = String(sourceProduct.name || '').trim() || 'Product';
       const notification = await Notification.create({
         type: 'branch_transfer_rejected',
         title: 'Branch transfer rejected',
         body: rejectReason
-          ? `${sourceProduct.name} ×${qty}: ${rejectReason}`
-          : `${sourceProduct.name} ×${qty} transfer was rejected`,
+          ? `${pname} ×${qty}: ${rejectReason}`
+          : `${pname} ×${qty} transfer was rejected`,
         data: {
           transferId: transfer._id,
           productId: sourceProduct._id,
+          productName: pname,
+          productCode: String(sourceProduct.code || '').trim(),
           quantity: qty,
           rejectedById: userId,
           rejectReason,
@@ -2521,23 +2561,62 @@ export const listBranchTransfers = async (req, res) => {
         .lean(),
     ]);
 
-    // Source product may have been deleted after approve — fall back to dest / snapshot / stock movement.
-    const missingProductTransferIds = (transfers || [])
-      .filter((t) => !t.product)
-      .map((t) => t._id);
+    // Source product may have been deleted (common after reject/approve) —
+    // fall back to dest / snapshot / stock movement / notification.
+    const missingProductTransfers = (transfers || []).filter((t) => !t.product);
+    const missingProductTransferIds = missingProductTransfers.map((t) => t._id);
     let movementNameByTransferId = new Map();
+    let notifyMetaByTransferId = new Map();
     if (missingProductTransferIds.length) {
-      const movements = await StockMovement.find({
-        referenceType: 'branch_transfer',
-        referenceId: { $in: missingProductTransferIds },
-      })
-        .select('referenceId productName')
-        .lean();
+      const [movements, notifications] = await Promise.all([
+        StockMovement.find({
+          referenceType: 'branch_transfer',
+          referenceId: { $in: missingProductTransferIds },
+        })
+          .select('referenceId productName')
+          .lean(),
+        Notification.find({
+          type: {
+            $in: [
+              'branch_transfer_pending',
+              'branch_transfer_rejected',
+              'branch_transfer_approved',
+            ],
+          },
+          $or: [
+            { 'data.transferId': { $in: missingProductTransferIds } },
+            {
+              'data.transferId': {
+                $in: missingProductTransferIds.map((id) => String(id)),
+              },
+            },
+          ],
+        })
+          .select('data body type createdAt')
+          .sort({ createdAt: 1 })
+          .lean(),
+      ]);
       movementNameByTransferId = new Map(
         (movements || [])
           .filter((m) => m.referenceId)
           .map((m) => [String(m.referenceId), String(m.productName || '').trim()])
       );
+      for (const n of notifications || []) {
+        const tid = n?.data?.transferId != null ? String(n.data.transferId) : '';
+        if (!tid || notifyMetaByTransferId.has(tid)) continue;
+        const dataName = String(n.data?.productName || '').trim();
+        const dataCode = String(n.data?.productCode || '').trim();
+        let bodyName = '';
+        if (!dataName && n.body) {
+          // Bodies like: "ProductName ×3: reason" or "ProductName ×3 transfer was rejected"
+          const m = String(n.body).match(/^(.*?)\s×\d+/);
+          bodyName = m ? String(m[1] || '').trim() : '';
+        }
+        notifyMetaByTransferId.set(tid, {
+          name: dataName || bodyName || '',
+          code: dataCode || '',
+        });
+      }
     }
 
     const hydratedTransfers = (transfers || []).map((t) => {
@@ -2545,14 +2624,19 @@ export const listBranchTransfers = async (req, res) => {
         return t;
       }
       const dest = t.destinationProduct;
+      const notifyMeta = notifyMetaByTransferId.get(String(t._id)) || {};
       const name =
         (dest && dest.name) ||
         t.productNameSnapshot ||
         movementNameByTransferId.get(String(t._id)) ||
+        notifyMeta.name ||
         '';
-      const code = (dest && dest.code) || t.productCodeSnapshot || '';
+      const code =
+        (dest && dest.code) || t.productCodeSnapshot || notifyMeta.code || '';
       return {
         ...t,
+        productNameSnapshot: t.productNameSnapshot || name || '',
+        productCodeSnapshot: t.productCodeSnapshot || code || '',
         product: name || code ? { name, code } : null,
       };
     });

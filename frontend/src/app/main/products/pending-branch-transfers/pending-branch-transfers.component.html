@@ -220,8 +220,10 @@
         <tbody>
           <tr *ngFor="let t of transfers">
             <td>
-              <span class="pending-transfers-product">{{ t.product?.name || '—' }}</span>
-              <span class="text-muted size-small d-block">{{ t.product?.code }}</span>
+              <span class="pending-transfers-product">{{ transferProductName(t) || '—' }}</span>
+              <span class="text-muted size-small d-block" *ngIf="transferProductCode(t)">{{
+                transferProductCode(t)
+              }}</span>
             </td>
             <td>{{ t.fromBranch?.name || '—' }}</td>
             <td>{{ t.toBranch?.name || '—' }}</td>
@@ -293,7 +295,7 @@
       <ul class="reject-modal__details" *ngIf="rejectTransfer">
         <li>
           {{ 'tr_product_name' | translate }}:
-          {{ rejectTransfer.product?.name || '—' }}
+          {{ transferProductName(rejectTransfer) || '—' }}
         </li>
         <li>
           {{ 'tr_branch_transfer_from' | translate }}:

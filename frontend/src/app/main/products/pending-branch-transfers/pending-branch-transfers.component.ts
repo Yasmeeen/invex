@@ -30,7 +30,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   isFilterOpen = true;
   isNotAuthorized = false;
   transfers: BranchTransferItem[] = [];
-  statusFilter: 'pending' | 'all' = 'pending';
+  statusFilter: 'pending' | 'rejected' | 'all' = 'pending';
   rejectTransfer: BranchTransferItem | null = null;
   rejectReason = '';
   actingId: string | null = null;
@@ -134,9 +134,9 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     );
   }
 
-  setFilter(v: 'pending' | 'all'): void {
+  setFilter(v: 'pending' | 'rejected' | 'all'): void {
     this.statusFilter = v;
-    this.params.status = v === 'all' ? 'all' : 'pending';
+    this.params.status = v;
     this.params.page = 1;
     this.load();
   }
@@ -308,6 +308,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
       [this.translate.instant('tr_branch_transfer_status_col')]: this.translate.instant(
         this.statusLabelKey(t)
       ),
+      [this.translate.instant('tr_branch_transfer_reject_reason')]:
+        t.status === 'rejected' ? t.rejectReason || '' : '',
       [this.translate.instant('tr_branch_transfer_date')]: this.formatTransferDate(t.createdAt) || '',
       [this.translate.instant('tr_branch_transfer_by')]: t.initiatedBy?.name || '',
     };

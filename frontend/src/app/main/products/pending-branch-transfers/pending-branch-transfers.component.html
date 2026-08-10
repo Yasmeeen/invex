@@ -21,6 +21,15 @@
         <button
           type="button"
           class="s-btn size-small"
+          [class.btn-primary]="statusFilter === 'rejected'"
+          [class.btn-secondary]="statusFilter !== 'rejected'"
+          (click)="setFilter('rejected')"
+        >
+          {{ 'tr_branch_transfer_status_rejected' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn size-small"
           [class.btn-primary]="statusFilter === 'all'"
           [class.btn-secondary]="statusFilter !== 'all'"
           (click)="setFilter('all')"
@@ -218,7 +227,19 @@
             <td>{{ t.toBranch?.name || '—' }}</td>
             <td>{{ t.quantity }}</td>
             <td>
-              <span [class.text-warning]="t.status === 'pending'">{{ statusLabelKey(t) | translate }}</span>
+              <span
+                [class.text-warning]="t.status === 'pending'"
+                [class.text-danger]="t.status === 'rejected'"
+                [class.text-success]="t.status === 'approved'"
+              >
+                {{ statusLabelKey(t) | translate }}
+              </span>
+              <span
+                class="text-muted size-small d-block pending-transfers-reject-reason"
+                *ngIf="t.status === 'rejected' && t.rejectReason"
+              >
+                {{ 'tr_branch_transfer_reject_reason' | translate }}: {{ t.rejectReason }}
+              </span>
             </td>
             <td>
               <span class="size-small">{{ formatTransferDate(t.createdAt) || '—' }}</span>

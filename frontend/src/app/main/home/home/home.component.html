@@ -1,3 +1,68 @@
+<div
+  class="celebration"
+  *ngIf="showCelebration"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="celebration-title"
+  (click)="dismissCelebration()"
+>
+  <div class="celebration__sky" aria-hidden="true">
+    <span
+      *ngFor="let piece of confetti"
+      class="celebration__piece"
+      [class.celebration__piece--paper]="piece.kind !== 'star'"
+      [class.celebration__piece--square]="piece.kind === 'square'"
+      [class.celebration__piece--strip]="piece.kind === 'strip'"
+      [class.celebration__piece--star]="piece.kind === 'star'"
+      [class.celebration__piece--burst]="piece.mode === 'burst'"
+      [ngStyle]="piece.style"
+      >{{ piece.kind === 'star' ? '★' : '' }}</span
+    >
+
+    <div
+      *ngFor="let burst of bursts"
+      class="celebration__burst"
+      [style.left]="burst.left"
+      [style.top]="burst.top"
+      [style.animationDelay]="burst.delay"
+    >
+      <span
+        *ngFor="let angle of sparkAngles"
+        class="celebration__spark-wrap"
+        [style.transform]="'rotate(' + angle + 'deg)'"
+      >
+        <i class="celebration__spark" [style.background]="burst.color" [style.boxShadow]="'0 0 10px ' + burst.color"></i>
+      </span>
+    </div>
+  </div>
+
+  <div class="celebration__card" (click)="$event.stopPropagation()">
+    <button
+      type="button"
+      class="celebration__close"
+      (click)="dismissCelebration()"
+      [attr.aria-label]="'tr_celebration_dismiss' | translate"
+    >
+      ×
+    </button>
+    <span class="celebration__badge">{{ 'tr_celebration_badge' | translate }}</span>
+    <div class="celebration__art">
+      <img src="/assets/images/faisal-opening-store.png" alt="" />
+    </div>
+    <h2 class="celebration__congrats">{{ 'tr_celebration_congrats' | translate }}</h2>
+    <p id="celebration-title" class="celebration__title">
+      {{ 'tr_celebration_title' | translate: { storeName: celebrationStoreName, branchName: celebrationBranchName } }}
+    </p>
+    <p class="celebration__subtitle">{{ 'tr_celebration_subtitle' | translate }}</p>
+    <button type="button" class="celebration__cta" (click)="goToNewBranch()">
+      {{ 'tr_celebration_cta' | translate }}
+    </button>
+    <button type="button" class="celebration__later" (click)="dismissCelebration()">
+      {{ 'tr_celebration_later' | translate }}
+    </button>
+  </div>
+</div>
+
 <div class="dashboard-page">
   <header class="dashboard-page__hero">
     <h1 class="dashboard-page__title">{{ 'tr_dashboard' | translate }}</h1>

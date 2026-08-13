@@ -15,6 +15,13 @@ const normalizeSalespeople = (raw) => {
     .filter(Boolean);
 };
 
+const parseOpeningDate = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 export const getBranches = async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
@@ -68,6 +75,7 @@ export const createBranch = async (req, res) => {
       employeesSalary,
       branchInvoices,
       expenses,
+      openingDate,
       salespeople,
     } = req.body;
 
@@ -86,6 +94,7 @@ export const createBranch = async (req, res) => {
       employeesSalary: Number(employeesSalary) || 0,
       branchInvoices: Number(branchInvoices) || 0,
       expenses: Number(expenses) || 0,
+      openingDate: parseOpeningDate(openingDate) ?? null,
       salespeople: normalizeSalespeople(salespeople),
     };
 
@@ -110,19 +119,26 @@ export const updateBranch = async (req, res) => {
       employeesSalary,
       branchInvoices,
       expenses,
+      openingDate,
       salespeople, } = req.body;
+
+    const update = {
+      name,
+      storeAddress,
+      rent: Number(rent) || 0,
+      employeesSalary: Number(employeesSalary) || 0,
+      branchInvoices: Number(branchInvoices) || 0,
+      expenses: Number(expenses) || 0,
+      salespeople: normalizeSalespeople(salespeople),
+    };
+    const parsedOpening = parseOpeningDate(openingDate);
+    if (parsedOpening !== undefined) {
+      update.openingDate = parsedOpening;
+    }
 
     const updatedBranch = await Branch.findByIdAndUpdate(
       req.params.id,
-      {
-        name,
-        storeAddress,
-        rent: Number(rent) || 0,
-        employeesSalary: Number(employeesSalary) || 0,
-        branchInvoices: Number(branchInvoices) || 0,
-        expenses: Number(expenses) || 0,
-        salespeople: normalizeSalespeople(salespeople),
-      },
+      update,
       { new: true }
     );
 

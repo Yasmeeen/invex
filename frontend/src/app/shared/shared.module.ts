@@ -53,7 +53,9 @@ import { BookingReprintHostComponent } from './components/booking-reprint-host/b
     ReactiveFormsModule,
     CoreModule.forRoot(),
     NgSelectModule,
-    TranslateModule
+    TranslateModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
   ],
   exports: [
     GhostLineComponent,

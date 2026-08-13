@@ -124,6 +124,8 @@ export interface Branch {
   employeesSalary: number;
   branchInvoices: number;
   expenses: number;
+  /** Optional grand-opening date; celebration shows from the day before for one week. */
+  openingDate?: string | Date | null;
   salespeople?: BranchSalesperson[];
 }
 

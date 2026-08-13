@@ -1,14 +1,18 @@
 import { ProductsSerivce } from './../../../shared/services/products.service';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import * as Highcharts from 'highcharts';
 import HC_treemap from 'highcharts/modules/treemap';
 import HC_solidGauge from 'highcharts/modules/solid-gauge';
+import { Router } from '@angular/router';
 import { DashboardService } from '@shared/services/dashboard.service';
 import { orderStatistics } from '@core/models/dashboard.model';
 import { Branch } from '@core/models/products.model';
 import { BranchesServce } from '@shared/services/branches.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
+import { openingCelebrationStorageKey } from '@core/utils/opening-celebration';
 
 HC_treemap(Highcharts);
 HC_solidGauge(Highcharts);
@@ -50,14 +54,36 @@ export class HomeComponent implements OnInit, OnDestroy {
   /** Total orders (sum of status segments) for dashboard badge */
   ordersTotal: number | null = null;
 
+  showCelebration = false;
+  confetti: {
+    kind: 'rect' | 'square' | 'strip' | 'star';
+    mode: 'fall' | 'burst';
+    style: Record<string, string>;
+  }[] = [];
+  sparkAngles = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+  bursts: { left: string; top: string; delay: string; color: string }[] = [];
+
   private langChangeSub?: Subscription;
+  private celebrationSub?: Subscription;
+  celebratingBranch: Branch | null = null;
 
   constructor(
     private dashboardService: DashboardService,
     private productsSerivce: ProductsSerivce,
     private branchesServce: BranchesServce,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private router: Router,
+    private storeSettings: StoreSettingsService,
+    private openingCelebration: OpeningCelebrationService
   ) {}
+
+  get celebrationStoreName(): string {
+    return (this.storeSettings.snapshot?.storeName || '').trim();
+  }
+
+  get celebrationBranchName(): string {
+    return (this.celebratingBranch?.name || '').trim();
+  }
 
   get averageOrderDisplay(): string | null {
     const inv = this.orderStatistics?.totalInvoices;
@@ -70,6 +96,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.celebrationSub = this.openingCelebration.activeBranch$.subscribe((branch) =>
+      this.syncOpeningPopup(branch)
+    );
     this.loadDashboardChartsAndStats();
     this.getBranches();
     this.loadUpcomingInstallments();
@@ -81,6 +110,97 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.langChangeSub?.unsubscribe();
+    this.celebrationSub?.unsubscribe();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeCelebration(): void {
+    if (this.showCelebration) {
+      this.dismissCelebration();
+    }
+  }
+
+  dismissCelebration(): void {
+    this.showCelebration = false;
+    const key = openingCelebrationStorageKey('popup', this.celebratingBranch);
+    if (!key) {
+      return;
+    }
+    try {
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* ignore storage errors */
+    }
+  }
+
+  goToNewBranch(): void {
+    this.dismissCelebration();
+    this.router.navigate(['/products']);
+  }
+
+  private syncOpeningPopup(branch: Branch | null): void {
+    this.celebratingBranch = branch;
+    if (!branch) {
+      this.showCelebration = false;
+      return;
+    }
+    const key = openingCelebrationStorageKey('popup', branch);
+    let overlaySeen = false;
+    try {
+      overlaySeen = !!key && sessionStorage.getItem(key) === '1';
+    } catch {
+      overlaySeen = false;
+    }
+    this.showCelebration = !overlaySeen;
+    if (this.showCelebration && !this.confetti.length) {
+      this.buildCelebrationParticles();
+    }
+  }
+
+  private buildCelebrationParticles(): void {
+    const colors = ['#6c5ce7', '#f5a623', '#f97316', '#3b82f6', '#fbbf24', '#a78bfa', '#ec4899', '#38bdf8'];
+    this.confetti = Array.from({ length: 96 }, (_, i) => {
+      const roll = i % 14;
+      const kind: 'rect' | 'square' | 'strip' | 'star' =
+        roll === 0 ? 'star' : roll % 3 === 1 ? 'square' : roll % 3 === 2 ? 'strip' : 'rect';
+      const mode: 'fall' | 'burst' = i % 4 === 0 ? 'burst' : 'fall';
+      const w =
+        kind === 'star'
+          ? 10 + Math.random() * 8
+          : kind === 'square'
+            ? 7 + Math.random() * 7
+            : kind === 'strip'
+              ? 3 + Math.random() * 3
+              : 8 + Math.random() * 10;
+      const h =
+        kind === 'star' || kind === 'square'
+          ? w
+          : kind === 'strip'
+            ? 12 + Math.random() * 14
+            : 5 + Math.random() * 5;
+      const color = colors[i % colors.length];
+      const style: Record<string, string> = {
+        left: mode === 'burst' ? `${36 + Math.random() * 28}%` : `${Math.random() * 100}%`,
+        animationDelay: `${Math.random() * 2.4}s`,
+        animationDuration: mode === 'burst' ? `${2 + Math.random() * 1.6}s` : `${3.2 + Math.random() * 2.6}s`,
+        width: `${w}px`,
+        height: `${h}px`,
+        background: kind === 'star' ? 'transparent' : color,
+        color,
+        '--tilt': `${Math.floor(Math.random() * 360)}deg`,
+        '--drift': `${(Math.random() * 22 - 11).toFixed(1)}vw`,
+      };
+      if (mode === 'burst') {
+        style.top = `${26 + Math.random() * 32}%`;
+      }
+      return { kind, mode, style };
+    });
+
+    this.bursts = [
+      { left: '18%', top: '18%', delay: '0s', color: '#f5a623' },
+      { left: '82%', top: '16%', delay: '0.7s', color: '#6c5ce7' },
+      { left: '50%', top: '12%', delay: '1.4s', color: '#38bdf8' },
+    ];
   }
 
   /** Rebuild charts only (strings) after language switch without reloading KPI stats. */

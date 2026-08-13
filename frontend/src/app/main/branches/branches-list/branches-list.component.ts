@@ -9,6 +9,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { Subscription } from 'rxjs';
 import { CreateEditBranchComponent } from '../create-edit-branch/create-edit-branch.component';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
+import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
 
 @Component({
   selector: 'app-branches-list',
@@ -56,7 +57,8 @@ export class BranchesListComponent implements OnInit {
     private translateService: TranslateService,
     private globals: Globals,
     private dialog: MatDialog,
-    private BranchesServce: BranchesServce
+    private BranchesServce: BranchesServce,
+    private openingCelebration: OpeningCelebrationService
   ) { }
 
   ngOnInit(): void {
@@ -155,7 +157,7 @@ export class BranchesListComponent implements OnInit {
       this.branchesService.deleteBranch(branchId).subscribe(() => {
         this.params.page = 1;
           this.getbranches()
-  
+        this.openingCelebration.load(true);
       })
     });
 

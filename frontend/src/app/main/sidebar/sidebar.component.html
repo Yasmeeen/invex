@@ -57,6 +57,14 @@
               >
                 {{ globals.pendingBranchTransferCount }}
               </span>
+              <span
+                *ngIf="link.children"
+                class="fa fa-chevron-down children-arrow"
+                role="button"
+                tabindex="0"
+                (click)="toggleChildren($event)"
+                (keydown.enter)="toggleChildren($event)"
+              ></span>
             </div>
           </a>
           <div
@@ -70,18 +78,30 @@
           >
             <span class="link-content__icon-wrap" aria-hidden="true">
               <span [class]="link.icon"></span>
+              <span
+                class="sidebar-pending-badge sidebar-pending-badge--on-icon"
+                *ngIf="hasPendingTransfersIn(link) && globals.pendingBranchTransferCount > 0"
+              >
+                {{ globals.pendingBranchTransferCount }}
+              </span>
             </span>
             <span class="main-icon-text">{{ link.name | translate }}</span>
+            <span
+              class="sidebar-pending-badge"
+              *ngIf="hasPendingTransfersIn(link) && globals.pendingBranchTransferCount > 0"
+            >
+              {{ globals.pendingBranchTransferCount }}
+            </span>
+            <span
+              *ngIf="link.children"
+              class="fa fa-chevron-down children-arrow"
+              role="button"
+              tabindex="0"
+              (click)="toggleChildren($event)"
+              (keydown.enter)="toggleChildren($event)"
+            ></span>
           </div>
         </div>
-        <span
-          *ngIf="link.children"
-          class="fa fa-chevron-down children-arrow"
-          role="button"
-          tabindex="0"
-          (click)="toggleChildren($event)"
-          (keydown.enter)="toggleChildren($event)"
-        ></span>
         <div *ngIf="link.children" class="child-menu">
           <div
             *ngFor="let child of link.children"
@@ -96,8 +116,20 @@
               <div class="link-content link-content--child">
                 <span class="link-content__icon-wrap" aria-hidden="true">
                   <span [class]="child.icon"></span>
+                  <span
+                    class="sidebar-pending-badge sidebar-pending-badge--on-icon"
+                    *ngIf="isPendingTransfersLink(child) && globals.pendingBranchTransferCount > 0"
+                  >
+                    {{ globals.pendingBranchTransferCount }}
+                  </span>
                 </span>
-                <span class="main-icon-text size-small ml-2">{{ child.name | translate }}</span>
+                <span class="main-icon-text size-small">{{ child.name | translate }}</span>
+                <span
+                  class="sidebar-pending-badge"
+                  *ngIf="isPendingTransfersLink(child) && globals.pendingBranchTransferCount > 0"
+                >
+                  {{ globals.pendingBranchTransferCount }}
+                </span>
               </div>
             </a>
           </div>

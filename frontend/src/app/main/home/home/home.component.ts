@@ -1,5 +1,6 @@
 import { ProductsSerivce } from './../../../shared/services/products.service';
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import * as Highcharts from 'highcharts';
@@ -26,12 +27,15 @@ const DONUT_STOCK_OUT = '#d4a5a8';
 const DONUT_ORDER_DONE = '#1b4332';
 const DONUT_ORDER_RESTORED = '#74c69d';
 
+export type HomeDashboardSection = 'accounts' | 'sales';
+
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss'],
 })
 export class HomeComponent implements OnInit, OnDestroy {
+  activeSection: HomeDashboardSection = 'accounts';
   fromDate: Date = new Date();
   toDate: Date = new Date();
   selectedBranch: any;
@@ -51,13 +55,28 @@ export class HomeComponent implements OnInit, OnDestroy {
   ordersTotal: number | null = null;
 
   private langChangeSub?: Subscription;
+  private salesLoaded = false;
+  private readonly storageKey = 'home.activeSection';
 
   constructor(
     private dashboardService: DashboardService,
     private productsSerivce: ProductsSerivce,
     private branchesServce: BranchesServce,
-    private translate: TranslateService
-  ) {}
+    private translate: TranslateService,
+    private route: ActivatedRoute
+  ) {
+    const qp = String(this.route.snapshot.queryParamMap.get('section') || '')
+      .trim()
+      .toLowerCase();
+    if (qp === 'sales' || qp === 'accounts') {
+      this.activeSection = qp;
+    } else {
+      const saved = localStorage.getItem(this.storageKey);
+      if (saved === 'sales' || saved === 'accounts') {
+        this.activeSection = saved;
+      }
+    }
+  }
 
   get averageOrderDisplay(): string | null {
     const inv = this.orderStatistics?.totalInvoices;
@@ -70,13 +89,34 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    if (this.activeSection === 'sales') {
+      this.ensureSalesDashboard();
+    }
+    this.langChangeSub = this.translate.onLangChange.subscribe(() => {
+      if (this.activeSection === 'sales') {
+        this.refreshChartsForCurrentLanguage();
+      }
+    });
+  }
+
+  setSection(section: HomeDashboardSection): void {
+    this.activeSection = section;
+    localStorage.setItem(this.storageKey, section);
+    if (section === 'sales') {
+      this.ensureSalesDashboard();
+    }
+  }
+
+  private ensureSalesDashboard(): void {
+    if (this.salesLoaded) {
+      setTimeout(() => this.refreshChartsForCurrentLanguage(), 0);
+      return;
+    }
+    this.salesLoaded = true;
     this.loadDashboardChartsAndStats();
     this.getBranches();
     this.loadUpcomingInstallments();
     this.loadPastUpcomingInstallments();
-    this.langChangeSub = this.translate.onLangChange.subscribe(() =>
-      this.refreshChartsForCurrentLanguage()
-    );
   }
 
   ngOnDestroy(): void {

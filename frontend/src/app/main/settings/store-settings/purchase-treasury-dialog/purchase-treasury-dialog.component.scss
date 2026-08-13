@@ -1,1 +1,227 @@
-@import '../settings-dialog-shared.scss';
+.money-accounts-page--dialog {
+  padding-bottom: 0.5rem;
+}
+
+.money-accounts-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.money-accounts-kpi {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  padding: 0.95rem 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  min-width: 0;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover,
+  &.is-active {
+    border-color: #c7d2fe;
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.08);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+  }
+}
+
+.money-accounts-kpi__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.05rem;
+}
+
+.money-accounts-kpi[data-type='cash'] .money-accounts-kpi__icon {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.money-accounts-kpi[data-type='bank'] .money-accounts-kpi__icon {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.money-accounts-kpi[data-type='wallet'] .money-accounts-kpi__icon {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+}
+
+.money-accounts-kpi[data-type='settlement'] .money-accounts-kpi__icon {
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+}
+
+.money-accounts-kpi--total {
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 70%);
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.money-accounts-kpi--total .money-accounts-kpi__icon {
+  background: rgba(16, 185, 129, 0.16);
+  color: #047857;
+}
+
+.money-accounts-kpi__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.money-accounts-kpi__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.money-accounts-kpi__value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.money-accounts-kpi__meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+@media (max-width: 1200px) {
+  .money-accounts-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .money-accounts-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.money-accounts-table__acc {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.money-accounts-table__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+
+  &[data-channel='cash'] {
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+  }
+
+  &[data-channel='bank'] {
+    background: rgba(59, 130, 246, 0.12);
+    color: #2563eb;
+  }
+
+  &[data-channel='wallet'] {
+    background: rgba(139, 92, 246, 0.12);
+    color: #7c3aed;
+  }
+
+  &[data-channel='settlement'] {
+    background: rgba(245, 158, 11, 0.14);
+    color: #d97706;
+  }
+}
+
+.money-accounts-table__actions {
+  white-space: nowrap;
+  text-align: start;
+  width: 3rem;
+}
+
+.money-accounts-table__actions .options-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: #6b7280;
+  vertical-align: middle;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #111827;
+  }
+
+  /* Keep dropdown anchored under the three-dots trigger (not the far cell edge). */
+  .options-menu-container {
+    inset-inline-end: 0;
+    inset-inline-start: auto;
+    min-width: 160px;
+  }
+}
+
+.money-accounts-table__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &[data-type='cash'] {
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+  }
+
+  &[data-type='bank'] {
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+  }
+
+  &[data-type='wallet'] {
+    background: rgba(139, 92, 246, 0.12);
+    color: #6d28d9;
+  }
+
+  &[data-type='settlement'] {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+  }
+}
+
+.money-accounts-table__badge--active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.money-accounts-table__badge--inactive {
+  background: rgba(107, 114, 128, 0.14);
+  color: #4b5563;
+}

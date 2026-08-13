@@ -1,259 +1,295 @@
 <div class="dashboard-page">
-  <header class="dashboard-page__hero">
-    <h1 class="dashboard-page__title">{{ 'tr_dashboard' | translate }}</h1>
-    <p class="dashboard-page__lead">{{ 'sales_summary' | translate }}</p>
-  </header>
+  <nav
+    class="dashboard-page__tabs"
+    role="tablist"
+    [attr.aria-label]="'tr_dashboard' | translate"
+  >
+    <button
+      type="button"
+      class="dashboard-page__tab"
+      role="tab"
+      [attr.aria-selected]="activeSection === 'accounts'"
+      [class.dashboard-page__tab--active]="activeSection === 'accounts'"
+      (click)="setSection('accounts')"
+    >
+      <i class="fa fa-university" aria-hidden="true"></i>
+      {{ 'tr_dashboard_tab_accounts' | translate }}
+    </button>
+    <button
+      type="button"
+      class="dashboard-page__tab"
+      role="tab"
+      [attr.aria-selected]="activeSection === 'sales'"
+      [class.dashboard-page__tab--active]="activeSection === 'sales'"
+      (click)="setSection('sales')"
+    >
+      <i class="fa fa-line-chart" aria-hidden="true"></i>
+      {{ 'tr_dashboard_tab_sales' | translate }}
+    </button>
+  </nav>
 
-  <!-- Top filter bar -->
-  <section class="dashboard-toolbar" [attr.aria-label]="'tr_dashboard_filters' | translate">
-    <div class="dashboard-toolbar__inner">
-      <div class="dashboard-toolbar__field">
-        <label class="dashboard-toolbar__label">{{ 'tr_branches' | translate }}</label>
-        <div class="input-with-icon bg-white dashboard-toolbar__control">
-          <ng-select
-            class="s-control s-select"
-            placeholder="{{ 'tr_select' | translate }}"
-            bindLabel="name"
-            bindValue="_id"
-            [(ngModel)]="selectedBranch"
-            name="branchId"
-            [items]="branches"
-            (change)="changeBranch()"
-            [clearable]="true"
+  <section
+    class="dashboard-page__section"
+    *ngIf="activeSection === 'accounts'"
+    role="tabpanel"
+  >
+    <app-treasury-accounts-list [asSection]="true"></app-treasury-accounts-list>
+  </section>
+
+  <section
+    class="dashboard-page__section"
+    *ngIf="activeSection === 'sales'"
+    role="tabpanel"
+  >
+    <!-- Top filter bar -->
+    <section class="dashboard-toolbar" [attr.aria-label]="'tr_dashboard_filters' | translate">
+      <div class="dashboard-toolbar__inner">
+        <div class="dashboard-toolbar__field">
+          <label class="dashboard-toolbar__label">{{ 'tr_branches' | translate }}</label>
+          <div class="input-with-icon bg-white dashboard-toolbar__control">
+            <ng-select
+              class="s-control s-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [(ngModel)]="selectedBranch"
+              name="branchId"
+              [items]="branches"
+              (change)="changeBranch()"
+              [clearable]="true"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+
+        <div class="dashboard-toolbar__field">
+          <label class="dashboard-toolbar__label">{{ 'tr_from' | translate }}</label>
+          <div class="input-with-icon dashboard-toolbar__control">
+            <input
+              [(ngModel)]="fromDate"
+              name="fromDate"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="pickFrom"
+              class="s-control bg-white"
+            />
+            <mat-datepicker #pickFrom></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="pickFrom"></mat-datepicker-toggle>
+          </div>
+        </div>
+
+        <div class="dashboard-toolbar__field">
+          <label class="dashboard-toolbar__label">{{ 'tr_to' | translate }}</label>
+          <div class="input-with-icon dashboard-toolbar__control">
+            <input
+              [(ngModel)]="toDate"
+              name="toDate"
+              placeholder="{{ 'tr_pick_date' | translate }}"
+              [matDatepicker]="pickTo"
+              class="s-control bg-white"
+            />
+            <mat-datepicker #pickTo></mat-datepicker>
+            <mat-datepicker-toggle class="input-icon date-picker" [for]="pickTo"></mat-datepicker-toggle>
+          </div>
+        </div>
+
+        <div class="dashboard-toolbar__actions">
+          <button type="button" class="s-btn btn-primary dashboard-toolbar__apply" (click)="applyFilters()">
+            <i class="fa fa-check mr-2" aria-hidden="true"></i>
+            {{ 'tr_apply' | translate }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPIs -->
+    <section class="dashboard-section">
+      <div class="dashboard-section__head">
+        <p class="dashboard-section__subtitle" *ngIf="!isToday">
+          {{ fromDate | date: 'dd/M/yyyy' }} {{ 'tr_to' | translate }} {{ toDate | date: 'dd/M/yyyy' }}
+        </p>
+        <p class="dashboard-section__subtitle" *ngIf="isToday">{{ 'tr_today' | translate }}</p>
+      </div>
+
+      <div class="dashboard-kpi-grid">
+        <article class="dashboard-kpi-card dashboard-kpi-card--sales">
+          <div class="dashboard-kpi-card__icon" aria-hidden="true">
+            <i class="fa fa-line-chart"></i>
+          </div>
+          <div class="dashboard-kpi-card__body">
+            <span class="dashboard-kpi-card__label">{{ 'tr_total_amount' | translate }}</span>
+            <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalSales }}</span>
+          </div>
+        </article>
+
+        <article class="dashboard-kpi-card dashboard-kpi-card--orders">
+          <div class="dashboard-kpi-card__icon" aria-hidden="true">
+            <i class="fa fa-shopping-cart"></i>
+          </div>
+          <div class="dashboard-kpi-card__body">
+            <span class="dashboard-kpi-card__label">{{ 'tr_total_number_of_invoices' | translate }}</span>
+            <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalInvoices }}</span>
+          </div>
+        </article>
+
+        <article class="dashboard-kpi-card dashboard-kpi-card--profit">
+          <div class="dashboard-kpi-card__icon" aria-hidden="true">
+            <i class="fa fa-money"></i>
+          </div>
+          <div class="dashboard-kpi-card__body">
+            <span class="dashboard-kpi-card__label">{{ 'tr_net_profit' | translate }}</span>
+            <span class="dashboard-kpi-card__value">{{ orderStatistics?.netProfit }}</span>
+          </div>
+        </article>
+
+        <article class="dashboard-kpi-card dashboard-kpi-card--avg" *ngIf="averageOrderDisplay !== null">
+          <div class="dashboard-kpi-card__icon" aria-hidden="true">
+            <i class="fa fa-calculator"></i>
+          </div>
+          <div class="dashboard-kpi-card__body">
+            <span class="dashboard-kpi-card__label">{{ 'tr_average_order' | translate }}</span>
+            <span class="dashboard-kpi-card__value">{{ averageOrderDisplay }}</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Charts grid: 2 per row -->
+    <section class="dashboard-charts" [attr.aria-label]="'tr_dashboard_charts' | translate">
+      <div class="dashboard-charts__grid">
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-card__header">
+            <span class="dashboard-chart-card__title">{{ 'tr_products' | translate }}</span>
+            <span class="dashboard-chart-card__badge" *ngIf="productsStats?.totalProducts != null">{{
+              productsStats?.totalProducts
+            }}</span>
+          </div>
+          <p class="dashboard-chart-card__caption">{{ 'tr_stock_status' | translate }}</p>
+          <div id="products-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
+        </div>
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-card__header">
+            <span class="dashboard-chart-card__title">{{ 'tr_invoices' | translate }}</span>
+          </div>
+          <p class="dashboard-chart-card__caption">{{ 'tr_invoice_stats' | translate }}</p>
+          <div id="invoices-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
+        </div>
+
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-card__header">
+            <span class="dashboard-chart-card__title">{{ 'tr_orders' | translate }}</span>
+            <span class="dashboard-chart-card__badge" *ngIf="ordersTotal != null">{{ ordersTotal }}</span>
+          </div>
+          <p class="dashboard-chart-card__caption">{{ 'tr_order_status' | translate }}</p>
+          <div id="orders-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
+        </div>
+
+        <div class="dashboard-chart-card">
+          <div class="dashboard-chart-card__header">
+            <span class="dashboard-chart-card__title">{{ 'tr_categories' | translate }}</span>
+          </div>
+          <p class="dashboard-chart-card__caption">{{ 'tr_category_distribution' | translate }}</p>
+          <div id="categories-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installments: tabs inside one card -->
+    <section class="dashboard-installments" [attr.aria-label]="'tr_installments' | translate">
+      <div class="dashboard-installments__card">
+        <div class="dashboard-installments__tabs" role="tablist">
+          <button
+            type="button"
+            class="dashboard-installments__tab"
+            [class.dashboard-installments__tab--active]="installmentsTab === 'upcoming'"
+            (click)="installmentsTab = 'upcoming'"
+            role="tab"
+            [attr.aria-selected]="installmentsTab === 'upcoming'"
           >
-          </ng-select>
-          <i class="fa fa-caret-down input-icon"></i>
+            {{ 'tr_tab_upcoming' | translate }}
+          </button>
+          <button
+            type="button"
+            class="dashboard-installments__tab"
+            [class.dashboard-installments__tab--active]="installmentsTab === 'past'"
+            (click)="installmentsTab = 'past'"
+            role="tab"
+            [attr.aria-selected]="installmentsTab === 'past'"
+          >
+            {{ 'tr_tab_past' | translate }}
+          </button>
         </div>
-      </div>
 
-      <div class="dashboard-toolbar__field">
-        <label class="dashboard-toolbar__label">{{ 'tr_from' | translate }}</label>
-        <div class="input-with-icon dashboard-toolbar__control">
-          <input
-            [(ngModel)]="fromDate"
-            name="fromDate"
-            placeholder="{{ 'tr_pick_date' | translate }}"
-            [matDatepicker]="pickFrom"
-            class="s-control bg-white"
-          />
-          <mat-datepicker #pickFrom></mat-datepicker>
-          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickFrom"></mat-datepicker-toggle>
-        </div>
-      </div>
-
-      <div class="dashboard-toolbar__field">
-        <label class="dashboard-toolbar__label">{{ 'tr_to' | translate }}</label>
-        <div class="input-with-icon dashboard-toolbar__control">
-          <input
-            [(ngModel)]="toDate"
-            name="toDate"
-            placeholder="{{ 'tr_pick_date' | translate }}"
-            [matDatepicker]="pickTo"
-            class="s-control bg-white"
-          />
-          <mat-datepicker #pickTo></mat-datepicker>
-          <mat-datepicker-toggle class="input-icon date-picker" [for]="pickTo"></mat-datepicker-toggle>
-        </div>
-      </div>
-
-      <div class="dashboard-toolbar__actions">
-        <button type="button" class="s-btn btn-primary dashboard-toolbar__apply" (click)="applyFilters()">
-          <i class="fa fa-check mr-2" aria-hidden="true"></i>
-          {{ 'tr_apply' | translate }}
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- KPIs -->
-  <section class="dashboard-section">
-    <div class="dashboard-section__head">
-      <p class="dashboard-section__subtitle" *ngIf="!isToday">
-        {{ fromDate | date: 'dd/M/yyyy' }} {{ 'tr_to' | translate }} {{ toDate | date: 'dd/M/yyyy' }}
-      </p>
-      <p class="dashboard-section__subtitle" *ngIf="isToday">{{ 'tr_today' | translate }}</p>
-    </div>
-
-    <div class="dashboard-kpi-grid">
-      <article class="dashboard-kpi-card dashboard-kpi-card--sales">
-        <div class="dashboard-kpi-card__icon" aria-hidden="true">
-          <i class="fa fa-line-chart"></i>
-        </div>
-        <div class="dashboard-kpi-card__body">
-          <span class="dashboard-kpi-card__label">{{ 'tr_total_amount' | translate }}</span>
-          <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalSales }}</span>
-        </div>
-      </article>
-
-      <article class="dashboard-kpi-card dashboard-kpi-card--orders">
-        <div class="dashboard-kpi-card__icon" aria-hidden="true">
-          <i class="fa fa-shopping-cart"></i>
-        </div>
-        <div class="dashboard-kpi-card__body">
-          <span class="dashboard-kpi-card__label">{{ 'tr_total_number_of_invoices' | translate }}</span>
-          <span class="dashboard-kpi-card__value">{{ orderStatistics?.totalInvoices }}</span>
-        </div>
-      </article>
-
-      <article class="dashboard-kpi-card dashboard-kpi-card--profit">
-        <div class="dashboard-kpi-card__icon" aria-hidden="true">
-          <i class="fa fa-money"></i>
-        </div>
-        <div class="dashboard-kpi-card__body">
-          <span class="dashboard-kpi-card__label">{{ 'tr_net_profit' | translate }}</span>
-          <span class="dashboard-kpi-card__value">{{ orderStatistics?.netProfit }}</span>
-        </div>
-      </article>
-
-      <article class="dashboard-kpi-card dashboard-kpi-card--avg" *ngIf="averageOrderDisplay !== null">
-        <div class="dashboard-kpi-card__icon" aria-hidden="true">
-          <i class="fa fa-calculator"></i>
-        </div>
-        <div class="dashboard-kpi-card__body">
-          <span class="dashboard-kpi-card__label">{{ 'tr_average_order' | translate }}</span>
-          <span class="dashboard-kpi-card__value">{{ averageOrderDisplay }}</span>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <!-- Charts grid: 2 per row -->
-  <section class="dashboard-charts" [attr.aria-label]="'tr_dashboard_charts' | translate">
-    <div class="dashboard-charts__grid">
-      <div class="dashboard-chart-card">
-        <div class="dashboard-chart-card__header">
-          <span class="dashboard-chart-card__title">{{ 'tr_products' | translate }}</span>
-          <span class="dashboard-chart-card__badge" *ngIf="productsStats?.totalProducts != null">{{
-            productsStats?.totalProducts
-          }}</span>
-        </div>
-        <p class="dashboard-chart-card__caption">{{ 'tr_stock_status' | translate }}</p>
-        <div id="products-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
-      </div>
-      <div class="dashboard-chart-card">
-        <div class="dashboard-chart-card__header">
-          <span class="dashboard-chart-card__title">{{ 'tr_invoices' | translate }}</span>
-        </div>
-        <p class="dashboard-chart-card__caption">{{ 'tr_invoice_stats' | translate }}</p>
-        <div id="invoices-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
-      </div>
-
-      <div class="dashboard-chart-card">
-        <div class="dashboard-chart-card__header">
-          <span class="dashboard-chart-card__title">{{ 'tr_orders' | translate }}</span>
-          <span class="dashboard-chart-card__badge" *ngIf="ordersTotal != null">{{ ordersTotal }}</span>
-        </div>
-        <p class="dashboard-chart-card__caption">{{ 'tr_order_status' | translate }}</p>
-        <div id="orders-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--donut"></div>
-      </div>
-
-  
-
-      <div class="dashboard-chart-card">
-        <div class="dashboard-chart-card__header">
-          <span class="dashboard-chart-card__title">{{ 'tr_categories' | translate }}</span>
-        </div>
-        <p class="dashboard-chart-card__caption">{{ 'tr_category_distribution' | translate }}</p>
-        <div id="categories-chart" class="dashboard-chart-card__plot dashboard-chart-card__plot--tall"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Installments: tabs inside one card -->
-  <section class="dashboard-installments" [attr.aria-label]="'tr_installments' | translate">
-    <div class="dashboard-installments__card">
-      <div class="dashboard-installments__tabs" role="tablist">
-        <button
-          type="button"
-          class="dashboard-installments__tab"
-          [class.dashboard-installments__tab--active]="installmentsTab === 'upcoming'"
-          (click)="installmentsTab = 'upcoming'"
-          role="tab"
-          [attr.aria-selected]="installmentsTab === 'upcoming'"
+        <div
+          class="dashboard-installments__panel"
+          *ngIf="installmentsTab === 'upcoming'"
+          role="tabpanel"
         >
-          {{ 'tr_tab_upcoming' | translate }}
-        </button>
-        <button
-          type="button"
-          class="dashboard-installments__tab"
-          [class.dashboard-installments__tab--active]="installmentsTab === 'past'"
-          (click)="installmentsTab = 'past'"
-          role="tab"
-          [attr.aria-selected]="installmentsTab === 'past'"
+          <h3 class="dashboard-installments__heading">{{ 'tr_upcoming_unpaid_installments' | translate }}</h3>
+          <div *ngIf="installments.length; else noUpcomingTpl" class="dashboard-table-wrap">
+            <table class="table s-table dashboard-table">
+              <thead>
+                <tr>
+                  <th>{{ 'tr_supplier' | translate }}</th>
+                  <th>{{ 'tr_due_date' | translate }}</th>
+                  <th>{{ 'tr_amount' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let inst of installments">
+                  <td>{{ inst.vendor?.name }}</td>
+                  <td>{{ inst.dueDate | date }}</td>
+                  <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                  <td class="dashboard-table__actions">
+                    <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                      {{ 'tr_mark_paid' | translate }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ng-template #noUpcomingTpl>
+            <p class="dashboard-installments__empty">{{ 'tr_empty_state' | translate }}</p>
+          </ng-template>
+        </div>
+
+        <div
+          class="dashboard-installments__panel"
+          *ngIf="installmentsTab === 'past'"
+          role="tabpanel"
         >
-          {{ 'tr_tab_past' | translate }}
-        </button>
-      </div>
-
-      <div
-        class="dashboard-installments__panel"
-        *ngIf="installmentsTab === 'upcoming'"
-        role="tabpanel"
-      >
-        <h3 class="dashboard-installments__heading">{{ 'tr_upcoming_unpaid_installments' | translate }}</h3>
-        <div *ngIf="installments.length; else noUpcomingTpl" class="dashboard-table-wrap">
-          <table class="table s-table dashboard-table">
-            <thead>
-              <tr>
-                <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_due_date' | translate }}</th>
-                <th>{{ 'tr_amount' | translate }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let inst of installments">
-                <td>{{ inst.vendor?.name }}</td>
-                <td>{{ inst.dueDate | date }}</td>
-                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
-                <td class="dashboard-table__actions">
-                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
-                    {{ 'tr_mark_paid' | translate }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <h3 class="dashboard-installments__heading">{{ 'tr_past_unpaid_installments' | translate }}</h3>
+          <div *ngIf="pastInstallments.length; else noPastTpl" class="dashboard-table-wrap">
+            <table class="table s-table dashboard-table">
+              <thead>
+                <tr>
+                  <th>{{ 'tr_supplier' | translate }}</th>
+                  <th>{{ 'tr_due_date' | translate }}</th>
+                  <th>{{ 'tr_amount' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let inst of pastInstallments">
+                  <td>{{ inst.vendor?.name }}</td>
+                  <td>{{ inst.dueDate | date }}</td>
+                  <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
+                  <td class="dashboard-table__actions">
+                    <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
+                      {{ 'tr_mark_paid' | translate }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <ng-template #noPastTpl>
+            <p class="dashboard-installments__empty">{{ 'tr_no_past_unpaid_installments' | translate }}</p>
+          </ng-template>
         </div>
-        <ng-template #noUpcomingTpl>
-          <p class="dashboard-installments__empty">{{ 'tr_empty_state' | translate }}</p>
-        </ng-template>
       </div>
-
-      <div
-        class="dashboard-installments__panel"
-        *ngIf="installmentsTab === 'past'"
-        role="tabpanel"
-      >
-        <h3 class="dashboard-installments__heading">{{ 'tr_past_unpaid_installments' | translate }}</h3>
-        <div *ngIf="pastInstallments.length; else noPastTpl" class="dashboard-table-wrap">
-          <table class="table s-table dashboard-table">
-            <thead>
-              <tr>
-                <th>{{ 'tr_supplier' | translate }}</th>
-                <th>{{ 'tr_due_date' | translate }}</th>
-                <th>{{ 'tr_amount' | translate }}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let inst of pastInstallments">
-                <td>{{ inst.vendor?.name }}</td>
-                <td>{{ inst.dueDate | date }}</td>
-                <td>{{ inst.amount | currency: 'EGP ':'symbol':'1.2-2' }}</td>
-                <td class="dashboard-table__actions">
-                  <button type="button" class="s-btn btn-secondary btn-sm" (click)="markAsPaid(inst._id, inst)">
-                    {{ 'tr_mark_paid' | translate }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <ng-template #noPastTpl>
-          <p class="dashboard-installments__empty">{{ 'tr_no_past_unpaid_installments' | translate }}</p>
-        </ng-template>
-      </div>
-    </div>
+    </section>
   </section>
 </div>

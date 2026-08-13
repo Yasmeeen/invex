@@ -1,0 +1,15 @@
+@import '../settings-dialog-shared.scss';
+
+.payment-account-map-table__head--wide,
+.payment-account-map-table__row--wide {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(110px, 1fr) minmax(110px, 1.1fr) minmax(110px, 1.1fr);
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+.payment-account-map-table__method {
+  font-size: 0.9rem;
+  min-width: 0;
+}

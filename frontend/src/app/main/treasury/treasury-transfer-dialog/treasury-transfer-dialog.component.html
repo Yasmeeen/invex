@@ -1,0 +1,53 @@
+<div class="dialog-pad">
+  <h3 class="mb-3">{{ titleKey | translate }}</h3>
+
+  <div class="form-group">
+    <label>{{ 'tr_treasury_from' | translate }}</label>
+    <select class="s-control width-100" [(ngModel)]="fromAccountKey">
+      <option value="">—</option>
+      <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
+    </select>
+    <p class="transfer-balance" *ngIf="fromAccountKey && availableFromBalance !== null">
+      {{ 'tr_treasury_available_balance' | translate }}:
+      {{ availableFromBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+    </p>
+    <p class="transfer-error" *ngIf="fromHasNoBalance">
+      {{ 'tr_treasury_transfer_no_balance' | translate }}
+    </p>
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_treasury_to' | translate }}</label>
+    <select class="s-control width-100" [(ngModel)]="toAccountKey">
+      <option value="">—</option>
+      <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_daily_expense_amount' | translate }}</label>
+    <input class="s-control width-100" type="number" min="0" step="0.01" [(ngModel)]="amount" />
+    <p class="transfer-error" *ngIf="amountExceedsBalance">
+      {{ 'tr_treasury_transfer_insufficient' | translate : { amount: availableFromBalanceLabel } }}
+    </p>
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_daily_expense_notes' | translate }}</label>
+    <input class="s-control width-100" type="text" [(ngModel)]="note" maxlength="500" />
+  </div>
+
+  <div class="flex flex-end gap-sm mt-3">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      (click)="submit()"
+      [disabled]="saving || cannotTransfer || loadingBalances"
+    >
+      {{ 'tr_save' | translate }}
+    </button>
+  </div>
+</div>

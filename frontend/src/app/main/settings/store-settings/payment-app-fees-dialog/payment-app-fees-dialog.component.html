@@ -1,66 +1,211 @@
-<div class="payment-app-fees-dialog">
-  <h2 mat-dialog-title class="payment-app-fees-dialog__title">
-    {{ 'tr_payment_methods_fees_title' | translate }}
+<div class="payment-methods-page" [class.payment-methods-page--dialog]="isDialog">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_payment_methods_catalog_title' | translate }}</span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button
+        type="button"
+        class="s-btn btn-primary size-body"
+        (click)="openAdd()"
+        [disabled]="saving"
+      >
+        <i class="fa fa-plus mr-1"></i>{{ 'tr_payment_methods_fees_add' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="isFilterOpen = !isFilterOpen"
+      >
+        <i class="fa fa-filter text-primary"></i>
+      </button>
+    </div>
   </h2>
 
-  <div mat-dialog-content class="payment-app-fees-dialog__content">
-    <div class="payment-app-fees-dialog__scroll">
-    <p class="payment-app-fees-dialog__lead">{{ 'tr_payment_methods_fees_hint' | translate }}</p>
+  <p class="plr-4 text-muted size-caption mb-3">{{ 'tr_payment_methods_unified_hint' | translate }}</p>
 
-    <div class="settings-dialog-table payment-methods-fees-table">
-      <div class="settings-dialog-table__head payment-methods-fees-table__head">
-        <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
-        <span>{{ 'tr_payment_methods_fees_col_percent' | translate }}</span>
-        <span></span>
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-4" *ngIf="isFilterOpen">
+    <div class="row flex-wrap">
+      <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_search' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              type="search"
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="onFiltersChanged()"
+              [placeholder]="'tr_payment_methods_search_placeholder' | translate"
+              autocomplete="off"
+            />
+          </div>
+        </div>
       </div>
-      <div class="settings-dialog-table__row payment-methods-fees-table__row mb-2" *ngFor="let row of feeRows; let i = index">
-        <div class="payment-methods-fees-table__method">
-          <input
-            type="text"
-            class="s-control settings-dialog-table__label"
-            [(ngModel)]="row.label"
-            [name]="'payMethodLabel_' + i"
-            maxlength="120"
-            autocomplete="off"
-            [attr.placeholder]="'tr_payment_methods_fees_method_placeholder' | translate"
-          />
-        </div>
-        <div class="payment-methods-fees-table__percent-cell">
-          <input
-            type="number"
-            class="s-control payment-methods-fees-table__percent"
-            [(ngModel)]="row.percent"
-            [name]="'payMethodPct_' + i"
-            min="0"
-            max="100"
-            step="0.01"
-          />
-        </div>
-        <div class="payment-methods-fees-table__actions">
-          <button
-            type="button"
-            class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
-            (click)="removeRow(i)"
-            [attr.title]="'tr_remove' | translate"
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_pay_show_in' | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="showInFilter"
+            (ngModelChange)="onFiltersChanged()"
           >
-            <i class="fa fa-trash-o"></i>
-          </button>
+            <option value="">{{ 'tr_money_accounts_all_types' | translate }}</option>
+            <option value="sale">{{ 'tr_pay_show_in_sale' | translate }}</option>
+            <option value="purchase">{{ 'tr_pay_show_in_purchase' | translate }}</option>
+            <option value="both">{{ 'tr_pay_show_in_both' | translate }}</option>
+          </select>
         </div>
       </div>
-    </div>
-
-    <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
-      <i class="fa fa-plus mr-1"></i>{{ 'tr_payment_methods_fees_add' | translate }}
-    </button>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_pay_effect' | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="effectFilter"
+            (ngModelChange)="onFiltersChanged()"
+          >
+            <option value="">{{ 'tr_money_accounts_all_types' | translate }}</option>
+            <option value="instant">{{ 'tr_pay_effect_instant' | translate }}</option>
+            <option value="settlement">{{ 'tr_pay_effect_settlement' | translate }}</option>
+            <option value="none">{{ 'tr_pay_effect_none' | translate }}</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div mat-dialog-actions align="end" class="payment-app-fees-dialog__actions">
-    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
-      {{ 'tr_cancel' | translate }}
-    </button>
-    <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">
-      {{ 'tr_save_settings' | translate }}
-    </button>
+  <div class="plr-4 mt-2">
+    <div class="table-container" *ngIf="filteredRows.length; else emptyMethods">
+      <table class="s-table table layout-fixed payment-methods-table">
+        <colgroup>
+          <col class="payment-methods-table__col-method" />
+          <col class="payment-methods-table__col-effect" />
+          <col class="payment-methods-table__col-show" />
+          <col class="payment-methods-table__col-linked" />
+          <col class="payment-methods-table__col-fee" />
+          <col class="payment-methods-table__col-actions" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>{{ 'tr_payment_methods_fees_col_method' | translate }}</th>
+            <th>{{ 'tr_pay_effect' | translate }}</th>
+            <th>{{ 'tr_pay_show_in' | translate }}</th>
+            <th>{{ 'tr_payment_linked_account' | translate }}</th>
+            <th>{{ 'tr_payment_methods_fees_col_percent' | translate }}</th>
+            <th>{{ 'tr_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of pagedRows">
+            <td>
+              <div class="payment-methods-table__method">
+                <span
+                  class="payment-methods-table__icon"
+                  [attr.data-channel]="methodIconChannel(row)"
+                  aria-hidden="true"
+                >
+                  <i class="fa" [ngClass]="methodIcon(row)"></i>
+                </span>
+                <div class="payment-methods-table__method-text">
+                  <span>{{ row.label }}</span>
+                  <div
+                    class="payment-methods-table__unlink-warn"
+                    *ngIf="needsAccountLinkWarning(row)"
+                  >
+                    <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+                    {{ 'tr_payment_unlinked_warning' | translate }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>{{ effectLabelKey(row) | translate }}</td>
+            <td>
+              <span class="payment-methods-table__badge" [attr.data-show]="row.showIn">
+                {{ showInLabelKey(row) | translate }}
+              </span>
+            </td>
+            <td>
+              <div class="payment-methods-table__linked" *ngIf="hasLinkedAccount(row); else noLinkedAccount">
+                <ng-container *ngIf="row.accountKey">
+                  <span
+                    class="payment-methods-table__icon payment-methods-table__icon--sm"
+                    [attr.data-channel]="methodIconChannel(row)"
+                    aria-hidden="true"
+                  >
+                    <i class="fa" [ngClass]="methodIcon(row)"></i>
+                  </span>
+                  <div>
+                    <div class="payment-methods-table__linked-name">{{ linkedAccountLabel(row) }}</div>
+                    <div class="payment-methods-table__linked-sub" *ngIf="linkedAccountSubLabel(row)">
+                      {{ linkedAccountSubLabel(row) }}
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-container *ngIf="row.effectMode === 'settlement' && settlementBankLabel(row)">
+                  <span class="payment-methods-table__linked-sep" *ngIf="row.accountKey" aria-hidden="true"></span>
+                  <span
+                    class="payment-methods-table__icon payment-methods-table__icon--sm"
+                    data-channel="bank"
+                    aria-hidden="true"
+                  >
+                    <i class="fa fa-university"></i>
+                  </span>
+                  <div>
+                    <div class="payment-methods-table__linked-name">{{ settlementBankLabel(row) }}</div>
+                    <div class="payment-methods-table__linked-sub">
+                      {{ 'tr_payment_settlement_bank' | translate }}
+                    </div>
+                  </div>
+                </ng-container>
+              </div>
+              <ng-template #noLinkedAccount><span>—</span></ng-template>
+            </td>
+            <td>{{ row.feePercent | number : '1.0-2' }}%</td>
+            <td class="payment-methods-table__actions">
+              <span class="options-menu">
+                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                <div class="options-menu-container p-0">
+                  <div class="single-option" (click)="openEdit(row)">
+                    {{ 'tr_action.edit' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="row.effectMode === 'settlement'"
+                    (click)="openSettle(row)"
+                  >
+                    {{ 'tr_treasury_quick_settle' | translate }}
+                  </div>
+                  <div class="border-bottom" *ngIf="row.key !== 'cash' && row.key !== 'credit'"></div>
+                  <div
+                    class="single-option"
+                    *ngIf="row.key !== 'cash' && row.key !== 'credit'"
+                    (click)="removeRow(row)"
+                  >
+                    <div class="text-error">{{ 'tr_action.delete' | translate }}</div>
+                  </div>
+                </div>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      >
+      </pagination>
+    </div>
+
+    <ng-template #emptyMethods>
+      <div class="text-muted text-center ptb-4">{{ 'tr_no_items_found' | translate }}</div>
+    </ng-template>
+
+    <div class="flex flex-end ptb-3" *ngIf="isDialog">
+      <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+        {{ 'tr_cancel' | translate }}
+      </button>
+    </div>
   </div>
 </div>

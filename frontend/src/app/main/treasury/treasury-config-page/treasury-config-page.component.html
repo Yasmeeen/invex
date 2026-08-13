@@ -1,0 +1,8 @@
+<div class="content-shadow bg-white mb-5 treasury-config-page">
+  <div class="treasury-config-page__body" *ngIf="mode === 'treasuries'">
+    <app-purchase-treasury-dialog></app-purchase-treasury-dialog>
+  </div>
+  <div class="treasury-config-page__body" *ngIf="mode === 'payment-methods'">
+    <app-payment-app-fees-dialog></app-payment-app-fees-dialog>
+  </div>
+</div>

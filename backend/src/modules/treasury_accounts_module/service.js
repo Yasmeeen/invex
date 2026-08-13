@@ -1,0 +1,424 @@
+import mongoose from 'mongoose';
+import moment from 'moment-timezone';
+import User from '../../DB/models/user.model.js';
+import Branch from '../../DB/models/branch.model.js';
+import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
+import TreasuryAccountOpening from '../../DB/models/treasuryAccountOpening.model.js';
+import {
+  getEffectiveMoneyAccountsFromDb,
+  settlementBankForAccount,
+} from '../settings_module/moneyAccounts.js';
+import {
+  computeAccountExpectedBalance,
+  computeAccountsExpectedBalances,
+  lastMovementsByAccount,
+  recordTreasuryTransfer,
+  round2,
+  businessDateStr,
+} from '../../utils/treasury-ledger.js';
+
+const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
+const BUSINESS_TZ = 'Africa/Cairo';
+
+async function loadActor(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
+  return User.findById(userId).select('role branch name').lean();
+}
+
+function canViewTreasury(actor) {
+  if (!actor) return false;
+  return (
+    ADMIN_ROLES.includes(actor.role) ||
+    actor.role === 'Branch Manager' ||
+    actor.role === 'Cashier'
+  );
+}
+
+function canSetOpening(actor) {
+  if (!actor) return false;
+  return ADMIN_ROLES.includes(actor.role) || actor.role === 'Branch Manager';
+}
+
+function actorMayUseBranch(actor, branchIdStr) {
+  if (!actor || !branchIdStr) return false;
+  if (ADMIN_ROLES.includes(actor.role)) return true;
+  if (!actor.branch) return false;
+  return String(actor.branch) === String(branchIdStr);
+}
+
+async function resolveBranchParam(actor, branchRaw) {
+  const explicit = String(branchRaw || '').trim();
+  if (explicit && mongoose.Types.ObjectId.isValid(explicit)) {
+    if (!actorMayUseBranch(actor, explicit)) return { error: 'Cannot access this branch' };
+    const exists = await Branch.findById(explicit).select('_id').lean();
+    if (!exists) return { error: 'Branch not found' };
+    return { branchId: new mongoose.Types.ObjectId(explicit) };
+  }
+  if (!ADMIN_ROLES.includes(actor.role) && actor.branch) {
+    return { branchId: new mongoose.Types.ObjectId(String(actor.branch)) };
+  }
+  return { error: 'Valid branch is required' };
+}
+
+export const listTreasuryAccounts = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.body?.userId;
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, req.query.branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const until = String(req.query.until || '').trim() || undefined;
+    if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+      return res.status(400).json({ error: 'until must be YYYY-MM-DD' });
+    }
+
+    const includeSettlement =
+      String(req.query.includeSettlement || '').toLowerCase() === '1' ||
+      String(req.query.includeSettlement || '').toLowerCase() === 'true';
+    let { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    if (!includeSettlement) {
+      moneyAccounts = (moneyAccounts || []).filter((a) => a.kind !== 'settlement');
+    }
+    const keys = (moneyAccounts || []).map((a) => a.key);
+    const [balances, lastByKey] = await Promise.all([
+      computeAccountsExpectedBalances(resolved.branchId, keys, until),
+      lastMovementsByAccount(resolved.branchId, keys),
+    ]);
+    const accounts = (moneyAccounts || []).map((acc) => {
+      const bal = balances.get(acc.key) || {
+        openingBalance: 0,
+        inTotal: 0,
+        outTotal: 0,
+        periodNet: 0,
+        expectedBalance: 0,
+      };
+      return {
+        key: acc.key,
+        label: acc.label,
+        kind: acc.kind,
+        channel: acc.channel || '',
+        accountNumber: acc.accountNumber || '',
+        phone: acc.phone || '',
+        enabled: acc.key === 'cash' ? true : acc.enabled !== false,
+        ...bal,
+        lastMovement: lastByKey.get(acc.key) || null,
+      };
+    });
+
+    res.status(200).json({
+      branch: String(resolved.branchId),
+      until: until || businessDateStr(),
+      accounts,
+    });
+  } catch (error) {
+    console.error('listTreasuryAccounts:', error);
+    res.status(500).json({ error: 'Failed to list treasury accounts' });
+  }
+};
+
+export const getTreasuryAccount = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.body?.userId;
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, req.query.branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const key = String(req.params.key || '')
+      .trim()
+      .toLowerCase();
+    const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    const acc = moneyAccounts.find((a) => a.key === key);
+    if (!acc) return res.status(404).json({ error: 'Account not found' });
+
+    const until = String(req.query.until || '').trim() || undefined;
+    const bal = await computeAccountExpectedBalance(resolved.branchId, key, until);
+
+    res.status(200).json({
+      branch: String(resolved.branchId),
+      account: acc,
+      ...bal,
+    });
+  } catch (error) {
+    console.error('getTreasuryAccount:', error);
+    res.status(500).json({ error: 'Failed to load account' });
+  }
+};
+
+export const listRecentLedger = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.body?.userId;
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, req.query.branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const limit = Math.min(30, Math.max(1, parseInt(req.query.limit, 10) || 8));
+    const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    const labelByKey = Object.fromEntries(
+      (moneyAccounts || []).map((a) => [a.key, a.label || a.key])
+    );
+
+    const rows = await TreasuryLedgerEntry.find({ branch: resolved.branchId })
+      .sort({ occurredAt: -1, createdAt: -1 })
+      .limit(limit)
+      .select(
+        'accountKey direction amount occurredAt sourceType sourceId counterAccountKey note'
+      )
+      .lean();
+
+    res.status(200).json({
+      branch: String(resolved.branchId),
+      entries: (rows || []).map((row) => ({
+        _id: row._id,
+        accountKey: row.accountKey,
+        accountLabel: labelByKey[row.accountKey] || row.accountKey,
+        counterAccountKey: row.counterAccountKey || '',
+        counterAccountLabel: row.counterAccountKey
+          ? labelByKey[row.counterAccountKey] || row.counterAccountKey
+          : '',
+        direction: row.direction,
+        amount: row.amount,
+        occurredAt: row.occurredAt,
+        sourceType: row.sourceType,
+        sourceId: row.sourceId || null,
+        note: row.note || '',
+      })),
+    });
+  } catch (error) {
+    console.error('listRecentLedger:', error);
+    res.status(500).json({ error: 'Failed to load recent ledger' });
+  }
+};
+
+export const listAccountLedger = async (req, res) => {
+  try {
+    const userId = req.query.userId || req.body?.userId;
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, req.query.branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const key = String(req.params.key || '')
+      .trim()
+      .toLowerCase();
+    const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    if (!moneyAccounts.some((a) => a.key === key)) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
+    const skip = (page - 1) * limit;
+
+    const match = {
+      branch: resolved.branchId,
+      accountKey: key,
+    };
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    if (from || to) {
+      match.occurredAt = {};
+      if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) {
+        match.occurredAt.$gte = moment.tz(from, 'YYYY-MM-DD', BUSINESS_TZ).startOf('day').utc().toDate();
+      }
+      if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        match.occurredAt.$lte = moment.tz(to, 'YYYY-MM-DD', BUSINESS_TZ).endOf('day').utc().toDate();
+      }
+    }
+
+    const [total, rows] = await Promise.all([
+      TreasuryLedgerEntry.countDocuments(match),
+      TreasuryLedgerEntry.find(match)
+        .sort({ occurredAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('createdBy', 'name')
+        .lean(),
+    ]);
+
+    res.status(200).json({
+      branch: String(resolved.branchId),
+      accountKey: key,
+      page,
+      limit,
+      total,
+      entries: rows,
+    });
+  } catch (error) {
+    console.error('listAccountLedger:', error);
+    res.status(500).json({ error: 'Failed to load ledger' });
+  }
+};
+
+export const createTreasuryTransfer = async (req, res) => {
+  try {
+    const {
+      userId,
+      branch,
+      fromAccountKey,
+      toAccountKey,
+      amount,
+      note,
+      isSettlement,
+    } = req.body || {};
+
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const result = await recordTreasuryTransfer({
+      branchId: resolved.branchId,
+      fromAccountKey,
+      toAccountKey,
+      amount,
+      sourceType: isSettlement ? 'settlement' : 'transfer',
+      note: String(note || '').trim().slice(0, 2000),
+      createdBy: userId,
+    });
+
+    if (result.error) {
+      const body = { error: result.error };
+      if (result.available != null) body.available = result.available;
+      return res.status(400).json(body);
+    }
+
+    res.status(201).json({
+      transferGroupId: result.transferGroupId,
+      fromAccountKey: String(fromAccountKey).trim().toLowerCase(),
+      toAccountKey: String(toAccountKey).trim().toLowerCase(),
+      amount: round2(amount),
+      outEntryId: result.outEntry?._id,
+      inEntryId: result.inEntry?._id,
+    });
+  } catch (error) {
+    console.error('createTreasuryTransfer:', error);
+    res.status(500).json({ error: 'Failed to create transfer' });
+  }
+};
+
+/**
+ * Settlement shortcut: move amount from settlement receivable → linked bank
+ * (settlementBankAccountKey from paymentMethodAccountMap).
+ */
+export const settleSettlementAccount = async (req, res) => {
+  try {
+    const { userId, branch, amount, note } = req.body || {};
+    const actor = await loadActor(userId);
+    if (!canViewTreasury(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+    const resolved = await resolveBranchParam(actor, branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const key = String(req.params.key || '')
+      .trim()
+      .toLowerCase();
+    const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
+    const account = moneyAccounts.find((a) => a.key === key);
+    if (!account) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    if (account.kind !== 'settlement') {
+      return res.status(400).json({ error: 'Only settlement accounts can use quick settle' });
+    }
+
+    const toAccountKey = settlementBankForAccount(paymentMethodAccountMap, key);
+    if (!toAccountKey) {
+      return res.status(400).json({
+        error: 'No settlement bank linked for this app. Set it in payment method → account map.',
+      });
+    }
+
+    const result = await recordTreasuryTransfer({
+      branchId: resolved.branchId,
+      fromAccountKey: key,
+      toAccountKey,
+      amount,
+      sourceType: 'settlement',
+      note: String(note || '').trim().slice(0, 2000) || `تسوية ${account.label}`,
+      createdBy: userId,
+    });
+
+    if (result.error) {
+      const body = { error: result.error };
+      if (result.available != null) body.available = result.available;
+      return res.status(400).json(body);
+    }
+
+    const fromBal = await computeAccountExpectedBalance(resolved.branchId, key);
+    const toBal = await computeAccountExpectedBalance(resolved.branchId, toAccountKey);
+
+    res.status(201).json({
+      fromAccountKey: key,
+      toAccountKey,
+      amount: round2(amount),
+      fromExpectedBalance: fromBal.expectedBalance,
+      toExpectedBalance: toBal.expectedBalance,
+      transferGroupId: result.transferGroupId,
+    });
+  } catch (error) {
+    console.error('settleSettlementAccount:', error);
+    res.status(500).json({ error: 'Failed to settle account' });
+  }
+};
+
+export const setAccountOpeningBalance = async (req, res) => {
+  try {
+    const { userId, branch, amount, note } = req.body || {};
+    const actor = await loadActor(userId);
+    if (!canSetOpening(actor)) {
+      return res.status(403).json({ error: 'Not allowed to set opening balance' });
+    }
+    const resolved = await resolveBranchParam(actor, branch);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+
+    const key = String(req.params.key || '')
+      .trim()
+      .toLowerCase();
+    const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    if (!moneyAccounts.some((a) => a.key === key)) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const amt = round2(amount);
+    if (!Number.isFinite(amt)) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const doc = await TreasuryAccountOpening.findOneAndUpdate(
+      { branch: resolved.branchId, accountKey: key },
+      {
+        $set: {
+          amount: amt,
+          note: String(note || '').trim().slice(0, 500),
+          setBy: userId,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const bal = await computeAccountExpectedBalance(resolved.branchId, key);
+
+    res.status(200).json({
+      accountKey: key,
+      openingBalance: doc.amount,
+      expectedBalance: bal.expectedBalance,
+    });
+  } catch (error) {
+    console.error('setAccountOpeningBalance:', error);
+    res.status(500).json({ error: 'Failed to set opening balance' });
+  }
+};

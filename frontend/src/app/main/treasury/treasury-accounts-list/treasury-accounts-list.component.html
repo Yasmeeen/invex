@@ -1,0 +1,337 @@
+<div class="tdash" [class.tdash--section]="asSection" not-authorized [notAuthorized]="isNotAuthorized">
+  <header class="tdash__header">
+    <div class="tdash__title-wrap" *ngIf="!asSection">
+      <div class="tdash__title-icon" aria-hidden="true">
+        <i class="fa fa-university"></i>
+      </div>
+      <div>
+        <h1 class="tdash__title">{{ 'tr_treasury_dashboard_title' | translate }}</h1>
+        <p class="tdash__subtitle">{{ 'tr_treasury_dashboard_hint' | translate }}</p>
+      </div>
+    </div>
+
+    <div class="tdash__controls" [class.tdash__controls--end]="asSection">
+      <div class="tdash__control" *ngIf="showBranchFilter">
+        <label class="tdash__control-label">{{ 'tr_branch' | translate }}</label>
+        <ng-select
+          class="s-control s-select"
+          [(ngModel)]="filterBranchId"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          (change)="load()"
+        >
+        </ng-select>
+      </div>
+      <div class="tdash__control">
+        <label class="tdash__control-label">{{ 'tr_treasury_until_date' | translate }}</label>
+        <input class="s-control" type="date" [(ngModel)]="untilDate" (change)="load()" />
+      </div>
+    </div>
+  </header>
+
+  <div class="tdash__loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i>
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <!-- KPI cards -->
+    <section class="tdash-kpis" [attr.aria-label]="'tr_treasury_dashboard_title' | translate">
+      <article class="tdash-kpi" [attr.data-type]="s.type" *ngFor="let s of summaries">
+        <div class="tdash-kpi__icon" aria-hidden="true">
+          <i class="fa" [ngClass]="typeIcon(s.type)"></i>
+        </div>
+        <div class="tdash-kpi__body">
+          <span class="tdash-kpi__label">
+            {{
+              s.type === 'settlement'
+                ? ('tr_treasury_kpi_settlements' | translate)
+                : typeLabel(s.type)
+            }}
+          </span>
+          <span class="tdash-kpi__value">
+            {{ s.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+          </span>
+          <span class="tdash-kpi__meta">
+            {{ s.count }} {{ 'tr_treasury_accounts_count' | translate }}
+          </span>
+        </div>
+      </article>
+
+      <article class="tdash-kpi tdash-kpi--total">
+        <div class="tdash-kpi__icon" aria-hidden="true">
+          <i class="fa fa-pie-chart"></i>
+        </div>
+        <div class="tdash-kpi__body">
+          <span class="tdash-kpi__label">{{ 'tr_treasury_total_balance' | translate }}</span>
+          <span class="tdash-kpi__value">
+            {{ totalBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+          </span>
+          <span class="tdash-kpi__meta">{{ 'tr_treasury_all_accounts' | translate }}</span>
+        </div>
+      </article>
+    </section>
+
+    <div class="tdash-grid">
+      <div class="tdash-grid__main">
+        <!-- Accounts overview -->
+        <section class="tdash-card">
+          <div class="tdash-card__head">
+            <h2 class="tdash-card__title">{{ 'tr_treasury_accounts_overview' | translate }}</h2>
+            <div class="tdash-card__tools">
+              <div class="tdash-search">
+                <i class="fa fa-search" aria-hidden="true"></i>
+                <input
+                  type="search"
+                  class="tdash-search__input"
+                  [(ngModel)]="searchQuery"
+                  (ngModelChange)="onFiltersChanged()"
+                  [placeholder]="'tr_search' | translate"
+                />
+              </div>
+              <select
+                class="tdash-select"
+                [(ngModel)]="typeFilter"
+                (ngModelChange)="onFiltersChanged()"
+              >
+                <option value="">{{ 'tr_treasury_all_types' | translate }}</option>
+                <option value="cash">{{ 'tr_treasury_type_cash' | translate }}</option>
+                <option value="bank">{{ 'tr_treasury_type_bank' | translate }}</option>
+                <option value="wallet">{{ 'tr_treasury_type_wallet' | translate }}</option>
+                <option value="settlement">{{ 'tr_treasury_type_settlement' | translate }}</option>
+              </select>
+              <button type="button" class="s-btn btn-primary tdash-new-btn" (click)="openNewAccount()">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                {{ 'tr_treasury_new_account' | translate }}
+              </button>
+            </div>
+          </div>
+
+          <div class="tdash-table-wrap" *ngIf="filteredAccounts.length; else emptyAccounts">
+            <table class="tdash-table">
+              <thead>
+                <tr>
+                  <th>{{ 'tr_treasury_account' | translate }}</th>
+                  <th>{{ 'tr_treasury_kind' | translate }}</th>
+                  <th>{{ 'tr_treasury_expected' | translate }}</th>
+                  <th>{{ 'tr_status' | translate }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let acc of pagedAccounts">
+                  <td>
+                    <div class="tdash-acc">
+                      <span
+                        class="tdash-acc__icon"
+                        [attr.data-type]="displayType(acc)"
+                        aria-hidden="true"
+                      >
+                        <i class="fa" [ngClass]="typeIcon(displayType(acc))"></i>
+                      </span>
+                      <div>
+                        <div class="tdash-acc__name">{{ acc.label }}</div>
+                        <div class="tdash-acc__ref" *ngIf="accountRef(acc) as ref">{{ ref }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="tdash-badge" [attr.data-type]="displayType(acc)">
+                      {{ typeLabel(displayType(acc)) }}
+                    </span>
+                  </td>
+                  <td class="tdash-balance">
+                    {{ acc.expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td>
+                    <span class="tdash-badge" [class.tdash-badge--active]="acc.enabled !== false" [class.tdash-badge--inactive]="acc.enabled === false">
+                      {{
+                        (acc.enabled !== false
+                          ? 'tr_treasury_status_active'
+                          : 'tr_treasury_status_inactive'
+                        ) | translate
+                      }}
+                    </span>
+                  </td>
+                  <td class="tdash-actions">
+                    <button
+                      type="button"
+                      class="tdash-icon-btn"
+                      (click)="openAccount(acc)"
+                      [attr.title]="'tr_view' | translate"
+                    >
+                      <i class="fa fa-eye" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="tdash-icon-btn"
+                      *ngIf="acc.kind === 'settlement'"
+                      (click)="openQuickSettle(acc)"
+                      [attr.title]="'tr_treasury_quick_settle' | translate"
+                    >
+                      <i class="fa fa-exchange" aria-hidden="true"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="tdash-pager" *ngIf="totalPages > 1">
+              <button
+                type="button"
+                class="tdash-icon-btn"
+                (click)="goPage(-1)"
+                [disabled]="page <= 1"
+              >
+                <i class="fa fa-chevron-left" aria-hidden="true"></i>
+              </button>
+              <span>
+                {{ page }} / {{ totalPages }}
+              </span>
+              <button
+                type="button"
+                class="tdash-icon-btn"
+                (click)="goPage(1)"
+                [disabled]="page >= totalPages"
+              >
+                <i class="fa fa-chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <ng-template #emptyAccounts>
+            <div class="tdash-empty">{{ 'tr_no_items_found' | translate }}</div>
+          </ng-template>
+        </section>
+
+        <div class="tdash-bottom">
+          <!-- Quick actions -->
+          <section class="tdash-card">
+            <div class="tdash-card__head">
+              <h2 class="tdash-card__title">{{ 'tr_treasury_quick_actions' | translate }}</h2>
+            </div>
+            <div class="tdash-actions-grid">
+              <button type="button" class="tdash-action" (click)="openTransfer(false)" [disabled]="!filterBranchId">
+                <span class="tdash-action__icon tdash-action__icon--blue"><i class="fa fa-exchange"></i></span>
+                <span>{{ 'tr_treasury_new_transfer' | translate }}</span>
+              </button>
+              <button type="button" class="tdash-action" (click)="openTransfer(true)" [disabled]="!filterBranchId">
+                <span class="tdash-action__icon tdash-action__icon--orange"><i class="fa fa-handshake-o"></i></span>
+                <span>{{ 'tr_treasury_new_settlement' | translate }}</span>
+              </button>
+              <button type="button" class="tdash-action" (click)="openNewAccount()">
+                <span class="tdash-action__icon tdash-action__icon--green"><i class="fa fa-plus-circle"></i></span>
+                <span>{{ 'tr_treasury_add_account' | translate }}</span>
+              </button>
+              <button type="button" class="tdash-action" (click)="openStatement()">
+                <span class="tdash-action__icon tdash-action__icon--purple"><i class="fa fa-file-text-o"></i></span>
+                <span>{{ 'tr_treasury_account_statement' | translate }}</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Balance by type -->
+          <section class="tdash-card tdash-card--chart">
+            <div class="tdash-card__head">
+              <h2 class="tdash-card__title">{{ 'tr_treasury_balance_by_type' | translate }}</h2>
+            </div>
+            <div class="tdash-chart-row">
+              <div id="treasury-balance-donut" class="tdash-donut"></div>
+              <ul class="tdash-legend">
+                <li *ngFor="let s of summaries">
+                  <span class="tdash-legend__dot" [attr.data-type]="s.type"></span>
+                  <span class="tdash-legend__name">{{ typeLabel(s.type) }}</span>
+                  <span class="tdash-legend__pct">
+                    {{
+                      totalBalance > 0
+                        ? ((s.total / totalBalance) * 100 | number : '1.0-1')
+                        : '0'
+                    }}%
+                  </span>
+                  <span class="tdash-legend__amt">
+                    {{ s.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <aside class="tdash-grid__side">
+        <!-- Recent transactions -->
+        <section class="tdash-card">
+          <div class="tdash-card__head">
+            <h2 class="tdash-card__title">{{ 'tr_treasury_recent_tx' | translate }}</h2>
+          </div>
+          <ul class="tdash-tx" *ngIf="recentEntries.length; else noRecent">
+            <li *ngFor="let entry of recentEntries">
+              <span
+                class="tdash-tx__icon"
+                [class.tdash-tx__icon--in]="entry.direction === 'in'"
+                [class.tdash-tx__icon--out]="entry.direction === 'out'"
+                aria-hidden="true"
+              >
+                <i class="fa" [ngClass]="entry.direction === 'in' ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+              </span>
+              <div class="tdash-tx__body">
+                <div class="tdash-tx__title">{{ sourceLabel(entry.sourceType) }}</div>
+                <div class="tdash-tx__meta">
+                  {{ entry.occurredAt | date : 'dd MMM, HH:mm' }}
+                </div>
+                <div class="tdash-tx__path">{{ movementPath(entry) }}</div>
+              </div>
+              <div
+                class="tdash-tx__amt"
+                [class.tdash-tx__amt--in]="entry.direction === 'in'"
+                [class.tdash-tx__amt--out]="entry.direction === 'out'"
+              >
+                {{ signedAmount(entry) | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+              </div>
+            </li>
+          </ul>
+          <ng-template #noRecent>
+            <div class="tdash-empty tdash-empty--sm">{{ 'tr_no_items_found' | translate }}</div>
+          </ng-template>
+        </section>
+
+        <!-- Settlements summary -->
+        <section class="tdash-card">
+          <div class="tdash-card__head">
+            <h2 class="tdash-card__title">{{ 'tr_treasury_settlements_summary' | translate }}</h2>
+            <button type="button" class="tdash-link-btn" (click)="typeFilter = 'settlement'; onFiltersChanged()">
+              {{ 'tr_view_all' | translate }}
+            </button>
+          </div>
+          <p class="tdash-card__hint">{{ 'tr_treasury_settlements_hint' | translate }}</p>
+          <ul class="tdash-settle" *ngIf="settlementAccounts.length; else noSettle">
+            <li *ngFor="let acc of settlementAccounts">
+              <div>
+                <div class="tdash-settle__name">{{ acc.label }}</div>
+                <div class="tdash-settle__amt">
+                  {{ acc.expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="s-btn btn-primary tdash-settle__btn"
+                (click)="openQuickSettle(acc)"
+                [disabled]="(acc.expectedBalance || 0) <= 0"
+              >
+                {{ 'tr_treasury_quick_settle' | translate }}
+              </button>
+            </li>
+          </ul>
+          <ng-template #noSettle>
+            <div class="tdash-empty tdash-empty--sm">{{ 'tr_no_items_found' | translate }}</div>
+          </ng-template>
+          <div class="tdash-settle-total" *ngIf="settlementAccounts.length">
+            <span>{{ 'tr_treasury_pending_total' | translate }}</span>
+            <strong>{{ pendingSettlementsTotal | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </ng-container>
+</div>

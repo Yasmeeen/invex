@@ -1,0 +1,95 @@
+<div class="ma-form">
+  <h2 class="ma-form__title">{{ titleKey | translate }}</h2>
+
+  <div class="ma-form__body">
+    <label class="ma-form__field">
+      <span>{{ 'tr_purchase_treasury_display_name' | translate }}</span>
+      <input
+        type="text"
+        class="s-control width-100"
+        [(ngModel)]="label"
+        name="maLabel"
+        maxlength="120"
+        autocomplete="off"
+        [attr.placeholder]="isCash ? ('tr_treasury_cash' | translate) : ('tr_purchase_treasury_display_name' | translate)"
+      />
+    </label>
+
+    <ng-container *ngIf="!isCash">
+      <label class="ma-form__field">
+        <span>{{ 'tr_money_account_channel' | translate }}</span>
+        <select
+          class="s-control width-100"
+          [(ngModel)]="channel"
+          name="maChannel"
+          (ngModelChange)="onChannelChange($event)"
+        >
+          <option value="bank">{{ 'tr_money_account_channel_bank' | translate }}</option>
+          <option value="wallet">{{ 'tr_money_account_channel_wallet' | translate }}</option>
+        </select>
+      </label>
+
+      <label class="ma-form__field" *ngIf="channel === 'bank'">
+        <span>{{ 'tr_money_account_number' | translate }}</span>
+        <input
+          type="text"
+          class="s-control width-100"
+          [(ngModel)]="accountNumber"
+          name="maAccNum"
+          maxlength="80"
+          autocomplete="off"
+          [attr.placeholder]="'tr_money_account_number_placeholder' | translate"
+        />
+      </label>
+
+      <label class="ma-form__field" *ngIf="channel === 'wallet'">
+        <span>{{ 'tr_money_account_phone' | translate }}</span>
+        <input
+          type="tel"
+          class="s-control width-100"
+          [(ngModel)]="phone"
+          name="maPhone"
+          maxlength="40"
+          autocomplete="off"
+          [attr.placeholder]="'tr_money_account_phone_placeholder' | translate"
+        />
+      </label>
+    </ng-container>
+
+    <div class="ma-form__field ma-form__field--toggle" *ngIf="!isCash">
+      <div class="ma-form__toggle-row">
+        <div>
+          <span class="ma-form__toggle-label">{{ 'tr_status' | translate }}</span>
+          <small class="ma-form__hint">
+            {{
+              (enabled ? 'tr_treasury_status_active' : 'tr_treasury_status_inactive') | translate
+            }}
+          </small>
+        </div>
+        <span class="s-checkbox-slider">
+          <input
+            type="checkbox"
+            id="maEnabledToggle"
+            [(ngModel)]="enabled"
+            name="maEnabled"
+          />
+          <label for="maEnabledToggle">
+            <span class="slider">
+              <span class="slider-bg"></span>
+              <span class="slider-handle"></span>
+            </span>
+          </label>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ma-form__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="!label.trim()">
+      {{ 'tr_save_settings' | translate }}
+    </button>
+  </div>
+</div>

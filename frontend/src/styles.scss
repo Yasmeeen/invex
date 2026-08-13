@@ -412,6 +412,38 @@ body[dir=rtl] {
   background: rgba(15, 23, 42, 0.22);
 }
 
+.cdk-overlay-backdrop.payment-method-form-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.payment-method-form-dialog-panel {
+  box-shadow: none;
+}
+
+.payment-method-form-dialog-panel .mat-dialog-container,
+.payment-method-form-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
+.cdk-overlay-backdrop.money-account-form-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.money-account-form-dialog-panel {
+  box-shadow: none;
+}
+
+.money-account-form-dialog-panel .mat-dialog-container,
+.money-account-form-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
 .cdk-overlay-backdrop.payment-splits-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

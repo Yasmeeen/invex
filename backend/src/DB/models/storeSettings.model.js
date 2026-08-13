@@ -12,6 +12,76 @@ const purchaseTreasuryMethodEntry = new mongoose.Schema(
   { _id: false }
 );
 
+/** Unified money accounts: cash drawer, bank/wallet treasuries, app settlement receivables. */
+const moneyAccountEntry = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true, maxlength: 40 },
+    label: { type: String, required: true, trim: true, maxlength: 120 },
+    /** cash = drawer; treasury = bank/wallet; settlement = app pending payout (aman/valu/…). */
+    kind: {
+      type: String,
+      enum: ['cash', 'treasury', 'settlement'],
+      required: true,
+      default: 'treasury',
+    },
+    /** For treasury kind: bank vs mobile wallet (optional for cash/settlement). */
+    channel: {
+      type: String,
+      enum: ['bank', 'wallet', ''],
+      default: '',
+    },
+    /** Optional bank account number (when channel=bank). */
+    accountNumber: { type: String, trim: true, maxlength: 80, default: '' },
+    /** Optional wallet phone number (when channel=wallet). */
+    phone: { type: String, trim: true, maxlength: 40, default: '' },
+    /** When false, account is inactive in UI pickers (cash stays always enabled). */
+    enabled: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
+/** Unified payment method catalog (sale / purchase / both + effect + sale-only fee). */
+const paymentMethodCatalogEntry = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true, maxlength: 40 },
+    label: { type: String, required: true, trim: true, maxlength: 120 },
+    /** Where the method appears in pickers. */
+    showIn: {
+      type: String,
+      enum: ['sale', 'purchase', 'both'],
+      required: true,
+      default: 'sale',
+    },
+    /** instant → wallet/bank; settlement → app receivable; none → credit (no treasury). */
+    effectMode: {
+      type: String,
+      enum: ['instant', 'settlement', 'none'],
+      required: true,
+      default: 'instant',
+    },
+    /** Sale/cashier app surcharge only (ignored for purchase). */
+    feePercent: { type: Number, default: 0, min: 0, max: 100 },
+  },
+  { _id: false }
+);
+
+/** Cashier payment method → money account that receives the funds. */
+const paymentMethodAccountMapEntry = new mongoose.Schema(
+  {
+    method: { type: String, required: true, trim: true, maxlength: 40 },
+    accountKey: { type: String, required: true, trim: true, maxlength: 40 },
+    /** instant | settlement — legacy rows without mode are inferred on read. */
+    mode: {
+      type: String,
+      enum: ['instant', 'settlement'],
+      required: false,
+    },
+    /** Bank/wallet that receives app settlement payout (settlement mode only). */
+    settlementBankAccountKey: { type: String, trim: true, maxlength: 40, default: '' },
+  },
+  { _id: false }
+);
+
 const paymentAppFeePercentEntry = new mongoose.Schema(
   {
     /** Same ids as cashier payment splits (fawry, valu, aman, …). */
@@ -41,6 +111,27 @@ const storeSettingsSchema = new mongoose.Schema(
      */
     purchaseTreasuryMethods: {
       type: [purchaseTreasuryMethodEntry],
+      default: [],
+    },
+    /**
+     * All balance-bearing accounts (cash + banks/wallets + settlement apps).
+     * Empty → API seeds from purchaseTreasuryMethods + default settlement apps.
+     */
+    moneyAccounts: {
+      type: [moneyAccountEntry],
+      default: [],
+    },
+    /**
+     * Unified payment methods (visibility + effect + sale fee%).
+     * Empty → API migrates from paymentAppFeePercents + purchaseTreasuryMethods + defaults.
+     */
+    paymentMethodsCatalog: {
+      type: [paymentMethodCatalogEntry],
+      default: [],
+    },
+    /** Cashier payment method → which moneyAccounts.key receives the money. */
+    paymentMethodAccountMap: {
+      type: [paymentMethodAccountMapEntry],
       default: [],
     },
     /** Cashier: gross → net allocation per payment app (customer pays net × (1 + percent/100)). */

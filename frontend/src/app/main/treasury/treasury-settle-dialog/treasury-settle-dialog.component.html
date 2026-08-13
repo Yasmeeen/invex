@@ -1,0 +1,70 @@
+<div class="settle-dialog">
+  <h2 class="settle-dialog__title">{{ 'tr_treasury_quick_settle' | translate }}</h2>
+  <p class="settle-dialog__hint">{{ 'tr_treasury_quick_settle_hint' | translate }}</p>
+
+  <div class="settle-dialog__body">
+    <label class="settle-dialog__field">
+      <span>{{ 'tr_payment_methods_fees_col_method' | translate }}</span>
+      <div class="s-control settle-dialog__readonly">{{ methodLabel }}</div>
+    </label>
+
+    <label class="settle-dialog__field" *ngIf="showBranchPicker">
+      <span>{{ 'tr_branch' | translate }}</span>
+      <ng-select
+        class="s-control s-select"
+        [(ngModel)]="branchId"
+        [items]="branches"
+        bindLabel="name"
+        bindValue="_id"
+        [clearable]="false"
+        name="settleBranch"
+        (change)="onBranchChanged()"
+      >
+      </ng-select>
+    </label>
+
+    <label class="settle-dialog__field">
+      <span>{{ 'tr_payment_settlement_bank' | translate }}</span>
+      <div class="s-control settle-dialog__readonly">{{ bankLabel || '—' }}</div>
+      <small class="settle-dialog__warn" *ngIf="!bankKey">
+        {{ 'tr_payment_settle_need_bank' | translate }}
+      </small>
+    </label>
+
+    <label class="settle-dialog__field">
+      <span>{{ 'tr_daily_expense_amount' | translate }}</span>
+      <input
+        class="s-control"
+        type="number"
+        min="0"
+        step="0.01"
+        [(ngModel)]="amount"
+        name="settleAmount"
+      />
+      <small class="settle-dialog__meta" *ngIf="pendingBalance !== null">
+        {{ 'tr_treasury_available_balance' | translate }}:
+        {{ pendingBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+      </small>
+      <small class="settle-dialog__warn" *ngIf="fromHasNoBalance">
+        {{ 'tr_treasury_transfer_no_balance' | translate }}
+      </small>
+      <small class="settle-dialog__warn" *ngIf="amountExceedsBalance">
+        {{ 'tr_treasury_transfer_insufficient' | translate : { amount: pendingBalanceLabel } }}
+      </small>
+    </label>
+
+    <label class="settle-dialog__field">
+      <span>{{ 'tr_daily_expense_notes' | translate }}</span>
+      <input class="s-control" type="text" [(ngModel)]="note" name="settleNote" maxlength="500" />
+    </label>
+  </div>
+
+  <div class="settle-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="cannotSubmit">
+      {{ 'tr_treasury_quick_settle' | translate }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,35 @@
+@import '../settings-dialog-shared.scss';
+
+.settlement-accounts-table__head,
+.settlement-accounts-table__row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.settlement-accounts-table__head > span:nth-child(1),
+.settlement-accounts-table__row > .s-control:nth-child(1) {
+  flex: 0 0 8rem;
+  width: 8rem;
+  min-width: 0;
+}
+
+.settlement-accounts-table__head > span:nth-child(2),
+.settlement-accounts-table__row > .s-control:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settlement-accounts-table__actions {
+  flex: 0 0 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settlement-accounts-table__head > span:nth-child(3) {
+  flex: 0 0 2.25rem;
+}

@@ -228,10 +228,11 @@ $shell-icon-active: darken($shell-icon, 6%);
                 }
 
                 .children-arrow {
-                    position: absolute;
-                    top: 0;
-                    height: 100%;
-                    width: 2.5rem;
+                    position: relative;
+                    flex-shrink: 0;
+                    width: 1.15rem;
+                    height: 1.15rem;
+                    margin-inline-start: 0.15rem;
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
@@ -239,7 +240,7 @@ $shell-icon-active: darken($shell-icon, 6%);
                     color: $shell-icon;
                     cursor: pointer;
                     transition: transform 0.25s ease, color 0.2s ease;
-                    z-index: 2;
+                    transform-origin: center center;
 
                     &:hover {
                         color: $shell-icon-hover;
@@ -293,12 +294,10 @@ $shell-icon-active: darken($shell-icon, 6%);
                 }
             }
 
-            .children-active,
-            .active-link,
-            .child-active {
-                > .children-arrow {
-                    transform: rotate(-180deg);
-                }
+            .children-active .children-arrow,
+            .active-link > div > .link-content > .children-arrow,
+            .active-link > div > a .children-arrow {
+                transform: rotate(-180deg);
             }
         }
 
@@ -393,7 +392,7 @@ $shell-icon-active: darken($shell-icon, 6%);
         display: inline-block !important;
     }
 
-    .children-arrow {
+    .app-sidebar .main-routing-links .anchor-container .children-arrow {
         display: none;
     }
 
@@ -412,6 +411,71 @@ $shell-icon-active: darken($shell-icon, 6%);
     }
 }
 
+@media (min-width: 992px) {
+    :host-context(.main-container--sidebar-collapsed) {
+        overflow: visible;
+        position: relative;
+        z-index: 12;
+    }
+
+    :host-context(.main-container--sidebar-collapsed):hover {
+        z-index: 40;
+    }
+
+    .main-sidebar.main-sidebar--collapsed:hover {
+        width: var(--app-sidebar-width, 250px);
+        max-width: var(--app-sidebar-width, 250px);
+        z-index: 40;
+        box-shadow: 0 20px 55px rgba(108, 92, 231, 0.18);
+
+        .logo-container {
+            justify-content: flex-start;
+        }
+
+        .logo-container__text,
+        .sidebar-user-card__meta,
+        .main-icon-text {
+            display: block;
+        }
+
+        .sidebar-user-card {
+            justify-content: flex-start;
+            padding: 0.85rem 1rem;
+            margin-inline: 1rem;
+        }
+
+        .app-sidebar .main-routing-links .anchor-container .children-arrow {
+            display: inline-flex;
+        }
+
+        .child-menu {
+            display: block !important;
+        }
+
+        .sidebar-pending-badge:not(.sidebar-pending-badge--on-icon) {
+            display: inline-block;
+        }
+
+        .sidebar-pending-badge--on-icon {
+            display: none !important;
+        }
+
+        .main-routing-links .anchor-container .link-content {
+            justify-content: flex-start;
+            padding-left: 0.9rem !important;
+            padding-right: 0.9rem !important;
+        }
+
+        .anchor-container--parent:hover > .child-menu,
+        .anchor-container--parent.children-active > .child-menu,
+        .anchor-container--parent.active-link > .child-menu {
+            max-height: 600px;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+    }
+}
+
 .main-routing-links .anchor-container > div > a:hover .link-content,
 .main-routing-links .anchor-container .link-content--nonav:hover {
     background: rgba(108, 92, 231, 0.07);
@@ -422,8 +486,7 @@ $shell-icon-active: darken($shell-icon, 6%);
     .main-sidebar .app-sidebar {
         .main-routing-links {
                 .children-arrow {
-                    #{$end}: 0;
-                    padding-#{$end}: 1rem;
+                    padding-#{$end}: 0;
                 }
 
                 .child-menu {

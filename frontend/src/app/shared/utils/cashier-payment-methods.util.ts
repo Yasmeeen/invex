@@ -5,6 +5,7 @@ import {
 } from '@shared/constants/payment-method-options';
 import {
   PaymentAppFeePercent,
+  PaymentMethodCatalogRow,
   RECEIPT_LANGUAGE_CODES,
   ReceiptLanguageCode,
 } from '@shared/services/store-settings.service';
@@ -36,6 +37,7 @@ export const CASHIER_PAYMENT_LOGOS: Record<string, string> = {
   fawry: 'assets/images/payment/fawry.svg',
   vodafone_cash: 'assets/images/payment/vodafone-cash.svg',
   instapay: 'assets/images/payment/instapay.svg',
+  etisalat_cash: 'assets/images/payment/cash.svg',
 };
 
 const DEFAULT_LOGO = 'assets/images/payment/cash.svg';
@@ -84,15 +86,38 @@ function defaultLabelForMethod(
   return m.replace(/_/g, ' ');
 }
 
+function showsInSale(showIn: string | undefined): boolean {
+  return showIn === 'sale' || showIn === 'both' || !showIn;
+}
+
 /**
- * Cashier + lists: cash & credit first, then store-configured methods, then catalog fallbacks.
+ * Cashier + lists: prefer unified catalog (sale/both), else fees + static fallback.
  */
 export function buildCashierPaymentMethods(
   fees: PaymentAppFeePercent[] | undefined | null,
-  translate: TranslateService
+  translate: TranslateService,
+  catalog?: PaymentMethodCatalogRow[] | null
 ): CashierPaymentMethod[] {
   const seen = new Set<string>();
   const out: CashierPaymentMethod[] = [];
+
+  const catalogSale = (catalog || []).filter(
+    (r) => r?.key && !HIDDEN_METHODS.has(r.key) && showsInSale(r.showIn)
+  );
+
+  if (catalogSale.length) {
+    for (const row of catalogSale) {
+      const id = String(row.key).trim().toLowerCase();
+      if (!id || seen.has(id)) continue;
+      out.push({
+        id,
+        label: String(row.label || '').trim() || defaultLabelForMethod(id, translate),
+        logo: paymentLogo(id),
+      });
+      seen.add(id);
+    }
+    return out;
+  }
 
   for (const id of ['cash', 'credit']) {
     out.push({
@@ -135,11 +160,16 @@ export function paymentMethodDisplayLabel(
   methodId: string | undefined | null,
   fees: PaymentAppFeePercent[] | undefined | null,
   translate: TranslateService,
-  lang?: string
+  lang?: string,
+  catalog?: PaymentMethodCatalogRow[] | null
 ): string {
   const m = String(methodId || '').trim().toLowerCase();
   if (!m) {
     return '—';
+  }
+  const cat = (catalog || []).find((x) => x.key === m);
+  if (cat?.label && String(cat.label).trim()) {
+    return String(cat.label).trim();
   }
   const row = (fees || []).find((x) => x.method === m);
   if (row?.label && String(row.label).trim()) {

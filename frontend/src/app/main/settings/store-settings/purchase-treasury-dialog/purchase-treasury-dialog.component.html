@@ -1,58 +1,277 @@
-<div class="purchase-treasury-dialog">
-  <h2 mat-dialog-title class="purchase-treasury-dialog__title">
-    {{ 'tr_purchase_treasury_settings_title' | translate }}
+<div class="money-accounts-page" [class.money-accounts-page--dialog]="isDialog">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_money_accounts_settings_title' | translate }}</span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button
+        type="button"
+        class="s-btn btn-secondary btn-sm"
+        (click)="openTransfer()"
+        [disabled]="saving || !singleBranchId"
+      >
+        <i class="fa fa-exchange mr-1"></i>{{ 'tr_treasury_transfer' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-primary btn-sm"
+        (click)="openAdd()"
+        [disabled]="saving"
+      >
+        <i class="fa fa-plus mr-1"></i>{{ 'tr_money_accounts_add' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="isFilterOpen = !isFilterOpen"
+      >
+        <i class="fa fa-filter text-primary"></i>
+      </button>
+    </div>
   </h2>
 
-  <div mat-dialog-content class="purchase-treasury-dialog__content">
-    <div class="purchase-treasury-dialog__scroll">
-    <p class="purchase-treasury-dialog__lead">{{ 'tr_purchase_treasury_settings_hint' | translate }}</p>
-
-    <div class="settings-dialog-table purchase-treasury-table">
-      <div class="settings-dialog-table__head purchase-treasury-table__head">
-        <span>{{ 'tr_purchase_treasury_display_name' | translate }}</span>
-        <span></span>
-      </div>
-      <div
-        class="settings-dialog-table__row purchase-treasury-table__row"
-        *ngFor="let row of treasuryRows; let i = index"
-      >
-        <div class="purchase-treasury-table__name-cell">
-          <input
-            type="text"
-            class="s-control settings-dialog-table__label"
-            [(ngModel)]="row.label"
-            [name]="'ptDisplay_' + i"
-            maxlength="120"
-            autocomplete="off"
-            [attr.placeholder]="row.key === 'cash' ? ('tr_treasury_cash' | translate) : ''"
-          />
-        </div>
-        <div class="purchase-treasury-table__actions">
-          <button
-            type="button"
-            class="s-btn btn-secondary btn-sm settings-dialog-table__remove"
-            (click)="removeRow(i)"
-            [disabled]="row.key === 'cash'"
-            [attr.title]="'tr_remove' | translate"
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-4" *ngIf="isFilterOpen">
+    <div class="row flex-wrap">
+      <div class="col-md-4" *ngIf="showBranchFilter">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [multiple]="true"
+            [closeOnSelect]="false"
+            [searchable]="true"
+            [clearable]="true"
+            appendTo="body"
+            [(ngModel)]="selectedBranchIds"
+            name="moneyAccountBranchIds"
+            [placeholder]="'tr_money_accounts_all_branches' | translate"
+            (ngModelChange)="onBranchChanged()"
           >
-            <i class="fa fa-trash-o"></i>
-          </button>
+          </ng-select>
         </div>
       </div>
-    </div>
-
-    <button type="button" class="s-btn btn-secondary btn-sm mt-2" (click)="addRow()">
-      <i class="fa fa-plus mr-1"></i>{{ 'tr_purchase_treasury_add' | translate }}
-    </button>
+      <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_search' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              type="search"
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="onFiltersChanged()"
+              [placeholder]="'tr_money_accounts_search_placeholder' | translate"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_money_account_channel' | translate }}</label>
+          <select
+            class="s-control width-100"
+            [(ngModel)]="channelFilter"
+            (ngModelChange)="onFiltersChanged()"
+          >
+            <option value="">{{ 'tr_money_accounts_all_types' | translate }}</option>
+            <option value="cash">{{ 'tr_treasury_type_cash' | translate }}</option>
+            <option value="bank">{{ 'tr_money_account_channel_bank' | translate }}</option>
+            <option value="wallet">{{ 'tr_money_account_channel_wallet' | translate }}</option>
+            <option value="settlement">{{ 'tr_treasury_type_settlement' | translate }}</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div mat-dialog-actions align="end" class="purchase-treasury-dialog__actions">
-    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
-      {{ 'tr_cancel' | translate }}
-    </button>
-    <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">
-      {{ 'tr_save_settings' | translate }}
-    </button>
+  <section
+    class="money-accounts-kpis plr-4"
+    *ngIf="listReady"
+    [attr.aria-label]="'tr_treasury_total_balance' | translate"
+  >
+    <article
+      class="money-accounts-kpi"
+      *ngFor="let s of summaries"
+      [attr.data-type]="s.type"
+      [class.is-active]="channelFilter === s.type"
+      role="button"
+      tabindex="0"
+      (click)="selectKpi(s.type)"
+      (keydown.enter)="selectKpi(s.type)"
+    >
+      <div class="money-accounts-kpi__icon" aria-hidden="true">
+        <i class="fa" [ngClass]="s.icon"></i>
+      </div>
+      <div class="money-accounts-kpi__body">
+        <span class="money-accounts-kpi__label">{{ s.labelKey | translate }}</span>
+        <span class="money-accounts-kpi__value">
+          {{ s.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+        </span>
+        <span class="money-accounts-kpi__meta">
+          {{ s.count }} {{ 'tr_treasury_accounts_count' | translate }}
+        </span>
+      </div>
+    </article>
+    <article
+      class="money-accounts-kpi money-accounts-kpi--total"
+      [class.is-active]="!channelFilter"
+      role="button"
+      tabindex="0"
+      (click)="selectKpi('')"
+      (keydown.enter)="selectKpi('')"
+    >
+      <div class="money-accounts-kpi__icon" aria-hidden="true">
+        <i class="fa fa-pie-chart"></i>
+      </div>
+      <div class="money-accounts-kpi__body">
+        <span class="money-accounts-kpi__label">{{ 'tr_treasury_total_balance' | translate }}</span>
+        <span class="money-accounts-kpi__value">
+          {{ totalBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+        </span>
+        <span class="money-accounts-kpi__meta">
+          {{ totalAccountsCount }} {{ 'tr_treasury_all_accounts' | translate }}
+        </span>
+      </div>
+    </article>
+  </section>
+
+  <div class="plr-4 mt-2" *ngIf="!listReady">
+    <div class="text-muted text-center ptb-4">{{ 'tr_loading' | translate }}</div>
+  </div>
+
+  <div class="plr-4 mt-2" *ngIf="listReady">
+    <div class="table-container" *ngIf="filteredRows.length; else emptyAccounts">
+      <table class="s-table table layout-fixed money-accounts-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_treasury_account' | translate }}</th>
+            <th>{{ 'tr_money_account_channel' | translate }}</th>
+            <th>{{ 'tr_money_account_ref' | translate }}</th>
+            <th>{{ 'tr_money_account_current_balance' | translate }}</th>
+            <th>{{ 'tr_status' | translate }}</th>
+            <th>{{ 'tr_actions' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of pagedRows">
+            <td>
+              <div class="money-accounts-table__acc">
+                <span
+                  class="money-accounts-table__icon"
+                  [attr.data-channel]="rowDisplayChannel(row)"
+                  aria-hidden="true"
+                >
+                  <i class="fa" [ngClass]="channelIcon(row)"></i>
+                </span>
+                <span>{{ row.label }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="money-accounts-table__badge" [attr.data-type]="rowDisplayChannel(row)">
+                {{ typeLabelKey(row) | translate }}
+              </span>
+            </td>
+            <td>
+              <ng-container [ngSwitch]="rowDisplayChannel(row)">
+                <span *ngSwitchCase="'bank'">{{ row.accountNumber || '—' }}</span>
+                <span *ngSwitchCase="'wallet'">{{ row.phone || '—' }}</span>
+                <span *ngSwitchDefault>—</span>
+              </ng-container>
+            </td>
+            <td>
+              <ng-container *ngIf="row.expectedBalance !== null; else balLoading">
+                {{ row.expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+              </ng-container>
+              <ng-template #balLoading>
+                {{ loadingBalances ? '…' : '—' }}
+              </ng-template>
+            </td>
+            <td>
+              <span
+                class="money-accounts-table__badge"
+                [class.money-accounts-table__badge--active]="row.enabled !== false"
+                [class.money-accounts-table__badge--inactive]="row.enabled === false"
+              >
+                {{
+                  (row.enabled !== false
+                    ? 'tr_treasury_status_active'
+                    : 'tr_treasury_status_inactive'
+                  ) | translate
+                }}
+              </span>
+            </td>
+            <td class="money-accounts-table__actions">
+              <span class="options-menu">
+                <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                <div class="options-menu-container p-0">
+                  <div class="single-option" *ngIf="canManageRow(row)" (click)="openEdit(row)">
+                    {{ 'tr_action.edit' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="row.kind === 'settlement' && singleBranchId"
+                    (click)="openQuickSettle(row)"
+                  >
+                    {{ 'tr_treasury_quick_settle' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="singleBranchId"
+                    (click)="openStatement(row)"
+                  >
+                    {{ 'tr_treasury_account_statement' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
+                    *ngIf="canManageRow(row)"
+                    (click)="toggleEnabled(row)"
+                  >
+                    {{
+                      (row.enabled !== false
+                        ? 'tr_money_account_deactivate'
+                        : 'tr_money_account_activate'
+                      ) | translate
+                    }}
+                  </div>
+                  <div class="border-bottom" *ngIf="canManageRow(row)"></div>
+                  <div
+                    class="single-option"
+                    *ngIf="canManageRow(row)"
+                    (click)="removeRow(row)"
+                  >
+                    <div class="text-error">{{ 'tr_action.delete' | translate }}</div>
+                  </div>
+                </div>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      >
+      </pagination>
+    </div>
+
+    <ng-template #emptyAccounts>
+      <div class="text-muted text-center ptb-4">{{ 'tr_no_items_found' | translate }}</div>
+    </ng-template>
+
+    <div class="flex flex-middle flex-end ptb-3" *ngIf="isDialog">
+      <button
+        type="button"
+        class="s-btn btn-secondary"
+        (click)="cancel()"
+        [disabled]="saving"
+      >
+        {{ 'tr_cancel' | translate }}
+      </button>
+    </div>
   </div>
 </div>

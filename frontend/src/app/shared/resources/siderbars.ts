@@ -5,61 +5,64 @@ export const AdminSidebar = [
     icon: 'fa fa-tachometer icon',
   },
   {
-    name: 'tr_products',
-    routerLink: '/products',
-    icon: 'fa fa-cube icon',
-  },
-  {
-    name: 'tr_branch_transfers_pending',
-    routerLink: '/products/branch-transfers',
-    icon: 'fa fa-exchange icon',
-  },
-  {
-    name: 'tr_serial_track',
-    routerLink: '/products/serial-track',
-    icon: 'fa fa-barcode icon',
-  },
-  {
-    name: 'tr_inventory',
-    routerLink: '/inventory',
+    name: 'tr_sidebar_inventory_products',
+    routerLink: 'null',
     icon: 'fa fa-cubes icon',
+    children: [
+      {
+        name: 'tr_products',
+        routerLink: '/products',
+        icon: 'fa fa-cube icon',
+      },
+      {
+        name: 'tr_inventory',
+        routerLink: '/inventory',
+        icon: 'fa fa-cubes icon',
+      },
+      {
+        name: 'tr_serial_track',
+        routerLink: '/products/serial-track',
+        icon: 'fa fa-barcode icon',
+      },
+      {
+        name: 'tr_branch_transfers_pending',
+        routerLink: '/products/branch-transfers',
+        icon: 'fa fa-exchange icon',
+      },
+      {
+        name: 'tr_categories',
+        routerLink: '/categories',
+        icon: 'fa fa-tags icon',
+      },
+    ],
   },
   {
-    name: 'tr_users',
-    routerLink: '/users',
-    icon: 'fa fa-users icon',
-  },
-  {
-    name: 'tr_branches',
-    routerLink: '/branches',
-    icon: 'fa fa-building icon',
-  },
-  {
-    name: 'tr_categories',
-    routerLink: '/categories',
-    icon: 'fa fa-tags icon',
-  },
-  {
-    name: 'tr_store_settings_menu',
-    routerLink: '/settings',
-    icon: 'fa fa-wrench icon',
-  },
-  {
-    name: 'tr_cashier.TITLE',
-    routerLink: '/cashier',
+    name: 'tr_sidebar_sales_cashier',
+    routerLink: 'null',
     icon: 'fa fa-credit-card icon',
+    children: [
+      {
+        name: 'tr_cashier.TITLE',
+        routerLink: '/cashier',
+        icon: 'fa fa-credit-card icon',
+      },
+      {
+        name: 'tr_orders',
+        routerLink: '/orders',
+        icon: 'fa fa-list-alt icon',
+      },
+      {
+        name: 'tr_daily_expenses_menu',
+        routerLink: '/expenses',
+        icon: 'fa fa-money icon',
+      },
+      {
+        name: 'tr_drawer_close_history_menu',
+        routerLink: '/drawer-close',
+        icon: 'fa fa-inbox icon',
+      },
+    ],
   },
-  {
-    name: 'tr_daily_expenses_menu',
-    routerLink: '/expenses',
-    icon: 'fa fa-money icon',
-  },
-  {
-    name: 'tr_drawer_close_history_menu',
-    routerLink: '/drawer-close',
-    icon: 'fa fa-inbox icon',
-  },
-
   {
     name: 'tr_purchases',
     routerLink: 'null',
@@ -79,13 +82,25 @@ export const AdminSidebar = [
         name: 'tr_purchases',
         routerLink: '/purchasing',
         icon: 'fa fa-file-text-o icon',
-      }
-    ]
+      },
+    ],
   },
   {
-    name: 'tr_orders',
-    routerLink: '/orders',
-    icon: 'fa fa-list-alt icon',
+    name: 'tr_treasury_menu',
+    routerLink: 'null',
+    icon: 'fa fa-university icon',
+    children: [
+      {
+        name: 'tr_money_accounts_settings_title',
+        routerLink: '/treasury/config/treasuries',
+        icon: 'fa fa-university icon',
+      },
+      {
+        name: 'tr_payment_methods_catalog_title',
+        routerLink: '/treasury/config/payment-methods',
+        icon: 'fa fa-credit-card icon',
+      },
+    ],
   },
   {
     name: 'tr_reports',
@@ -106,19 +121,38 @@ export const AdminSidebar = [
       },
     ],
   },
-
   {
-    name: 'tr_audit_title',
-    routerLink: '/audits',
-    icon: 'fa fa-history icon',
+    name: 'tr_sidebar_administration',
+    routerLink: 'null',
+    icon: 'fa fa-cogs icon',
+    children: [
+      {
+        name: 'tr_users',
+        routerLink: '/users',
+        icon: 'fa fa-users icon',
+      },
+      {
+        name: 'tr_branches',
+        routerLink: '/branches',
+        icon: 'fa fa-building icon',
+      },
+      {
+        name: 'tr_store_settings_menu',
+        routerLink: '/settings',
+        icon: 'fa fa-wrench icon',
+      },
+      {
+        name: 'tr_audit_title',
+        routerLink: '/audits',
+        icon: 'fa fa-history icon',
+      },
+    ],
   },
   {
     name: 'tr_vixa',
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
-
-
 ];
 
 /** Co Admin: full admin menu except dashboard (/home) and profit report. */
@@ -134,17 +168,16 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
   }
 );
 
-/** Branch Manager: like Co Admin but no branches, settings, or users. */
+/** Branch Manager: like Co Admin but no administration group.
+ *  Treasury config (accounts / payment methods) is admin-only.
+ *  Accounts dashboard lives on /home (admin); no separate /treasury menu entry.
+ */
 export const BranchManagerSidebar = CoAdminSidebar.filter(
   (item) =>
-    item.routerLink !== '/branches' &&
-    item.routerLink !== '/settings' &&
-    item.routerLink !== '/users' &&
-    item.routerLink !== '/audits'
+    item.name !== 'tr_sidebar_administration' && item.name !== 'tr_treasury_menu'
 );
 
 export const Cashier = [
-
   {
     name: 'tr_orders',
     routerLink: '/orders',
@@ -170,41 +203,46 @@ export const Cashier = [
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
-
 ];
 
 /** Formerly Operation Manager — orders, inventory, products, branches, categories, reports. */
 export const Warehouse = [
-
+  {
+    name: 'tr_sidebar_inventory_products',
+    routerLink: 'null',
+    icon: 'fa fa-cubes icon',
+    children: [
+      {
+        name: 'tr_products',
+        routerLink: '/products',
+        icon: 'fa fa-cube icon',
+      },
+      {
+        name: 'tr_inventory',
+        routerLink: '/inventory',
+        icon: 'fa fa-cubes icon',
+      },
+      {
+        name: 'tr_serial_track',
+        routerLink: '/products/serial-track',
+        icon: 'fa fa-barcode icon',
+      },
+      {
+        name: 'tr_categories',
+        routerLink: '/categories',
+        icon: 'fa fa-tags icon',
+      },
+    ],
+  },
   {
     name: 'tr_orders',
     routerLink: '/orders',
     icon: 'fa fa-list-alt icon',
   },
   {
-    name: 'tr_inventory',
-    routerLink: '/inventory',
-    icon: 'fa fa-cubes icon',
-  },
-  {
-    name: 'tr_products',
-    routerLink: '/products',
-    icon: 'fa fa-cube icon',
-  },
-  {
-    name: 'tr_serial_track',
-    routerLink: '/products/serial-track',
-    icon: 'fa fa-barcode icon',
-  },
-  {
     name: 'tr_branches',
     routerLink: '/branches',
     icon: 'fa fa-building icon',
-  },
-  {
-    name: 'tr_categories',
-    routerLink: '/categories',
-    icon: 'fa fa-tags icon',
   },
   {
     name: 'tr_reports',
@@ -230,7 +268,6 @@ export const Warehouse = [
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
-
 ];
 
 /** View products only; bookings allowed from products list. */

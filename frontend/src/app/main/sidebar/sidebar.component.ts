@@ -105,6 +105,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
     return link?.routerLink === this.pendingTransfersLink;
   }
 
+  /** Parent accordion shows badge when a child is the pending-transfers route. */
+  hasPendingTransfersIn(link: SidebarItem): boolean {
+    if (this.isPendingTransfersLink(link)) {
+      return true;
+    }
+    return !!link?.children?.some((c) => this.isPendingTransfersLink(c));
+  }
+
   refreshPendingTransferCount(): void {
     if (!this.showsPendingTransfersBadge) {
       this.globals.pendingBranchTransferCount = 0;

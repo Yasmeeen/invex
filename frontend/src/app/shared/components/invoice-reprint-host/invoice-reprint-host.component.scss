@@ -1,11 +1,13 @@
 /* Screen: hosts stay hidden. Print visibility is owned by _receipt-print-modes.scss */
 #print-sale-receipt,
-#print-purchase-receipt {
+#print-purchase-receipt,
+#print-payment-receipt {
   display: none;
 }
 
 #print-sale-receipt[dir='rtl'],
-#print-purchase-receipt[dir='rtl'] {
+#print-purchase-receipt[dir='rtl'],
+#print-payment-receipt[dir='rtl'] {
   direction: rtl;
   text-align: right;
 

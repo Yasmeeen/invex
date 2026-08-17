@@ -70,6 +70,13 @@ import {
 } from '@shared/utils/payment-app-fee.util';
 import { toDataURL as qrToDataUrl } from 'qrcode';
 import { environment } from 'src/environments/environment';
+import { IsolatedReceiptPrintHandle, printIsolatedReceipt } from '@shared/utils/isolated-receipt-print';
+import {
+  isPayLaterMethod,
+  isPayLaterSettled,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+} from '@core/utils/order-display.util';
 
 @Component({
   selector: 'app-cashier-order',
@@ -128,6 +135,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private pendingExchangePurchaseReceipt: any = null;
   /** Store pays customer/supplier the exchange difference — treasury chosen at checkout. */
   private pendingExchangeSettlement: ExchangeSettlementTreasuryResult | null = null;
+  private cashierPrintHandle: IsolatedReceiptPrintHandle | null = null;
+  private cashierPrintClearTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Client / supplier information section
   isClientInfoOpen = true;
@@ -207,6 +216,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       clearTimeout(this.barcodeScanTimer);
       this.barcodeScanTimer = null;
     }
+    this.disposeCashierPrint();
   }
 
   private rebuildPaymentMethods(): void {
@@ -1066,6 +1076,22 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   receiptExchangeCollected(): number {
     const v = Number(this.createdOrder?.amountPaid);
     return Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
+  }
+
+  isCreditSale(): boolean {
+    return isPayLaterMethod(this.createdOrder?.paymentMethod);
+  }
+
+  isCreditFullySettled(): boolean {
+    return isPayLaterSettled(this.createdOrder);
+  }
+
+  receiptCreditPaid(): number {
+    return orderDisplayPaid(this.createdOrder);
+  }
+
+  receiptCreditRemaining(): number {
+    return orderDisplayRemaining(this.createdOrder);
   }
 
   printDeskPurchaseReceipt(): void {
@@ -2334,6 +2360,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         subtotalPrice: receiptSubtotal,
         invoiceDiscountAmount: receiptInvoiceDisc,
         totalPrice: receiptFinal,
+        paymentMethod: base?.paymentMethod,
+        amountPaid: Number(base?.amountPaid) || 0,
+        paymentStatus: base?.paymentStatus,
+        payments: Array.isArray(base?.payments) ? base.payments : [],
         bookingDepositCreditAmount:
           Number(base?.bookingDepositCreditAmount) > 0
             ? Number(base.bookingDepositCreditAmount)
@@ -2403,6 +2433,44 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private runCashierPrint(): void {
     this.bookingReprint.clearPending();
     this.invoiceReprint.clearPending();
+    this.disposeCashierPrint();
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      window.print();
+      return;
+    }
+
+    const id =
+      this.printMode === 'deskPurchase' ? 'print-purchase-receipt' : 'print-container';
+    const host = document.getElementById(id);
+    if (!host || !host.innerHTML.trim()) {
+      this.fallbackMainWindowPrint();
+      return;
+    }
+
+    this.cashierPrintHandle = printIsolatedReceipt(host, {
+      title: 'Cashier receipt',
+      onFallback: () => this.fallbackMainWindowPrint(),
+      onPrinted: () => {
+        this.cashierPrintHandle = null;
+      },
+    });
+  }
+
+  private disposeCashierPrint(): void {
+    if (this.cashierPrintClearTimer != null) {
+      clearTimeout(this.cashierPrintClearTimer);
+      this.cashierPrintClearTimer = null;
+    }
+    this.cashierPrintHandle?.dispose();
+    this.cashierPrintHandle = null;
+    if (typeof document !== 'undefined' && document.body.getAttribute('data-receipt-print') === 'cashier') {
+      document.body.removeAttribute('data-receipt-print');
+    }
+  }
+
+  private fallbackMainWindowPrint(): void {
+    this.cashierPrintHandle?.dispose();
+    this.cashierPrintHandle = null;
     if (typeof document === 'undefined') {
       window.print();
       return;
@@ -2416,8 +2484,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     };
     window.addEventListener('afterprint', clearFlag);
     window.print();
-    // Fallback if afterprint never fires (some browsers / cancelled dialogs)
-    setTimeout(clearFlag, 60000);
+    this.cashierPrintClearTimer = setTimeout(clearFlag, 60000);
   }
 
   receiptLinesSubtotal(): number {

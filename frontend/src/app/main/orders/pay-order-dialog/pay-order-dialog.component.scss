@@ -81,6 +81,15 @@
   }
 }
 
+.pay-order-dialog__print-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+  cursor: pointer;
+  font-weight: 500;
+}
+
 .pay-order-dialog__actions {
   flex-shrink: 0;
   display: flex;

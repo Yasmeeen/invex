@@ -68,6 +68,8 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
   /** all | with_bookings | without_bookings — maps to API `booked` */
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
+  /** all | available | out_of_stock — maps to API `inStock` */
+  stockFilter: 'all' | 'available' | 'out_of_stock' = 'all';
 
   readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
     { id: 'all', labelKey: 'tr_location_all' },
@@ -82,6 +84,15 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     { id: 'all', labelKey: 'tr_products_booking_filter_all' },
     { id: 'with_bookings', labelKey: 'tr_products_booking_filter_with' },
     { id: 'without_bookings', labelKey: 'tr_products_booking_filter_without' },
+  ];
+
+  readonly stockFilterOptions: Array<{
+    id: 'all' | 'available' | 'out_of_stock';
+    labelKey: string;
+  }> = [
+    { id: 'all', labelKey: 'tr_products_stock_filter_all' },
+    { id: 'available', labelKey: 'tr_products_stock_filter_available' },
+    { id: 'out_of_stock', labelKey: 'tr_products_stock_filter_out' },
   ];
   totalNumberOfProducts: number;
   viewMode: 'table' | 'cards' = 'cards';
@@ -238,6 +249,11 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       filterParams['booked'] = 'true';
     } else if (this.bookingFilter === 'without_bookings') {
       filterParams['booked'] = 'false';
+    }
+    if (this.stockFilter === 'available') {
+      filterParams['inStock'] = 'true';
+    } else if (this.stockFilter === 'out_of_stock') {
+      filterParams['inStock'] = 'false';
     }
     if (this.locationFilter === 'warehouse') {
       filterParams['warehouseOnly'] = true;
@@ -479,6 +495,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     delete this.params['warehouseOnly'];
     delete this.params['excludeWarehouse'];
     delete this.params['booked'];
+    delete this.params['inStock'];
     delete this.params['categoryId'];
     delete this.params['attrKey'];
     delete this.params['attrValue'];
@@ -532,6 +549,11 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     this.selectedAttributeKey = '';
     this.selectedAttributeValue = '';
     this.refreshAttributeKeyOptions();
+    this.params.page = 1;
+    this.getproducts();
+  }
+
+  onStockFilterChange(): void {
     this.params.page = 1;
     this.getproducts();
   }

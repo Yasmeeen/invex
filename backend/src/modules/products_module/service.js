@@ -1138,9 +1138,11 @@ function buildProductsListQuery(queryParams = {}) {
     });
   }
 
-  // Cashier / grids that only need sellable units
+  // Available (stock > 0) vs finished / out of stock (stock 0)
   if (inStock === 'true' || inStock === true) {
     query.stock = { $gt: 0 };
+  } else if (inStock === 'false' || inStock === false) {
+    query.stock = { $lte: 0 };
   }
 
   if (booked === 'true' || booked === true) {

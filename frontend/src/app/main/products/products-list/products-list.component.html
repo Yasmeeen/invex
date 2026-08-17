@@ -171,6 +171,26 @@
       </div>
       <div class="col-md-4">
         <div class="form-group mb-0">
+          <label>{{ 'tr_products_stock_filter' | translate }}</label>
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="stockFilterOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
+            [(ngModel)]="stockFilter"
+            name="stockFilter"
+            (ngModelChange)="onStockFilterChange()"
+          >
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group mb-0">
           <label>{{ 'tr_products_booking_filter' | translate }}</label>
           <ng-select
             class="s-control s-select width-100"

@@ -1,0 +1,26 @@
+@import 'variables';
+@import 'color_scheme';
+@import 'invoice-container-print';
+
+.payment-receipt-badge {
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border: 1.5px dashed #333;
+  display: inline-block;
+  width: auto;
+  min-width: 60%;
+}
+
+.payment-receipt-subtitle {
+  margin: 0 0 8px;
+}
+
+.payment-receipt-products .products-table__col-name {
+  width: 78%;
+}
+
+.payment-receipt-products .products-table__col-qty {
+  width: 22%;
+}

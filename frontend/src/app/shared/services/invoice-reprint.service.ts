@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
+import { PaymentReceiptData } from '@shared/components/payment-receipt-print/payment-receipt-print.component';
 
-export type InvoiceReprintMode = 'sale' | 'purchase';
+export type InvoiceReprintMode = 'sale' | 'purchase' | 'payment';
 
 export interface InvoiceReprintRequest {
   mode: InvoiceReprintMode;
@@ -9,7 +10,7 @@ export interface InvoiceReprintRequest {
   printDate: Date;
 }
 
-/** Sale / purchase invoice reprints only (booking uses BookingReprintService). */
+/** Sale / purchase / installment payment reprints (booking uses BookingReprintService). */
 @Injectable({ providedIn: 'root' })
 export class InvoiceReprintService {
   private readonly requests$ = new Subject<InvoiceReprintRequest>();
@@ -36,7 +37,16 @@ export class InvoiceReprintService {
     });
   }
 
-  /** Drop any in-DOM sale/purchase reprint so it cannot leak into the next print. */
+  printPayment(receipt: PaymentReceiptData, printDate?: Date | string | null): void {
+    if (!receipt?.order) return;
+    this.requests$.next({
+      mode: 'payment',
+      data: receipt,
+      printDate: this.resolvePrintDate(printDate ?? receipt.paidAt),
+    });
+  }
+
+  /** Drop any in-DOM sale/purchase/payment reprint so it cannot leak into the next print. */
   clearPending(): void {
     this.clear$.next();
   }

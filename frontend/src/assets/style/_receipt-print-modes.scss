@@ -3,6 +3,7 @@
    - cashier  → #print-container / desk #print-purchase-receipt
    - sale     → #print-sale-receipt (orders reprint)
    - purchase → #print-purchase-receipt (orders reprint)
+   - payment  → #print-payment-receipt (installment settlement)
    - booking  → #print-booking-receipt
 */
 
@@ -10,6 +11,7 @@
   body[data-receipt-print='cashier'] *,
   body[data-receipt-print='sale'] *,
   body[data-receipt-print='purchase'] *,
+  body[data-receipt-print='payment'] *,
   body[data-receipt-print='booking'] * {
     visibility: hidden;
   }
@@ -38,6 +40,14 @@
   body[data-receipt-print='purchase'] .vixa,
   body[data-receipt-print='purchase'] .vixa__panel,
   body[data-receipt-print='purchase'] .vixa__fab,
+  body[data-receipt-print='payment'] .app-notification,
+  body[data-receipt-print='payment'] #app-notifications-container,
+  body[data-receipt-print='payment'] #main-sidebar,
+  body[data-receipt-print='payment'] .app-sidebar,
+  body[data-receipt-print='payment'] app-vixa-chat,
+  body[data-receipt-print='payment'] .vixa,
+  body[data-receipt-print='payment'] .vixa__panel,
+  body[data-receipt-print='payment'] .vixa__fab,
   body[data-receipt-print='booking'] .app-notification,
   body[data-receipt-print='booking'] #app-notifications-container,
   body[data-receipt-print='booking'] #main-sidebar,
@@ -71,7 +81,9 @@
   body[data-receipt-print='cashier'] #print-booking-receipt,
   body[data-receipt-print='cashier'] #print-booking-receipt *,
   body[data-receipt-print='cashier'] #print-sale-receipt,
-  body[data-receipt-print='cashier'] #print-sale-receipt * {
+  body[data-receipt-print='cashier'] #print-sale-receipt *,
+  body[data-receipt-print='cashier'] #print-payment-receipt,
+  body[data-receipt-print='cashier'] #print-payment-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -97,7 +109,9 @@
   body[data-receipt-print='sale'] #print-booking-receipt,
   body[data-receipt-print='sale'] #print-booking-receipt *,
   body[data-receipt-print='sale'] #print-purchase-receipt,
-  body[data-receipt-print='sale'] #print-purchase-receipt * {
+  body[data-receipt-print='sale'] #print-purchase-receipt *,
+  body[data-receipt-print='sale'] #print-payment-receipt,
+  body[data-receipt-print='sale'] #print-payment-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -123,7 +137,37 @@
   body[data-receipt-print='purchase'] #print-booking-receipt,
   body[data-receipt-print='purchase'] #print-booking-receipt *,
   body[data-receipt-print='purchase'] #print-sale-receipt,
-  body[data-receipt-print='purchase'] #print-sale-receipt * {
+  body[data-receipt-print='purchase'] #print-sale-receipt *,
+  body[data-receipt-print='purchase'] #print-payment-receipt,
+  body[data-receipt-print='purchase'] #print-payment-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- installment payment receipt --- */
+  body[data-receipt-print='payment'] #print-payment-receipt,
+  body[data-receipt-print='payment'] #print-payment-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='payment'] #print-payment-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='payment'] #print-container,
+  body[data-receipt-print='payment'] #print-container *,
+  body[data-receipt-print='payment'] #print-booking-receipt,
+  body[data-receipt-print='payment'] #print-booking-receipt *,
+  body[data-receipt-print='payment'] #print-sale-receipt,
+  body[data-receipt-print='payment'] #print-sale-receipt *,
+  body[data-receipt-print='payment'] #print-purchase-receipt,
+  body[data-receipt-print='payment'] #print-purchase-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -149,7 +193,9 @@
   body[data-receipt-print='booking'] #print-sale-receipt,
   body[data-receipt-print='booking'] #print-sale-receipt *,
   body[data-receipt-print='booking'] #print-purchase-receipt,
-  body[data-receipt-print='booking'] #print-purchase-receipt * {
+  body[data-receipt-print='booking'] #print-purchase-receipt *,
+  body[data-receipt-print='booking'] #print-payment-receipt,
+  body[data-receipt-print='booking'] #print-payment-receipt * {
     display: none !important;
     visibility: hidden !important;
   }

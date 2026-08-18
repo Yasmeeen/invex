@@ -160,6 +160,23 @@ const parseSupplierPhone = (query) => {
   return v.length ? v : null;
 };
 
+/** Comma-separated (or repeated) ObjectIds from a query param, e.g. multi-select filters. */
+const parseOidCsvList = (raw) => {
+  const values = Array.isArray(raw) ? raw : [raw];
+  const unique = [];
+  for (const value of values) {
+    const str = String(value ?? '').trim();
+    if (!str || str === 'undefined' || str === 'null') continue;
+    for (const part of str.split(',')) {
+      const id = part.trim();
+      if (mongoose.Types.ObjectId.isValid(id) && !unique.includes(id)) {
+        unique.push(id);
+      }
+    }
+  }
+  return unique.map((id) => new mongoose.Types.ObjectId(id));
+};
+
 const parseSupplierId = (query) => {
   const raw = String(
     query.supplier_id ?? query.supplierId ?? query.vendor_id ?? query.vendorId ?? ''
@@ -184,7 +201,7 @@ const parseCommonFilters = (query) => {
   );
   const to = toDate(query.to, nowCairo.clone().endOf('day').utc().toDate(), { endOfDay: true });
 
-  const categoryRaw = String(query.category_id || query.categoryId || '').trim();
+  const categoryIds = parseOidCsvList(query.category_id ?? query.categoryId);
 
   return {
     from,
@@ -195,9 +212,8 @@ const parseCommonFilters = (query) => {
     productId: mongoose.Types.ObjectId.isValid(String(query.product_id || ''))
       ? new mongoose.Types.ObjectId(String(query.product_id))
       : null,
-    categoryId: mongoose.Types.ObjectId.isValid(categoryRaw)
-      ? new mongoose.Types.ObjectId(categoryRaw)
-      : null,
+    categoryIds,
+    categoryId: categoryIds[0] || null,
     customerId: mongoose.Types.ObjectId.isValid(String(query.customer_id || ''))
       ? new mongoose.Types.ObjectId(String(query.customer_id))
       : null,
@@ -209,6 +225,13 @@ const parseCommonFilters = (query) => {
     page: Math.max(1, Number(query.page) || 1),
     limit: Math.max(1, Math.min(200, Number(query.limit) || 20)),
   };
+};
+
+/** Order lines store only productId, so categories are matched through their products. */
+const resolveCategoryProductIdFilter = async (categoryIds) => {
+  if (!categoryIds?.length) return null;
+  const productIds = await Product.find({ category: { $in: categoryIds } }).distinct('_id');
+  return { $in: productIds };
 };
 
 /** Resolve vendor ids matching a supplier phone (exact candidates or last-10 / substring). */
@@ -338,9 +361,8 @@ export const getSalesReport = async (req, res) => {
     appendOrderCustomerFilters(baseMatch, f);
     if (f.productId) {
       baseMatch['products.productId'] = f.productId;
-    } else if (f.categoryId) {
-      const categoryProductIds = await Product.find({ category: f.categoryId }).distinct('_id');
-      baseMatch['products.productId'] = { $in: categoryProductIds };
+    } else if (f.categoryIds.length) {
+      baseMatch['products.productId'] = await resolveCategoryProductIdFilter(f.categoryIds);
     }
     if (f.sellerName) baseMatch.sellerName = f.sellerName;
 
@@ -423,9 +445,14 @@ export const getProfitReport = async (req, res) => {
     const match = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) match.branch = f.branchId;
     appendOrderCustomerFilters(match, f);
-    if (f.productId) match['products.productId'] = f.productId;
+    const lineProductIdFilter = f.productId
+      ? f.productId
+      : await resolveCategoryProductIdFilter(f.categoryIds);
+    if (lineProductIdFilter) match['products.productId'] = lineProductIdFilter;
     if (f.sellerName) match.sellerName = f.sellerName;
-    const unwindMatch = f.productId ? { 'products.productId': f.productId } : {};
+    const unwindMatch = lineProductIdFilter
+      ? { 'products.productId': lineProductIdFilter }
+      : {};
 
     const overhead = await getBranchOverheadForReport(f.branchId);
     const daysInPeriod = calendarDaysInclusive(f.from, f.to);
@@ -570,9 +597,8 @@ export const getProductsReport = async (req, res) => {
     appendOrderCustomerFilters(orderMatch, f);
 
     let scopedProductIds = f.productId || null;
-    if (f.categoryId && !f.productId) {
-      const categoryProductIds = await Product.find({ category: f.categoryId }).distinct('_id');
-      scopedProductIds = { $in: categoryProductIds };
+    if (!f.productId && f.categoryIds.length) {
+      scopedProductIds = await resolveCategoryProductIdFilter(f.categoryIds);
     }
     const orderProductIdFilter = intersectProductIdFilter(scopedProductIds, supplierProductIds);
     if (orderProductIdFilter) {
@@ -607,7 +633,11 @@ export const getProductsReport = async (req, res) => {
       ],
     };
     if (f.branchId) productMatch.branch = f.branchId;
-    if (f.categoryId) productMatch.category = f.categoryId;
+    if (f.categoryIds.length === 1) {
+      productMatch.category = f.categoryIds[0];
+    } else if (f.categoryIds.length > 1) {
+      productMatch.category = { $in: f.categoryIds };
+    }
     const inventoryProductIdFilter = intersectProductIdFilter(f.productId || null, supplierProductIds);
     if (inventoryProductIdFilter) {
       productMatch._id = inventoryProductIdFilter;

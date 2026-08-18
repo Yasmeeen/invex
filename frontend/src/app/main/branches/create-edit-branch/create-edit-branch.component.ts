@@ -5,6 +5,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { TranslateService } from '@ngx-translate/core';
 import { Branch } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
+import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
 
 @Component({
   selector: 'app-create-edit-branch',
@@ -23,6 +24,7 @@ export class CreateEditBranchComponent implements OnInit {
     private branchesService: BranchesServce,
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
+    private openingCelebration: OpeningCelebrationService,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -44,7 +46,10 @@ export class CreateEditBranchComponent implements OnInit {
   getBranchData(){
     this.branchesService.getBranch(this.branchId).subscribe((response:any)=> {
       this.branchId = response._id
-      this.branchForm.form.patchValue(response);
+      this.branchForm.form.patchValue({
+        ...response,
+        openingDate: response.openingDate ? new Date(response.openingDate) : null,
+      });
       const list = Array.isArray(response.salespeople) ? response.salespeople : [];
       this.salespeople = list.length
         ? list
@@ -68,8 +73,10 @@ export class CreateEditBranchComponent implements OnInit {
 
   private buildBranchPayload(): Branch {
     const formValue = this.branchForm.value;
+    const openingRaw = formValue?.openingDate;
     return {
       ...formValue,
+      openingDate: openingRaw ? new Date(openingRaw) : null,
       salespeople: this.salespeople
         .map((sp) => ({ name: String(sp.name || '').trim(), active: true }))
         .filter((sp) => sp.name.length > 0),
@@ -85,6 +92,7 @@ export class CreateEditBranchComponent implements OnInit {
     this.branchesService.createBranch(this.branch).subscribe({
       next: () => {
         this.appNotificationService.push('Branch created successfully!', 'success');
+        this.openingCelebration.load(true);
         this.dialogRef.close(true);
       },
       error: () => {
@@ -104,6 +112,7 @@ export class CreateEditBranchComponent implements OnInit {
     this.branchesService.updateBranch(this.branchId, this.branch).subscribe({
       next: () => {
         this.appNotificationService.push('Branch updated successfully!', 'success');
+        this.openingCelebration.load(true);
         this.dialogRef.close(true);
       },
       error: () => {

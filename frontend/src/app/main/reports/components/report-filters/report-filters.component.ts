@@ -49,7 +49,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
     branch_id: null as string | null,
-    category_id: null as string | null,
+    category_ids: [] as string[],
     supplier_id: null as string | null,
     product_id: null as string | null,
     customer_phone: '',
@@ -94,7 +94,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
       this.loadSalespeople();
-      if (this.reportType === 'products' || this.reportType === 'sales') {
+      if (this.categoryFilterVisible) {
         this.loadCategories();
       }
     }
@@ -104,6 +104,16 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     if (this.reportType === 'bookings' && this.users.length === 0) {
       this.loadUsers();
     }
+  }
+
+  get categoryFilterVisible(): boolean {
+    return (
+      this.reportType === 'products' || this.reportType === 'sales' || this.reportType === 'profit'
+    );
+  }
+
+  private get selectedCategoryIds(): string[] {
+    return (this.filters.category_ids || []).map((id: string) => String(id)).filter(Boolean);
   }
 
   get lockedBranchLabel(): string {
@@ -149,8 +159,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     if (this.filters.branch_id) {
       params.branchId = String(this.filters.branch_id);
     }
-    if (this.filters.category_id) {
-      params.categoryId = String(this.filters.category_id);
+    const categoryIds = this.selectedCategoryIds;
+    if (categoryIds.length) {
+      params.categoryId = categoryIds.join(',');
     }
     this.productsSerivce.getProducts(params).subscribe({
       next: (res: any) => (this.products = res.products || []),
@@ -284,8 +295,8 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
       customer_phone: (this.filters.customer_phone || '').trim(),
       groupBy: this.filters.groupBy || 'daily',
     };
-    if (this.reportType === 'products' || this.reportType === 'sales') {
-      base.category_id = this.filters.category_id ? String(this.filters.category_id) : '';
+    if (this.categoryFilterVisible) {
+      base.category_id = this.selectedCategoryIds.join(',');
     }
     if (this.reportType === 'products' && this.filters.supplier_id) {
       base.supplier_id = String(this.filters.supplier_id);
@@ -323,7 +334,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
         this.filters.branch_id = String(u.branch._id);
       }
     }
-    this.filters.category_id = null;
+    this.filters.category_ids = [];
     this.filters.supplier_id = null;
     this.selectedSupplierId = null;
     this.selectedSupplierLabel = '';

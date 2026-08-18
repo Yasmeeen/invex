@@ -23,6 +23,7 @@ import { ProductPurchaseApprovalDialogComponent } from './components/product-pur
 import { PurchaseReceiptPrintComponent } from './components/purchase-receipt-print/purchase-receipt-print.component';
 import { SaleReceiptPrintComponent } from './components/sale-receipt-print/sale-receipt-print.component';
 import { BookingReceiptPrintComponent } from './components/booking-receipt-print/booking-receipt-print.component';
+import { PaymentReceiptPrintComponent } from './components/payment-receipt-print/payment-receipt-print.component';
 import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/invoice-reprint-host.component';
 import { BookingReprintHostComponent } from './components/booking-reprint-host/booking-reprint-host.component';
 
@@ -43,6 +44,7 @@ import { BookingReprintHostComponent } from './components/booking-reprint-host/b
     PurchaseReceiptPrintComponent,
     SaleReceiptPrintComponent,
     BookingReceiptPrintComponent,
+    PaymentReceiptPrintComponent,
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
   ],
@@ -53,7 +55,9 @@ import { BookingReprintHostComponent } from './components/booking-reprint-host/b
     ReactiveFormsModule,
     CoreModule.forRoot(),
     NgSelectModule,
-    TranslateModule
+    TranslateModule,
+    MatDatepickerModule,
+    MatNativeDateModule,
   ],
   exports: [
     GhostLineComponent,
@@ -77,6 +81,7 @@ import { BookingReprintHostComponent } from './components/booking-reprint-host/b
     PurchaseReceiptPrintComponent,
     SaleReceiptPrintComponent,
     BookingReceiptPrintComponent,
+    PaymentReceiptPrintComponent,
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
   ],

@@ -1,7 +1,7 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { Router } from '@angular/router';
-import { Order, Branch } from '@core/models/products.model';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Branch, Order } from '@core/models/products.model';
 import {
   isPayLaterMethod,
   isPayLaterSettled,
@@ -13,7 +13,9 @@ import {
   ClientHistoryOrderRow,
   ClientHistoryPurchaseRow,
   ClientHistoryResponse,
+  ClientLedgerEntry,
   ClientSettlementPreview,
+  PaginationData,
 } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
@@ -31,23 +33,36 @@ import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-de
 import { ClientOpeningDebitDialogComponent } from '../client-opening-debit-dialog/client-opening-debit-dialog.component';
 import { ClientPayClientDialogComponent } from '../client-pay-client-dialog/client-pay-client-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
+import { Subscription } from 'rxjs';
 
-export type ClientHistoryDialogData = { client: Client; forcedBranchId?: string | null };
+export type ClientHistoryTab = 'overview' | 'credit' | 'orders' | 'purchases' | 'ledger';
 
 @Component({
-  selector: 'app-client-history-dialog',
-  templateUrl: './client-history-dialog.component.html',
-  styleUrls: ['./client-history-dialog.component.scss'],
+  selector: 'app-client-history',
+  templateUrl: './client-history.component.html',
+  styleUrls: ['./client-history.component.scss'],
 })
-export class ClientHistoryDialogComponent implements OnInit {
+export class ClientHistoryComponent implements OnInit, OnDestroy {
   loading = true;
   settling = false;
   exportingPdf = false;
   history: ClientHistoryResponse | null = null;
+  client: Client | null = null;
+  clientId: string | null = null;
+
+  activeTab: ClientHistoryTab = 'overview';
+  perPage = 10;
+  creditPage = 1;
+  ordersPage = 1;
+  purchasesPage = 1;
+  ledgerPage = 1;
+
   /** Branch for cash-drawer attribution (deposits / credit invoice payments). */
   paymentBranchId: string | null = null;
   showBranchPicker = false;
   branches: Branch[] = [];
+
+  private routeSub?: Subscription;
 
   constructor(
     private userService: UserSerivce,
@@ -56,14 +71,13 @@ export class ClientHistoryDialogComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private accountHistoryPdf: AccountHistoryPdfService,
-    private ref: MatDialogRef<ClientHistoryDialogComponent>,
     private storeSettings: StoreSettingsService,
     private dialog: MatDialog,
     private router: Router,
-    @Inject(MAT_DIALOG_DATA) public data: ClientHistoryDialogData
+    private route: ActivatedRoute
   ) {
     const actor = this.auth.getUserFromLocalStorage();
-    const ctx = resolveActorBranchContext(actor, data.forcedBranchId);
+    const ctx = resolveActorBranchContext(actor, null);
     this.paymentBranchId = ctx.branchId;
     this.showBranchPicker = ctx.showBranchPicker;
   }
@@ -84,15 +98,151 @@ export class ClientHistoryDialogComponent implements OnInit {
     } else if (!this.paymentBranchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
     }
-    this.loadHistory();
+
+    this.routeSub = this.route.paramMap.subscribe((params) => {
+      this.clientId = params.get('id');
+      this.resetTablePages();
+      this.loadClient();
+      this.loadHistory();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+  }
+
+  setTab(tab: ClientHistoryTab): void {
+    if (this.activeTab === tab) return;
+    this.activeTab = tab;
   }
 
   onPaymentBranchChange(branchId: string): void {
     this.paymentBranchId = String(branchId || '').trim() || null;
   }
 
+  goBack(): void {
+    this.router.navigate(['/clients']);
+  }
+
+  get clientTitle(): string {
+    const c = this.client || (this.history?.client as Client | undefined);
+    return String(c?.name || c?.phoneNumber || '').trim();
+  }
+
   get settlementPreview(): ClientSettlementPreview | null {
     return this.history?.settlementPreview || null;
+  }
+
+  get creditOrdersRows(): ClientHistoryOrderRow[] {
+    return this.history?.creditOrders || [];
+  }
+
+  get ordersRows(): ClientHistoryOrderRow[] {
+    return this.history?.orders || [];
+  }
+
+  get purchasesRows(): ClientHistoryPurchaseRow[] {
+    return this.history?.purchases || [];
+  }
+
+  get ledgerRows(): ClientLedgerEntry[] {
+    return this.history?.ledgerEntries || [];
+  }
+
+  get creditCount(): number {
+    return this.creditOrdersRows.length;
+  }
+
+  get ordersCount(): number {
+    return this.ordersRows.length;
+  }
+
+  get purchasesCount(): number {
+    return this.purchasesRows.length;
+  }
+
+  get ledgerCount(): number {
+    return this.ledgerRows.length;
+  }
+
+  get pagedCreditOrders(): ClientHistoryOrderRow[] {
+    return this.slicePage(this.creditOrdersRows, this.creditPage);
+  }
+
+  get pagedOrders(): ClientHistoryOrderRow[] {
+    return this.slicePage(this.ordersRows, this.ordersPage);
+  }
+
+  get pagedPurchases(): ClientHistoryPurchaseRow[] {
+    return this.slicePage(this.purchasesRows, this.purchasesPage);
+  }
+
+  get pagedLedgerEntries(): ClientLedgerEntry[] {
+    return this.slicePage(this.ledgerRows, this.ledgerPage);
+  }
+
+  get creditPagination(): PaginationData {
+    return this.buildPagination(this.creditCount, this.creditPage);
+  }
+
+  get ordersPagination(): PaginationData {
+    return this.buildPagination(this.ordersCount, this.ordersPage);
+  }
+
+  get purchasesPagination(): PaginationData {
+    return this.buildPagination(this.purchasesCount, this.purchasesPage);
+  }
+
+  get ledgerPagination(): PaginationData {
+    return this.buildPagination(this.ledgerCount, this.ledgerPage);
+  }
+
+  onCreditPageChange(page: number): void {
+    this.creditPage = page;
+  }
+
+  onOrdersPageChange(page: number): void {
+    this.ordersPage = page;
+  }
+
+  onPurchasesPageChange(page: number): void {
+    this.purchasesPage = page;
+  }
+
+  onLedgerPageChange(page: number): void {
+    this.ledgerPage = page;
+  }
+
+  loadClient(): void {
+    if (!this.clientId) return;
+    this.userService.getClient(String(this.clientId)).subscribe({
+      next: (res: any) => {
+        this.client = res?.client || res || null;
+      },
+      error: () => {
+        this.client = null;
+      },
+    });
+  }
+
+  loadHistory(): void {
+    if (!this.clientId) return;
+    this.loading = true;
+    this.userService.getClientHistory(String(this.clientId)).subscribe({
+      next: (res) => {
+        this.history = res;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
+  }
+
+  /** Client object required by the action dialogs. */
+  private get actionClient(): Client | null {
+    return this.client || ((this.history?.client as Client) ?? null);
   }
 
   netBalanceText(): string {
@@ -184,13 +334,11 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   settle(): void {
-    if (!this.history?.canSettle || this.settling) return;
-    const id = this.data.client._id;
-    if (!id) return;
+    if (!this.history?.canSettle || this.settling || !this.clientId) return;
 
     this.settling = true;
     const u = this.auth.getUserFromLocalStorage();
-    this.userService.settleClientBalances(String(id), { userId: u?._id }).subscribe({
+    this.userService.settleClientBalances(String(this.clientId), { userId: u?._id }).subscribe({
       next: (res) => {
         this.settling = false;
         this.notify.push(this.translate.instant('tr_client_settlement_ok'), 'success');
@@ -201,7 +349,7 @@ export class ClientHistoryDialogComponent implements OnInit {
           this.history!.settlementPreview = res.settlementPreview;
           this.history!.canSettle = res.settlementPreview.canSettle;
         }
-        this.loadHistory();
+        this.afterBalanceChange();
       },
       error: (err) => {
         this.settling = false;
@@ -214,6 +362,11 @@ export class ClientHistoryDialogComponent implements OnInit {
     });
   }
 
+  private afterBalanceChange(): void {
+    this.resetTablePages();
+    this.loadHistory();
+  }
+
   canSetOpeningDebit(): boolean {
     const hasOpeningLedger = (this.history?.ledgerEntries || []).some(
       (e) => e.type === 'opening_debit'
@@ -222,30 +375,76 @@ export class ClientHistoryDialogComponent implements OnInit {
   }
 
   openOpeningDebitDialog(): void {
+    const client = this.actionClient;
+    if (!client) return;
     const ref = this.dialog.open(ClientOpeningDebitDialogComponent, {
       width: '480px',
       maxWidth: '96vw',
-      data: { client: this.data.client },
+      data: { client },
       disableClose: true,
     });
     ref.afterClosed().subscribe((saved) => {
-      if (saved) this.loadHistory();
+      if (saved) this.afterBalanceChange();
     });
   }
 
-  loadHistory(): void {
-    const id = this.data.client._id;
-    if (!id) return;
-    this.loading = true;
-    this.userService.getClientHistory(String(id)).subscribe({
-      next: (res) => {
-        this.history = res;
-        this.loading = false;
+  openDepositDialog(): void {
+    const client = this.actionClient;
+    if (!client) return;
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    this.dialog
+      .open(ClientDepositDialogComponent, {
+        width: '520px',
+        maxWidth: '96vw',
+        data: { client, forcedBranchId: this.paymentBranchId },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) {
+          this.afterBalanceChange();
+        }
+      });
+  }
+
+  maxPayClientAmount(): number {
+    const weOwe = Number(this.history?.weOweClient);
+    if (Number.isFinite(weOwe) && weOwe > 0) {
+      return Math.round(weOwe * 100) / 100;
+    }
+    const prepaid = Number(this.history?.prepaidBalance) || 0;
+    const deferred = Number(this.history?.clientPayableDeferred) || 0;
+    return Math.round((prepaid + deferred) * 100) / 100;
+  }
+
+  canPayClient(): boolean {
+    return this.maxPayClientAmount() > 0.005;
+  }
+
+  openPayClientDialog(): void {
+    const client = this.actionClient;
+    if (!client) return;
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    const ref = this.dialog.open(ClientPayClientDialogComponent, {
+      width: '520px',
+      maxWidth: '96vw',
+      panelClass: 'client-pay-client-dialog-panel',
+      backdropClass: 'client-pay-client-dialog-backdrop',
+      data: {
+        client,
+        forcedBranchId: this.paymentBranchId,
+        maxAmount: this.maxPayClientAmount(),
       },
-      error: () => {
-        this.loading = false;
-        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
-      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.afterBalanceChange();
     });
   }
 
@@ -312,9 +511,23 @@ export class ClientHistoryDialogComponent implements OnInit {
     return s.length > 10 ? s.slice(-10).toUpperCase() : s.toUpperCase();
   }
 
+  ledgerTypeLabel(type: string): string {
+    switch (type) {
+      case 'deposit':
+        return this.translate.instant('tr_client_ledger_deposit');
+      case 'opening_debit':
+        return this.translate.instant('tr_client_ledger_opening_debit');
+      case 'settlement':
+        return this.translate.instant('tr_client_ledger_settlement');
+      case 'payout':
+        return this.translate.instant('tr_client_ledger_payout');
+      default:
+        return type || '—';
+    }
+  }
+
   goToSalesInvoice(orderNumber?: number | string | null): void {
     if (orderNumber == null || orderNumber === '') return;
-    this.ref.close(false);
     this.router.navigate(['/orders'], {
       queryParams: { section: 'sales', search: String(orderNumber) },
     });
@@ -323,7 +536,6 @@ export class ClientHistoryDialogComponent implements OnInit {
   goToPurchaseInvoice(purchaseId?: string | null): void {
     const id = normalizeMongoId(purchaseId);
     if (!id) return;
-    this.ref.close(false);
     this.router.navigate(['/orders'], {
       queryParams: { section: 'purchases', search: id },
     });
@@ -349,7 +561,7 @@ export class ClientHistoryDialogComponent implements OnInit {
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
-      if (ok) this.loadHistory();
+      if (ok) this.afterBalanceChange();
     });
   }
 
@@ -373,7 +585,7 @@ export class ClientHistoryDialogComponent implements OnInit {
         purchaseId: id,
         remaining: Number(row.remaining) || 0,
         partyTypeLabel: this.translate.instant('tr_party_client'),
-        partyName: String(this.data.client?.name || '').trim(),
+        partyName: this.clientTitle,
         productName: row.productName || '',
         requestDate: row.createdAt,
         forcedBranchId: this.paymentBranchId,
@@ -381,102 +593,27 @@ export class ClientHistoryDialogComponent implements OnInit {
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
-      if (ok) this.loadHistory();
+      if (ok) this.afterBalanceChange();
     });
-  }
-
-  maxPayClientAmount(): number {
-    const weOwe = Number(this.history?.weOweClient);
-    if (Number.isFinite(weOwe) && weOwe > 0) {
-      return Math.round(weOwe * 100) / 100;
-    }
-    const prepaid = Number(this.history?.prepaidBalance) || 0;
-    const deferred = Number(this.history?.clientPayableDeferred) || 0;
-    return Math.round((prepaid + deferred) * 100) / 100;
-  }
-
-  canPayClient(): boolean {
-    return this.maxPayClientAmount() > 0.005;
-  }
-
-  openPayClientDialog(): void {
-    if (!this.paymentBranchId) {
-      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
-      return;
-    }
-    const ref = this.dialog.open(ClientPayClientDialogComponent, {
-      width: '520px',
-      maxWidth: '96vw',
-      panelClass: 'client-pay-client-dialog-panel',
-      backdropClass: 'client-pay-client-dialog-backdrop',
-      data: {
-        client: this.data.client,
-        forcedBranchId: this.paymentBranchId,
-        maxAmount: this.maxPayClientAmount(),
-      },
-      disableClose: true,
-    });
-    ref.afterClosed().subscribe((ok) => {
-      if (ok) this.loadHistory();
-    });
-  }
-
-  openDepositDialog(): void {
-    if (!this.paymentBranchId) {
-      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
-      return;
-    }
-    this.dialog
-      .open(ClientDepositDialogComponent, {
-        width: '520px',
-        maxWidth: '96vw',
-        data: { client: this.data.client, forcedBranchId: this.paymentBranchId },
-        disableClose: true,
-      })
-      .afterClosed()
-      .subscribe((saved) => {
-        if (saved) {
-          this.loadHistory();
-        }
-      });
-  }
-
-  ledgerTypeLabel(type: string): string {
-    switch (type) {
-      case 'deposit':
-        return this.translate.instant('tr_client_ledger_deposit');
-      case 'opening_debit':
-        return this.translate.instant('tr_client_ledger_opening_debit');
-      case 'settlement':
-        return this.translate.instant('tr_client_ledger_settlement');
-      case 'payout':
-        return this.translate.instant('tr_client_ledger_payout');
-      default:
-        return type || '—';
-    }
   }
 
   async exportPdf(): Promise<void> {
-    if (!this.history || this.exportingPdf) return;
+    const client = this.actionClient;
+    if (!this.history || !client || this.exportingPdf) return;
     this.exportingPdf = true;
     try {
-      await this.accountHistoryPdf.exportClientHistory(
-        this.data.client,
-        this.history,
-        this.translate,
-        {
-          netBalanceText: () => this.netBalanceText(),
-          settlementNetAfterText: (p) => this.settlementNetAfterText(p),
-          ledgerTypeLabel: (type) => this.ledgerTypeLabel(type),
-          paymentStatusLabel: (status) => this.paymentStatusLabel(status),
-          paymentMethodLabel: (method) => this.paymentMethodLabel(method),
-          purchaseStatusLabel: (status) => this.purchaseStatusLabel(status),
-          purchaseTreasuryLabel: (row) => this.purchaseTreasuryLabel(row),
-          orderPaid: (order) => this.orderPaid(order),
-          orderRemaining: (order) => this.orderRemaining(order),
-          formatMoney: (amount) => this.formatMoney(amount),
-        }
-      );
+      await this.accountHistoryPdf.exportClientHistory(client, this.history, this.translate, {
+        netBalanceText: () => this.netBalanceText(),
+        settlementNetAfterText: (p) => this.settlementNetAfterText(p),
+        ledgerTypeLabel: (type) => this.ledgerTypeLabel(type),
+        paymentStatusLabel: (status) => this.paymentStatusLabel(status),
+        paymentMethodLabel: (method) => this.paymentMethodLabel(method),
+        purchaseStatusLabel: (status) => this.purchaseStatusLabel(status),
+        purchaseTreasuryLabel: (row) => this.purchaseTreasuryLabel(row),
+        orderPaid: (order) => this.orderPaid(order),
+        orderRemaining: (order) => this.orderRemaining(order),
+        formatMoney: (amount) => this.formatMoney(amount),
+      });
     } catch {
       this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
     } finally {
@@ -484,7 +621,27 @@ export class ClientHistoryDialogComponent implements OnInit {
     }
   }
 
-  close(): void {
-    this.ref.close(false);
+  private resetTablePages(): void {
+    this.creditPage = 1;
+    this.ordersPage = 1;
+    this.purchasesPage = 1;
+    this.ledgerPage = 1;
+  }
+
+  private slicePage<T>(items: T[], page: number): T[] {
+    const start = (page - 1) * this.perPage;
+    return items.slice(start, start + this.perPage);
+  }
+
+  private buildPagination(totalCount: number, currentPage: number): PaginationData {
+    const totalPages = Math.max(1, Math.ceil(totalCount / this.perPage) || 1);
+    const page = Math.min(Math.max(1, currentPage), totalPages);
+    return {
+      currentPage: page,
+      nextPage: Math.min(page + 1, totalPages),
+      prevPage: Math.max(page - 1, 1),
+      totalCount,
+      totalPages,
+    };
   }
 }

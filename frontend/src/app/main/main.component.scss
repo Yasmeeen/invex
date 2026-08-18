@@ -1,5 +1,166 @@
 @import 'mixins';
 
+.sys-celebrate {
+    position: fixed;
+    inset: 0;
+    z-index: 7;
+    pointer-events: none;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 42% 32% at 8% 12%, rgba(245, 166, 35, 0.1), transparent 70%),
+        radial-gradient(ellipse 38% 30% at 94% 86%, rgba(184, 232, 142, 0.1), transparent 70%);
+}
+
+.sys-celebrate__star {
+    position: absolute;
+    line-height: 1;
+    text-shadow: 0 0 10px currentColor;
+    opacity: 0.55;
+    animation-name: sys-celebrate-twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+.sys-celebrate__flake {
+    position: absolute;
+    top: -20px;
+    border-radius: 1px;
+    opacity: 0.72;
+    animation-name: sys-celebrate-paper;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+
+    &--paper {
+        box-shadow: 0 1px 2px rgba(17, 24, 39, 0.14);
+    }
+
+    &--square {
+        border-radius: 2px;
+    }
+
+    &--strip {
+        border-radius: 1px;
+    }
+
+    &--star {
+        background: transparent !important;
+        line-height: 1;
+        font-size: 1em;
+        text-shadow: 0 0 8px currentColor;
+        animation-name: sys-celebrate-fall-spin;
+    }
+}
+
+.sys-celebrate__burst {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    animation: sys-celebrate-burst-pop 3.4s ease-out infinite;
+}
+
+.sys-celebrate__spark-wrap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+}
+
+.sys-celebrate__spark {
+    display: block;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    border-radius: 50%;
+    animation: sys-celebrate-spark 1.25s ease-out infinite;
+}
+
+@keyframes sys-celebrate-twinkle {
+    0%,
+    100% {
+        transform: scale(0.75) rotate(0deg);
+        opacity: 0.25;
+    }
+    50% {
+        transform: scale(1.2) rotate(18deg);
+        opacity: 0.85;
+    }
+}
+
+@keyframes sys-celebrate-paper {
+    0% {
+        transform: translate3d(0, -6vh, 0) rotate(var(--tilt, 0deg));
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.75;
+    }
+    100% {
+        transform: translate3d(var(--drift, 8vw), 108vh, 0) rotate(calc(var(--tilt, 0deg) + 520deg));
+        opacity: 0.25;
+    }
+}
+
+@keyframes sys-celebrate-fall-spin {
+    0% {
+        transform: translate3d(0, -6vh, 0) rotate(0deg) scale(0.8);
+        opacity: 0.2;
+    }
+    40% {
+        opacity: 0.7;
+        transform: translate3d(5vw, 42vh, 0) rotate(180deg) scale(1.1);
+    }
+    100% {
+        transform: translate3d(-6vw, 108vh, 0) rotate(480deg) scale(0.7);
+        opacity: 0.2;
+    }
+}
+
+@keyframes sys-celebrate-burst-pop {
+    0%,
+    22% {
+        transform: scale(0.35);
+        opacity: 0;
+    }
+    28% {
+        opacity: 0.9;
+        transform: scale(1);
+    }
+    70% {
+        opacity: 0.7;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes sys-celebrate-spark {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translateY(-78px) scale(0.12);
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sys-celebrate__star,
+    .sys-celebrate__flake,
+    .sys-celebrate__flake--star,
+    .sys-celebrate__burst,
+    .sys-celebrate__spark {
+        animation: none !important;
+        opacity: 0.35;
+    }
+
+    .sys-opening-banner__track {
+        animation: none !important;
+    }
+}
+
 .main-container {
     margin: 0;
     position: relative;
@@ -24,16 +185,92 @@
         flex: 1;
     }
 
+    .main-top {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        flex-shrink: 0;
+    }
+
     .main-header {
         margin: 0;
         padding: 0;
         background: #fff;
         border-bottom: 1px solid rgba(108, 92, 231, 0.12);
-        position: sticky;
-        top: 0;
-        z-index: 10;
         min-height: 60px;
-        flex-shrink: 0;
+    }
+}
+
+.sys-opening-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.5rem 0.55rem 0;
+    background: linear-gradient(90deg, #6c5ce7 0%, #8b7cf7 55%, #f5a623 140%);
+    color: #fff;
+    overflow: hidden;
+}
+
+.sys-opening-banner__marquee {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.sys-opening-banner__track {
+    display: flex;
+    width: max-content;
+    animation: sys-opening-marquee 28s linear infinite;
+}
+
+.sys-opening-banner__copy {
+    flex-shrink: 0;
+    padding-inline: 2.5rem;
+    white-space: nowrap;
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+body[dir='rtl'] .sys-opening-banner__track {
+    animation-name: sys-opening-marquee-rtl;
+}
+
+@keyframes sys-opening-marquee {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes sys-opening-marquee-rtl {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(50%);
+    }
+}
+
+.sys-opening-banner__close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin-inline-end: 0.5rem;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.16);
     }
 }
 

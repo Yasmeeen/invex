@@ -13,6 +13,7 @@ import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
 } from '@shared/components/payment-splits-dialog/payment-splits-dialog.component';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import {
   PaymentSplitsResult,
   paymentSplitsNetTotal,
@@ -38,6 +39,7 @@ export class PayOrderDialogComponent implements OnInit {
   readonly order: Order;
   branches: Branch[] = [];
   showBranchPicker = false;
+  printReceipt = true;
   private paymentBranchId: string | null = null;
   confirmedPayment: PaymentSplitsResult | null = null;
 
@@ -49,6 +51,7 @@ export class PayOrderDialogComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private dialog: MatDialog,
+    private invoiceReprint: InvoiceReprintService,
     private ref: MatDialogRef<PayOrderDialogComponent, boolean>,
     @Inject(MAT_DIALOG_DATA) data: PayOrderDialogData
   ) {
@@ -221,10 +224,14 @@ export class PayOrderDialogComponent implements OnInit {
         branchId,
       })
       .subscribe({
-        next: () => {
-          this.saving = false;
+        next: (res: any) => {
           this.notify.push(this.translate.instant('tr_payment_added'), 'success');
-          this.ref.close(true);
+          if (this.printReceipt) {
+            this.printPaymentReceipt(String(orderId), res?.order, netTotal, splits, paidAt);
+          } else {
+            this.saving = false;
+            this.ref.close(true);
+          }
         },
         error: (err) => {
           this.saving = false;
@@ -235,6 +242,45 @@ export class PayOrderDialogComponent implements OnInit {
           this.notify.push(msg, 'error');
         },
       });
+  }
+
+  private printPaymentReceipt(
+    orderId: string,
+    fallback: any,
+    paidNow: number,
+    payments: Array<{ method?: string; amount: number }>,
+    paidAt: string
+  ): void {
+    const remainingAfter = Math.max(
+      0,
+      Math.round((this.remaining - paidNow) * 100) / 100
+    );
+    const unwrapOrder = (raw: any) =>
+      raw?.products || raw?.orderNumber != null ? raw : raw?.order || raw;
+
+    const printAndClose = (order: any) => {
+      this.saving = false;
+      const source = unwrapOrder(order) || unwrapOrder(fallback) || this.order;
+      const merged = {
+        ...(this.order || {}),
+        ...(source || {}),
+        products:
+          (source?.products?.length ? source.products : null) || this.order?.products || [],
+      };
+      this.invoiceReprint.printPayment({
+        order: merged,
+        paidNow,
+        remainingAfter,
+        payments,
+        paidAt,
+      });
+      this.ref.close(true);
+    };
+
+    this.orders.getOrder(orderId).subscribe({
+      next: (full: any) => printAndClose(full || fallback),
+      error: () => printAndClose(fallback),
+    });
   }
 
   close(): void {

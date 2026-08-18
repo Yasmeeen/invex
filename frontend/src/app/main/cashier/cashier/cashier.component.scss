@@ -682,17 +682,25 @@
         color: #1e8449;
       }
 
-      .cashier-booking-hint {
+      .cashier-booking-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        margin-bottom: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
         font-size: 0.65rem;
-        line-height: 1.25;
-        color: #7b1fa2;
-        background: #f3e5f5;
-        border: 1px solid #ce93d8;
-        border-radius: 4px;
-        padding: 4px 6px;
-        margin: 0 4px 6px;
-        text-align: center;
-        pointer-events: none;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #e65100;
+        background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%);
+        border: 1px solid #ffb300;
+        white-space: nowrap;
+
+        i {
+          font-size: 0.65rem;
+        }
       }
     }
 
@@ -1026,7 +1034,7 @@
   }
 
   $receiptWidth: 80mm;
-  $receiptHeight: 200mm;
+  $receiptHeight: 297mm;
 
   @import 'invoice-container-print';
 

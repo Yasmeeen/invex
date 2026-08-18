@@ -121,6 +121,25 @@
                         />
                       </div>
                     </div>
+
+                    <!-- Opening date (optional celebration window) -->
+                    <div class="col-md-4 mt-3">
+                      <div class="form-group">
+                        <label>{{ 'tr_opening_date' | translate }}</label>
+                        <div class="input-with-icon">
+                          <input
+                            name="openingDate"
+                            ngModel
+                            placeholder="{{ 'tr_pick_date' | translate }}"
+                            [matDatepicker]="openingPick"
+                            class="s-control"
+                          />
+                          <mat-datepicker #openingPick></mat-datepicker>
+                          <mat-datepicker-toggle class="input-icon date-picker" [for]="openingPick"></mat-datepicker-toggle>
+                        </div>
+                        <span class="size-small text-muted d-block mt-1">{{ 'tr_opening_date_hint' | translate }}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div class="row mt-4">

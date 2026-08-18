@@ -1,9 +1,67 @@
 <system-alerts></system-alerts>
 <div class="main-container" [class.main-container--sidebar-collapsed]="sidebarCollapsed">
+  <div class="sys-celebrate" *ngIf="hasActiveOpening" aria-hidden="true">
+    <span
+      *ngFor="let star of sysStars"
+      class="sys-celebrate__star"
+      [ngStyle]="star.style"
+    >★</span>
+    <span
+      *ngFor="let flake of sysConfetti"
+      class="sys-celebrate__flake"
+      [class.sys-celebrate__flake--paper]="flake.kind !== 'star'"
+      [class.sys-celebrate__flake--square]="flake.kind === 'square'"
+      [class.sys-celebrate__flake--strip]="flake.kind === 'strip'"
+      [class.sys-celebrate__flake--star]="flake.kind === 'star'"
+      [ngStyle]="flake.style"
+    >{{ flake.kind === 'star' ? '★' : '' }}</span>
+    <div
+      *ngFor="let burst of sysBursts"
+      class="sys-celebrate__burst"
+      [style.left]="burst.left"
+      [style.top]="burst.top"
+      [style.animationDelay]="burst.delay"
+    >
+      <span
+        *ngFor="let angle of sysSparkAngles"
+        class="sys-celebrate__spark-wrap"
+        [style.transform]="'rotate(' + angle + 'deg)'"
+      >
+        <i
+          class="sys-celebrate__spark"
+          [style.background]="burst.color"
+          [style.boxShadow]="'0 0 8px ' + burst.color"
+        ></i>
+      </span>
+    </div>
+  </div>
   <app-sidebar #appSidebar (collapsedChange)="onSidebarCollapsed($event)"></app-sidebar>
   <div class="main-column">
-    <div class="main-header">
-      <app-header (toggleDesktopSidebar)="appSidebar.toggleCollapse()"></app-header>
+    <div class="main-top">
+      <div class="sys-opening-banner" *ngIf="showOpeningBanner">
+        <div class="sys-opening-banner__marquee">
+          <div class="sys-opening-banner__track">
+            <span class="sys-opening-banner__copy" *ngFor="let copy of bannerCopies">
+              {{ 'tr_celebration_congrats' | translate }}
+              ·
+              {{ 'tr_celebration_title' | translate: { storeName: celebrationStoreName, branchName: celebrationBranchName } }}
+              ·
+              {{ 'tr_celebration_subtitle' | translate }}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="sys-opening-banner__close"
+          (click)="dismissOpeningBanner()"
+          [attr.aria-label]="'tr_celebration_dismiss' | translate"
+        >
+          ×
+        </button>
+      </div>
+      <div class="main-header">
+        <app-header (toggleDesktopSidebar)="appSidebar.toggleCollapse()"></app-header>
+      </div>
     </div>
     <div class="main-content plr-7 ptb-4 plr-3-mob">
       <router-outlet></router-outlet>

@@ -912,6 +912,32 @@ iframe {
         top: 2px;
     }
 
+    // The bare Font Awesome glyph is only a few pixels wide, which makes it
+    // nearly impossible to hit with a finger. Give it a real box instead.
+    >.fa-ellipsis-v,
+    >.fa-ellipsis-h {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        vertical-align: middle;
+        border-radius: 50%;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.15s ease;
+    }
+
+    >.fa-ellipsis-v:hover,
+    >.fa-ellipsis-h:hover {
+        background-color: rgba(0, 0, 0, 0.06);
+    }
+
+    &.active>.fa-ellipsis-v,
+    &.active>.fa-ellipsis-h {
+        background-color: rgba(0, 0, 0, 0.09);
+    }
+
     .options-menu-container {
         font-size: 0.875rem;
         position: absolute;

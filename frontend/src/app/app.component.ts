@@ -52,17 +52,18 @@ export class AppComponent {
     @HostListener("document:click", ["$event"])
 
     onDocumentClicked(ev:any) {
-        if (ev.target.classList.contains('options-menu')) {
-            ev.target.classList.toggle('active');
-            if (ev.target.parentNode.classList.contains('active')) {
-                this.fitMenu(ev.target);
-            }
+        if (typeof ev.target.closest !== 'function') {
+            return;
         }
-        if (ev.target.closest('.options-menu')) {
-            if (ev.target.parentNode.classList.contains('options-menu')) {
-                ev.target.parentNode.classList.toggle('active');
-                if (ev.target.parentNode.classList.contains('active')) {
-                    this.fitMenu(ev.target.closest('.options-menu'));
+        // Anything inside the menu that is not part of its own dropdown counts as
+        // the trigger, so taps that land next to the icon still open it.
+        let clickedMenu = ev.target.closest('.options-menu');
+        if (clickedMenu) {
+            let openedDropdown = ev.target.closest('.options-menu-container');
+            if (!openedDropdown || !clickedMenu.contains(openedDropdown)) {
+                clickedMenu.classList.toggle('active');
+                if (clickedMenu.classList.contains('active')) {
+                    this.fitMenu(clickedMenu);
                 }
             }
         }
@@ -114,15 +115,37 @@ export class AppComponent {
         }
     }
     fitMenu(menu:any) {
+        let container = menu.querySelector('.options-menu-container');
+        if (!container) {
+            return;
+        }
         menu.classList.remove('reverse-v');
-        menu.querySelectorAll('.options-menu-container')[0].style.maxHeight = 'none';
         menu.classList.remove('reverse-h');
-        let offsetAndHeight = menu.querySelectorAll('.options-menu-container')[0].offsetHeight + menu.offsetTop;
-        let widnowHeight = window.innerHeight
-        let outOfWindowVertically = offsetAndHeight - widnowHeight > 0 ? true : false;
-        if (outOfWindowVertically) {
-            menu.classList.add('reverse-v')
-            menu.querySelectorAll('.options-menu-container')[0].style.maxHeight = (menu.offsetTop - 20) + 'px';
+        container.style.maxHeight = 'none';
+        container.style.overflowY = '';
+
+        const gap = 20;
+        const minHeight = 120;
+        const triggerRect = menu.getBoundingClientRect();
+        const menuHeight = container.offsetHeight;
+        const spaceBelow = window.innerHeight - triggerRect.bottom - gap;
+        const spaceAbove = triggerRect.top - gap;
+
+        if (menuHeight <= spaceBelow) {
+            return;
+        }
+        if (spaceAbove > spaceBelow) {
+            menu.classList.add('reverse-v');
+            this.limitMenuHeight(container, Math.max(spaceAbove, minHeight), menuHeight);
+        } else {
+            this.limitMenuHeight(container, Math.max(spaceBelow, minHeight), menuHeight);
+        }
+    }
+
+    private limitMenuHeight(container:any, available:number, menuHeight:number) {
+        container.style.maxHeight = available + 'px';
+        if (menuHeight > available) {
+            container.style.overflowY = 'auto';
         }
     }
 

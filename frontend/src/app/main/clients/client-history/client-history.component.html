@@ -1,0 +1,448 @@
+<div class="content-shadow bg-white mb-5 client-history-page">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">
+      <button
+        type="button"
+        class="client-history-back"
+        (click)="goBack()"
+        [attr.aria-label]="'tr_go_back' | translate"
+      >
+        <i class="fa fa-arrow-right"></i>
+      </button>
+      {{ 'tr_client_history' | translate }}
+      <span class="client-history-page__name" *ngIf="clientTitle">— {{ clientTitle }}</span>
+    </span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        *ngIf="!loading && history"
+        [disabled]="exportingPdf"
+        (click)="exportPdf()"
+      >
+        {{ 'tr_report_export_pdf' | translate }}
+      </button>
+    </div>
+  </h2>
+
+  <app-ghost-line *ngIf="loading" class="plr-4" [length]="8" [type]="'table'"></app-ghost-line>
+
+  <ng-container *ngIf="!loading && history">
+    <div class="form-group plr-4 mb-3" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branches' | translate }}</label>
+      <div class="input-with-icon" style="max-width: 320px">
+        <ng-select
+          class="s-control s-select"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          [(ngModel)]="paymentBranchId"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="onPaymentBranchChange($event)"
+          placeholder="{{ 'tr_branches' | translate }}"
+        >
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+      <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_payment_branch_hint' | translate }}</p>
+    </div>
+
+    <div class="client-history-tabs plr-4" role="tablist">
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'overview'"
+        [class.client-history-tabs__btn--active]="activeTab === 'overview'"
+        (click)="setTab('overview')"
+      >
+        {{ 'tr_client_history_tab_overview' | translate }}
+      </button>
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'credit'"
+        [class.client-history-tabs__btn--active]="activeTab === 'credit'"
+        (click)="setTab('credit')"
+      >
+        {{ 'tr_client_history_tab_credit' | translate }}
+        <span class="client-history-tabs__count client-history-tabs__count--warn" *ngIf="creditCount">{{ creditCount }}</span>
+      </button>
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'orders'"
+        [class.client-history-tabs__btn--active]="activeTab === 'orders'"
+        (click)="setTab('orders')"
+      >
+        {{ 'tr_client_history_tab_orders' | translate }}
+        <span class="client-history-tabs__count" *ngIf="ordersCount">{{ ordersCount }}</span>
+      </button>
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'purchases'"
+        [class.client-history-tabs__btn--active]="activeTab === 'purchases'"
+        (click)="setTab('purchases')"
+      >
+        {{ 'tr_client_history_tab_purchases' | translate }}
+        <span class="client-history-tabs__count" *ngIf="purchasesCount">{{ purchasesCount }}</span>
+      </button>
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'ledger'"
+        [class.client-history-tabs__btn--active]="activeTab === 'ledger'"
+        (click)="setTab('ledger')"
+      >
+        {{ 'tr_client_history_tab_ledger' | translate }}
+        <span class="client-history-tabs__count" *ngIf="ledgerCount">{{ ledgerCount }}</span>
+      </button>
+    </div>
+
+    <!-- Overview -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'overview'" role="tabpanel">
+      <div class="row mb-3">
+        <div class="col-md-4 mb-3">
+          <div class="balance-card balance-card--owe">
+            <div class="balance-card__label">{{ 'tr_client_debit_balance' | translate }}</div>
+            <div class="balance-card__value">
+              {{ (history.clientOwesUs ?? history.creditBalanceDue) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </div>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromOpeningBalance || 0) > 0">
+              {{ 'tr_client_debit_from_opening' | translate }}:
+              {{ history.owesFromOpeningBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromSales || 0) > 0">
+              {{ 'tr_client_debit_from_sales' | translate }}:
+              {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="history.creditOrdersCount > 0">
+              {{ 'tr_client_credit_invoices_count' | translate:{ count: history.creditOrdersCount } }}
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4 mb-3">
+          <div class="balance-card balance-card--credit">
+            <div class="balance-card__label">{{ 'tr_client_credit_balance' | translate }}</div>
+            <div class="balance-card__value">
+              {{ (history.weOweClient ?? history.prepaidBalance ?? 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </div>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.prepaidBalance || 0) > 0">
+              {{ 'tr_client_credit_prepaid' | translate }}:
+              {{ history.prepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.clientPayableDeferred || 0) > 0">
+              {{ 'tr_client_payable_from_deferred' | translate }}:
+              {{ history.clientPayableDeferred | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
+          </div>
+        </div>
+        <div class="col-md-4 mb-3">
+          <div class="balance-card balance-card--net" *ngIf="history.netBalanceMessage">
+            <div class="balance-card__label">{{ 'tr_client_net_balance' | translate }}</div>
+            <div class="balance-card__value balance-card__value--net">
+              {{ netBalanceText() }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="balance-card balance-card--points balance-card--compact mb-3">
+        <div class="balance-card__label">{{ 'tr_client_total_points' | translate }}</div>
+        <div class="balance-card__value balance-card__value--sm">{{ history.totalPointsEarned }}</div>
+        <p class="size-small text-muted m-0 mt-1">{{ 'tr_client_points_hint' | translate }}</p>
+      </div>
+
+      <div class="client-settlement-row card mb-3 plr-3 ptb-3" *ngIf="settlementPreview">
+        <h5 class="mt-0 mb-2">{{ 'tr_client_settlement_section' | translate }}</h5>
+        <p class="size-small text-muted mb-2">{{ 'tr_client_settlement_section_hint' | translate }}</p>
+        <div class="row">
+          <div class="col-md-3 col-6 mb-2">
+            <span class="size-small text-muted d-block">{{ 'tr_client_settlement_debit' | translate }}</span>
+            <strong>{{ settlementPreview.debitTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+          </div>
+          <div class="col-md-3 col-6 mb-2">
+            <span class="size-small text-muted d-block">{{ 'tr_client_settlement_credit' | translate }}</span>
+            <strong>{{ settlementPreview.creditTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+          </div>
+          <div class="col-md-3 col-6 mb-2" *ngIf="settlementPreview.canSettle">
+            <span class="size-small text-muted d-block">{{ 'tr_client_settlement_will_offset' | translate }}</span>
+            <strong class="text-primary">{{ settlementPreview.settleAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+          </div>
+          <div class="col-md-3 col-12 flex flex-end flex-bottom">
+            <button
+              type="button"
+              class="s-btn btn-primary"
+              *ngIf="settlementPreview.canSettle"
+              [disabled]="settling"
+              (click)="confirmSettle()"
+            >
+              {{ 'tr_client_settle_balances' | translate }}
+            </button>
+          </div>
+        </div>
+        <p class="size-small m-0 mt-2 text-muted" *ngIf="settlementPreview.canSettle">
+          {{ settlementNetAfterText(settlementPreview) }}
+        </p>
+      </div>
+
+      <div class="flex flex-wrap gap-2 client-history-actions mb-2">
+        <button
+          type="button"
+          class="s-btn btn-primary"
+          *ngIf="canSetOpeningDebit()"
+          (click)="openOpeningDebitDialog()"
+        >
+          {{ 'tr_client_opening_debit_set' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" (click)="openDepositDialog()">
+          {{ 'tr_client_add_deposit' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-primary"
+          *ngIf="canPayClient()"
+          (click)="openPayClientDialog()"
+        >
+          {{ 'tr_client_pay_client' | translate }}
+        </button>
+      </div>
+      <p class="size-small text-muted m-0">{{ 'tr_client_history_overview_hint' | translate }}</p>
+    </div>
+
+    <!-- Outstanding pay-later invoices -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'credit'" role="tabpanel">
+      <p class="size-small text-muted mb-3">{{ 'tr_client_unpaid_credit_orders' | translate }}</p>
+      <div class="table-container mb-3" *ngIf="creditCount">
+        <table class="s-table table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_order_number' | translate }}</th>
+              <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
+              <th>{{ 'tr_paid' | translate }}</th>
+              <th>{{ 'tr_remaining' | translate }}</th>
+              <th class="col-status">{{ 'tr_payment_status' | translate }}</th>
+              <th>{{ 'tr_created_at' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of pagedCreditOrders">
+              <td>
+                <button
+                  type="button"
+                  class="history-invoice-link"
+                  *ngIf="o.orderNumber != null"
+                  (click)="goToSalesInvoice(o.orderNumber)"
+                >
+                  #{{ o.orderNumber }}
+                </button>
+                <span *ngIf="o.orderNumber == null">—</span>
+              </td>
+              <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td class="text-error">{{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td class="col-status">{{ paymentStatusLabel(o.paymentStatus) }}</td>
+              <td>{{ o.createdAt | date:'short' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="s-btn btn-primary btn-sm"
+                  *ngIf="canPayOrder(o)"
+                  (click)="openPayOrderDialog(o)"
+                >
+                  {{ 'tr_add_payment' | translate }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pagination
+        *ngIf="creditCount > perPage"
+        [paginationData]="creditPagination"
+        [perPage]="perPage"
+        (paginationUpdate)="onCreditPageChange($event)"
+      ></pagination>
+      <p *ngIf="!creditCount" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+    </div>
+
+    <!-- All sales -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'orders'" role="tabpanel">
+      <p class="size-small text-muted mb-3">{{ 'tr_client_operations_hint' | translate }}</p>
+      <div class="table-container mb-3" *ngIf="ordersCount">
+        <table class="s-table table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_order_number' | translate }}</th>
+              <th>{{ 'tr_final_after_extra_discount' | translate }}</th>
+              <th>{{ 'tr_paid' | translate }}</th>
+              <th>{{ 'tr_remaining' | translate }}</th>
+              <th>{{ 'tr_points_earned' | translate }}</th>
+              <th>{{ 'tr_payment_method' | translate }}</th>
+              <th class="col-status">{{ 'tr_status' | translate }}</th>
+              <th>{{ 'tr_created_at' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of pagedOrders" [class.row-restored]="o.status === 'restored'">
+              <td>
+                <button
+                  type="button"
+                  class="history-invoice-link"
+                  *ngIf="o.orderNumber != null"
+                  (click)="goToSalesInvoice(o.orderNumber)"
+                >
+                  #{{ o.orderNumber }}
+                </button>
+                <span *ngIf="o.orderNumber == null">—</span>
+              </td>
+              <td>{{ o.totalPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>{{ orderPaid(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <span *ngIf="orderRemaining(o) > 0" class="text-error">
+                  {{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </span>
+                <span class="text-success weight-bold" *ngIf="isCreditFullySettled(o)">
+                  {{ 'tr_credit_fully_settled' | translate }}
+                </span>
+                <span *ngIf="orderRemaining(o) <= 0 && !isCreditFullySettled(o)">—</span>
+              </td>
+              <td>{{ o.pointsEarned ?? 0 }}</td>
+              <td>{{ paymentMethodLabel(o.paymentMethod) }}</td>
+              <td class="col-status">
+                {{ o.status === 'restored' ? ('tr_restored' | translate) : paymentStatusLabel(o.paymentStatus, o) }}
+              </td>
+              <td>{{ o.createdAt | date:'short' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="s-btn btn-primary btn-sm"
+                  *ngIf="canPayOrder(o)"
+                  (click)="openPayOrderDialog(o)"
+                >
+                  {{ 'tr_add_payment' | translate }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pagination
+        *ngIf="ordersCount > perPage"
+        [paginationData]="ordersPagination"
+        [perPage]="perPage"
+        (paginationUpdate)="onOrdersPageChange($event)"
+      ></pagination>
+      <p *ngIf="!ordersCount" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+    </div>
+
+    <!-- Purchases from client -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'purchases'" role="tabpanel">
+      <p class="size-small text-muted mb-3">{{ 'tr_client_purchases_hint' | translate }}</p>
+      <div class="table-container mb-3" *ngIf="purchasesCount">
+        <table class="s-table table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_purchase_document_ref' | translate }}</th>
+              <th>{{ 'tr_name' | translate }}</th>
+              <th>{{ 'tr_code' | translate }}</th>
+              <th class="col-qty">{{ 'tr_cashier.QTY' | translate }}</th>
+              <th>{{ 'tr_paid' | translate }}</th>
+              <th>{{ 'tr_remaining' | translate }}</th>
+              <th>{{ 'tr_receipt_purchase_treasury' | translate }}</th>
+              <th class="col-status">{{ 'tr_status' | translate }}</th>
+              <th>{{ 'tr_created_at' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of pagedPurchases" [class.row-rejected]="p.status === 'rejected'">
+              <td>
+                <button
+                  type="button"
+                  class="history-invoice-link"
+                  *ngIf="p._id"
+                  (click)="goToPurchaseInvoice(p._id)"
+                >
+                  {{ purchaseRef(p) }}
+                </button>
+                <span *ngIf="!p._id">—</span>
+              </td>
+              <td>{{ p.productName }}</td>
+              <td>{{ p.productCode }}</td>
+              <td class="col-qty">{{ p.quantity }}</td>
+              <td>{{ p.totalPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>
+                <span *ngIf="p.isDeferredPurchase && (p.remaining || 0) > 0">
+                  {{ p.remaining | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </span>
+                <span *ngIf="!p.isDeferredPurchase || !(p.remaining || 0)">—</span>
+              </td>
+              <td>{{ purchaseTreasuryLabel(p) }}</td>
+              <td class="col-status">{{ purchaseStatusLabel(p.status) }}</td>
+              <td>{{ p.createdAt | date:'short' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="s-btn btn-primary btn-sm"
+                  *ngIf="canPayDeferredPurchase(p)"
+                  (click)="openPayDeferredPurchase(p)"
+                >
+                  {{ 'tr_add_payment' | translate }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pagination
+        *ngIf="purchasesCount > perPage"
+        [paginationData]="purchasesPagination"
+        [perPage]="perPage"
+        (paginationUpdate)="onPurchasesPageChange($event)"
+      ></pagination>
+      <p *ngIf="!purchasesCount" class="text-muted">{{ 'tr_client_purchases_empty' | translate }}</p>
+    </div>
+
+    <!-- Ledger -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'ledger'" role="tabpanel">
+      <div class="table-container mb-3" *ngIf="ledgerCount">
+        <table class="s-table table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_date' | translate }}</th>
+              <th>{{ 'tr_type' | translate }}</th>
+              <th>{{ 'tr_payment_method' | translate }}</th>
+              <th>{{ 'tr_payment_amount' | translate }}</th>
+              <th>{{ 'tr_payment_note' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let e of pagedLedgerEntries">
+              <td>{{ e.createdAt | date:'short' }}</td>
+              <td>{{ ledgerTypeLabel(e.type) }}</td>
+              <td>{{ paymentMethodLabel(e.paymentMethod) }}</td>
+              <td>{{ e.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+              <td>{{ e.note }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pagination
+        *ngIf="ledgerCount > perPage"
+        [paginationData]="ledgerPagination"
+        [perPage]="perPage"
+        (paginationUpdate)="onLedgerPageChange($event)"
+      ></pagination>
+      <p *ngIf="!ledgerCount" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+    </div>
+  </ng-container>
+</div>

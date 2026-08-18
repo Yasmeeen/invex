@@ -30,7 +30,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   isFilterOpen = true;
   isNotAuthorized = false;
   transfers: BranchTransferItem[] = [];
-  statusFilter: 'pending' | 'all' = 'pending';
+  statusFilter: 'pending' | 'rejected' | 'all' = 'pending';
   rejectTransfer: BranchTransferItem | null = null;
   rejectReason = '';
   actingId: string | null = null;
@@ -134,9 +134,9 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     );
   }
 
-  setFilter(v: 'pending' | 'all'): void {
+  setFilter(v: 'pending' | 'rejected' | 'all'): void {
     this.statusFilter = v;
-    this.params.status = v === 'all' ? 'all' : 'pending';
+    this.params.status = v;
     this.params.page = 1;
     this.load();
   }
@@ -300,17 +300,33 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   private mapTransferExportRow(t: BranchTransferItem): Record<string, string | number> {
     return {
-      [this.translate.instant('tr_product_name')]: t.product?.name || '',
-      [this.translate.instant('tr_code')]: t.product?.code || '',
+      [this.translate.instant('tr_product_name')]: this.transferProductName(t),
+      [this.translate.instant('tr_code')]: this.transferProductCode(t),
       [this.translate.instant('tr_branch_transfer_from')]: t.fromBranch?.name || '',
       [this.translate.instant('tr_branch_transfer_to_branch')]: t.toBranch?.name || '',
       [this.translate.instant('tr_branch_transfer_quantity')]: t.quantity ?? 0,
       [this.translate.instant('tr_branch_transfer_status_col')]: this.translate.instant(
         this.statusLabelKey(t)
       ),
+      [this.translate.instant('tr_branch_transfer_reject_reason')]:
+        t.status === 'rejected' ? t.rejectReason || '' : '',
       [this.translate.instant('tr_branch_transfer_date')]: this.formatTransferDate(t.createdAt) || '',
       [this.translate.instant('tr_branch_transfer_by')]: t.initiatedBy?.name || '',
     };
+  }
+
+  transferProductName(t: BranchTransferItem | null | undefined): string {
+    if (!t) {
+      return '';
+    }
+    return String(t.product?.name || t.productNameSnapshot || '').trim();
+  }
+
+  transferProductCode(t: BranchTransferItem | null | undefined): string {
+    if (!t) {
+      return '';
+    }
+    return String(t.product?.code || t.productCodeSnapshot || '').trim();
   }
 
   canResolve(transfer: BranchTransferItem): boolean {
@@ -403,7 +419,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   private transferConfirmDetails(t: BranchTransferItem): string[] {
     const details = [
-      `${this.translate.instant('tr_product_name')}: ${t.product?.name || '—'}`,
+      `${this.translate.instant('tr_product_name')}: ${this.transferProductName(t) || '—'}`,
       `${this.translate.instant('tr_branch_transfer_from')}: ${t.fromBranch?.name || '—'}`,
       `${this.translate.instant('tr_branch_transfer_to_branch')}: ${t.toBranch?.name || '—'}`,
       `${this.translate.instant('tr_branch_transfer_quantity')}: ${t.quantity ?? 0}`,

@@ -52,6 +52,9 @@ export interface DrawerClosePreview {
   /** Cash collected from clients on credit sales (installments) — included in cashReceivedTotal. */
   clientOrderCashDrawerTotal?: number;
   clientOrderCashDrawerPaymentCount?: number;
+  /** Cash received from clients as prepaid deposits. */
+  clientDepositCashDrawerTotal?: number;
+  clientDepositCashDrawerCount?: number;
   cashReceivedTotal: number;
   cashRefundedTotal: number;
   expectedCashInDrawer: number;

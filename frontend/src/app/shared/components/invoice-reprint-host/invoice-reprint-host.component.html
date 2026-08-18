@@ -9,3 +9,9 @@
   [purchase]="data"
   [printDate]="printDate"
 ></app-purchase-receipt-print>
+
+<app-payment-receipt-print
+  *ngIf="mode === 'payment' && data"
+  [receipt]="data"
+  [printDate]="printDate"
+></app-payment-receipt-print>

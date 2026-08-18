@@ -272,7 +272,7 @@
               </div>
               <div class="receipt-item-attrs" *ngIf="item.invoiceAttributes?.length">
                 <span class="receipt-item-attr" *ngFor="let ia of item.invoiceAttributes">
-                  {{ ia.label }}: {{ ia.value }}
+                  <bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi>
                 </span>
               </div>
             </td>

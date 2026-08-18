@@ -121,6 +121,20 @@
     background-image: none !important;
 }
 
+.options-menu {
+    >.fa-ellipsis-v,
+    >.fa-ellipsis-h {
+        width: 44px;
+        height: 44px;
+        font-size: 1.125rem;
+    }
+
+    >.fa-ellipsis-v:active,
+    >.fa-ellipsis-h:active {
+        background-color: rgba(0, 0, 0, 0.12);
+    }
+}
+
 .single-notification {
     .notifications-title {
         max-width: 170px !important;

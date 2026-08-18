@@ -427,3 +427,301 @@
     color: var(--dash-forest);
   }
 }
+
+/* ── Faisal branch opening celebration ── */
+.celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(17, 24, 39, 0.48);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.celebration__sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.celebration__piece {
+  position: absolute;
+  top: -24px;
+  border-radius: 1px;
+  opacity: 0.95;
+  animation-name: celebration-paper;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+.celebration__piece--paper {
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.18);
+}
+
+.celebration__piece--square {
+  border-radius: 2px;
+}
+
+.celebration__piece--strip {
+  border-radius: 1px;
+}
+
+.celebration__piece--star {
+  background: transparent !important;
+  line-height: 1;
+  font-size: 1em;
+  text-shadow: 0 0 8px currentColor;
+  animation-name: celebration-fall-spin;
+}
+
+.celebration__piece--burst {
+  animation-name: celebration-paper-burst;
+}
+
+@keyframes celebration-paper {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(var(--tilt, 0deg));
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 8vw), 110vh, 0) rotate(calc(var(--tilt, 0deg) + 540deg));
+    opacity: 0.8;
+  }
+}
+
+@keyframes celebration-paper-burst {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(var(--tilt, 0deg)) scale(0.7);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 10vw), 72vh, 0) rotate(calc(var(--tilt, 0deg) + 420deg)) scale(1);
+    opacity: 0.12;
+  }
+}
+
+@keyframes celebration-fall-spin {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(0deg) scale(0.8);
+    opacity: 0.4;
+  }
+  40% {
+    opacity: 1;
+    transform: translate3d(6vw, 40vh, 0) rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: translate3d(-8vw, 110vh, 0) rotate(540deg) scale(0.7);
+    opacity: 0.7;
+  }
+}
+
+.celebration__burst {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  animation: celebration-burst-pop 2.6s ease-out infinite;
+}
+
+.celebration__spark-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.celebration__spark {
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  animation: celebration-spark 1.15s ease-out infinite;
+}
+
+@keyframes celebration-burst-pop {
+  0%,
+  18% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes celebration-spark {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-92px) scale(0.15);
+    opacity: 0;
+  }
+}
+
+.celebration__card {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 1.75rem 1.75rem 1.5rem;
+  text-align: center;
+  cursor: default;
+  color: #1a1f1c;
+  background: #fff;
+  border: 1px solid rgba(108, 92, 231, 0.08);
+  border-radius: 28px;
+  box-shadow: 0 24px 64px rgba(17, 24, 39, 0.22);
+  animation: celebration-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.celebration__close {
+  position: absolute;
+  top: 14px;
+  inset-inline-end: 14px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+}
+
+.celebration__badge {
+  display: inline-block;
+  margin-bottom: 0.85rem;
+  padding: 0.28rem 0.85rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #6c5ce7;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.celebration__art {
+  margin: 0 auto 0.85rem;
+  width: min(220px, 70%);
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.celebration__congrats {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.55rem, 4vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #6c5ce7;
+}
+
+.celebration__title {
+  margin: 0 0 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #111827;
+}
+
+.celebration__subtitle {
+  margin: 0 0 1.35rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #9ca3af;
+}
+
+.celebration__cta {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  padding: 0.85rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  background: #6c5ce7;
+  box-shadow: 0 8px 20px rgba(108, 92, 231, 0.28);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    background: #5b4cdb;
+  }
+}
+
+.celebration__later {
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  border: none;
+  background: transparent;
+  color: #a78bfa;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: #6c5ce7;
+  }
+}
+
+@keyframes celebration-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes celebration-twinkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 0 18px rgba(245, 166, 35, 0.35);
+  }
+  50% {
+    transform: scale(1.12) rotate(12deg);
+    box-shadow: 0 0 32px rgba(245, 166, 35, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration__piece,
+  .celebration__piece--star,
+  .celebration__piece--burst,
+  .celebration__burst,
+  .celebration__spark,
+  .celebration__card {
+    animation: none !important;
+  }
+}

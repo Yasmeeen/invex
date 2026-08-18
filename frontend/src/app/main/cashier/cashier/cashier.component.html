@@ -306,8 +306,10 @@
             </div>
           </div>
            <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
-          <div *ngIf="bookedQty(product) > 0" class="cashier-booking-hint">
-            {{
+          <div
+            *ngIf="bookedQty(product) > 0"
+            class="cashier-booking-badge"
+            [attr.title]="
               'tr_cashier_booking_on_card'
                 | translate
                   : {
@@ -315,6 +317,12 @@
                       free: freeSellableQty(product),
                       stock: product.stock
                     }
+            "
+          >
+            <i class="fa fa-bookmark" aria-hidden="true"></i>
+            {{
+              'tr_product_booking_reserved_short'
+                | translate : { n: bookedQty(product) }
             }}
           </div>
           <div class="product-name">{{ product.name }}</div>
@@ -712,7 +720,7 @@
           </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
-              {{ ia.label }}: {{ ia.value }}
+              <bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi>
             </span>
           </div>
         </td>

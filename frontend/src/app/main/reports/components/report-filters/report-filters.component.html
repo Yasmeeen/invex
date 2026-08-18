@@ -30,7 +30,7 @@
     </div>
     <div
       class="report-filters__field report-filters__field--wide"
-      *ngIf="reportType === 'products' || reportType === 'sales'"
+      *ngIf="categoryFilterVisible"
     >
       <label>{{ 'tr_report_filter_category_id' | translate }}</label>
       <ng-select
@@ -39,8 +39,10 @@
         bindLabel="name"
         bindValue="_id"
         [items]="categories"
-        [(ngModel)]="filters.category_id"
+        [(ngModel)]="filters.category_ids"
         name="reportCategory"
+        [multiple]="true"
+        [closeOnSelect]="false"
         [clearable]="true"
         [searchable]="true"
         (change)="onCategoryChange()"

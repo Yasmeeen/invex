@@ -54,6 +54,21 @@ export async function resolveBranchForCashDrawer({ userId, branchId: branchIdRaw
   return null;
 }
 
+/**
+ * Drawer documents are written moments after their ledger entry, so they are matched
+ * by time rather than by amount — the two differ whenever payment-app fees are paid
+ * in cash (drawer doc holds cash + fees, the ledger entry only the cash split).
+ */
+export const CASH_DRAWER_DEDUPE_WINDOW_MS = 5 * 60 * 1000;
+
+/** Aggregation conditions matching a drawer doc recorded alongside a ledger entry. */
+export function drawerDocCreatedNearLedgerEntry(ledgerCreatedAtVar) {
+  return [
+    { $gte: ['$createdAt', { $subtract: [ledgerCreatedAtVar, CASH_DRAWER_DEDUPE_WINDOW_MS] }] },
+    { $lte: ['$createdAt', { $add: [ledgerCreatedAtVar, CASH_DRAWER_DEDUPE_WINDOW_MS] }] },
+  ];
+}
+
 export function buildCashDrawerLedgerFields({ fromCashDrawer, branchId }) {
   const fields = { affectsCashDrawer: Boolean(fromCashDrawer) };
   if (fromCashDrawer && branchId && mongoose.Types.ObjectId.isValid(String(branchId))) {
@@ -160,8 +175,8 @@ async function sumLegacyLedgerCashOutflows(branchOid, start, end) {
         from: paymentColl,
         let: {
           vId: '$_id',
-          amt: '$ledgerEntries.amount',
           pType: '$ledgerEntries.type',
+          at: '$ledgerEntries.createdAt',
         },
         pipeline: [
           {
@@ -169,9 +184,9 @@ async function sumLegacyLedgerCashOutflows(branchOid, start, end) {
               $expr: {
                 $and: [
                   { $eq: ['$vendor', '$$vId'] },
-                  { $eq: ['$amount', '$$amt'] },
                   { $eq: ['$paymentType', '$$pType'] },
                   { $eq: ['$branch', branchOid] },
+                  ...drawerDocCreatedNearLedgerEntry('$$at'),
                 ],
               },
             },

@@ -53,7 +53,7 @@
             <span
               class="invoice-item-attr"
               *ngFor="let ia of attrLinesFor(line?.productPayload)"
-            >{{ ia.label }}: {{ ia.value }}</span>
+            ><bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi></span>
           </div>
         </td>
         <td>{{ line.quantity }}</td>

@@ -68,6 +68,11 @@
         <label>{{ 'tr_payment_note' | translate }}</label>
         <input class="s-control width-100" type="text" formControlName="note" maxlength="500" />
       </div>
+
+      <label class="checkbox-row pay-order-dialog__print-row">
+        <input type="checkbox" [(ngModel)]="printReceipt" [ngModelOptions]="{ standalone: true }" />
+        <span>{{ 'tr_order_payment_print_receipt' | translate }}</span>
+      </label>
     </form>
   </div>
 

@@ -175,7 +175,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   payAmountInputMax(methodId: string): number | undefined {
-    return this.isCreditPayMethod(methodId) ? this.invoiceNetTotal : undefined;
+    if (this.isCreditPayMethod(methodId) || this.mode === 'installment') {
+      return this.invoiceNetTotal;
+    }
+    return undefined;
   }
 
   onSelectedPayMethodsChange(ids: string[] | null): void {
@@ -203,6 +206,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   private ensureDefaultNetAmounts(): void {
+    // Deposit amounts are free-form (invoiceNetTotal is 0); do not overwrite user input.
+    if (this.mode === 'deposit') {
+      return;
+    }
     if (this.selectedPayMethods.length !== 1) {
       return;
     }
@@ -214,8 +221,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       }
       return;
     }
-    // Keep single method in sync with invoice total (avoids freezing at first typed digit).
-    if (!Number.isFinite(cur) || Math.abs(cur - this.invoiceNetTotal) > 0.001) {
+    // Prefill empty amount only. Never replace a typed partial (installment / down payment).
+    if (!Number.isFinite(cur) || cur <= 0) {
       this.payAmounts = { ...this.payAmounts, [id]: Math.max(0, this.invoiceNetTotal) };
     }
   }
@@ -457,7 +464,11 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   confirm(): void {
-    this.ensureDefaultNetAmounts();
+    // Checkout with an empty amount can default to the invoice total.
+    // Installment / deposit must keep the typed amount (partial payments).
+    if (this.mode === 'checkout') {
+      this.ensureDefaultNetAmounts();
+    }
 
     const paymentSplits = this.selectedPayMethods
       .filter((id) => String(id || '').trim())

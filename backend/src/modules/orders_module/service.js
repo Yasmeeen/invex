@@ -30,6 +30,14 @@ import {
   postTreasurySplitOutflows,
   safeTreasuryPost,
 } from '../../utils/treasury-ledger.js';
+import { getOrCreateStoreSettings } from '../settings_module/storeSettingsDoc.js';
+import { normalizePaymentMethodsCatalog } from '../settings_module/paymentMethodsCatalog.js';
+import {
+  catalogCreditFeePercent,
+  creditMarkupAmount,
+  creditOnAccountAmount,
+  distributeAmountOntoLinePrices,
+} from '../../utils/credit-sale-markup.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -88,13 +96,16 @@ function normalizePaymentFeeAllocations(raw) {
 
 function appendFeePaymentLines(payments, feeAllocations, { paidAt, paidByUserId }) {
   for (const fee of feeAllocations) {
+    const collected = fee.feeGrossOnPaidVia > 0 ? fee.feeGrossOnPaidVia : fee.feeNet;
     payments.push({
-      amount: fee.feeNet,
+      amount: collected,
       paidAt,
       paidByUserId,
       method: fee.paidVia,
       countsTowardInvoice: false,
       feeForMethod: fee.forMethod,
+      feeNet: fee.feeNet,
+      feeGrossOnPaidVia: collected,
       feePercentSnapshot: fee.feePercentSnapshot > 0 ? fee.feePercentSnapshot : undefined,
       note: `Fee · ${fee.forMethod}`,
     });
@@ -178,7 +189,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -449,7 +460,7 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    const subtotalPrice = Math.round(totalPrice * 100) / 100;
+    let subtotalPrice = Math.round(totalPrice * 100) / 100;
     let invoiceDiscountAmount = Number(invoiceDiscountRaw);
     if (!Number.isFinite(invoiceDiscountAmount)) {
       invoiceDiscountAmount = 0;
@@ -675,6 +686,28 @@ export const createOrder = async (req, res) => {
       resolvedPaymentMethod = String(paymentMethod || 'cash').trim() || 'cash';
     }
 
+    let creditFeePercent = 0;
+    let creditFeeAmount = 0;
+    const onAccount = creditOnAccountAmount(amountDueForPayment, paidAmount);
+    if (onAccount > 0.001) {
+      const settingsDoc = await getOrCreateStoreSettings();
+      const catalog = normalizePaymentMethodsCatalog({
+        paymentMethodsCatalog: settingsDoc?.paymentMethodsCatalog,
+        paymentAppFeePercents: settingsDoc?.paymentAppFeePercents,
+        purchaseTreasuryMethods: settingsDoc?.purchaseTreasuryMethods,
+      });
+      creditFeePercent = catalogCreditFeePercent(catalog);
+      const wantedMarkup = creditMarkupAmount(onAccount, creditFeePercent);
+      if (wantedMarkup > 0) {
+        creditFeeAmount = distributeAmountOntoLinePrices(orderProducts, wantedMarkup);
+        if (creditFeeAmount > 0) {
+          subtotalPrice = Math.round((subtotalPrice + creditFeeAmount) * 100) / 100;
+          totalPrice = Math.round((totalPrice + creditFeeAmount) * 100) / 100;
+          amountDueForPayment = Math.round((amountDueForPayment + creditFeeAmount) * 100) / 100;
+        }
+      }
+    }
+
     const paymentStatus =
       paidAmount >= amountDueForPayment - 0.001
         ? 'paid'
@@ -715,6 +748,9 @@ export const createOrder = async (req, res) => {
           subtotalPrice,
           invoiceDiscountAmount,
           totalPrice,
+          ...(creditFeeAmount > 0
+            ? { creditFeePercent, creditFeeAmount }
+            : {}),
           ...(exchangeCreditApplied > 0
             ? {
                 exchangeTradeInCreditAmount: exchangeCreditApplied,

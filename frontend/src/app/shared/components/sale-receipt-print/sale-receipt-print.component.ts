@@ -134,6 +134,16 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
     return orderDisplayRemaining(this.order);
   }
 
+  receiptCreditFeeAmount(): number {
+    const n = Number(this.order?.creditFeeAmount);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+
+  receiptCreditFeePercent(): number {
+    const n = Number(this.order?.creditFeePercent);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   receiptPaidPayments(): Array<{ method?: string; amount: number; feeForMethod?: string }> {
     const list = this.order?.payments;
     if (!Array.isArray(list)) {

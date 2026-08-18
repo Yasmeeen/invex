@@ -114,6 +114,15 @@
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
+      <tr *ngIf="receiptCreditFeeAmount() > 0">
+        <td>
+          {{ 'tr_receipt_credit_fee_included' | receiptTranslate: st.receiptLanguage }}
+          ({{ receiptCreditFeePercent() }}%)
+        </td>
+        <td class="money">
+          +{{ formatReceiptAmount(receiptCreditFeeAmount()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
       <tr *ngIf="receiptExchangeCredit() > 0">
         <td>{{ 'tr_exchange_trade_in_credit_line' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">

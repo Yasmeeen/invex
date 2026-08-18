@@ -119,6 +119,11 @@ export const AdminSidebar = [
         routerLink: '/reports/desk-purchases',
         icon: 'fa fa-shopping-basket icon',
       },
+      {
+        name: 'tr_reports_treasury',
+        routerLink: '/reports/treasury',
+        icon: 'fa fa-university icon',
+      },
     ],
   },
   {
@@ -155,16 +160,29 @@ export const AdminSidebar = [
   },
 ];
 
-/** Co Admin: full admin menu except dashboard (/home) and profit report. */
+/** Co Admin: full admin menu except dashboard (/home) and profit report.
+ *  Accounts dashboard is not on /home for this role, so /treasury stays in the menu.
+ */
 export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== '/home').map(
   (item) => {
     if (!item.children?.length) {
       return item;
     }
-    return {
-      ...item,
-      children: item.children.filter((c) => c.routerLink !== '/reports/profit'),
-    };
+    const children = item.children.filter((c) => c.routerLink !== '/reports/profit');
+    if (item.name === 'tr_treasury_menu') {
+      return {
+        ...item,
+        children: [
+          {
+            name: 'tr_treasury_balances',
+            routerLink: '/treasury',
+            icon: 'fa fa-list-alt icon',
+          },
+          ...children,
+        ],
+      };
+    }
+    return { ...item, children };
   }
 );
 
@@ -260,6 +278,11 @@ export const Warehouse = [
         name: 'tr_report_title_desk_purchases',
         routerLink: '/reports/desk-purchases',
         icon: 'fa fa-shopping-basket icon',
+      },
+      {
+        name: 'tr_reports_treasury',
+        routerLink: '/reports/treasury',
+        icon: 'fa fa-university icon',
       },
     ],
   },

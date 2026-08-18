@@ -1,14 +1,191 @@
 .fw-bold {
   font-weight: 600;
 }
-.treasury-summary > div {
-  min-width: 140px;
-  margin-inline-end: 1.5rem;
-  margin-bottom: 0.5rem;
-}
 .text-success {
   color: #1b7a3d;
 }
 .text-danger {
   color: #b42318;
+}
+
+.account-kpi {
+  border: 1px solid #e6e9ef;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.85rem 1rem;
+}
+
+.account-kpi--primary {
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 70%);
+  border-color: #bfdbfe;
+}
+
+.account-kpi__label {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.account-kpi__value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.account-kpi__value--meta {
+  font-size: 0.95rem;
+}
+
+.method-card {
+  border: 1px solid #e6e9ef;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.62rem 0.72rem;
+}
+
+.method-card--in {
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 75%);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.method-card--out {
+  background: linear-gradient(180deg, #fef2f2 0%, #ffffff 75%);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.method-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.method-card__title {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.84rem;
+}
+
+.method-card__net {
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.method-card__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.method-card__stats span {
+  display: block;
+  font-size: 0.73rem;
+  color: #667085;
+}
+
+.method-card__stats strong {
+  display: block;
+  font-size: 0.8rem;
+  color: #111827;
+}
+
+.ledger-table-wrap {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ledger-table thead th {
+  background: #f8fafc;
+  color: #475467;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.ledger-table td {
+  border-top: 1px solid #f1f5f9;
+  font-size: 0.84rem;
+}
+
+.ledger-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.ledger-datetime {
+  width: 18%;
+  min-width: 148px;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ledger-table thead .ledger-datetime,
+.ledger-table thead .ledger-amount {
+  font-size: 0.82rem;
+}
+
+.ledger-icon-col {
+  width: 48px;
+}
+
+.ledger-source {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.ledger-direction {
+  font-weight: 700;
+}
+
+.ledger-amount {
+  width: 16%;
+  min-width: 132px;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 0.98rem;
+  color: #0f172a;
+}
+
+.tdash-tx__icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tdash-tx__icon--in {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.tdash-tx__icon--out {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.statement-filter-date .input-with-icon {
+  position: relative;
+}
+
+.statement-filter-date .s-control {
+  height: 36px;
+  font-size: 0.86rem;
+  padding-inline-end: 2.15rem;
+}
+
+.statement-filter-apply .s-btn {
+  min-width: 100%;
+  height: 36px;
 }

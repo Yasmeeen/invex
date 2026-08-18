@@ -90,14 +90,26 @@ export const createMoneyAccount = async (req, res) => {
     const accounts = allAccounts(doc);
     const used = new Set(accounts.map((a) => a.key));
     const key = allocateKey(label, used);
-    const channel = parseChannel('treasury', key, req.body?.channel);
+    const kind =
+      String(req.body?.kind || '')
+        .trim()
+        .toLowerCase() === 'settlement'
+        ? 'settlement'
+        : 'treasury';
+    const channel = parseChannel(kind, key, req.body?.channel);
     const created = {
       key,
       label,
-      kind: 'treasury',
+      kind,
       channel,
-      accountNumber: channel === 'bank' ? String(req.body?.accountNumber || '').trim().slice(0, 80) : '',
-      phone: channel === 'wallet' ? String(req.body?.phone || '').trim().slice(0, 40) : '',
+      accountNumber:
+        kind !== 'settlement' && channel === 'bank'
+          ? String(req.body?.accountNumber || '').trim().slice(0, 80)
+          : '',
+      phone:
+        kind !== 'settlement' && channel === 'wallet'
+          ? String(req.body?.phone || '').trim().slice(0, 40)
+          : '',
       enabled: req.body?.enabled !== false && req.body?.enabled !== 'false',
     };
     const next = [...accounts, created];

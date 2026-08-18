@@ -3,7 +3,11 @@
 
   <div class="form-group">
     <label>{{ 'tr_treasury_from' | translate }}</label>
-    <select class="s-control width-100" [(ngModel)]="fromAccountKey">
+    <select
+      class="s-control width-100"
+      [(ngModel)]="fromAccountKey"
+      (ngModelChange)="onAccountsChanged()"
+    >
       <option value="">—</option>
       <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
     </select>
@@ -18,10 +22,27 @@
 
   <div class="form-group">
     <label>{{ 'tr_treasury_to' | translate }}</label>
-    <select class="s-control width-100" [(ngModel)]="toAccountKey">
+    <select
+      class="s-control width-100"
+      [(ngModel)]="toAccountKey"
+      (ngModelChange)="onAccountsChanged()"
+    >
       <option value="">—</option>
       <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
     </select>
+  </div>
+
+  <div class="form-group" *ngIf="showBranchPicker">
+    <label>{{ 'tr_branch' | translate }}</label>
+    <select
+      class="s-control width-100"
+      [(ngModel)]="selectedBranchId"
+      (ngModelChange)="onBranchChange()"
+    >
+      <option value="">—</option>
+      <option *ngFor="let b of branches" [value]="b._id">{{ b.name }}</option>
+    </select>
+    <p class="transfer-balance">{{ 'tr_treasury_cash_branch_hint' | translate }}</p>
   </div>
 
   <div class="form-group">

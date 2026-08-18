@@ -159,6 +159,9 @@ export interface Order {
   /** Extra cashier discount on the whole bill. */
   invoiceDiscountAmount?: number;
   totalPrice?: number;
+  /** بيع بالآجل: % added onto unpaid portion (already in line prices / totalPrice). */
+  creditFeePercent?: number;
+  creditFeeAmount?: number;
   /** Credit sales tracking */
   amountPaid?: number;
   paymentStatus?: 'unpaid' | 'partial' | 'paid';

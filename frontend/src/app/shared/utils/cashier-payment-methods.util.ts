@@ -161,19 +161,29 @@ export function paymentMethodDisplayLabel(
   fees: PaymentAppFeePercent[] | undefined | null,
   translate: TranslateService,
   lang?: string,
-  catalog?: PaymentMethodCatalogRow[] | null
+  catalog?: PaymentMethodCatalogRow[] | null,
+  extraAccounts?: Array<{ key?: string; label?: string }> | null
 ): string {
-  const m = String(methodId || '').trim().toLowerCase();
+  const m = String(methodId || '')
+    .trim()
+    .toLowerCase();
   if (!m) {
     return '—';
   }
-  const cat = (catalog || []).find((x) => x.key === m);
+  if (m === 'mixed') {
+    return defaultLabelForMethod('mixed', translate, lang);
+  }
+  const cat = (catalog || []).find((x) => String(x.key || '').toLowerCase() === m);
   if (cat?.label && String(cat.label).trim()) {
     return String(cat.label).trim();
   }
-  const row = (fees || []).find((x) => x.method === m);
+  const row = (fees || []).find((x) => String(x.method || '').toLowerCase() === m);
   if (row?.label && String(row.label).trim()) {
     return String(row.label).trim();
+  }
+  const acc = (extraAccounts || []).find((x) => String(x.key || '').toLowerCase() === m);
+  if (acc?.label && String(acc.label).trim()) {
+    return String(acc.label).trim();
   }
   return defaultLabelForMethod(m, translate, lang);
 }

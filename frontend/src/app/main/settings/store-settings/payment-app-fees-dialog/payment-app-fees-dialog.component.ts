@@ -190,6 +190,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
 
   /** Instant methods with no treasury home — money accepted but not posted to accounts. */
   needsAccountLinkWarning(row: CatalogUiRow): boolean {
+    if (row.effectMode === 'settlement') return !row.accountKey;
     return row.effectMode === 'instant' && !row.accountKey && row.key !== 'cash';
   }
 
@@ -207,6 +208,10 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
 
   openSettle(row: CatalogUiRow): void {
     if (row.effectMode !== 'settlement' || this.saving) return;
+    if (!row.accountKey) {
+      this.notify.push(this.translate.instant('tr_payment_linked_settlement_none'), 'error');
+      return;
+    }
     if (!row.settlementBankAccountKey) {
       this.notify.push(this.translate.instant('tr_payment_settle_need_bank'), 'error');
       return;
@@ -215,8 +220,8 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
       width: '420px',
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
-        methodKey: row.key,
-        label: row.label,
+        methodKey: row.accountKey,
+        label: this.linkedAccountLabel(row),
         settlementBankAccountKey: row.settlementBankAccountKey,
         settlementBankLabel: this.settlementBankLabel(row),
       },
@@ -366,14 +371,13 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
   private toUiRow(r: PaymentMethodRecord): CatalogUiRow {
     const key = String(r.key || '').toLowerCase();
     const effectMode = r.effectMode || 'instant';
-    const accountKey =
-      key === 'cash' ? 'cash' : effectMode === 'settlement' ? key : r.accountKey || '';
+    const accountKey = key === 'cash' ? 'cash' : r.accountKey || '';
     return {
       key,
       label: r.label,
       showIn: r.showIn || 'sale',
       effectMode,
-      feePercent: key === 'cash' || key === 'credit' ? 0 : Number(r.feePercent) || 0,
+      feePercent: key === 'cash' ? 0 : Number(r.feePercent) || 0,
       lockedKey: true,
       accountKey,
       settlementBankAccountKey: r.settlementBankAccountKey || '',

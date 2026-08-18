@@ -35,5 +35,9 @@ export class ReportsService {
   getDeskPurchasesTreasuryReport(params: any) {
     return this.http.get(`${REPORTS_URL}/desk-purchases-treasury`, { params });
   }
+
+  getTreasuryAccountsReport(params: any) {
+    return this.http.get(`${REPORTS_URL}/treasury-accounts`, { params });
+  }
 }
 

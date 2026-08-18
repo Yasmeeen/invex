@@ -11,6 +11,7 @@ import {
   salesRefundCashDue,
 } from './return-refund-mirror.js';
 import { getEffectivePurchaseTreasuryMethodsFromDb, treasuryMethodMap } from '../modules/settings_module/treasuryMethods.js';
+import { netSettlementFeesOnPaymentSplits } from './treasury-ledger.js';
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -379,7 +380,10 @@ export async function processOrderReturn(order, body = {}) {
     const alreadyPaid = round2(Number(order.amountPaid) || 0);
 
     if (cashRefundDue > 0.001) {
-      const baseSplits = buildSalesRefundPaymentSplits(order, cashRefundDue);
+      const baseSplits = await netSettlementFeesOnPaymentSplits(
+        buildSalesRefundPaymentSplits(order, cashRefundDue),
+        order.payments
+      );
       const finalized = finalizeSalesRefundSplits(baseSplits, {
         cashRefundVia: cashViaRaw,
         cashTreasuryKey,
@@ -398,7 +402,10 @@ export async function processOrderReturn(order, body = {}) {
     }
     recalcPaymentStatus(order);
   } else {
-    const baseSplits = buildSalesRefundPaymentSplits(order, refundTotal);
+    const baseSplits = await netSettlementFeesOnPaymentSplits(
+      buildSalesRefundPaymentSplits(order, refundTotal),
+      order.payments
+    );
     const finalized = finalizeSalesRefundSplits(baseSplits, {
       cashRefundVia: cashViaRaw,
       cashTreasuryKey,

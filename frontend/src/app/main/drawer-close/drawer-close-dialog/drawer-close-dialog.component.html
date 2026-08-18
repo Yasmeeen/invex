@@ -108,7 +108,7 @@
             class="drawer-close-dialog__row drawer-close-dialog__row--sub"
             *ngFor="let row of preview.salesReturnRefundsByTreasury"
           >
-            <span>{{ row.label }} <span class="drawer-close-dialog__hint">({{ row.key }}) · {{ row.count }}</span></span>
+            <span>{{ payMethodLabel(row.key) || row.label }} <span class="drawer-close-dialog__hint">· {{ row.count }}</span></span>
             <span>−{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
           </div>
         </ng-container>
@@ -188,7 +188,7 @@
         <ng-container *ngIf="preview.deskPurchaseByTreasuryMethod?.length">
           <div class="drawer-close-dialog__muted size-small mb-1">{{ 'tr_drawer_close_desk_purchase_by_treasury' | translate }}</div>
           <div class="drawer-close-dialog__row drawer-close-dialog__row--sub" *ngFor="let row of preview.deskPurchaseByTreasuryMethod">
-            <span>{{ row.label }} <span class="drawer-close-dialog__hint">({{ row.key }}) · {{ row.count }}</span></span>
+            <span>{{ payMethodLabel(row.key) || row.label }} <span class="drawer-close-dialog__hint">· {{ row.count }}</span></span>
             <span>−{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
           </div>
         </ng-container>

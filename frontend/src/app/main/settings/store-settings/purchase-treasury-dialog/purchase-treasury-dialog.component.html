@@ -5,8 +5,16 @@
       <button
         type="button"
         class="s-btn btn-secondary btn-sm"
+        (click)="openDeposit()"
+        [disabled]="saving"
+      >
+        <i class="fa fa-arrow-down mr-1"></i>{{ 'tr_treasury_deposit' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary btn-sm"
         (click)="openTransfer()"
-        [disabled]="saving || !singleBranchId"
+        [disabled]="saving"
       >
         <i class="fa fa-exchange mr-1"></i>{{ 'tr_treasury_transfer' | translate }}
       </button>
@@ -210,6 +218,13 @@
                   </div>
                   <div
                     class="single-option"
+                    *ngIf="row.kind !== 'settlement'"
+                    (click)="openDeposit(row)"
+                  >
+                    {{ 'tr_treasury_deposit' | translate }}
+                  </div>
+                  <div
+                    class="single-option"
                     *ngIf="row.kind === 'settlement' && singleBranchId"
                     (click)="openQuickSettle(row)"
                   >
@@ -217,7 +232,6 @@
                   </div>
                   <div
                     class="single-option"
-                    *ngIf="singleBranchId"
                     (click)="openStatement(row)"
                   >
                     {{ 'tr_treasury_account_statement' | translate }}

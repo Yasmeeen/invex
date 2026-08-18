@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogModule } from '@angular/material/dialog';
 import { SharedModule } from '@shared/shared.module';
 import { TreasuryTransferDialogModule } from '../../../treasury/treasury-transfer-dialog/treasury-transfer-dialog.module';
+import { TreasuryDepositDialogModule } from '../../../treasury/treasury-deposit-dialog/treasury-deposit-dialog.module';
 import { TreasurySettleDialogModule } from '../../../treasury/treasury-settle-dialog/treasury-settle-dialog.module';
 import { PurchaseTreasuryDialogComponent } from './purchase-treasury-dialog.component';
 import { MoneyAccountFormDialogComponent } from '../money-account-form-dialog/money-account-form-dialog.component';
@@ -16,6 +17,7 @@ import { MoneyAccountFormDialogComponent } from '../money-account-form-dialog/mo
     SharedModule,
     MatDialogModule,
     TreasuryTransferDialogModule,
+    TreasuryDepositDialogModule,
     TreasurySettleDialogModule,
   ],
   exports: [PurchaseTreasuryDialogComponent],

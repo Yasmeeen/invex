@@ -33,10 +33,10 @@
             class="s-control"
             [(ngModel)]="row.accountKey"
             [name]="'payMap_' + row.method"
-            [disabled]="row.method === 'cash' || row.mode === 'settlement'"
+            [disabled]="row.method === 'cash'"
           >
             <option value="">{{ 'tr_payment_account_map_none' | translate }}</option>
-            <option *ngFor="let a of accounts" [value]="a.key">
+            <option *ngFor="let a of accountsForRow(row)" [value]="a.key">
               {{ a.label }}
             </option>
           </select>

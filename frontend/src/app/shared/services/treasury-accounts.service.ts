@@ -36,7 +36,10 @@ export interface TreasuryLedgerEntry {
   sourceType: string;
   sourceId?: string;
   counterAccountKey?: string;
+  counterAccountLabel?: string;
   note?: string;
+  branchId?: string;
+  branchName?: string;
   createdBy?: { _id: string; name?: string };
 }
 
@@ -60,13 +63,12 @@ export class TreasuryAccountsService {
 
   listAccounts(params: {
     userId: string;
-    branch: string;
+    branch?: string;
     until?: string;
     includeSettlement?: boolean;
-  }): Observable<{ branch: string; until: string; accounts: MoneyAccountBalance[] }> {
-    let httpParams = new HttpParams()
-      .set('userId', params.userId)
-      .set('branch', params.branch);
+  }): Observable<{ branch: string | null; until: string; accounts: MoneyAccountBalance[] }> {
+    let httpParams = new HttpParams().set('userId', params.userId);
+    if (params.branch) httpParams = httpParams.set('branch', params.branch);
     if (params.until) httpParams = httpParams.set('until', params.until);
     if (params.includeSettlement) httpParams = httpParams.set('includeSettlement', '1');
     return this.http.get<{ branch: string; until: string; accounts: MoneyAccountBalance[] }>(
@@ -77,13 +79,13 @@ export class TreasuryAccountsService {
 
   listRecent(params: {
     userId: string;
-    branch: string;
+    branch?: string;
     limit?: number;
-  }): Observable<{ branch: string; entries: TreasuryRecentEntry[] }> {
+  }): Observable<{ branch: string | null; entries: TreasuryRecentEntry[] }> {
     let httpParams = new HttpParams()
       .set('userId', params.userId)
-      .set('branch', params.branch)
       .set('limit', String(params.limit || 8));
+    if (params.branch) httpParams = httpParams.set('branch', params.branch);
     return this.http.get<{ branch: string; entries: TreasuryRecentEntry[] }>(
       `${TREASURY_URL}/recent`,
       { params: httpParams }
@@ -93,10 +95,11 @@ export class TreasuryAccountsService {
   getAccount(params: {
     key: string;
     userId: string;
-    branch: string;
+    branch?: string;
     until?: string;
   }): Observable<{
-    branch: string;
+    branch: string | null;
+    allBranches?: boolean;
     account: {
       key: string;
       label: string;
@@ -105,15 +108,15 @@ export class TreasuryAccountsService {
       accountNumber?: string;
       phone?: string;
     };
+    linkedPaymentMethods?: Array<{ key: string; label: string }>;
     openingBalance: number;
     inTotal: number;
     outTotal: number;
     periodNet: number;
     expectedBalance: number;
   }> {
-    let httpParams = new HttpParams()
-      .set('userId', params.userId)
-      .set('branch', params.branch);
+    let httpParams = new HttpParams().set('userId', params.userId);
+    if (params.branch) httpParams = httpParams.set('branch', params.branch);
     if (params.until) httpParams = httpParams.set('until', params.until);
     return this.http.get<any>(`${TREASURY_URL}/accounts/${encodeURIComponent(params.key)}`, {
       params: httpParams,
@@ -123,14 +126,18 @@ export class TreasuryAccountsService {
   listLedger(params: {
     key: string;
     userId: string;
-    branch: string;
+    branch?: string;
     from?: string;
     to?: string;
+    methods?: string[];
     page?: number;
     limit?: number;
   }): Observable<{
-    branch: string;
+    branch: string | null;
+    allBranches?: boolean;
     accountKey: string;
+    linkedPaymentMethods?: Array<{ key: string; label: string }>;
+    methodTotals?: Array<{ key: string; label: string; inTotal: number; outTotal: number; net: number }>;
     page: number;
     limit: number;
     total: number;
@@ -138,11 +145,14 @@ export class TreasuryAccountsService {
   }> {
     let httpParams = new HttpParams()
       .set('userId', params.userId)
-      .set('branch', params.branch)
       .set('page', String(params.page || 1))
       .set('limit', String(params.limit || 30));
+    if (params.branch) httpParams = httpParams.set('branch', params.branch);
     if (params.from) httpParams = httpParams.set('from', params.from);
     if (params.to) httpParams = httpParams.set('to', params.to);
+    if (params.methods?.length) {
+      httpParams = httpParams.set('methods', params.methods.join(','));
+    }
     return this.http.get<any>(
       `${TREASURY_URL}/accounts/${encodeURIComponent(params.key)}/ledger`,
       { params: httpParams }
@@ -151,7 +161,7 @@ export class TreasuryAccountsService {
 
   createTransfer(body: {
     userId: string;
-    branch: string;
+    branch?: string;
     fromAccountKey: string;
     toAccountKey: string;
     amount: number;
@@ -161,9 +171,25 @@ export class TreasuryAccountsService {
     return this.http.post(`${TREASURY_URL}/transfers`, body);
   }
 
+  createDeposit(body: {
+    userId: string;
+    branch: string;
+    accountKey: string;
+    amount: number;
+    note?: string;
+  }): Observable<any> {
+    return this.http.post(`${TREASURY_URL}/deposits`, body);
+  }
+
   setOpeningBalance(
     key: string,
-    body: { userId: string; branch: string; amount: number; note?: string }
+    body: {
+      userId: string;
+      branch?: string;
+      amount: number;
+      note?: string;
+      allBranches?: boolean;
+    }
   ): Observable<any> {
     return this.http.post(
       `${TREASURY_URL}/accounts/${encodeURIComponent(key)}/opening-balance`,
@@ -173,7 +199,7 @@ export class TreasuryAccountsService {
 
   settleAccount(
     key: string,
-    body: { userId: string; branch: string; amount: number; note?: string }
+    body: { userId: string; amount: number; note?: string }
   ): Observable<any> {
     return this.http.post(
       `${TREASURY_URL}/accounts/${encodeURIComponent(key)}/settle`,

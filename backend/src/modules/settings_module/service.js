@@ -25,8 +25,8 @@ function serializeSettings(doc) {
     purchaseTreasuryMethods: doc.purchaseTreasuryMethods,
   });
 
-  // Money accounts in DB are authoritative. Catalog may only ADD missing homes
-  // (e.g. new settlement apps) — never rebuild the list from sale/purchase catalog.
+  // Money accounts in DB are authoritative. Catalog may only ADD missing
+  // treasury homes for instant purchase methods — never auto-create settlement companies.
   let moneyAccounts = normalizeMoneyAccounts({
     purchaseTreasuryMethods: doc.purchaseTreasuryMethods,
     moneyAccounts: doc.moneyAccounts,

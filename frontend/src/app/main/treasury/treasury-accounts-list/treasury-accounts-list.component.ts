@@ -17,6 +17,7 @@ import * as Highcharts from 'highcharts';
 import { forkJoin, of, Subscription } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { TreasuryTransferDialogComponent } from '../treasury-transfer-dialog/treasury-transfer-dialog.component';
+import { TreasuryDepositDialogComponent } from '../treasury-deposit-dialog/treasury-deposit-dialog.component';
 import { TreasurySettleDialogComponent } from '../treasury-settle-dialog/treasury-settle-dialog.component';
 
 export type TreasuryDisplayType = 'cash' | 'bank' | 'wallet' | 'settlement';
@@ -68,13 +69,11 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
         this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
           next: (res: any) => {
             this.branches = res?.branches || [];
-            if (!this.filterBranchId && this.branches.length) {
-              this.filterBranchId = this.branches[0]._id;
-              this.load();
-            }
+            this.load();
           },
           error: () => {
             this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+            this.load();
           },
         })
       );
@@ -86,6 +85,11 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
 
   get showBranchFilter(): boolean {
     return canPickBranchRole(this.globals.currentUser?.role);
+  }
+
+  get canDeposit(): boolean {
+    const r = this.globals.currentUser?.role;
+    return r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager';
   }
 
   get summaries(): SummaryBucket[] {
@@ -110,7 +114,6 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
   get filteredAccounts(): MoneyAccountBalance[] {
     const q = this.searchQuery.trim().toLowerCase();
     return this.accounts.filter((acc) => {
-      if (!this.typeFilter && this.displayType(acc) === 'settlement') return false;
       if (this.typeFilter && this.displayType(acc) !== this.typeFilter) return false;
       if (!q) return true;
       const ref = this.accountRef(acc).toLowerCase();
@@ -147,22 +150,27 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
 
   load(): void {
     const uid = this.globals.currentUser?._id;
-    if (!uid || !this.filterBranchId) {
+    if (!uid) {
+      this.loading = false;
+      return;
+    }
+    if (!this.showBranchFilter && !this.filterBranchId) {
       this.loading = false;
       return;
     }
     this.loading = true;
+    const branch = this.filterBranchId || undefined;
     this.subscriptions.push(
       forkJoin({
         accounts: this.treasury.listAccounts({
           userId: uid,
-          branch: this.filterBranchId,
+          branch,
           until: this.untilDate || undefined,
           includeSettlement: true,
         }),
         recent: this.treasury
-          .listRecent({ userId: uid, branch: this.filterBranchId, limit: 8 })
-          .pipe(catchError(() => of({ branch: this.filterBranchId, entries: [] }))),
+          .listRecent({ userId: uid, branch, limit: 8 })
+          .pipe(catchError(() => of({ branch: branch || null, entries: [] }))),
       }).subscribe({
         next: ({ accounts, recent }) => {
           this.accounts = accounts.accounts || [];
@@ -247,7 +255,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
 
   openAccount(acc: MoneyAccountBalance): void {
     this.router.navigate(['/treasury', acc.key], {
-      queryParams: { branch: this.filterBranchId },
+      queryParams: this.filterBranchId ? { branch: this.filterBranchId } : {},
     });
   }
 
@@ -259,7 +267,6 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
       data: {
         methodKey: acc.key,
         label: acc.label,
-        branchId: this.filterBranchId,
       },
     });
     this.subscriptions.push(
@@ -277,6 +284,25 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
         branchId: this.filterBranchId,
         accounts: this.accounts,
         isSettlement,
+      },
+    });
+    this.subscriptions.push(
+      ref.afterClosed().subscribe((ok) => {
+        if (ok) this.load();
+      })
+    );
+  }
+
+  openDeposit(): void {
+    if (!this.canDeposit) return;
+    const branches = this.showBranchFilter ? this.branches : [];
+    const ref = this.dialog.open(TreasuryDepositDialogComponent, {
+      width: '480px',
+      panelClass: 'treasury-transfer-dialog-panel',
+      data: {
+        branchId: this.filterBranchId,
+        branches,
+        accounts: this.filterBranchId ? this.accounts : undefined,
       },
     });
     this.subscriptions.push(

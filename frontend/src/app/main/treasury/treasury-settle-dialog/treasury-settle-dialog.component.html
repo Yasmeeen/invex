@@ -8,21 +8,6 @@
       <div class="s-control settle-dialog__readonly">{{ methodLabel }}</div>
     </label>
 
-    <label class="settle-dialog__field" *ngIf="showBranchPicker">
-      <span>{{ 'tr_branch' | translate }}</span>
-      <ng-select
-        class="s-control s-select"
-        [(ngModel)]="branchId"
-        [items]="branches"
-        bindLabel="name"
-        bindValue="_id"
-        [clearable]="false"
-        name="settleBranch"
-        (change)="onBranchChanged()"
-      >
-      </ng-select>
-    </label>
-
     <label class="settle-dialog__field">
       <span>{{ 'tr_payment_settlement_bank' | translate }}</span>
       <div class="s-control settle-dialog__readonly">{{ bankLabel || '—' }}</div>

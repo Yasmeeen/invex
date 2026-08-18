@@ -26,6 +26,7 @@ import {
   MoneyAccountFormResult,
 } from '../money-account-form-dialog/money-account-form-dialog.component';
 import { TreasuryTransferDialogComponent } from '../../../treasury/treasury-transfer-dialog/treasury-transfer-dialog.component';
+import { TreasuryDepositDialogComponent } from '../../../treasury/treasury-deposit-dialog/treasury-deposit-dialog.component';
 import { TreasurySettleDialogComponent } from '../../../treasury/treasury-settle-dialog/treasury-settle-dialog.component';
 
 interface AccountUiRow {
@@ -164,7 +165,6 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     const q = this.searchQuery.trim().toLowerCase();
     return this.treasuryRows.filter((row) => {
       const ch = this.rowDisplayChannel(row);
-      if (!this.channelFilter && ch === 'settlement') return false;
       if (this.channelFilter && ch !== this.channelFilter) return false;
       if (!q) return true;
       return (
@@ -241,7 +241,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
   }
 
   canManageRow(row: AccountUiRow): boolean {
-    return row.key !== 'cash' && row.kind !== 'settlement';
+    return row.key !== 'cash';
   }
 
   channelIcon(row: AccountUiRow): string {
@@ -261,21 +261,48 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
   }
 
   openAdd(): void {
-    this.openFormDialog({ mode: 'add', channel: 'bank', enabled: true });
+    const kind: 'settlement' | 'treasury' =
+      this.channelFilter === 'settlement' ? 'settlement' : 'treasury';
+    const channel =
+      kind === 'settlement' ? '' : this.channelFilter === 'wallet' ? 'wallet' : 'bank';
+    this.openFormDialog({ mode: 'add', kind, channel, enabled: true });
   }
 
   openTransfer(): void {
     if (this.saving) return;
-    if (!this.singleBranchId) {
-      this.notify.push(this.translate.instant('tr_treasury_pick_one_branch'), 'error');
-      return;
-    }
+    const branches = this.showBranchFilter ? this.branches : [];
+    const branchId =
+      this.singleBranchId || (branches.length === 1 ? String(branches[0]._id) : '');
     const ref = this.dialog.open(TreasuryTransferDialogComponent, {
       width: '480px',
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
-        branchId: this.singleBranchId,
-        accounts: this.accountBalances,
+        branchId,
+        branches,
+        accounts: this.singleBranchId ? this.accountBalances : undefined,
+      },
+    });
+    this.subscriptions.push(
+      ref.afterClosed().subscribe((ok) => {
+        if (ok) this.loadList({ silent: true });
+      })
+    );
+  }
+
+  openDeposit(row?: AccountUiRow): void {
+    if (this.saving) return;
+    if (row?.kind === 'settlement') return;
+    const branches = this.showBranchFilter ? this.branches : [];
+    const branchId =
+      this.singleBranchId || (branches.length === 1 ? String(branches[0]._id) : '');
+    const ref = this.dialog.open(TreasuryDepositDialogComponent, {
+      width: '480px',
+      panelClass: 'treasury-transfer-dialog-panel',
+      data: {
+        branchId,
+        branches,
+        accounts: this.singleBranchId ? this.accountBalances : undefined,
+        preferAccount: row?.key,
       },
     });
     this.subscriptions.push(
@@ -291,6 +318,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       mode: 'edit',
       key: row.key,
       label: row.label,
+      kind: row.kind === 'settlement' ? 'settlement' : 'treasury',
       channel: row.channel,
       accountNumber: row.accountNumber,
       phone: row.phone,
@@ -406,7 +434,6 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       data: {
         methodKey: row.key,
         label: row.label,
-        branchId: this.singleBranchId,
       },
     });
     this.subscriptions.push(
@@ -417,13 +444,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
   }
 
   openStatement(row: AccountUiRow): void {
-    if (!this.singleBranchId) {
-      this.notify.push(this.translate.instant('tr_treasury_pick_one_branch'), 'error');
-      return;
-    }
-    this.router.navigate(['/treasury', row.key], {
-      queryParams: { branch: this.singleBranchId },
-    });
+    this.router.navigate(['/treasury', row.key]);
   }
 
   toggleEnabled(row: AccountUiRow): void {
@@ -445,6 +466,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     mode: 'add' | 'edit';
     key?: string;
     label?: string;
+    kind?: 'cash' | 'treasury' | 'settlement';
     channel?: MoneyAccountChannel | '';
     accountNumber?: string;
     phone?: string;
@@ -474,7 +496,8 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       this.moneyAccounts
         .create({
           label: result.label,
-          channel: result.channel === 'wallet' ? 'wallet' : 'bank',
+          kind: result.kind === 'settlement' ? 'settlement' : 'treasury',
+          channel: result.kind === 'settlement' ? '' : result.channel === 'wallet' ? 'wallet' : 'bank',
           accountNumber: result.accountNumber,
           phone: result.phone,
           enabled: result.enabled !== false,
@@ -493,7 +516,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       this.moneyAccounts
         .update(result.key, {
           label: result.label,
-          channel: result.channel === 'wallet' ? 'wallet' : 'bank',
+          channel: result.kind === 'settlement' ? '' : result.channel === 'wallet' ? 'wallet' : 'bank',
           accountNumber: result.accountNumber,
           phone: result.phone,
           enabled: result.enabled !== false,
@@ -543,11 +566,11 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   private loadRowsFromSettings(): void {
     const money = this.storeSettingsService.snapshot.moneyAccounts || [];
-    const editable = money.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
     const methods = this.storeSettingsService.snapshot.purchaseTreasuryMethods || [];
+    const editable = money.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
 
-    if (editable.length > 1 || (editable.length === 1 && editable[0].key !== 'cash')) {
-      this.treasuryRows = editable.map((a) => this.toUiRow(a));
+    if (money.length > 1 || (money.length === 1 && money[0].key !== 'cash')) {
+      this.treasuryRows = money.map((a) => this.toUiRow(a));
       this.clampPage();
       return;
     }
@@ -631,6 +654,16 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     this.clampPage();
   }
 
+  /** Identical opening across branches is company-wide and counted once. */
+  private combineCompanyOpening(a: number, b: number): number {
+    const x = Math.round((Number(a) || 0) * 100) / 100;
+    const y = Math.round((Number(b) || 0) * 100) / 100;
+    if (x === y) return x;
+    if (!x) return y;
+    if (!y) return x;
+    return Math.round((x + y) * 100) / 100;
+  }
+
   private mergeAccountBalances(lists: MoneyAccountBalance[][]): MoneyAccountBalance[] {
     const map = new Map<string, MoneyAccountBalance>();
     for (const list of lists) {
@@ -639,22 +672,33 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
         if (!key) continue;
         const prev = map.get(key);
         if (!prev) {
+          const opening = Number(acc.openingBalance) || 0;
+          const inn = Number(acc.inTotal) || 0;
+          const out = Number(acc.outTotal) || 0;
           map.set(key, {
             ...acc,
-            openingBalance: Number(acc.openingBalance) || 0,
-            inTotal: Number(acc.inTotal) || 0,
-            outTotal: Number(acc.outTotal) || 0,
-            periodNet: Number(acc.periodNet) || 0,
-            expectedBalance: Number(acc.expectedBalance) || 0,
+            openingBalance: opening,
+            inTotal: inn,
+            outTotal: out,
+            periodNet: inn - out,
+            expectedBalance: opening + inn - out,
           });
           continue;
         }
-        prev.openingBalance = (Number(prev.openingBalance) || 0) + (Number(acc.openingBalance) || 0);
-        prev.inTotal = (Number(prev.inTotal) || 0) + (Number(acc.inTotal) || 0);
-        prev.outTotal = (Number(prev.outTotal) || 0) + (Number(acc.outTotal) || 0);
-        prev.periodNet = (Number(prev.periodNet) || 0) + (Number(acc.periodNet) || 0);
-        prev.expectedBalance =
-          (Number(prev.expectedBalance) || 0) + (Number(acc.expectedBalance) || 0);
+        const opening =
+          key === 'cash'
+            ? (Number(prev.openingBalance) || 0) + (Number(acc.openingBalance) || 0)
+            : this.combineCompanyOpening(
+                Number(prev.openingBalance) || 0,
+                Number(acc.openingBalance) || 0
+              );
+        const inn = (Number(prev.inTotal) || 0) + (Number(acc.inTotal) || 0);
+        const out = (Number(prev.outTotal) || 0) + (Number(acc.outTotal) || 0);
+        prev.openingBalance = opening;
+        prev.inTotal = inn;
+        prev.outTotal = out;
+        prev.periodNet = inn - out;
+        prev.expectedBalance = opening + inn - out;
         const prevAt = prev.lastMovement?.occurredAt || '';
         const nextAt = acc.lastMovement?.occurredAt || '';
         if (nextAt && (!prevAt || nextAt > prevAt)) {

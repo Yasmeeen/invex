@@ -1084,6 +1084,7 @@ export const addVendorReceivedDeposit = async (req, res) => {
       await postPaymentMethodInflows({
         branchId,
         methodAmounts: splits,
+        feeAllocations,
         sourceType: 'vendor_receipt',
         sourceId: vendor._id,
         note,

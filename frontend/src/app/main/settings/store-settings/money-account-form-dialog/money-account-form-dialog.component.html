@@ -20,16 +20,21 @@
         <span>{{ 'tr_money_account_channel' | translate }}</span>
         <select
           class="s-control width-100"
-          [(ngModel)]="channel"
-          name="maChannel"
-          (ngModelChange)="onChannelChange($event)"
+          [(ngModel)]="accountType"
+          name="maType"
+          [disabled]="typeLocked"
+          (ngModelChange)="onTypeChange($event)"
         >
           <option value="bank">{{ 'tr_money_account_channel_bank' | translate }}</option>
           <option value="wallet">{{ 'tr_money_account_channel_wallet' | translate }}</option>
+          <option value="settlement">{{ 'tr_money_account_kind_settlement' | translate }}</option>
         </select>
+        <small class="ma-form__hint" *ngIf="isSettlement">
+          {{ 'tr_money_account_settlement_hint' | translate }}
+        </small>
       </label>
 
-      <label class="ma-form__field" *ngIf="channel === 'bank'">
+      <label class="ma-form__field" *ngIf="accountType === 'bank'">
         <span>{{ 'tr_money_account_number' | translate }}</span>
         <input
           type="text"
@@ -42,7 +47,7 @@
         />
       </label>
 
-      <label class="ma-form__field" *ngIf="channel === 'wallet'">
+      <label class="ma-form__field" *ngIf="accountType === 'wallet'">
         <span>{{ 'tr_money_account_phone' | translate }}</span>
         <input
           type="tel"

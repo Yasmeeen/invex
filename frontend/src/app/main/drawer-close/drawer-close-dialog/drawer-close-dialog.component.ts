@@ -98,6 +98,7 @@ export class DrawerCloseDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.storeSettings.load();
     if (this.fixedBranchId) {
       this.countForm.patchValue({ branchId: this.fixedBranchId });
       this.countForm.get('branchId')?.disable();
@@ -185,10 +186,14 @@ export class DrawerCloseDialogComponent implements OnInit {
   }
 
   payMethodLabel(method: string): string {
+    const snap = this.storeSettings.snapshot;
     return paymentMethodDisplayLabel(
       method,
-      this.storeSettings.snapshot.paymentAppFeePercents,
-      this.translate
+      snap.paymentAppFeePercents,
+      this.translate,
+      undefined,
+      snap.paymentMethodsCatalog,
+      [...(snap.moneyAccounts || []), ...(snap.purchaseTreasuryMethods || [])]
     );
   }
 

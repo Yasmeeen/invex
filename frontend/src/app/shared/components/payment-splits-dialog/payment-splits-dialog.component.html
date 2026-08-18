@@ -50,8 +50,8 @@
               <span class="payment-option">
                 <img [src]="$any(item).logo" class="payment-logo" alt="" />
                 {{ $any(item).label }}
-                <span *ngIf="paymentAppFeePercent($any(item).id) > 0" class="text-muted size-small">
-                  (+{{ paymentAppFeePercent($any(item).id) | number : '1.0-2' }}%)
+                <span *ngIf="methodSalePercent($any(item).id) > 0" class="text-muted size-small">
+                  (+{{ methodSalePercent($any(item).id) | number : '1.0-2' }}%)
                 </span>
               </span>
             </ng-template>
@@ -78,8 +78,8 @@
             </ng-container>
             <ng-template #payMethodRowLabel>{{ payMethodDisplayLabel(mid) }}</ng-template>
           </span>
-          <span *ngIf="paymentAppFeePercent(mid) > 0" class="text-muted size-small">
-            (+{{ paymentAppFeePercent(mid) | number : '1.0-2' }}%)
+          <span *ngIf="methodSalePercent(mid) > 0" class="text-muted size-small">
+            (+{{ methodSalePercent(mid) | number : '1.0-2' }}%)
           </span>
         </div>
         <input
@@ -102,6 +102,20 @@
         >
           {{ 'tr_cashier_credit_balance_due' | translate }}:
           <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div
+          class="size-small mt-1"
+          *ngIf="creditMarkupPreview() > 0"
+        >
+          {{ 'tr_cashier_credit_markup_line' | translate:{ percent: creditFeePercent() } }}:
+          <strong>+{{ creditMarkupPreview() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+        </div>
+        <div
+          class="size-small mt-1"
+          *ngIf="creditMarkupPreview() > 0"
+        >
+          {{ 'tr_cashier_credit_due_after_markup' | translate }}:
+          <strong>{{ creditDueAfterMarkup() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
         </div>
         <div class="size-small mt-2" [class.text-error]="paymentOverAllocated()">
           {{ 'tr_cashier_payment_allocated' | translate }}:
@@ -190,6 +204,7 @@
             <th>{{ 'tr_payment_gross_col_invoice' | translate }}</th>
             <th>{{ 'tr_payment_gross_col_fees' | translate }}</th>
             <th>{{ 'tr_payment_gross_col_total' | translate }}</th>
+            <th *ngIf="hasSettlementFee()">{{ 'tr_payment_settlement_receivable' | translate }}</th>
           </tr>
         </thead>
         <tbody>
@@ -198,9 +213,18 @@
             <td>{{ row.invoiceNet | currency:'EGP ':'symbol':'1.2-2' }}</td>
             <td>{{ row.feeGross | currency:'EGP ':'symbol':'1.2-2' }}</td>
             <td><strong>{{ row.totalGross | currency:'EGP ':'symbol':'1.2-2' }}</strong></td>
+            <td *ngIf="hasSettlementFee()">
+              <strong *ngIf="settlementReceivable(row.method) != null; else notSettlement">
+                {{ settlementReceivable(row.method) | currency:'EGP ':'symbol':'1.2-2' }}
+              </strong>
+              <ng-template #notSettlement>—</ng-template>
+            </td>
           </tr>
         </tbody>
       </table>
+      <p class="text-muted size-small mt-2" *ngIf="hasSettlementFee()">
+        {{ 'tr_payment_settlement_receivable_hint' | translate }}
+      </p>
     </div>
   </div>
 

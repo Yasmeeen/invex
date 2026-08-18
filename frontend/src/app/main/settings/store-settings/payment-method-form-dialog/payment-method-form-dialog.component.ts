@@ -57,6 +57,7 @@ export class PaymentMethodFormDialogComponent {
 
   readonly accounts: MoneyAccount[];
   readonly bankAccounts: MoneyAccount[];
+  readonly settlementAccounts: MoneyAccount[];
 
   constructor(
     private dialogRef: MatDialogRef<PaymentMethodFormDialogComponent, PaymentMethodFormResult | false>,
@@ -67,6 +68,7 @@ export class PaymentMethodFormDialogComponent {
     const all = Array.isArray(data.accounts) ? data.accounts : [];
     this.accounts = all.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
     this.bankAccounts = this.accounts.filter((a) => a.kind === 'treasury' || a.kind === 'cash');
+    this.settlementAccounts = all.filter((a) => a.kind === 'settlement' && a.enabled !== false);
     this.label = String(data.label || '').trim();
     this.showIn = data.showIn || 'sale';
     this.effectMode = this.isCash
@@ -104,12 +106,18 @@ export class PaymentMethodFormDialogComponent {
     return !this.isCredit && this.effectMode === 'instant';
   }
 
-  get showSettlementBank(): boolean {
+  get showSettlementLink(): boolean {
     return !this.isCredit && this.effectMode === 'settlement';
   }
 
+  get cannotSave(): boolean {
+    if (!String(this.label || '').trim()) return true;
+    if (this.showSettlementLink && !this.accountKey) return true;
+    return false;
+  }
+
   get feeEditable(): boolean {
-    return !this.isCash && !this.isCredit && this.effectMode !== 'none';
+    return !this.isCash && (this.isCredit || this.effectMode !== 'none');
   }
 
   onEffectChange(): void {
@@ -122,7 +130,6 @@ export class PaymentMethodFormDialogComponent {
     }
     if (this.isCredit) {
       this.effectMode = 'none';
-      this.feePercent = 0;
       this.accountKey = '';
       this.settlementBankAccountKey = '';
       return;
@@ -134,7 +141,10 @@ export class PaymentMethodFormDialogComponent {
       return;
     }
     if (this.effectMode === 'settlement') {
-      this.accountKey = String(this.data.key || '').trim().toLowerCase();
+      const linked = String(this.accountKey || this.data.accountKey || '')
+        .trim()
+        .toLowerCase();
+      this.accountKey = this.settlementAccounts.some((a) => a.key === linked) ? linked : '';
       if (!this.settlementBankAccountKey) {
         const misr = this.bankAccounts.find((a) => a.key === 'bank_misr');
         this.settlementBankAccountKey = misr?.key || this.bankAccounts[0]?.key || '';
@@ -142,6 +152,9 @@ export class PaymentMethodFormDialogComponent {
       return;
     }
     this.settlementBankAccountKey = '';
+    if (!this.accounts.some((a) => a.key === this.accountKey)) {
+      this.accountKey = '';
+    }
   }
 
   cancel(): void {
@@ -161,7 +174,9 @@ export class PaymentMethodFormDialogComponent {
     if (this.isCash) {
       accountKey = 'cash';
     } else if (effectMode === 'settlement') {
-      accountKey = String(this.data.key || '').trim().toLowerCase();
+      accountKey = String(this.accountKey || '')
+        .trim()
+        .toLowerCase();
       settlementBankAccountKey = String(this.settlementBankAccountKey || '')
         .trim()
         .toLowerCase();
@@ -175,7 +190,7 @@ export class PaymentMethodFormDialogComponent {
       showIn: this.showIn || 'sale',
       effectMode,
       feePercent:
-        this.isCash || this.isCredit || effectMode === 'none'
+        this.isCash || (!this.isCredit && effectMode === 'none')
           ? 0
           : Math.max(0, Math.min(100, Number(this.feePercent) || 0)),
       accountKey,

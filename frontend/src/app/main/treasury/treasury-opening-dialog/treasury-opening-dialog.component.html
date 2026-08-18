@@ -3,6 +3,9 @@
   <div class="form-group">
     <label>{{ 'tr_treasury_opening' | translate }}</label>
     <input class="s-control width-100" type="number" step="0.01" [(ngModel)]="amount" />
+    <p class="text-muted size-caption mt-1" *ngIf="data.applyAllBranches">
+      {{ 'tr_treasury_opening_all_branches_hint' | translate }}
+    </p>
   </div>
   <div class="form-group">
     <label>{{ 'tr_daily_expense_notes' | translate }}</label>

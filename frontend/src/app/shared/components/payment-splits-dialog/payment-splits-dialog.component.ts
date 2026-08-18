@@ -19,6 +19,10 @@ import {
   PaymentSplitsResult,
   round2,
 } from '@shared/utils/payment-app-fee.util';
+import {
+  catalogCreditFeePercent,
+  creditMarkupAmount,
+} from '@shared/utils/credit-sale-markup.util';
 import { Subscription } from 'rxjs';
 
 export type PaymentSplitsDialogMode = 'checkout' | 'installment' | 'deposit';
@@ -121,6 +125,33 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
 
   paymentAppFeePercent(methodId: string | undefined | null): number {
     return paymentAppFeePercent(methodId, this.storeSettings.snapshot.paymentAppFeePercents);
+  }
+
+  creditFeePercent(): number {
+    return catalogCreditFeePercent(this.storeSettings.snapshot.paymentMethodsCatalog);
+  }
+
+  /** App-fee % or credit-sale markup % for badges in the picker. */
+  methodSalePercent(methodId: string | undefined | null): number {
+    if (this.isCreditPayMethod(methodId)) {
+      return this.creditFeePercent();
+    }
+    return this.paymentAppFeePercent(methodId);
+  }
+
+  creditMarkupPreview(): number {
+    if (this.mode === 'deposit' || this.paymentOverAllocated()) {
+      return 0;
+    }
+    const remaining = this.paymentRemaining();
+    if (remaining <= 0.005) {
+      return 0;
+    }
+    return creditMarkupAmount(remaining, this.creditFeePercent());
+  }
+
+  creditDueAfterMarkup(): number {
+    return round2(this.paymentRemaining() + this.creditMarkupPreview());
   }
 
   getPayMethodDef(id: string): CashierPaymentMethod | undefined {
@@ -349,7 +380,47 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     ).length > 0;
   }
 
-  grossWithdrawalPreview() {
+  isSettlementMethod(method: string): boolean {
+    const m = String(method || '')
+      .trim()
+      .toLowerCase();
+    const row = (this.storeSettings.snapshot.paymentMethodsCatalog || []).find(
+      (c) => String(c.key || '').toLowerCase() === m
+    );
+    return row?.effectMode === 'settlement';
+  }
+
+  hasSettlementFee(): boolean {
+    return this.feeSources.some((src) => {
+      if (this.feeNetForMethod(src.forMethod) <= 0) return false;
+      if (this.isSettlementMethod(src.forMethod)) return true;
+      const via = src.paidVia === 'same' ? src.forMethod : src.paidVia;
+      return this.isSettlementMethod(via);
+    });
+  }
+
+  settlementReceivable(method: string): number | null {
+    if (!this.isSettlementMethod(method)) return null;
+    const m = String(method || '')
+      .trim()
+      .toLowerCase();
+    const result = this.currentSplitsResult();
+    let rec = round2(Number(this.payAmounts[m]) || 0);
+    for (const fee of result.feeAllocations || []) {
+      if (fee.forMethod === m) {
+        rec = round2(rec - (Number(fee.feeNet) || 0));
+      }
+      const via = String(fee.paidVia || '').toLowerCase();
+      if (via && via !== 'same' && via === m && fee.forMethod !== m) {
+        const gross = round2(Number(fee.feeGrossOnPaidVia) || Number(fee.feeNet) || 0);
+        const nested = round2(Math.max(0, gross - (Number(fee.feeNet) || 0)));
+        rec = round2(rec + gross - nested);
+      }
+    }
+    return round2(Math.max(0, rec));
+  }
+
+  private currentSplitsResult() {
     return buildPaymentSplitsResult(
       this.buildCurrentSplits(),
       this.feeSources.length
@@ -359,7 +430,11 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
             this.storeSettings.snapshot.paymentAppFeePercents
           ),
       this.storeSettings.snapshot.paymentAppFeePercents
-    ).grossWithdrawals;
+    );
+  }
+
+  grossWithdrawalPreview() {
+    return this.currentSplitsResult().grossWithdrawals;
   }
 
   trackPayMethodId(_index: number, id: string): string {

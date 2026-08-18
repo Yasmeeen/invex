@@ -1,14 +1,14 @@
 <div class="report-filters card">
-  <div class="row">
-    <div class="col-md-2">
+  <div class="report-filters__row">
+    <div class="report-filters__field">
       <label>{{ 'tr_from' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.from" />
     </div>
-    <div class="col-md-2">
+    <div class="report-filters__field">
       <label>{{ 'tr_to' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.to" />
     </div>
-    <div class="col-md-3" *ngIf="!branchFilterLocked">
+    <div class="report-filters__field report-filters__field--wide" *ngIf="!branchFilterLocked">
       <label>{{ 'tr_branches' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -24,11 +24,14 @@
       >
       </ng-select>
     </div>
-    <div class="col-md-3" *ngIf="branchFilterLocked">
+    <div class="report-filters__field report-filters__field--wide" *ngIf="branchFilterLocked">
       <label>{{ 'tr_branches' | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
-    <div class="col-md-3" *ngIf="reportType === 'products' || reportType === 'sales'">
+    <div
+      class="report-filters__field report-filters__field--wide"
+      *ngIf="reportType === 'products' || reportType === 'sales'"
+    >
       <label>{{ 'tr_report_filter_category_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -44,7 +47,7 @@
       >
       </ng-select>
     </div>
-    <div class="col-md-3 mt-4" *ngIf="reportType === 'products'">
+    <div class="report-filters__field report-filters__field--wide" *ngIf="reportType === 'products'">
       <label>{{ 'tr_search_supplier' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -75,7 +78,10 @@
         </ng-template>
       </ng-select>
     </div>
-    <div class="col-md-3 mt-4" *ngIf="reportType !== 'deskPurchases'">
+    <div
+      class="report-filters__field report-filters__field--wide"
+      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury'"
+    >
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -94,7 +100,10 @@
         </ng-template>
       </ng-select>
     </div>
-    <div class="col-md-2 mt-4" *ngIf="reportType !== 'deskPurchases'">
+    <div
+      class="report-filters__field"
+      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury'"
+    >
       <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
       <input
         class="s-control"
@@ -104,7 +113,7 @@
         autocomplete="tel"
       />
     </div>
-    <div class="col-md-2 mt-4" *ngIf="reportType === 'sales' || reportType === 'profit'">
+    <div class="report-filters__field" *ngIf="reportType === 'sales' || reportType === 'profit'">
       <label>{{ 'tr_report_filter_seller' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -117,23 +126,29 @@
       >
       </ng-select>
     </div>
-    <div class="col-md-2 mt-4" *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases'">
+    <div
+      class="report-filters__field"
+      *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases' && reportType !== 'treasury'"
+    >
       <label>{{ 'tr_report_filter_group' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.groupBy">
         <option value="daily">{{ 'tr_report_group_daily' | translate }}</option>
         <option value="monthly">{{ 'tr_report_group_monthly' | translate }}</option>
       </select>
     </div>
-    <div class="col-md-4">
-      <div class="actions">
-        <button class="s-btn btn-primary" type="button" (click)="applyFilters()">{{ 'tr_apply' | translate }}</button>
-        <button class="s-btn btn-secondary" type="button" (click)="reset()">{{ 'tr_reset' | translate }}</button>
-      </div>
+    <div class="report-filters__actions">
+      <button class="s-btn btn-primary" type="button" (click)="applyFilters()">
+        {{ 'tr_apply' | translate }}
+      </button>
+      <button class="s-btn btn-secondary" type="button" (click)="reset()">
+        {{ 'tr_reset' | translate }}
+      </button>
+      <ng-content></ng-content>
     </div>
   </div>
 
-  <div class="row mt-2" *ngIf="reportType === 'bookings'">
-    <div class="col-md-2">
+  <div class="report-filters__row report-filters__row--secondary" *ngIf="reportType === 'bookings'">
+    <div class="report-filters__field">
       <label>{{ 'tr_bookings_report_filter_status' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.booking_status" name="bookingStatus">
         <option value="all">{{ 'tr_bookings_report_status_all' | translate }}</option>
@@ -141,7 +156,7 @@
         <option value="cancelled">{{ 'tr_bookings_report_status_cancelled' | translate }}</option>
       </select>
     </div>
-    <div class="col-md-2">
+    <div class="report-filters__field">
       <label>{{ 'tr_bookings_report_filter_confirmed' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.booking_confirmed" name="bookingConfirmed">
         <option value="all">{{ 'tr_bookings_report_confirmed_all' | translate }}</option>
@@ -149,13 +164,13 @@
         <option value="false">{{ 'tr_bookings_report_confirmed_no' | translate }}</option>
       </select>
     </div>
-    <div class="col-md-2 mt-4">
+    <div class="report-filters__field">
       <label class="report-filters__check">
         <input type="checkbox" [(ngModel)]="filters.warehouse_only" name="warehouseOnly" />
         {{ 'tr_bookings_report_warehouse_only' | translate }}
       </label>
     </div>
-    <div class="col-md-3">
+    <div class="report-filters__field report-filters__field--wide">
       <label>{{ 'tr_requested_by' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -170,7 +185,7 @@
       >
       </ng-select>
     </div>
-    <div class="col-md-4">
+    <div class="report-filters__field report-filters__field--wide">
       <label>{{ 'tr_bookings_report_search' | translate }}</label>
       <input
         class="s-control"
@@ -181,5 +196,4 @@
       />
     </div>
   </div>
-
 </div>

@@ -45,11 +45,7 @@ function mapFrom(doc, accounts, catalog) {
 
 function serializeMethod(row, mapRow, accountsByKey) {
   const accountKey =
-    row.key === 'cash'
-      ? 'cash'
-      : row.effectMode === 'settlement'
-        ? row.key
-        : mapRow?.accountKey || '';
+    row.key === 'cash' ? 'cash' : mapRow?.accountKey || '';
   const acc = accountKey ? accountsByKey.get(accountKey) : null;
   return {
     key: row.key,
@@ -84,16 +80,25 @@ function isSpendableAccount(accounts, key) {
   return acc && (acc.kind === 'cash' || acc.kind === 'treasury');
 }
 
+function isSettlementAccount(accounts, key) {
+  const acc = (accounts || []).find((a) => a.key === key);
+  return !!(acc && acc.kind === 'settlement');
+}
+
 function buildMapRow(method, effectMode, accountKey, settlementBankAccountKey, accounts) {
   if (method === 'credit' || effectMode === 'none') return null;
   const mode = effectMode === 'settlement' ? 'settlement' : 'instant';
   const validKeys = new Set((accounts || []).map((a) => a.key));
   let acc =
-    method === 'cash' ? 'cash' : mode === 'settlement' ? method : String(accountKey || '').trim().toLowerCase();
-  if (!acc) return null;
-  if (mode !== 'settlement' && validKeys.size && !validKeys.has(acc)) {
-    if (method === 'cash') acc = 'cash';
-    else return null;
+    method === 'cash' ? 'cash' : String(accountKey || '').trim().toLowerCase();
+  if (mode === 'settlement') {
+    if (!isSettlementAccount(accounts, acc)) return null;
+  } else {
+    if (!acc) return null;
+    if (validKeys.size && !validKeys.has(acc)) {
+      if (method === 'cash') acc = 'cash';
+      else return null;
+    }
   }
   let bank = mode === 'settlement' ? String(settlementBankAccountKey || '').trim().toLowerCase() : '';
   if (bank && (!isSpendableAccount(accounts, bank) || bank === acc)) bank = '';
@@ -232,7 +237,8 @@ export const updatePaymentMethod = async (req, res) => {
     let feePercent = req.body?.feePercent !== undefined ? Number(req.body.feePercent) : prev.feePercent;
     if (!Number.isFinite(feePercent)) feePercent = 0;
     feePercent = Math.max(0, Math.min(100, feePercent));
-    if (key === 'cash' || key === 'credit' || effectMode === 'none') feePercent = 0;
+    if (key === 'cash') feePercent = 0;
+    else if (key !== 'credit' && effectMode === 'none') feePercent = 0;
 
     catalog[idx] = { key, label, showIn, effectMode, feePercent };
 

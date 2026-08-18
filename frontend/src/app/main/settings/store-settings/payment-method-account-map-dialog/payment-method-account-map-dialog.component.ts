@@ -28,6 +28,7 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
   rows: MapUiRow[] = [];
   accounts: MoneyAccount[] = [];
   bankAccounts: MoneyAccount[] = [];
+  settlementAccounts: MoneyAccount[] = [];
   saving = false;
 
   constructor(
@@ -47,6 +48,7 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
       : [{ key: 'cash', label: 'Cash', kind: 'cash' }];
     this.accounts = all.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
     this.bankAccounts = this.accounts.filter((a) => a.kind === 'treasury' || a.kind === 'cash');
+    this.settlementAccounts = all.filter((a) => a.kind === 'settlement');
 
     const saved = this.storeSettingsService.snapshot.paymentMethodAccountMap || [];
     const savedMap = new Map(saved.map((r) => [r.method, r]));
@@ -68,11 +70,12 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
         method: m.key,
         label: m.label || m.key,
         accountKey:
-          mode === 'settlement' || m.key === 'cash'
-            ? m.key === 'cash'
-              ? 'cash'
-              : m.key
-            : prev?.accountKey || '',
+          m.key === 'cash'
+            ? 'cash'
+            : prev?.accountKey ||
+              (mode === 'settlement' && this.settlementAccounts.some((a) => a.key === m.key)
+                ? m.key
+                : ''),
         mode,
         settlementBankAccountKey:
           mode === 'settlement'
@@ -84,6 +87,10 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
     });
   }
 
+  accountsForRow(row: MapUiRow): MoneyAccount[] {
+    return row.mode === 'settlement' ? this.settlementAccounts : this.accounts;
+  }
+
   onModeChange(row: MapUiRow): void {
     if (row.method === 'cash') {
       row.mode = 'instant';
@@ -91,7 +98,9 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
       return;
     }
     if (row.mode === 'settlement') {
-      row.accountKey = row.method;
+      if (!this.settlementAccounts.some((a) => a.key === row.accountKey)) {
+        row.accountKey = '';
+      }
       if (!row.settlementBankAccountKey) {
         row.settlementBankAccountKey =
           this.bankAccounts.find((a) => a.key === 'bank_misr')?.key ||
@@ -99,6 +108,9 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
           '';
       }
       return;
+    }
+    if (!this.accounts.some((a) => a.key === row.accountKey)) {
+      row.accountKey = '';
     }
     row.settlementBankAccountKey = '';
   }
@@ -112,7 +124,7 @@ export class PaymentMethodAccountMapDialogComponent implements OnInit {
       .filter((r) => r.accountKey)
       .map((r) => ({
         method: r.method,
-        accountKey: r.method === 'cash' || r.mode === 'settlement' ? r.method : r.accountKey,
+        accountKey: r.method === 'cash' ? 'cash' : r.accountKey,
         mode: r.method === 'cash' ? 'instant' : r.mode,
         settlementBankAccountKey:
           r.mode === 'settlement' ? r.settlementBankAccountKey || '' : '',

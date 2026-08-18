@@ -20,6 +20,7 @@ export class TreasuryOpeningDialogComponent {
     @Inject(MAT_DIALOG_DATA)
     public data: {
       branchId: string;
+      applyAllBranches?: boolean;
       accountKey: string;
       label: string;
       currentOpening: number;
@@ -44,7 +45,8 @@ export class TreasuryOpeningDialogComponent {
     this.treasury
       .setOpeningBalance(this.data.accountKey, {
         userId: uid,
-        branch: this.data.branchId,
+        branch: this.data.applyAllBranches ? undefined : this.data.branchId,
+        allBranches: !!this.data.applyAllBranches,
         amount: amt,
         note: this.note,
       })

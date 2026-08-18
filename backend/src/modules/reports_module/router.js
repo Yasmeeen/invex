@@ -8,6 +8,7 @@ import {
   getInstallmentsReport,
   getBookingsReport,
   getDeskPurchasesTreasuryReport,
+  getTreasuryAccountsReport,
 } from './service.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/customers', getCustomersReport);
 router.get('/installments', getInstallmentsReport);
 router.get('/bookings', getBookingsReport);
 router.get('/desk-purchases-treasury', getDeskPurchasesTreasuryReport);
+router.get('/treasury-accounts', getTreasuryAccountsReport);
 
 export default router;
 

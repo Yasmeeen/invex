@@ -9,6 +9,9 @@ import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model
 import Branch from '../../DB/models/branch.model.js';
 import Vendor from '../../DB/models/vendor.model.js';
 import DailyExpense from '../../DB/models/dailyExpense.model.js';
+import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
+import TreasuryAccountOpening from '../../DB/models/treasuryAccountOpening.model.js';
+import { getEffectiveMoneyAccountsFromDb } from '../settings_module/moneyAccounts.js';
 import { buildPhoneSearchCandidates, digitsOnly } from '../../utils/phone-utils.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
@@ -16,6 +19,8 @@ import {
   resolvePurchaseTreasurySplits,
 } from '../../utils/purchase-treasury-splits.js';
 import { NON_OPERATING_DAILY_EXPENSE_TYPES } from '../../utils/daily-expense-categories.js';
+import { companyOpeningForAccount, isCashDrawerAccount } from '../../utils/treasury-ledger.js';
+import { getCurrentDrawerCash, sumCurrentDrawerCashAllBranches } from '../drawer_close_module/service.js';
 
 /** Business calendar for report date filters (matches orders/dashboard). */
 const REPORT_TZ = 'Africa/Cairo';
@@ -973,5 +978,295 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
   } catch (error) {
     console.error('getDeskPurchasesTreasuryReport:', error);
     return res.status(500).json({ error: 'Failed to generate desk purchases treasury report' });
+  }
+};
+
+function accountDisplayType(acc) {
+  if (acc?.kind === 'cash') return 'cash';
+  if (acc?.kind === 'settlement') return 'settlement';
+  if (acc?.channel === 'wallet') return 'wallet';
+  return 'bank';
+}
+
+function emptyLedgerTotals() {
+  return { inTotal: 0, outTotal: 0 };
+}
+
+async function ledgerTotalsByAccount(match) {
+  const rows = await TreasuryLedgerEntry.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: { accountKey: '$accountKey', direction: '$direction' },
+        total: { $sum: '$amount' },
+      },
+    },
+  ]);
+  const map = new Map();
+  for (const r of rows) {
+    const key = String(r?._id?.accountKey || '').toLowerCase();
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, emptyLedgerTotals());
+    const row = map.get(key);
+    if (r._id.direction === 'in') row.inTotal = round2(r.total);
+    if (r._id.direction === 'out') row.outTotal = round2(r.total);
+  }
+  return map;
+}
+
+/**
+ * Wallets, money accounts, and payment methods: period balances + sales volume by method.
+ */
+export const getTreasuryAccountsReport = async (req, res) => {
+  try {
+    const f = parseCommonFilters(req.query);
+    const { moneyAccounts, paymentMethodAccountMap, paymentMethodsCatalog } =
+      await getEffectiveMoneyAccountsFromDb();
+    const accounts = moneyAccounts || [];
+    const keys = accounts.map((a) => a.key).filter(Boolean);
+    const accountsByKey = new Map(accounts.map((a) => [a.key, a]));
+    const mapByMethod = new Map((paymentMethodAccountMap || []).map((r) => [r.method, r]));
+
+    const baseMatch = {};
+    if (f.branchId) baseMatch.branch = f.branchId;
+    if (keys.length) baseMatch.accountKey = { $in: keys };
+
+    const openingMatch = keys.length ? { accountKey: { $in: keys } } : { accountKey: { $in: [] } };
+    if (f.branchId) openingMatch.branch = f.branchId;
+
+    const lastMatch = { ...baseMatch, occurredAt: { $gte: f.from, $lte: f.to } };
+
+    const [openingDocs, beforeFrom, inPeriod, lastRows, salesByMethod, sourceRows] = await Promise.all([
+      TreasuryAccountOpening.find(openingMatch).select('accountKey amount').lean(),
+      keys.length
+        ? ledgerTotalsByAccount({ ...baseMatch, occurredAt: { $lt: f.from } })
+        : Promise.resolve(new Map()),
+      keys.length
+        ? ledgerTotalsByAccount({ ...baseMatch, occurredAt: { $gte: f.from, $lte: f.to } })
+        : Promise.resolve(new Map()),
+      keys.length
+        ? TreasuryLedgerEntry.aggregate([
+            { $match: lastMatch },
+            { $sort: { occurredAt: -1, createdAt: -1 } },
+            {
+              $group: {
+                _id: '$accountKey',
+                occurredAt: { $first: '$occurredAt' },
+                direction: { $first: '$direction' },
+                amount: { $first: '$amount' },
+                sourceType: { $first: '$sourceType' },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+      Order.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: f.from, $lte: f.to },
+            status: { $ne: 'restored' },
+            ...(f.branchId ? { branch: f.branchId } : {}),
+          },
+        },
+        {
+          $group: {
+            _id: { $toLower: { $ifNull: ['$paymentMethod', 'cash'] } },
+            totalSales: { $sum: '$totalPrice' },
+            totalOrders: { $sum: 1 },
+          },
+        },
+      ]),
+      TreasuryLedgerEntry.aggregate([
+        {
+          $match: {
+            occurredAt: { $gte: f.from, $lte: f.to },
+            ...(f.branchId ? { branch: f.branchId } : {}),
+            ...(keys.length ? { accountKey: { $in: keys } } : {}),
+          },
+        },
+        {
+          $group: {
+            _id: { sourceType: '$sourceType', direction: '$direction' },
+            total: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const openingAmountsByKey = new Map();
+    for (const doc of openingDocs || []) {
+      const key = String(doc.accountKey || '').toLowerCase();
+      const list = openingAmountsByKey.get(key) || [];
+      list.push(Number(doc.amount) || 0);
+      openingAmountsByKey.set(key, list);
+    }
+    const openingByKey = new Map(
+      [...openingAmountsByKey.entries()].map(([key, amounts]) => [
+        key,
+        companyOpeningForAccount(key, amounts),
+      ])
+    );
+
+    const lastByKey = new Map(
+      (lastRows || []).map((r) => [
+        String(r._id || '').toLowerCase(),
+        {
+          occurredAt: r.occurredAt,
+          direction: r.direction,
+          amount: round2(r.amount),
+          sourceType: r.sourceType || 'other',
+        },
+      ])
+    );
+
+    const typeOrder = { cash: 0, bank: 1, wallet: 2, settlement: 3 };
+    const accountRows = accounts
+      .map((acc) => {
+        const key = acc.key;
+        const openingBalance = openingByKey.get(key) || 0;
+        const prior = beforeFrom.get(key) || emptyLedgerTotals();
+        const period = inPeriod.get(key) || emptyLedgerTotals();
+        const openingAtStart = round2(openingBalance + prior.inTotal - prior.outTotal);
+        const periodIn = period.inTotal;
+        const periodOut = period.outTotal;
+        const expectedBalance = round2(openingAtStart + periodIn - periodOut);
+        const displayType = accountDisplayType(acc);
+        return {
+          key,
+          label: acc.label || key,
+          kind: acc.kind,
+          channel: acc.channel || '',
+          displayType,
+          accountNumber: acc.accountNumber || '',
+          phone: acc.phone || '',
+          enabled: acc.key === 'cash' ? true : acc.enabled !== false,
+          openingAtStart,
+          periodIn,
+          periodOut,
+          periodNet: round2(periodIn - periodOut),
+          expectedBalance,
+          lastMovement: lastByKey.get(key) || null,
+        };
+      })
+      .sort((a, b) => {
+        const d = (typeOrder[a.displayType] ?? 9) - (typeOrder[b.displayType] ?? 9);
+        return d !== 0 ? d : String(a.label).localeCompare(String(b.label), 'ar');
+      });
+
+    const untilDate = moment(f.to).tz(REPORT_TZ).format('YYYY-MM-DD');
+    const cashRow = accountRows.find((row) => isCashDrawerAccount(row.key));
+    if (cashRow) {
+      cashRow.expectedBalance = f.branchId
+        ? await getCurrentDrawerCash(f.branchId, untilDate)
+        : await sumCurrentDrawerCashAllBranches(untilDate);
+    }
+
+    const totalsByType = { cash: 0, bank: 0, wallet: 0, settlement: 0 };
+    let periodInAll = 0;
+    let periodOutAll = 0;
+    for (const row of accountRows) {
+      totalsByType[row.displayType] = round2((totalsByType[row.displayType] || 0) + row.expectedBalance);
+      periodInAll = round2(periodInAll + row.periodIn);
+      periodOutAll = round2(periodOutAll + row.periodOut);
+    }
+
+    const salesMap = new Map(
+      (salesByMethod || []).map((r) => [
+        String(r._id || 'cash').toLowerCase() || 'cash',
+        { totalSales: round2(r.totalSales), totalOrders: r.totalOrders || 0 },
+      ])
+    );
+
+    const catalog = paymentMethodsCatalog || [];
+    const seenMethods = new Set(catalog.map((m) => m.key));
+    const paymentMethods = catalog.map((row) => {
+      const mapRow = mapByMethod.get(row.key);
+      const accountKey = row.key === 'cash' ? 'cash' : mapRow?.accountKey || '';
+      const acc = accountKey ? accountsByKey.get(accountKey) : null;
+      const bankKey = mapRow?.settlementBankAccountKey || '';
+      const bank = bankKey ? accountsByKey.get(bankKey) : null;
+      const sales = salesMap.get(row.key) || { totalSales: 0, totalOrders: 0 };
+      return {
+        key: row.key,
+        label: row.label || row.key,
+        showIn: row.showIn || 'sale',
+        effectMode: row.effectMode || 'instant',
+        feePercent: Number(row.feePercent) || 0,
+        accountKey,
+        accountLabel: acc?.label || '',
+        settlementBankAccountKey: bankKey,
+        settlementBankLabel: bank?.label || '',
+        totalSales: sales.totalSales,
+        totalOrders: sales.totalOrders,
+      };
+    });
+
+    for (const [method, sales] of salesMap.entries()) {
+      if (seenMethods.has(method) || !method) continue;
+      const acc = accountsByKey.get(method);
+      paymentMethods.push({
+        key: method,
+        label: acc?.label || method,
+        showIn: 'sale',
+        effectMode: method === 'credit' || method === 'mixed' ? 'none' : 'instant',
+        feePercent: 0,
+        accountKey: '',
+        accountLabel: '',
+        settlementBankAccountKey: '',
+        settlementBankLabel: '',
+        totalSales: sales.totalSales,
+        totalOrders: sales.totalOrders,
+      });
+    }
+
+    const methodRank = (k) => (k === 'cash' ? 0 : k === 'credit' ? 1 : 2);
+    paymentMethods.sort((a, b) => {
+      const d = methodRank(a.key) - methodRank(b.key);
+      if (d !== 0) return d;
+      const salesDiff = (b.totalSales || 0) - (a.totalSales || 0);
+      return salesDiff !== 0 ? salesDiff : String(a.label).localeCompare(String(b.label), 'ar');
+    });
+
+    const bySourceTypeMap = new Map();
+    for (const r of sourceRows || []) {
+      const sourceType = String(r?._id?.sourceType || 'other');
+      if (!bySourceTypeMap.has(sourceType)) {
+        bySourceTypeMap.set(sourceType, { sourceType, inTotal: 0, outTotal: 0, count: 0 });
+      }
+      const row = bySourceTypeMap.get(sourceType);
+      row.count += r.count || 0;
+      if (r._id.direction === 'in') row.inTotal = round2(r.total);
+      if (r._id.direction === 'out') row.outTotal = round2(r.total);
+    }
+    const bySourceType = [...bySourceTypeMap.values()]
+      .map((row) => ({
+        ...row,
+        net: round2(row.inTotal - row.outTotal),
+      }))
+      .sort((a, b) => String(a.sourceType).localeCompare(String(b.sourceType)));
+
+    const orderSales = paymentMethods.reduce((s, m) => round2(s + (m.totalSales || 0)), 0);
+
+    return res.json({
+      filters: f,
+      summary: {
+        spendableTotal: round2(totalsByType.cash + totalsByType.bank + totalsByType.wallet),
+        cashTotal: totalsByType.cash,
+        bankTotal: totalsByType.bank,
+        walletTotal: totalsByType.wallet,
+        settlementTotal: totalsByType.settlement,
+        accountsCount: accountRows.length,
+        methodsCount: paymentMethods.length,
+        periodIn: periodInAll,
+        periodOut: periodOutAll,
+        orderSales,
+      },
+      accounts: accountRows,
+      paymentMethods,
+      bySourceType,
+    });
+  } catch (error) {
+    console.error('getTreasuryAccountsReport:', error);
+    return res.status(500).json({ error: 'Failed to generate treasury accounts report' });
   }
 };

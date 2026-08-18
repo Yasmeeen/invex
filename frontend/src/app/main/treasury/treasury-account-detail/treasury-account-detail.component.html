@@ -4,7 +4,7 @@
       <button type="button" class="s-btn btn-link" (click)="back()">
         <i class="fa fa-arrow-left"></i>
       </button>
-      {{ label || accountKey }}
+      {{ pageTitle }}
     </span>
     <div class="btn-group flex flex-middle gap-sm">
       <button type="button" class="s-btn btn-secondary size-body" *ngIf="canSetOpening" (click)="openOpening()">
@@ -18,46 +18,126 @@
       >
         {{ 'tr_treasury_quick_settle' | translate }}
       </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        *ngIf="canDeposit"
+        (click)="openDeposit()"
+      >
+        {{ 'tr_treasury_deposit' | translate }}
+      </button>
       <button type="button" class="s-btn btn-secondary size-body" (click)="openTransfer(isSettlement)">
         {{ (isSettlement ? 'tr_treasury_settlement_manual' : 'tr_treasury_transfer') | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="isFilterOpen = !isFilterOpen"
+      >
+        <i class="fa fa-filter text-primary"></i>
       </button>
     </div>
   </h2>
 
-  <div class="plr-4 pb-3 flex flex-wrap gap-md treasury-summary">
-    <div>
-      <div class="text-muted size-caption">{{ 'tr_treasury_opening' | translate }}</div>
-      <div class="size-h5">{{ openingBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
-    </div>
-    <div>
-      <div class="text-muted size-caption">{{ 'tr_treasury_expected' | translate }}</div>
-      <div class="size-h5 fw-bold">{{ expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
-    </div>
-    <div *ngIf="channel === 'bank' && accountNumber">
-      <div class="text-muted size-caption">{{ 'tr_money_account_number' | translate }}</div>
-      <div class="size-h5">{{ accountNumber }}</div>
-    </div>
-    <div *ngIf="channel === 'wallet' && phone">
-      <div class="text-muted size-caption">{{ 'tr_money_account_phone' | translate }}</div>
-      <div class="size-h5">{{ phone }}</div>
+  <div class="plr-4 pb-3">
+    <div class="row account-kpis">
+      <div class="col-md-4 mb-3">
+        <article class="account-kpi">
+          <div class="account-kpi__label">{{ 'tr_treasury_opening' | translate }}</div>
+          <div class="account-kpi__value">{{ openingBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
+        </article>
+      </div>
+      <div class="col-md-4 mb-3">
+        <article class="account-kpi account-kpi--primary">
+          <div class="account-kpi__label">{{ 'tr_treasury_expected' | translate }}</div>
+          <div class="account-kpi__value">{{ expectedBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</div>
+        </article>
+      </div>
+      <div class="col-md-4 mb-3" *ngIf="channel === 'bank' && accountNumber">
+        <article class="account-kpi">
+          <div class="account-kpi__label">{{ 'tr_money_account_number' | translate }}</div>
+          <div class="account-kpi__value account-kpi__value--meta">{{ accountNumber }}</div>
+        </article>
+      </div>
+      <div class="col-md-4 mb-3" *ngIf="channel === 'wallet' && phone">
+        <article class="account-kpi">
+          <div class="account-kpi__label">{{ 'tr_money_account_phone' | translate }}</div>
+          <div class="account-kpi__value account-kpi__value--meta">{{ phone }}</div>
+        </article>
+      </div>
     </div>
   </div>
+
+  <p class="plr-4 text-muted size-caption mb-3" *ngIf="isCashAccount">
+    {{ 'tr_treasury_cash_follows_drawer' | translate }}
+  </p>
 
   <p class="plr-4 text-muted size-caption mb-3" *ngIf="isSettlement">
     {{ 'tr_treasury_settlement_hint' | translate }}
   </p>
 
-  <div class="filters-card bg-secondary plr-4 ptb-2 mb-4">
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-4" *ngIf="isFilterOpen">
     <div class="row flex-wrap">
-      <div class="col-md-3">
+      <div class="col-md-2" *ngIf="canPickBranch">
+        <label>{{ 'tr_branch' | translate }}</label>
+        <ng-select
+          class="s-control s-select width-100"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [(ngModel)]="filterBranchId"
+          [clearable]="true"
+          [placeholder]="'tr_report_all_branches' | translate"
+          name="statementBranch"
+        >
+        </ng-select>
+      </div>
+      <div class="col-md-2 statement-filter-date">
         <label>{{ 'tr_daily_expenses_date_from' | translate }}</label>
-        <input class="s-control width-100" type="date" [(ngModel)]="dateFrom" />
+        <div class="input-with-icon">
+          <input
+            class="s-control width-100 bg-white"
+            [ngModel]="dateFromModel"
+            (ngModelChange)="onDateFromChange($event)"
+            [matDatepicker]="fromPicker"
+            name="statementDateFrom"
+            [placeholder]="'tr_pick_date' | translate"
+          />
+          <mat-datepicker #fromPicker></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="fromPicker"></mat-datepicker-toggle>
+        </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2 statement-filter-date">
         <label>{{ 'tr_daily_expenses_date_to' | translate }}</label>
-        <input class="s-control width-100" type="date" [(ngModel)]="dateTo" />
+        <div class="input-with-icon">
+          <input
+            class="s-control width-100 bg-white"
+            [ngModel]="dateToModel"
+            (ngModelChange)="onDateToChange($event)"
+            [matDatepicker]="toPicker"
+            name="statementDateTo"
+            [placeholder]="'tr_pick_date' | translate"
+          />
+          <mat-datepicker #toPicker></mat-datepicker>
+          <mat-datepicker-toggle class="input-icon date-picker" [for]="toPicker"></mat-datepicker-toggle>
+        </div>
       </div>
-      <div class="col-md-3 flex flex-bottom pb-2">
+      <div class="col-md-4" *ngIf="linkedPaymentMethods.length > 0">
+        <label>{{ 'tr_report_col_payment_type' | translate }}</label>
+        <ng-select
+          class="s-control s-select width-100"
+          [items]="linkedPaymentMethods"
+          bindLabel="label"
+          bindValue="key"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          [clearable]="true"
+          [(ngModel)]="selectedMethodKeys"
+          name="statementMethods"
+        >
+        </ng-select>
+      </div>
+      <div class="col-md-2 flex flex-bottom  statement-filter-apply">
         <button type="button" class="s-btn btn-secondary" (click)="applyFilters()">
           {{ 'tr_apply' | translate }}
         </button>
@@ -65,31 +145,68 @@
     </div>
   </div>
 
+  <div class="plr-4 pb-2" *ngIf="methodTotals.length > 0">
+    <div class="row method-cards">
+      <div class="col-md-4 mb-3" *ngFor="let m of methodTotals">
+        <article
+          class="method-card"
+          [class.method-card--in]="m.net >= 0"
+          [class.method-card--out]="m.net < 0"
+        >
+          <div class="method-card__head">
+            <div class="method-card__title">{{ methodLabel(m.key) }}</div>
+            <div class="method-card__net" [class.text-danger]="m.net < 0" [class.text-success]="m.net >= 0">
+              {{ m.net | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+            </div>
+          </div>
+          <div class="method-card__stats">
+            <div>
+              <span>{{ 'tr_treasury_in' | translate }}</span>
+              <strong>{{ m.inTotal | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+            </div>
+            <div>
+              <span>{{ 'tr_treasury_out' | translate }}</span>
+              <strong>{{ m.outTotal | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+
   <div class="plr-4" *ngIf="!loading">
-    <div class="table-container" *ngIf="entries.length > 0">
-      <table class="s-table table layout-fixed">
+    <div class="table-container ledger-table-wrap" *ngIf="entries.length > 0">
+      <table class="s-table table layout-fixed ledger-table">
         <thead>
           <tr>
-            <th>{{ 'tr_daily_expenses_recorded_at' | translate }}</th>
+            <th class="ledger-datetime">{{ 'tr_daily_expenses_recorded_at' | translate }}</th>
+            <th *ngIf="showBranchColumn">{{ 'tr_branch' | translate }}</th>
+            <th class="ledger-icon-col"></th>
             <th>{{ 'tr_treasury_source' | translate }}</th>
             <th>{{ 'tr_treasury_direction' | translate }}</th>
-            <th>{{ 'tr_daily_expense_amount' | translate }}</th>
+            <th class="ledger-amount">{{ 'tr_daily_expense_amount' | translate }}</th>
             <th>{{ 'tr_treasury_counter' | translate }}</th>
             <th>{{ 'tr_daily_expense_notes' | translate }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let e of entries">
-            <td>{{ e.occurredAt | date : 'short' }}</td>
-            <td>{{ sourceLabel(e.sourceType) }}</td>
+            <td class="ledger-datetime">{{ e.occurredAt | date : 'short' }}</td>
+            <td *ngIf="showBranchColumn">{{ e.branchName || '—' }}</td>
+            <td class="ledger-icon-col">
+              <span class="tdash-tx__icon" [class.tdash-tx__icon--in]="e.direction === 'in'" [class.tdash-tx__icon--out]="e.direction === 'out'">
+                <i class="fa" [ngClass]="e.direction === 'in' ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+              </span>
+            </td>
+            <td><span class="ledger-source">{{ sourceLabel(e.sourceType) }}</span></td>
             <td>
-              <span [class.text-success]="e.direction === 'in'" [class.text-danger]="e.direction === 'out'">
+              <span class="ledger-direction" [class.text-success]="e.direction === 'in'" [class.text-danger]="e.direction === 'out'">
                 {{ e.direction === 'in' ? ('tr_treasury_in' | translate) : ('tr_treasury_out' | translate) }}
               </span>
             </td>
-            <td>{{ e.amount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td>{{ e.counterAccountKey || '—' }}</td>
-            <td>{{ e.note || '—' }}</td>
+            <td class="ledger-amount">{{ e.amount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ counterLabel(e) }}</td>
+            <td>{{ noteLabel(e) }}</td>
           </tr>
         </tbody>
       </table>

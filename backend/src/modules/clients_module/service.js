@@ -927,6 +927,7 @@ export const addClientDeposit = async (req, res) => {
       await postPaymentMethodInflows({
         branchId,
         methodAmounts: splits,
+        feeAllocations,
         sourceType: "client_deposit",
         sourceId: client._id,
         note,

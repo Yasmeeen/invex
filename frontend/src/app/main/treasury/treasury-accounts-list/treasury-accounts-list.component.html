@@ -19,7 +19,8 @@
           [items]="branches"
           bindLabel="name"
           bindValue="_id"
-          [clearable]="false"
+          [clearable]="true"
+          [placeholder]="'tr_report_all_branches' | translate"
           (change)="load()"
         >
         </ng-select>
@@ -54,7 +55,12 @@
             {{ s.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}
           </span>
           <span class="tdash-kpi__meta">
-            {{ s.count }} {{ 'tr_treasury_accounts_count' | translate }}
+            <ng-container *ngIf="s.type === 'cash'; else otherKpiMeta">
+              {{ 'tr_treasury_cash_kpi_hint' | translate }}
+            </ng-container>
+            <ng-template #otherKpiMeta>
+              {{ s.count }} {{ 'tr_treasury_accounts_count' | translate }}
+            </ng-template>
           </span>
         </div>
       </article>
@@ -212,11 +218,21 @@
               <h2 class="tdash-card__title">{{ 'tr_treasury_quick_actions' | translate }}</h2>
             </div>
             <div class="tdash-actions-grid">
-              <button type="button" class="tdash-action" (click)="openTransfer(false)" [disabled]="!filterBranchId">
+              <button type="button" class="tdash-action" (click)="openTransfer(false)">
                 <span class="tdash-action__icon tdash-action__icon--blue"><i class="fa fa-exchange"></i></span>
                 <span>{{ 'tr_treasury_new_transfer' | translate }}</span>
               </button>
-              <button type="button" class="tdash-action" (click)="openTransfer(true)" [disabled]="!filterBranchId">
+              <button
+                type="button"
+                class="tdash-action"
+                *ngIf="canDeposit"
+                (click)="openDeposit()"
+                [disabled]="!filterBranchId && !showBranchFilter"
+              >
+                <span class="tdash-action__icon tdash-action__icon--teal"><i class="fa fa-arrow-down"></i></span>
+                <span>{{ 'tr_treasury_new_deposit' | translate }}</span>
+              </button>
+              <button type="button" class="tdash-action" (click)="openTransfer(true)">
                 <span class="tdash-action__icon tdash-action__icon--orange"><i class="fa fa-handshake-o"></i></span>
                 <span>{{ 'tr_treasury_new_settlement' | translate }}</span>
               </button>

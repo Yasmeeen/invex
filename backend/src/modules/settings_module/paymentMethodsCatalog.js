@@ -8,7 +8,9 @@ import { DEFAULT_SETTLEMENT_ACCOUNTS } from './moneyAccounts.js';
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 const SHOW_IN = new Set(['sale', 'purchase', 'both']);
 const EFFECT_MODES = new Set(['instant', 'settlement', 'none']);
+/** Cashier app-fee percents (Aman/Valu…) — credit markup is stored on the catalog row instead. */
 const FEE_BLOCKED = new Set(['cash', 'credit', 'mixed']);
+const FEE_PERCENT_BLOCKED = new Set(['cash', 'mixed']);
 
 /** Known cashier/sale methods (labels Arabic; client can edit). */
 const DEFAULT_SALE_METHODS = [
@@ -54,7 +56,7 @@ function normalizeEffectMode(key, raw) {
 }
 
 function normalizeFeePercent(key, raw) {
-  if (FEE_BLOCKED.has(key)) return 0;
+  if (FEE_PERCENT_BLOCKED.has(key)) return 0;
   let percent = Number(raw);
   if (!Number.isFinite(percent)) percent = 0;
   return Math.max(0, Math.min(100, Math.round(percent * 100) / 100));
@@ -223,23 +225,7 @@ export function mergeMoneyAccountsFromCatalog(moneyAccounts, catalog) {
     if (!key) continue;
 
     if (row.effectMode === 'settlement') {
-      if (seen.has(key)) {
-        const existing = list.find((a) => normalizeKey(a.key) === key);
-        if (existing && existing.kind === 'settlement' && row.label) {
-          existing.label = row.label;
-        }
-      } else {
-        list.push({
-          key,
-          label: row.label,
-          kind: 'settlement',
-          channel: '',
-          accountNumber: '',
-          phone: '',
-          enabled: true,
-        });
-        seen.add(key);
-      }
+      // Settlement companies are created in money accounts, not from payment methods.
       continue;
     }
 

@@ -245,7 +245,13 @@ export function normalizePaymentMethodAccountMap(rawList, validAccountKeys, acco
 
     let accountKey = normalizeKey(row?.accountKey);
     if (method === 'cash') accountKey = 'cash';
-    if (mode === 'settlement') accountKey = method;
+    if (mode === 'settlement') {
+      const acc = accMap.get(accountKey);
+      if (!acc || acc.kind !== 'settlement') {
+        const self = accMap.get(method);
+        accountKey = self?.kind === 'settlement' ? method : '';
+      }
+    }
     if (!accountKey) continue;
     if (valid.size > 0 && !valid.has(accountKey)) continue;
 
@@ -306,9 +312,10 @@ function plainPaymentMapRow(row) {
   };
 }
 
-/** Catalog effectMode wins: settlement methods always post to a hidden home with the same key. */
+/** Catalog effectMode wins for map mode. Settlement methods link to a company account. */
 export function syncPaymentMapWithCatalog(mapRows, catalog, validAccountKeys, accounts) {
   const byMethod = new Map();
+  const accByKey = new Map((Array.isArray(accounts) ? accounts : []).map((a) => [a.key, a]));
   for (const row of mapRows || []) {
     const plain = plainPaymentMapRow(row);
     if (plain) byMethod.set(plain.method, plain);
@@ -318,9 +325,13 @@ export function syncPaymentMapWithCatalog(mapRows, catalog, validAccountKeys, ac
     if (!method || method === 'credit' || method === 'mixed') continue;
     const prev = byMethod.get(method);
     if (row.effectMode === 'settlement') {
+      let accountKey = normalizeKey(prev?.accountKey);
+      if (!accountKey || accByKey.get(accountKey)?.kind !== 'settlement') {
+        accountKey = accByKey.get(method)?.kind === 'settlement' ? method : '';
+      }
       byMethod.set(method, {
         method,
-        accountKey: method,
+        accountKey,
         mode: 'settlement',
         settlementBankAccountKey:
           prev?.settlementBankAccountKey || DEFAULT_SETTLEMENT_BANK_KEY,
@@ -346,6 +357,29 @@ export function paymentMethodToAccountMap(mapRows) {
   }
   m.set('cash', 'cash');
   return m;
+}
+
+/** Payment methods that land on a settlement (app receivable) account. */
+export function settlementPaymentMethods(mapRows, moneyAccounts) {
+  const set = new Set();
+  const kindByKey = new Map(
+    (moneyAccounts || []).map((a) => [String(a.key || '').trim().toLowerCase(), a.kind])
+  );
+  for (const row of mapRows || []) {
+    const method = String(row?.method || '')
+      .trim()
+      .toLowerCase();
+    if (!method || method === 'cash' || method === 'credit') continue;
+    if (row?.mode === 'settlement') {
+      set.add(method);
+      continue;
+    }
+    const accKey = String(row?.accountKey || '')
+      .trim()
+      .toLowerCase();
+    if (kindByKey.get(accKey) === 'settlement') set.add(method);
+  }
+  return set;
 }
 
 /** Find settlement bank for a settlement account key from the payment map. */
@@ -395,7 +429,7 @@ export async function getEffectiveMoneyAccountsFromDb() {
     keys,
     moneyAccounts
   );
-  return { moneyAccounts, paymentMethodAccountMap };
+  return { moneyAccounts, paymentMethodAccountMap, paymentMethodsCatalog: catalog };
 }
 
 export function moneyAccountMap(accounts) {
@@ -404,4 +438,30 @@ export function moneyAccountMap(accounts) {
     m.set(row.key, row);
   }
   return m;
+}
+
+/** Display names for account / payment-method keys stored on ledger rows. */
+export function treasuryLabelByKey(moneyAccounts, paymentMethodsCatalog) {
+  const map = {};
+  for (const row of paymentMethodsCatalog || []) {
+    const k = normalizeKey(row?.key);
+    const lbl = String(row?.label || '').trim();
+    if (k && lbl) map[k] = lbl;
+  }
+  for (const row of moneyAccounts || []) {
+    const k = normalizeKey(row?.key);
+    const lbl = String(row?.label || '').trim();
+    if (k && lbl) map[k] = lbl;
+  }
+  return map;
+}
+
+export function prettyTreasuryText(raw, labelByKey) {
+  const n = String(raw || '').trim();
+  if (!n) return '';
+  const lower = n.toLowerCase();
+  if (labelByKey?.[lower]) return labelByKey[lower];
+  return n.replace(/[a-z][a-z0-9_]{0,39}/gi, (token) => {
+    return labelByKey?.[token.toLowerCase()] || token;
+  });
 }

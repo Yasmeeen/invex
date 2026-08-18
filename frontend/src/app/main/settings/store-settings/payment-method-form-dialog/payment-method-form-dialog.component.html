@@ -49,8 +49,9 @@
         min="0"
         max="100"
         step="0.01"
-        [attr.title]="'tr_pay_fee_sale_only_hint' | translate"
+        [attr.title]="(isCredit ? 'tr_pay_credit_fee_hint' : 'tr_pay_fee_sale_only_hint') | translate"
       />
+      <small class="pm-form__hint" *ngIf="isCredit">{{ 'tr_pay_credit_fee_hint' | translate }}</small>
     </label>
 
     <label class="pm-form__field" *ngIf="needsAccountLink">
@@ -69,23 +70,39 @@
       <small class="pm-form__hint">{{ 'tr_payment_linked_account_hint' | translate }}</small>
     </label>
 
-    <label class="pm-form__field" *ngIf="showSettlementBank">
-      <span>{{ 'tr_payment_settlement_bank' | translate }}</span>
-      <select class="s-control" [(ngModel)]="settlementBankAccountKey" name="pmSettleBank">
-        <option value="">{{ 'tr_payment_settlement_bank_none' | translate }}</option>
-        <option *ngFor="let a of bankAccounts" [value]="a.key">
-          {{ a.label }}
-        </option>
-      </select>
-      <small class="pm-form__hint">{{ 'tr_payment_settlement_implicit_hint' | translate }}</small>
-    </label>
+    <ng-container *ngIf="showSettlementLink">
+      <label class="pm-form__field">
+        <span>{{ 'tr_payment_linked_settlement' | translate }}</span>
+        <select class="s-control" [(ngModel)]="accountKey" name="pmSettlementApp">
+          <option value="">{{ 'tr_payment_linked_settlement_none' | translate }}</option>
+          <option *ngFor="let a of settlementAccounts" [value]="a.key">
+            {{ a.label }}
+          </option>
+        </select>
+        <small class="pm-form__hint">{{ 'tr_payment_linked_settlement_hint' | translate }}</small>
+        <small class="pm-form__hint" *ngIf="!settlementAccounts.length">
+          {{ 'tr_payment_linked_settlement_empty' | translate }}
+        </small>
+      </label>
+
+      <label class="pm-form__field">
+        <span>{{ 'tr_payment_settlement_bank' | translate }}</span>
+        <select class="s-control" [(ngModel)]="settlementBankAccountKey" name="pmSettleBank">
+          <option value="">{{ 'tr_payment_settlement_bank_none' | translate }}</option>
+          <option *ngFor="let a of bankAccounts" [value]="a.key">
+            {{ a.label }}
+          </option>
+        </select>
+        <small class="pm-form__hint">{{ 'tr_payment_settlement_bank_hint' | translate }}</small>
+      </label>
+    </ng-container>
   </div>
 
   <div class="pm-form__actions">
     <button type="button" class="s-btn btn-secondary" (click)="cancel()">
       {{ 'tr_cancel' | translate }}
     </button>
-    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="!label.trim()">
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="cannotSave">
       {{ 'tr_save_settings' | translate }}
     </button>
   </div>

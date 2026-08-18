@@ -1,11 +1,8 @@
 import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Globals } from '@core/globals';
-import { Branch } from '@core/models/products.model';
-import { canPickBranchRole } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
-import { BranchesServce } from '@shared/services/branches.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { TreasuryAccountsService } from '@shared/services/treasury-accounts.service';
 import { Subscription } from 'rxjs';
@@ -13,7 +10,6 @@ import { Subscription } from 'rxjs';
 export interface TreasurySettleDialogData {
   methodKey: string;
   label?: string;
-  branchId?: string;
   settlementBankAccountKey?: string;
   settlementBankLabel?: string;
 }
@@ -26,8 +22,6 @@ export interface TreasurySettleDialogData {
 export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
   methodKey = '';
   methodLabel = '';
-  branchId = '';
-  branches: Branch[] = [];
   bankKey = '';
   bankLabel = '';
   amount: number | null = null;
@@ -43,15 +37,10 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
     @Inject(MAT_DIALOG_DATA) public data: TreasurySettleDialogData,
     private treasury: TreasuryAccountsService,
     private storeSettings: StoreSettingsService,
-    private branchesService: BranchesServce,
     private notify: AppNotificationService,
     private translate: TranslateService,
     private globals: Globals
   ) {}
-
-  get showBranchPicker(): boolean {
-    return canPickBranchRole(this.globals.currentUser?.role);
-  }
 
   get fromHasNoBalance(): boolean {
     return this.pendingBalance != null && Math.round(this.pendingBalance * 100) <= 0;
@@ -67,7 +56,6 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
     return (
       this.saving ||
       this.loading ||
-      !this.branchId ||
       !this.bankKey ||
       this.fromHasNoBalance ||
       this.amountExceedsBalance
@@ -85,7 +73,6 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
       .trim()
       .toLowerCase();
     this.methodLabel = String(this.data?.label || this.methodKey).trim() || this.methodKey;
-    this.branchId = String(this.data?.branchId || this.globals.currentUser?.branch || '');
     this.bankKey = String(this.data?.settlementBankAccountKey || '')
       .trim()
       .toLowerCase();
@@ -93,37 +80,17 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
 
     this.storeSettings.load();
     this.subscriptions.push(this.storeSettings.settings$.subscribe(() => this.resolveBank()));
-
-    if (this.showBranchPicker) {
-      this.subscriptions.push(
-        this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
-          next: (res: any) => {
-            this.branches = res?.branches || [];
-            if (!this.branchId && this.branches.length) {
-              this.branchId = String(this.branches[0]._id);
-            }
-            this.loadBalance();
-          },
-          error: () => this.loadBalance(),
-        })
-      );
-    } else {
-      this.loadBalance();
-    }
+    this.loadBalance();
   }
 
   ngOnDestroy(): void {
     this.subscriptions.forEach((s) => s.unsubscribe());
   }
 
-  onBranchChanged(): void {
-    this.loadBalance();
-  }
-
   submit(): void {
     const uid = this.globals.currentUser?._id;
     const amt = Number(this.amount);
-    if (!uid || !this.methodKey || !this.branchId) return;
+    if (!uid || !this.methodKey) return;
     if (!this.bankKey) {
       this.notify.push(this.translate.instant('tr_payment_settle_need_bank'), 'error');
       return;
@@ -151,7 +118,6 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
       this.treasury
         .settleAccount(this.methodKey, {
           userId: uid,
-          branch: this.branchId,
           amount: amt,
           note: this.note,
         })
@@ -218,26 +184,24 @@ export class TreasurySettleDialogComponent implements OnInit, OnDestroy {
 
   private loadBalance(): void {
     const uid = this.globals.currentUser?._id;
-    if (!uid || !this.branchId || !this.methodKey) {
+    if (!uid || !this.methodKey) {
       this.pendingBalance = null;
       return;
     }
     this.loading = true;
     this.subscriptions.push(
-      this.treasury
-        .getAccount({ key: this.methodKey, userId: uid, branch: this.branchId })
-        .subscribe({
-          next: (res) => {
-            this.pendingBalance = Number(res?.expectedBalance);
-            if (!Number.isFinite(this.pendingBalance)) this.pendingBalance = 0;
-            if (!this.methodLabel) this.methodLabel = res?.account?.label || this.methodKey;
-            this.loading = false;
-          },
-          error: () => {
-            this.pendingBalance = null;
-            this.loading = false;
-          },
-        })
+      this.treasury.getAccount({ key: this.methodKey, userId: uid }).subscribe({
+        next: (res) => {
+          this.pendingBalance = Number(res?.expectedBalance);
+          if (!Number.isFinite(this.pendingBalance)) this.pendingBalance = 0;
+          if (!this.methodLabel) this.methodLabel = res?.account?.label || this.methodKey;
+          this.loading = false;
+        },
+        error: () => {
+          this.pendingBalance = null;
+          this.loading = false;
+        },
+      })
     );
   }
 

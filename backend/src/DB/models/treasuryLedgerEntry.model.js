@@ -13,6 +13,9 @@ const SOURCE_TYPES = [
   'daily_expense',
   'transfer',
   'settlement',
+  'deposit',
+  'drawer_close',
+  'drawer_variance',
   'opening',
   'other',
 ];

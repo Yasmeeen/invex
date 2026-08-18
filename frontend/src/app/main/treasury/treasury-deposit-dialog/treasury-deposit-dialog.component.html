@@ -1,0 +1,52 @@
+<div class="dialog-pad">
+  <h3 class="mb-3">{{ 'tr_treasury_deposit' | translate }}</h3>
+  <p class="deposit-hint">{{ 'tr_treasury_deposit_hint' | translate }}</p>
+
+  <div class="form-group" *ngIf="showBranchPicker">
+    <label>{{ 'tr_branch' | translate }}</label>
+    <select
+      class="s-control width-100"
+      [(ngModel)]="selectedBranchId"
+      (ngModelChange)="onBranchChange()"
+    >
+      <option value="">—</option>
+      <option *ngFor="let b of branches" [value]="b._id">{{ b.name }}</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_treasury_account' | translate }}</label>
+    <select class="s-control width-100" [(ngModel)]="accountKey">
+      <option value="">—</option>
+      <option *ngFor="let a of accountOptions" [value]="a.key">{{ a.label }}</option>
+    </select>
+    <p class="transfer-balance" *ngIf="accountKey && availableBalance !== null">
+      {{ 'tr_treasury_available_balance' | translate }}:
+      {{ availableBalance | currency : 'EGP ' : 'symbol' : '1.2-2' }}
+    </p>
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_daily_expense_amount' | translate }}</label>
+    <input class="s-control width-100" type="number" min="0" step="0.01" [(ngModel)]="amount" />
+  </div>
+
+  <div class="form-group">
+    <label>{{ 'tr_daily_expense_notes' | translate }}</label>
+    <input class="s-control width-100" type="text" [(ngModel)]="note" maxlength="500" />
+  </div>
+
+  <div class="flex flex-end gap-sm mt-3">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      (click)="submit()"
+      [disabled]="cannotSubmit"
+    >
+      {{ 'tr_treasury_deposit' | translate }}
+    </button>
+  </div>
+</div>

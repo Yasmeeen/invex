@@ -469,6 +469,7 @@ export const createProductBooking = async (req, res) => {
       await postPaymentMethodInflows({
         branchId: branchOid,
         methodAmounts: depositPayments,
+        feeAllocations,
         sourceType: 'booking_deposit',
         sourceId: booking._id,
         note: `Booking deposit — ${product.name || product.code || booking._id}`,

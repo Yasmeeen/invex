@@ -5,6 +5,7 @@ import {
   listRecentLedger,
   listAccountLedger,
   createTreasuryTransfer,
+  createTreasuryDeposit,
   setAccountOpeningBalance,
   settleSettlementAccount,
 } from './service.js';
@@ -18,5 +19,6 @@ router.get('/accounts/:key/ledger', listAccountLedger);
 router.post('/accounts/:key/opening-balance', setAccountOpeningBalance);
 router.post('/accounts/:key/settle', settleSettlementAccount);
 router.post('/transfers', createTreasuryTransfer);
+router.post('/deposits', createTreasuryDeposit);
 
 export default router;

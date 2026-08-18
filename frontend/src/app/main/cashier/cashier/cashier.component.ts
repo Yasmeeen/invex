@@ -34,6 +34,12 @@ import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
+import {
+  isPayLaterMethod,
+  isPayLaterSettled,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+} from '@core/utils/order-display.util';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import {
@@ -2328,13 +2334,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.exchangeTradeInPurchase = null;
 
       const base = res?.newOrder ?? {};
-      // Receipt must show invoice-level discount even if API omits fields or CD lags.
+      const apiSub = Number(base?.subtotalPrice);
+      const apiDisc = Number(base?.invoiceDiscountAmount);
+      const apiTotal = Number(base?.totalPrice);
+      // Prefer API totals so credit-sale markup on line prices is printed.
       this.createdOrder = {
         ...base,
         partyType: clientDetails.linkParty ? clientDetails.partyType : 'client',
-        subtotalPrice: receiptSubtotal,
-        invoiceDiscountAmount: receiptInvoiceDisc,
-        totalPrice: receiptFinal,
+        subtotalPrice: Number.isFinite(apiSub) ? apiSub : receiptSubtotal,
+        invoiceDiscountAmount: Number.isFinite(apiDisc) ? apiDisc : receiptInvoiceDisc,
+        totalPrice: Number.isFinite(apiTotal) ? apiTotal : receiptFinal,
         bookingDepositCreditAmount:
           Number(base?.bookingDepositCreditAmount) > 0
             ? Number(base.bookingDepositCreditAmount)
@@ -2463,6 +2472,32 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const adj = Number(this.createdOrder?.invoiceDiscountAmount);
     const disc = Number.isFinite(adj) ? adj : 0;
     return Math.round((sub - disc) * 100) / 100;
+  }
+
+  receiptCreditFeeAmount(): number {
+    const n = Number(this.createdOrder?.creditFeeAmount);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+
+  receiptCreditFeePercent(): number {
+    const n = Number(this.createdOrder?.creditFeePercent);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  isCreditSale(): boolean {
+    return isPayLaterMethod(this.createdOrder?.paymentMethod);
+  }
+
+  isCreditFullySettled(): boolean {
+    return isPayLaterSettled(this.createdOrder);
+  }
+
+  receiptCreditPaid(): number {
+    return orderDisplayPaid(this.createdOrder);
+  }
+
+  receiptCreditRemaining(): number {
+    return orderDisplayRemaining(this.createdOrder);
   }
 
   receiptPaidPayments(): Array<{ method?: string; amount: number; feeForMethod?: string }> {

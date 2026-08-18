@@ -214,7 +214,8 @@ export class StoreSettingsService {
       let feePercent = Number(row?.feePercent);
       if (!Number.isFinite(feePercent)) feePercent = 0;
       feePercent = Math.max(0, Math.min(100, feePercent));
-      if (key === 'cash' || key === 'credit' || effectMode === 'none') feePercent = 0;
+      if (key === 'cash') feePercent = 0;
+      else if (key !== 'credit' && effectMode === 'none') feePercent = 0;
       seen.add(key);
       out.push({ key, label, showIn, effectMode, feePercent });
     }

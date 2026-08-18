@@ -12,6 +12,8 @@ import {
   BookingsReportResponse,
   ProductBookingsService,
 } from '@shared/services/product-bookings.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 
 type ReportCardVM = {
   titleKey: string;
@@ -63,6 +65,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   deskPurchasesDetailColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   deskPurchasesDetailRows: any[] = [];
 
+  /** Treasury report: payment methods + ledger source activity. */
+  treasuryMethodColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
+  treasuryMethodRows: any[] = [];
+  treasurySourceColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
+  treasurySourceRows: any[] = [];
+
   /** Sales report: breakdown by cash / card / application payment types. */
   salesPaymentColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   salesPaymentRows: any[] = [];
@@ -83,6 +91,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     installments: 'tr_report_title_installments',
     bookings: 'tr_report_title_bookings',
     deskPurchases: 'tr_report_title_desk_purchases',
+    treasury: 'tr_report_title_treasury',
   };
 
   constructor(
@@ -91,10 +100,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     private exportService: ReportExportService,
     private translate: TranslateService,
     private authenticationService: AuthenticationService,
-    private productBookingsService: ProductBookingsService
+    private productBookingsService: ProductBookingsService,
+    private storeSettings: StoreSettingsService
   ) {}
 
   ngOnInit(): void {
+    this.storeSettings.load();
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.lastReportPayload) {
         this.bindReportData(this.lastReportPayload);
@@ -176,6 +187,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.salesPaymentRows = [];
           this.deskPurchasesDetailColumns = [];
           this.deskPurchasesDetailRows = [];
+          this.treasuryMethodColumns = [];
+          this.treasuryMethodRows = [];
+          this.treasurySourceColumns = [];
+          this.treasurySourceRows = [];
         }
       );
       return;
@@ -191,6 +206,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       customers: this.reportsService.getCustomersReport.bind(this.reportsService),
       installments: this.reportsService.getInstallmentsReport.bind(this.reportsService),
       deskPurchases: this.reportsService.getDeskPurchasesTreasuryReport.bind(this.reportsService),
+      treasury: this.reportsService.getTreasuryAccountsReport.bind(this.reportsService),
     };
 
     map[this.reportType](scoped).subscribe(
@@ -211,6 +227,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.salesPaymentRows = [];
         this.deskPurchasesDetailColumns = [];
         this.deskPurchasesDetailRows = [];
+        this.treasuryMethodColumns = [];
+        this.treasuryMethodRows = [];
+        this.treasurySourceColumns = [];
+        this.treasurySourceRows = [];
         this.branchCapitalColumns = [];
         this.branchCapitalRows = [];
       }
@@ -225,6 +245,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.salesPaymentRows = [];
     this.deskPurchasesDetailColumns = [];
     this.deskPurchasesDetailRows = [];
+    this.treasuryMethodColumns = [];
+    this.treasuryMethodRows = [];
+    this.treasurySourceColumns = [];
+    this.treasurySourceRows = [];
     this.branchCapitalColumns = [];
     this.branchCapitalRows = [];
     const t = (key: string, params?: object) => this.translate.instant(key, params);
@@ -486,7 +510,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       ];
       const bt = s.byTreasury || [];
       this.tableRows = bt.map((x: any) => ({
-        treasuryLabel: x.treasuryLabel ? `${x.treasuryLabel} (${x.treasuryKey})` : x.treasuryKey,
+        treasuryLabel: x.treasuryLabel || x.treasuryKey,
         totalAmount: x.totalAmount,
         intakeCount: x.intakeCount,
       }));
@@ -519,6 +543,126 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         quantity: x.quantity,
         unitCost: x.unitCost,
         lineTotal: x.lineTotal,
+      }));
+      return;
+    }
+
+    if (this.reportType === 'treasury') {
+      const s = res.summary || {};
+      this.cards = [
+        { titleKey: 'tr_report_card_spendable', value: s.spendableTotal ?? 0, money: true },
+        { titleKey: 'tr_treasury_type_cash', value: s.cashTotal ?? 0, money: true },
+        { titleKey: 'tr_treasury_type_bank', value: s.bankTotal ?? 0, money: true },
+        { titleKey: 'tr_treasury_type_wallet', value: s.walletTotal ?? 0, money: true },
+        { titleKey: 'tr_treasury_type_settlement', value: s.settlementTotal ?? 0, money: true },
+        { titleKey: 'tr_report_card_method_sales', value: s.orderSales ?? 0, money: true },
+      ];
+
+      const typeLabel: Record<string, string> = {
+        cash: t('tr_treasury_type_cash'),
+        bank: t('tr_treasury_type_bank'),
+        wallet: t('tr_treasury_type_wallet'),
+        settlement: t('tr_treasury_type_settlement'),
+      };
+      const showInLabel: Record<string, string> = {
+        sale: t('tr_pay_show_in_sale'),
+        purchase: t('tr_pay_show_in_purchase'),
+        both: t('tr_pay_show_in_both'),
+      };
+      const effectLabel: Record<string, string> = {
+        instant: t('tr_pay_effect_instant'),
+        settlement: t('tr_pay_effect_settlement'),
+        none: t('tr_pay_effect_none'),
+      };
+
+      this.tableColumns = [
+        { key: 'accountLabel', labelKey: 'tr_treasury_account' },
+        { key: 'displayType', labelKey: 'tr_treasury_kind' },
+        { key: 'accountRef', labelKey: 'tr_report_col_account_ref' },
+        { key: 'openingAtStart', labelKey: 'tr_report_treasury_opening_start', format: 'money' },
+        { key: 'periodIn', labelKey: 'tr_treasury_in', format: 'money' },
+        { key: 'periodOut', labelKey: 'tr_treasury_out', format: 'money' },
+        { key: 'expectedBalance', labelKey: 'tr_treasury_expected', format: 'money' },
+        { key: 'lastMovement', labelKey: 'tr_treasury_last_movement' },
+      ];
+      this.tableRows = (res.accounts || []).map((x: any) => {
+        let accountRef = '—';
+        if (x.channel === 'bank' && x.accountNumber) accountRef = x.accountNumber;
+        else if (x.channel === 'wallet' && x.phone) accountRef = x.phone;
+        const lm = x.lastMovement;
+        const lastMovement = lm?.occurredAt
+          ? `${new Date(lm.occurredAt).toLocaleString()} · ${t(
+              'tr_treasury_source_' + (lm.sourceType || 'other')
+            )}`
+          : '—';
+        return {
+          accountLabel: x.label || x.key,
+          displayType: typeLabel[x.displayType] || x.displayType,
+          accountRef,
+          openingAtStart: x.openingAtStart,
+          periodIn: x.periodIn,
+          periodOut: x.periodOut,
+          expectedBalance: x.expectedBalance,
+          lastMovement,
+        };
+      });
+
+      const barCats = (res.accounts || []).filter(
+        (x: any) => Math.abs(Number(x.expectedBalance || 0)) > 0
+      );
+      this.chartOptions =
+        barCats.length > 0
+          ? this.barChart(
+              t('tr_report_chart_treasury_by_account'),
+              barCats.map((x: any) => String(x.label || x.key)),
+              barCats.map((x: any) => Number(x.expectedBalance || 0))
+            )
+          : null;
+
+      const methods = res.paymentMethods || [];
+      this.treasuryMethodColumns = [
+        { key: 'methodLabel', labelKey: 'tr_report_col_payment_type' },
+        { key: 'showIn', labelKey: 'tr_pay_show_in' },
+        { key: 'effectMode', labelKey: 'tr_pay_effect' },
+        { key: 'accountLabel', labelKey: 'tr_payment_linked_account' },
+        { key: 'settlementBank', labelKey: 'tr_payment_settlement_bank' },
+        { key: 'feePercent', labelKey: 'tr_report_col_fee_percent' },
+        { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
+        { key: 'totalSales', labelKey: 'tr_report_col_sales', format: 'money' },
+      ];
+      this.treasuryMethodRows = methods.map((x: any) => ({
+        methodLabel: this.prettyPayLabel(x.label, x.key),
+        showIn: showInLabel[x.showIn] || x.showIn || '—',
+        effectMode: effectLabel[x.effectMode] || x.effectMode || '—',
+        accountLabel: x.accountLabel || '—',
+        settlementBank: x.settlementBankLabel || '—',
+        feePercent: `${Number(x.feePercent || 0)}%`,
+        totalOrders: x.totalOrders || 0,
+        totalSales: x.totalSales || 0,
+      }));
+
+      const pieMethods = methods
+        .filter((x: any) => Number(x.totalSales || 0) > 0)
+        .map((x: any) => ({
+          name: this.prettyPayLabel(x.label, x.key),
+          y: Number(x.totalSales || 0),
+        }));
+      this.secondaryChartOptions =
+        pieMethods.length > 0
+          ? this.pieChart(t('tr_report_chart_treasury_by_method'), pieMethods)
+          : null;
+
+      this.treasurySourceColumns = [
+        { key: 'sourceType', labelKey: 'tr_treasury_source' },
+        { key: 'inTotal', labelKey: 'tr_treasury_in', format: 'money' },
+        { key: 'outTotal', labelKey: 'tr_treasury_out', format: 'money' },
+        { key: 'count', labelKey: 'tr_report_desk_purchases_col_intakes' },
+      ];
+      this.treasurySourceRows = (res.bySourceType || []).map((x: any) => ({
+        sourceType: t('tr_treasury_source_' + (x.sourceType || 'other')),
+        inTotal: x.inTotal,
+        outTotal: x.outTotal,
+        count: x.count,
       }));
       return;
     }
@@ -688,6 +832,32 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.reportType === 'treasury') {
+      const t = (key: string) => this.translate.instant(key);
+      const summaryRows = this.cards.map((c) => ({
+        [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+        [t('tr_report_col_value')]: this.formatCardExportValue(c),
+      }));
+      const sheets: { name: string; rows: Record<string, unknown>[] }[] = [
+        { name: t('tr_report_sheet_summary'), rows: summaryRows },
+        { name: t('tr_report_treasury_accounts_title'), rows: this.mapRowsForExport(this.tableColumns, this.tableRows) },
+      ];
+      if (this.treasuryMethodRows.length > 0) {
+        sheets.push({
+          name: t('tr_report_treasury_methods_title'),
+          rows: this.mapRowsForExport(this.treasuryMethodColumns, this.treasuryMethodRows),
+        });
+      }
+      if (this.treasurySourceRows.length > 0) {
+        sheets.push({
+          name: t('tr_report_treasury_sources_title'),
+          rows: this.mapRowsForExport(this.treasurySourceColumns, this.treasurySourceRows),
+        });
+      }
+      this.exportService.exportToExcelMultiSheet(filename, sheets);
+      return;
+    }
+
     this.exportService.exportToExcel(
       filename,
       this.mapRowsForExport(this.tableColumns, this.tableRows)
@@ -715,6 +885,46 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           title: this.translate.instant('tr_report_chart_top_products'),
           columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
           rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        });
+      }
+      if (sections.length === 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_sheet_summary'),
+          columns: [
+            this.translate.instant('tr_report_col_label'),
+            this.translate.instant('tr_report_col_value'),
+          ],
+          rows: summaryRows.map((r) => ({
+            [this.translate.instant('tr_report_col_label')]: r.label,
+            [this.translate.instant('tr_report_col_value')]: r.value,
+          })),
+        });
+      }
+      await this.exportService.exportMultiSectionPdf(title, summaryRows, sections);
+      return;
+    }
+
+    if (this.reportType === 'treasury') {
+      const sections = [];
+      if (this.tableRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_treasury_accounts_title'),
+          columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        });
+      }
+      if (this.treasuryMethodRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_treasury_methods_title'),
+          columns: this.treasuryMethodColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.treasuryMethodColumns, this.treasuryMethodRows),
+        });
+      }
+      if (this.treasurySourceRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_treasury_sources_title'),
+          columns: this.treasurySourceColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.treasurySourceColumns, this.treasurySourceRows),
         });
       }
       if (sections.length === 0) {
@@ -922,5 +1132,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   /** Bookings by branch — alternating mauve palette. */
   private bookingsBranchDonutChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
     return this.donutChart(title, data, this.bookingsDonutColors, '#5b21b6');
+  }
+
+  private prettyPayLabel(label: string | undefined, key: string | undefined): string {
+    const snap = this.storeSettings.snapshot;
+    return paymentMethodDisplayLabel(
+      key || label,
+      snap.paymentAppFeePercents,
+      this.translate,
+      undefined,
+      snap.paymentMethodsCatalog,
+      [...(snap.moneyAccounts || []), ...(snap.purchaseTreasuryMethods || [])]
+    );
   }
 }

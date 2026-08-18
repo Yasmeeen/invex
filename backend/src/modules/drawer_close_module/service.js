@@ -17,7 +17,12 @@ import { sumVendorCashDrawerInflows } from '../../utils/vendor-cash-drawer-inflo
 import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
 import { refundAllocationFromReturnRecord, salesReturnTreasuryRefundLines } from '../../utils/order-return.js';
 import { refundTreasuryCashFromReturnRecord } from '../../utils/purchase-return.js';
-import { sumCashTransferNet } from '../../utils/treasury-ledger.js';
+import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
+import {
+  recordTreasuryLedgerEntry,
+  safeTreasuryPost,
+  sumCashTransferNet,
+} from '../../utils/treasury-ledger.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 /** Business day boundaries for drawer close (store operations). */
@@ -228,6 +233,41 @@ async function computeDrawerPreviewWithPeriod(branchOid, targetDateStr) {
     periodEndDate: period.periodEndDate,
     missedDaysCount: period.missedDaysCount,
   };
+}
+
+/**
+ * Cash currently expected in a branch drawer (same figure as drawer-close preview).
+ * After a close covering `untilDate`, this is the retained cash left in the drawer.
+ */
+export async function getCurrentDrawerCash(branchId, untilDate) {
+  if (!branchId || !mongoose.Types.ObjectId.isValid(String(branchId))) return 0;
+  const branchOid = new mongoose.Types.ObjectId(String(branchId));
+  const dateStr =
+    untilDate && parseBusinessDay(untilDate) ? String(untilDate).trim() : todayBusinessDateStr();
+  const period = await resolveClosePeriod(branchOid, dateStr);
+  if (period.periodAlreadyClosed) {
+    const covering = await findCloseCoveringDate(branchOid, dateStr);
+    return round2(Number(covering?.retainedCash ?? 0));
+  }
+  if (!period.bounds) {
+    return round2(Number(period.openingCashBalance ?? 0));
+  }
+  try {
+    const preview = await computeDrawerPreviewWithPeriod(branchOid, dateStr);
+    return round2(Number(preview.expectedCashInDrawer ?? 0));
+  } catch (err) {
+    console.warn('getCurrentDrawerCash:', err?.message || err);
+    return round2(Number(period.openingCashBalance ?? 0));
+  }
+}
+
+/** Sum of current drawer cash across every branch (company cash total). */
+export async function sumCurrentDrawerCashAllBranches(untilDate) {
+  const branches = await Branch.find({}).select('_id').lean();
+  const amounts = await Promise.all(
+    (branches || []).map((b) => getCurrentDrawerCash(b._id, untilDate))
+  );
+  return round2(amounts.reduce((s, n) => s + Number(n || 0), 0));
 }
 
 async function loadActor(userId) {
@@ -830,6 +870,36 @@ export const closeDrawer = async (req, res) => {
         .lean()
     );
 
+    const closeOccurredAt = period.bounds?.end || new Date();
+    await safeTreasuryPost('drawer_close', async () => {
+      if (cashResult.deposited > 0) {
+        await recordTreasuryLedgerEntry({
+          branchId: branchOid,
+          accountKey: 'cash',
+          direction: 'out',
+          amount: cashResult.deposited,
+          occurredAt: closeOccurredAt,
+          sourceType: 'drawer_close',
+          sourceId: doc._id,
+          note: 'إيداع من الدرج',
+          createdBy: userId,
+        });
+      }
+      if (Math.abs(variance) > VARIANCE_EPS) {
+        await recordTreasuryLedgerEntry({
+          branchId: branchOid,
+          accountKey: 'cash',
+          direction: variance > 0 ? 'in' : 'out',
+          amount: Math.abs(variance),
+          occurredAt: closeOccurredAt,
+          sourceType: 'drawer_variance',
+          sourceId: doc._id,
+          note: reasonTrim.slice(0, 2000),
+          createdBy: userId,
+        });
+      }
+    });
+
     res.status(201).json(populated);
   } catch (err) {
     console.error('❌ closeDrawer:', err.message);
@@ -873,6 +943,10 @@ export const reopenLastDrawerClose = async (req, res) => {
 
     const removed = normalizeDrawerCloseRow(latest);
     await DrawerClose.findByIdAndDelete(latest._id);
+    await TreasuryLedgerEntry.deleteMany({
+      sourceType: { $in: ['drawer_close', 'drawer_variance'] },
+      sourceId: latest._id,
+    });
 
     res.json({
       success: true,

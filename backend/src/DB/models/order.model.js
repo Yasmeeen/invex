@@ -44,6 +44,11 @@ const orderSchema = new mongoose.Schema(
     /** Amount due after all discounts (unchanged meaning for reports). */
     totalPrice: { type: Number, min: 0 },
 
+    /** بيع بالآجل: % added onto the credit (unpaid) portion at checkout. */
+    creditFeePercent: { type: Number, default: 0, min: 0 },
+    /** Snapshot of that markup in EGP (already included in line prices / totalPrice). */
+    creditFeeAmount: { type: Number, default: 0, min: 0 },
+
     /**
      * Cashier exchange / trade-in: purchase credit applied toward this sale (EGP).
      * Payment validation uses (totalPrice − appliedCredit); totalPrice stays gross sale.
@@ -96,6 +101,10 @@ const orderSchema = new mongoose.Schema(
         countsTowardInvoice: { type: Boolean, default: true },
         /** Method that generated this fee line (e.g. aman). */
         feeForMethod: { type: String, required: false, trim: true },
+        /** Original fee on `feeForMethod` (before any gross-up on paidVia). */
+        feeNet: { type: Number, required: false, min: 0 },
+        /** Amount collected on paidVia, including that method's own % if any. */
+        feeGrossOnPaidVia: { type: Number, required: false, min: 0 },
         feePercentSnapshot: { type: Number, required: false, min: 0 },
         /** Purchase treasuries when recording pay-later settlement (same keys as desk purchase). */
         paymentTreasurySplits: {

@@ -1,12 +1,15 @@
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
-import { MoneyAccountChannel } from '@shared/services/store-settings.service';
+import { MoneyAccountChannel, MoneyAccountKind } from '@shared/services/store-settings.service';
+
+export type MoneyAccountFormType = 'bank' | 'wallet' | 'settlement';
 
 export interface MoneyAccountFormData {
   mode: 'add' | 'edit';
   key?: string;
   label?: string;
+  kind?: MoneyAccountKind;
   channel?: MoneyAccountChannel | '';
   accountNumber?: string;
   phone?: string;
@@ -16,6 +19,7 @@ export interface MoneyAccountFormData {
 export interface MoneyAccountFormResult {
   key: string;
   label: string;
+  kind: 'treasury' | 'settlement';
   channel: MoneyAccountChannel | '';
   accountNumber: string;
   phone: string;
@@ -29,8 +33,7 @@ export interface MoneyAccountFormResult {
 })
 export class MoneyAccountFormDialogComponent {
   label = '';
-  /** Always `bank` or `wallet` for non-cash rows. */
-  channel: 'bank' | 'wallet' = 'bank';
+  accountType: MoneyAccountFormType = 'bank';
   accountNumber = '';
   phone = '';
   enabled = true;
@@ -43,12 +46,16 @@ export class MoneyAccountFormDialogComponent {
     this.label = String(data.label || '').trim();
     this.enabled = data.enabled !== false;
     if (this.isCash) {
-      this.channel = 'bank';
+      this.accountType = 'bank';
       this.accountNumber = '';
       this.phone = '';
       this.enabled = true;
+    } else if (data.kind === 'settlement') {
+      this.accountType = 'settlement';
+      this.accountNumber = '';
+      this.phone = '';
     } else {
-      this.channel = data.channel === 'wallet' ? 'wallet' : 'bank';
+      this.accountType = data.channel === 'wallet' ? 'wallet' : 'bank';
       this.accountNumber = String(data.accountNumber || '').trim();
       this.phone = String(data.phone || '').trim();
     }
@@ -58,18 +65,25 @@ export class MoneyAccountFormDialogComponent {
     return String(this.data.key || '').toLowerCase() === 'cash';
   }
 
+  get typeLocked(): boolean {
+    return this.data.mode === 'edit';
+  }
+
+  get isSettlement(): boolean {
+    return this.accountType === 'settlement';
+  }
+
   get titleKey(): string {
     if (this.isCash) return 'tr_money_account_edit_cash_title';
+    if (this.data.mode === 'add' && this.isSettlement) return 'tr_money_account_add_settlement';
     return this.data.mode === 'add' ? 'tr_money_accounts_add' : 'tr_money_account_edit_title';
   }
 
-  onChannelChange(next: string): void {
-    this.channel = next === 'wallet' ? 'wallet' : 'bank';
-    if (this.channel === 'bank') {
-      this.phone = '';
-    } else {
-      this.accountNumber = '';
-    }
+  onTypeChange(next: string): void {
+    if (this.typeLocked) return;
+    this.accountType = next === 'wallet' ? 'wallet' : next === 'settlement' ? 'settlement' : 'bank';
+    if (this.accountType !== 'bank') this.accountNumber = '';
+    if (this.accountType !== 'wallet') this.phone = '';
   }
 
   cancel(): void {
@@ -85,6 +99,7 @@ export class MoneyAccountFormDialogComponent {
       this.dialogRef.close({
         key: 'cash',
         label: label || this.translate.instant('tr_treasury_cash'),
+        kind: 'treasury',
         channel: '',
         accountNumber: '',
         phone: '',
@@ -92,10 +107,23 @@ export class MoneyAccountFormDialogComponent {
       });
       return;
     }
-    const channel: 'bank' | 'wallet' = this.channel === 'wallet' ? 'wallet' : 'bank';
+    if (this.accountType === 'settlement') {
+      this.dialogRef.close({
+        key: String(this.data.key || '').trim().toLowerCase(),
+        label,
+        kind: 'settlement',
+        channel: '',
+        accountNumber: '',
+        phone: '',
+        enabled: this.enabled !== false,
+      });
+      return;
+    }
+    const channel: 'bank' | 'wallet' = this.accountType === 'wallet' ? 'wallet' : 'bank';
     this.dialogRef.close({
       key: String(this.data.key || '').trim().toLowerCase(),
       label,
+      kind: 'treasury',
       channel,
       accountNumber: channel === 'bank' ? String(this.accountNumber || '').trim().slice(0, 80) : '',
       phone: channel === 'wallet' ? String(this.phone || '').trim().slice(0, 40) : '',

@@ -17,6 +17,7 @@ export class CreateEditBranchComponent implements OnInit {
   branchId: string;
   isEdit: boolean;
   salespeople: { name: string }[] = [{ name: '' }];
+  openingDate: Date | null = null;
   @ViewChild('branchForm') branchForm: NgForm;
 
   constructor(
@@ -46,9 +47,10 @@ export class CreateEditBranchComponent implements OnInit {
   getBranchData(){
     this.branchesService.getBranch(this.branchId).subscribe((response:any)=> {
       this.branchId = response._id
+      this.openingDate = response.openingDate ? new Date(response.openingDate) : null;
       this.branchForm.form.patchValue({
         ...response,
-        openingDate: response.openingDate ? new Date(response.openingDate) : null,
+        openingDate: this.openingDate,
       });
       const list = Array.isArray(response.salespeople) ? response.salespeople : [];
       this.salespeople = list.length
@@ -71,12 +73,26 @@ export class CreateEditBranchComponent implements OnInit {
     this.salespeople.splice(index, 1);
   }
 
+  clearOpeningDate(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.openingDate = null;
+    this.branchForm?.form.patchValue({ openingDate: null });
+    this.branchForm?.form.get('openingDate')?.markAsDirty();
+  }
+
   private buildBranchPayload(): Branch {
     const formValue = this.branchForm.value;
     const openingRaw = formValue?.openingDate;
+    const openingDate =
+      openingRaw instanceof Date
+        ? openingRaw.toLocaleDateString('en-CA')
+        : openingRaw
+          ? new Date(openingRaw).toLocaleDateString('en-CA')
+          : null;
     return {
       ...formValue,
-      openingDate: openingRaw ? new Date(openingRaw) : null,
+      openingDate,
       salespeople: this.salespeople
         .map((sp) => ({ name: String(sp.name || '').trim(), active: true }))
         .filter((sp) => sp.name.length > 0),

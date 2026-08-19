@@ -12,7 +12,22 @@ export function parseOpeningDate(value: string | Date | null | undefined): Date 
   if (value == null || value === '') {
     return null;
   }
-  const d = value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+    return startOfLocalDay(value);
+  }
+  const raw = String(value).trim();
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (dateOnly) {
+    const y = Number(dateOnly[1]);
+    const m = Number(dateOnly[2]) - 1;
+    const day = Number(dateOnly[3]);
+    const local = new Date(y, m, day);
+    return Number.isNaN(local.getTime()) ? null : local;
+  }
+  const d = new Date(raw);
   if (Number.isNaN(d.getTime())) {
     return null;
   }

@@ -117,6 +117,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.celebrationSub = this.openingCelebration.activeBranch$.subscribe((branch) =>
       this.syncOpeningPopup(branch)
     );
+    this.syncOpeningPopup(this.openingCelebration.snapshot);
+    this.openingCelebration.load();
     if (this.activeSection === 'sales') {
       this.ensureSalesDashboard();
     }

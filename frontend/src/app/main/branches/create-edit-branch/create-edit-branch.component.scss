@@ -1,0 +1,38 @@
+.opening-date-field {
+  position: relative;
+
+  .s-control {
+    padding-inline-end: 4.5rem;
+  }
+
+  &__clear {
+    position: absolute;
+    top: 50%;
+    inset-inline-end: 2.5rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #7a8993;
+    cursor: pointer;
+    z-index: 11;
+    pointer-events: auto;
+
+    &:hover {
+      background: rgba(122, 137, 147, 0.12);
+      color: #4e5665;
+    }
+  }
+
+  .date-picker {
+    width: 2.5rem !important;
+    inset-inline-end: 0;
+    inset-inline-start: auto !important;
+  }
+}

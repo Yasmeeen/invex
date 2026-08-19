@@ -415,7 +415,11 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     let rec = round2(Number(this.payAmounts[m]) || 0);
     for (const fee of result.feeAllocations || []) {
       if (fee.forMethod === m) {
-        rec = round2(rec - (Number(fee.feeNet) || 0));
+        const ownDeduction =
+          fee.paidVia === m
+            ? round2(Number(fee.feeGrossOnPaidVia) || Number(fee.feeNet) || 0)
+            : round2(Number(fee.feeNet) || 0);
+        rec = round2(rec - ownDeduction);
       }
       const via = String(fee.paidVia || '').toLowerCase();
       if (via && via !== 'same' && via === m && fee.forMethod !== m) {

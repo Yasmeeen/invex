@@ -2,11 +2,8 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { NavigationEnd, Router, RouterEvent } from '@angular/router';
 import { CurrentUser } from '@core/models/users-interfaces.model';
 import { TranslateService } from '@ngx-translate/core';
-import { UserSerivce } from '@shared/services/user.service';
-import { Globals } from '../core/globals';
-import { AuthenticationService } from '../core/services/authentication.service';
-import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { isWarehouse } from '@core/utils/role-utils';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
 import { openingCelebrationStorageKey } from '@core/utils/opening-celebration';
 import { Branch } from '@core/models/products.model';
@@ -46,18 +43,15 @@ export class MainComponent implements OnInit, OnDestroy {
       private storeSettingsService: StoreSettingsService,
       private openingCelebration: OpeningCelebrationService
   ) {
-      // this.currentUser = this.authenticationService.getCurrentUser();
-      // globals.currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       document.body.classList.add('admin_theme');
-
-
   }
   ngOnInit() {
       this.buildSystemCelebration();
-      this.openingCelebration.load();
       this.celebrationSub = this.openingCelebration.activeBranch$.subscribe((branch) =>
         this.syncOpeningCelebration(branch)
       );
+      this.syncOpeningCelebration(this.openingCelebration.snapshot);
+      this.openingCelebration.load();
       this.storeSettingsService.load();
     // Hide Vixa for warehouse (and legacy Operation Manager).
     try {

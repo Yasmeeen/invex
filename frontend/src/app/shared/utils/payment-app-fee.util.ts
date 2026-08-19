@@ -76,7 +76,8 @@ export function grossFromNet(net: number, percent: number): number {
 export function feeGrossOnPaidVia(
   feeNet: number,
   paidVia: string,
-  fees: PaymentAppFeePercent[] | undefined | null
+  fees: PaymentAppFeePercent[] | undefined | null,
+  feeForMethod?: string
 ): number {
   const fee = round2(Number(feeNet) || 0);
   if (fee <= 0) {
@@ -86,7 +87,11 @@ export function feeGrossOnPaidVia(
     .trim()
     .toLowerCase();
   if (!via || via === FEE_PAID_VIA_SAME) {
-    return fee;
+    const sameMethod = String(feeForMethod || '')
+      .trim()
+      .toLowerCase();
+    const pctSame = paymentAppFeePercent(sameMethod, fees);
+    return grossFromNet(fee, pctSame);
   }
   const pct = paymentAppFeePercent(via, fees);
   return grossFromNet(fee, pct);
@@ -152,7 +157,12 @@ export function buildPaymentSplitsResult(
     }
     const paidViaRaw = sourceMap.get(split.method) ?? FEE_PAID_VIA_SAME;
     const paidVia = resolvePaidViaMethod(split.method, paidViaRaw);
-    const feeGross = feeGrossOnPaidVia(feeNet, paidViaRaw === FEE_PAID_VIA_SAME ? FEE_PAID_VIA_SAME : paidVia, fees);
+    const feeGross = feeGrossOnPaidVia(
+      feeNet,
+      paidViaRaw === FEE_PAID_VIA_SAME ? FEE_PAID_VIA_SAME : paidVia,
+      fees,
+      split.method
+    );
 
     feeAllocations.push({
       forMethod: split.method,
@@ -163,7 +173,7 @@ export function buildPaymentSplitsResult(
     });
 
     if (paidViaRaw === FEE_PAID_VIA_SAME) {
-      grossByMethod[split.method] = round2((grossByMethod[split.method] || 0) + feeNet);
+      grossByMethod[split.method] = round2((grossByMethod[split.method] || 0) + feeGross);
     } else {
       grossByMethod[paidVia] = round2((grossByMethod[paidVia] || 0) + feeGross);
     }

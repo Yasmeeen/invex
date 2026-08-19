@@ -603,7 +603,7 @@ $shell-icon-active: darken($shell-icon, 6%);
         max-width: 0 !important;
     }
 
-    ::ng-deep.sidebar-active {
+    :host-context(.sidebar-active) {
         .sidebar-background {
             width: 100vw;
             height: 100vh;
@@ -628,6 +628,7 @@ $shell-icon-active: darken($shell-icon, 6%);
             #{$start}: 0;
             #{$end}: auto;
             margin-#{$start}: -100vw;
+            transition: margin 0.3s ease;
         }
 
         &.sidebar-active .main-sidebar {
@@ -642,4 +643,11 @@ $shell-icon-active: darken($shell-icon, 6%);
 
     // directions
     @import 'directions/decide';
+
+    :host-context(.sidebar-active) {
+        .main-sidebar {
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+    }
 }

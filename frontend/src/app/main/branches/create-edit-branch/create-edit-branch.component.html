@@ -126,15 +126,26 @@
                     <div class="col-md-4 mt-3">
                       <div class="form-group">
                         <label>{{ 'tr_opening_date' | translate }}</label>
-                        <div class="input-with-icon">
+                        <div class="input-with-icon opening-date-field">
                           <input
                             name="openingDate"
-                            ngModel
+                            [(ngModel)]="openingDate"
                             placeholder="{{ 'tr_pick_date' | translate }}"
                             [matDatepicker]="openingPick"
                             class="s-control"
                           />
                           <mat-datepicker #openingPick></mat-datepicker>
+                          <button
+                            type="button"
+                            class="opening-date-field__clear"
+                            *ngIf="openingDate"
+                            (mousedown)="$event.preventDefault(); $event.stopPropagation()"
+                            (click)="clearOpeningDate($event)"
+                            [attr.aria-label]="'tr_clear_opening_date' | translate"
+                            [attr.title]="'tr_clear_opening_date' | translate"
+                          >
+                            <i class="fa fa-times" aria-hidden="true"></i>
+                          </button>
                           <mat-datepicker-toggle class="input-icon date-picker" [for]="openingPick"></mat-datepicker-toggle>
                         </div>
                         <span class="size-small text-muted d-block mt-1">{{ 'tr_opening_date_hint' | translate }}</span>

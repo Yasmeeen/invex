@@ -43,6 +43,8 @@ const productSchema = new mongoose.Schema(
       ref: 'Category',
       required: true,
     },
+    /** null/undefined = inherit category.sellByWeight; true/false = override. */
+    sellByWeightOverride: { type: Boolean, required: false, default: undefined },
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
@@ -90,13 +92,13 @@ const productSchema = new mongoose.Schema(
       of: String,
       default: {},
     },
-    /** Optional: name of the employee who registered / added the device. */
+    /** Optional: name of the employee who registered / added the product. */
     addedBy: {
       type: String,
       default: '',
       trim: true,
     },
-    /** Optional: client or supplier the device was acquired from (trade-in / purchase source). */
+    /** Optional: client or supplier the product was acquired from (trade-in / purchase source). */
     acquiredFrom: {
       partyType: {
         type: String,

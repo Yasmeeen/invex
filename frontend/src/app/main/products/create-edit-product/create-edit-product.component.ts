@@ -32,6 +32,7 @@ import {
   ProductPurchaseRequestsService,
 } from '@shared/services/product-purchase-requests.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { resolveSellByWeight } from '@shared/utils/sale-quantity.util';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
@@ -344,7 +345,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   get showUnitsTab(): boolean {
-    /** Create flow: device data (code, prices, image, attrs) always lives on tab 2. */
+    /** Create flow: product data (code, prices, image, attrs) always lives on tab 2. */
     return !this.isEdit;
   }
 
@@ -385,8 +386,18 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return !!(this.selectedCategory?.multiCodePerPiece);
   }
 
+  get isWeightCategory(): boolean {
+    return resolveSellByWeight({
+      weightSalesEnabled: !!this.storeSettings.snapshot.weightSalesEnabled,
+      category: this.selectedCategory,
+    });
+  }
+
   getStockQty(): number {
     const v = this.basicInfoForm?.value?.stock;
+    if (this.isWeightCategory) {
+      return Math.max(0, Number(v) || 0);
+    }
     return Math.max(1, Math.floor(Number(v) || 1));
   }
 

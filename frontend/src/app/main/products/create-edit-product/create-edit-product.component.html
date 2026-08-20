@@ -151,7 +151,13 @@
                       class="form-group"
                       [class.has-error]="stock.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
+                      <label>
+                        {{
+                          isWeightCategory
+                            ? ('tr_stock_weight' | translate)
+                            : (cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate))
+                        }}
+                      </label>
                       <input
                         type="number"
                         class="s-control"
@@ -159,7 +165,8 @@
                         #stock="ngModel"
                         ngModel
                         required
-                        min="1"
+                        [min]="isWeightCategory ? 0 : 1"
+                        [step]="isWeightCategory ? 0.001 : 1"
                         (ngModelChange)="onStockQuantityChanged(); onDeskTreasuryCostInputsChanged()"
                       />
                       <span
@@ -171,7 +178,7 @@
                     </div>
                   </div>
 
-                  <!-- Create: device data lives on tab 2. Edit: keep full form here. -->
+                  <!-- Create: product data lives on tab 2. Edit: keep full form here. -->
                   <div class="col-md-12" *ngIf="!isEdit">
                     <div class="form-group multi-unit-tab-hint">
                       <p class="text-muted size-small m-0">
@@ -755,7 +762,7 @@
                       </div>
                     </ng-container>
 
-                    <!-- Shared device data (qty 1 or multi same-data) -->
+                    <!-- Shared product data (qty 1 or multi same-data) -->
                     <div class="row" *ngIf="!isPerUnitVariantMode">
                       <div class="col-md-12 mt-2 mb-2" *ngIf="isMultiUnitMode">
                         <h4 class="m-0">{{ 'tr_product_tab_units_shared_data' | translate }}</h4>

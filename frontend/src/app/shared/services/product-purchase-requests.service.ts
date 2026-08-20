@@ -29,7 +29,7 @@ export interface DeskPurchaseProductPayload {
   attributes?: Record<string, string>;
   imageUrl?: string;
   notes?: string;
-  /** Employee who added the device */
+  /** Employee who added the product */
   addedBy?: string;
   /** When category uses multi-code per piece and quantity > 1 */
   unitCodes?: string[];
@@ -51,13 +51,13 @@ export class ProductPurchaseRequestsService {
     purchaseTreasuryKey?: string;
     /** Split cost across treasuries; amounts must sum to netPrice × quantity. */
     purchaseTreasurySplits?: PurchaseTreasurySplit[];
-    /** Cashier exchange trade-in: device intake only; treasury at settlement. */
+    /** Cashier exchange trade-in: product intake only; treasury at settlement. */
     exchangeTradeIn?: boolean;
   }): Observable<any> {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }
 
-  /** Append another device to an existing exchange trade-in purchase (one invoice). */
+  /** Append another product to an existing exchange trade-in purchase (one invoice). */
   addLine(
     purchaseId: string,
     payload: {

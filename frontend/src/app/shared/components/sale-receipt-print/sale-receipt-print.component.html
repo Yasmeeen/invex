@@ -8,6 +8,13 @@
       {{ st.storeName }}
     </div>
 
+    <div class="invoice-delivery-badge center" *ngIf="order?.isDelivery">
+      <span class="invoice-delivery-badge__icon" aria-hidden="true">🚚</span>
+      <span class="invoice-delivery-badge__label">
+        {{ 'tr_invoice_delivery_badge' | receiptTranslate: st.receiptLanguage }}
+      </span>
+    </div>
+
     <table class="invoice-table meta-table">
       <tr>
         <td>{{ 'tr_invoice_number' | receiptTranslate: st.receiptLanguage }}</td>
@@ -20,6 +27,10 @@
       <tr>
         <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
         <td>{{ printDate | date: 'dd MMM y' }}</td>
+      </tr>
+      <tr *ngIf="order?.isDelivery && order?.deliveryPersonName">
+        <td>{{ 'tr_receipt_delivery_person' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ order.deliveryPersonName }}</td>
       </tr>
     </table>
 

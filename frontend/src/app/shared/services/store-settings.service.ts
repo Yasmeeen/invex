@@ -82,6 +82,12 @@ export interface StoreSettings {
   bookingPolicy: string;
   /** Print bookingPolicy on booking receipts when true. */
   showBookingPolicyOnReceipt: boolean;
+  /** Master switch for sell-by-weight categories and cashier weight entry. */
+  weightSalesEnabled: boolean;
+  /** Master switch for delivery invoices at cashier. */
+  deliveryOrdersEnabled: boolean;
+  /** Master switch for desk product purchase + exchange at cashier. */
+  cashierPurchaseExchangeEnabled: boolean;
 }
 
 const DEFAULTS: StoreSettings = {
@@ -105,6 +111,9 @@ const DEFAULTS: StoreSettings = {
   showReturnExchangePolicyOnReceipt: false,
   bookingPolicy: '',
   showBookingPolicyOnReceipt: false,
+  weightSalesEnabled: false,
+  deliveryOrdersEnabled: false,
+  cashierPurchaseExchangeEnabled: true,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -302,6 +311,9 @@ export class StoreSettingsService {
           showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
           bookingPolicy: data.bookingPolicy ?? '',
           showBookingPolicyOnReceipt: Boolean(data.showBookingPolicyOnReceipt),
+          weightSalesEnabled: Boolean(data.weightSalesEnabled),
+          deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
+          cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
         });
         this.ensureReceiptTranslationPacks();
       },

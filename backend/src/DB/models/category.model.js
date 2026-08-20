@@ -9,6 +9,10 @@ const categorySchema = new mongoose.Schema({
    * When false, one code covers the whole quantity (single product, stock N).
    */
   multiCodePerPiece: { type: Boolean, default: false },
+  /** When true (and store weightSalesEnabled), products sell by weight (kg/g). */
+  sellByWeight: { type: Boolean, default: false },
+  /** Unit shown on receipts and stock for sellByWeight categories. */
+  weightUnit: { type: String, enum: ['kg', 'g'], default: 'kg' },
   /**
    * When true, products in this category are deleted once stock reaches 0 (e.g. after a sale).
    * When false, out-of-stock products remain so stock can be topped up later.
@@ -57,6 +61,8 @@ function ensureCodeInPlain(_doc, ret) {
     ret.attributeDefs = [];
   }
   ret.multiCodePerPiece = !!ret.multiCodePerPiece;
+  ret.sellByWeight = !!ret.sellByWeight;
+  ret.weightUnit = ret.weightUnit === 'g' ? 'g' : 'kg';
   ret.deleteProductWhenOutOfStock = !!ret.deleteProductWhenOutOfStock;
   // Missing / null → true (legacy categories & schema default)
   ret.showProductCodeOnInvoice =

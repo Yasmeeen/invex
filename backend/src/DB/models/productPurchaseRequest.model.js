@@ -120,7 +120,7 @@ const productPurchaseRequestSchema = new mongoose.Schema(
     quantity: { type: Number, required: true, min: 1, default: 1 },
 
     /**
-     * Multi-device purchase invoice lines (exchange / multi trade-in).
+     * Multi-product purchase invoice lines (exchange / multi trade-in).
      * When set, totals use all lines; productPayload+quantity mirror the first line for legacy readers.
      */
     lines: {

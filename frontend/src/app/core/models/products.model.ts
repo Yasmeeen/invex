@@ -28,13 +28,18 @@ export interface Product {
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
   imageUrl?: string;
-  /** Optional: employee name who added / registered the device */
+  /** Optional: employee name who added / registered the product */
   addedBy?: string;
-  /** Optional source: client or supplier the device was acquired from */
+  /** null = inherit category; true/false overrides sell-by-weight. */
+  sellByWeightOverride?: boolean | null;
+  /** Cashier / order line: piece or weight. */
+  saleUnit?: 'piece' | 'weight';
+  weightUnit?: 'kg' | 'g';
+  /** Optional source: client or supplier the product was acquired from */
   acquiredFrom?: ProductAcquiredFrom | null;
 }
 
-/** Payload / API shape for optional device source (client or supplier). */
+/** Payload / API shape for optional product source (client or supplier). */
 export interface ProductAcquiredFrom {
   partyType?: 'client' | 'supplier';
   clientId?: string;
@@ -94,6 +99,10 @@ export interface Category {
   multiCodePerPiece?: boolean;
   /** When true, products are deleted once stock reaches 0 */
   deleteProductWhenOutOfStock?: boolean;
+  /** When true (and store weightSalesEnabled), products sell by weight. */
+  sellByWeight?: boolean;
+  /** kg or g for sellByWeight categories. */
+  weightUnit?: 'kg' | 'g';
   /** When true, product code is shown under the name on the customer invoice (default true). */
   showProductCodeOnInvoice?: boolean;
   /** Dynamic attributes definition (new format: string keys; legacy: objects with key/label). */
@@ -127,6 +136,7 @@ export interface Branch {
   /** Optional grand-opening date; celebration shows from the day before for one week. */
   openingDate?: string | Date | null;
   salespeople?: BranchSalesperson[];
+  deliveryStaff?: BranchSalesperson[];
 }
 
 /** Snapshot line item on a saved order (API shape; not a full Product). */
@@ -136,6 +146,8 @@ export interface OrderProductLine {
   code: string;
   quantity: number;
   returnedQuantity?: number;
+  saleUnit?: 'piece' | 'weight';
+  weightUnit?: 'kg' | 'g';
   price?: number;
   cost?: number;
   isApplyDiscount?: boolean;
@@ -154,6 +166,9 @@ export interface Order {
   clientPhoneNumber: string;
   sellerName: string;
   clientAddress: string
+  /** Cashier delivery invoice. */
+  isDelivery?: boolean;
+  deliveryPersonName?: string;
   branch?:  Branch;
   numberOfProducts? : number;
   /** After line-item discounts, before invoice-level discount (new orders). */

@@ -17,6 +17,48 @@
                 </div>
   
                 <form #branchForm="ngForm">
+                  <nav
+                    class="branch-modal-tabs"
+                    role="tablist"
+                    [attr.aria-label]="'tr_new_branch' | translate"
+                  >
+                    <button
+                      type="button"
+                      class="branch-modal-tabs__btn"
+                      role="tab"
+                      [class.is-active]="activeTab === generalTab.id"
+                      [attr.aria-selected]="activeTab === generalTab.id"
+                      (click)="activeTab = generalTab.id"
+                    >
+                      <i class="fa" [ngClass]="generalTab.icon" aria-hidden="true"></i>
+                      <span>{{ generalTab.labelKey | translate }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="branch-modal-tabs__btn"
+                      role="tab"
+                      [class.is-active]="activeTab === salespeopleTab.id"
+                      [attr.aria-selected]="activeTab === salespeopleTab.id"
+                      (click)="activeTab = salespeopleTab.id"
+                    >
+                      <i class="fa" [ngClass]="salespeopleTab.icon" aria-hidden="true"></i>
+                      <span>{{ salespeopleTab.labelKey | translate }}</span>
+                    </button>
+                    <button
+                      *ngIf="deliveryOrdersEnabled"
+                      type="button"
+                      class="branch-modal-tabs__btn"
+                      role="tab"
+                      [class.is-active]="activeTab === deliveryTab.id"
+                      [attr.aria-selected]="activeTab === deliveryTab.id"
+                      (click)="activeTab = deliveryTab.id"
+                    >
+                      <i class="fa" [ngClass]="deliveryTab.icon" aria-hidden="true"></i>
+                      <span>{{ deliveryTab.labelKey | translate }}</span>
+                    </button>
+                  </nav>
+
+                  <div *ngIf="activeTab === 'general'" role="tabpanel" class="branch-modal-panel">
                   <div class="row">
                     <!-- Branch Name -->
                     <div class="col-md-4">
@@ -152,8 +194,10 @@
                       </div>
                     </div>
                   </div>
+                  </div>
 
-                  <div class="row mt-4">
+                  <div *ngIf="activeTab === 'salespeople'" role="tabpanel" class="branch-modal-panel">
+                  <div class="row">
                     <div class="col-12">
                       <label class="weight-medium">{{ 'tr_branch_salespeople' | translate }}</label>
                       <p class="size-small text-muted mb-2">{{ 'tr_branch_salespeople_hint' | translate }}</p>
@@ -189,6 +233,51 @@
                         <i class="fa fa-plus mr-1"></i> {{ 'tr_add_salesperson' | translate }}
                       </button>
                     </div>
+                  </div>
+                  </div>
+
+                  <div
+                    *ngIf="activeTab === 'delivery' && deliveryOrdersEnabled"
+                    role="tabpanel"
+                    class="branch-modal-panel"
+                  >
+                  <div class="row">
+                    <div class="col-12">
+                      <label class="weight-medium">{{ 'tr_branch_delivery_staff' | translate }}</label>
+                      <p class="size-small text-muted mb-2">{{ 'tr_branch_delivery_staff_hint' | translate }}</p>
+                    </div>
+                    <div class="col-12" *ngFor="let ds of deliveryStaff; let i = index">
+                      <div class="row align-items-end mb-2">
+                        <div class="col-md-8">
+                          <div class="form-group mb-0">
+                            <label *ngIf="i === 0">{{ 'tr_delivery_person_name' | translate }}</label>
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="ds.name"
+                              [name]="'deliveryStaff_' + i"
+                              [placeholder]="'tr_delivery_person_name' | translate"
+                            />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <button
+                            type="button"
+                            class="s-btn btn-danger btn-sm"
+                            (click)="removeDeliveryStaff(i)"
+                            [attr.title]="'tr_delete' | translate"
+                          >
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12 mt-2">
+                      <button type="button" class="s-btn btn-secondary btn-sm" (click)="addDeliveryStaff()">
+                        <i class="fa fa-plus mr-1"></i> {{ 'tr_add_delivery_staff' | translate }}
+                      </button>
+                    </div>
+                  </div>
                   </div>
                 </form>
                 

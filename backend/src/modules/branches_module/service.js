@@ -92,6 +92,7 @@ export const createBranch = async (req, res) => {
       expenses,
       openingDate,
       salespeople,
+      deliveryStaff,
     } = req.body;
 
     // ✅ Required validation
@@ -111,6 +112,7 @@ export const createBranch = async (req, res) => {
       expenses: Number(expenses) || 0,
       openingDate: parseOpeningDate(openingDate) ?? null,
       salespeople: normalizeSalespeople(salespeople),
+      deliveryStaff: normalizeSalespeople(deliveryStaff),
     };
 
     const newBranch = await Branch.create(newBranchData);
@@ -135,7 +137,9 @@ export const updateBranch = async (req, res) => {
       branchInvoices,
       expenses,
       openingDate,
-      salespeople, } = req.body;
+      salespeople,
+      deliveryStaff,
+    } = req.body;
 
     const update = {
       name,
@@ -146,6 +150,9 @@ export const updateBranch = async (req, res) => {
       expenses: Number(expenses) || 0,
       salespeople: normalizeSalespeople(salespeople),
     };
+    if (deliveryStaff !== undefined) {
+      update.deliveryStaff = normalizeSalespeople(deliveryStaff);
+    }
     const parsedOpening = parseOpeningDate(openingDate);
     if (parsedOpening !== undefined) {
       update.openingDate = parsedOpening;

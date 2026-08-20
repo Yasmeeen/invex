@@ -16,6 +16,12 @@ import {
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
+import {
+  normalizeSaleQuantity,
+  resolveSellByWeight,
+  roundWeight,
+} from '../../utils/sale-quantity.util.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -421,7 +427,7 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
-/** Optional employee name who registered the device (trimmed, max 200 chars). */
+/** Optional employee name who registered the product (trimmed, max 200 chars). */
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
 
 /** If netPrice omitted/empty, use price - (price * discount% / 100) (clamped to >= 0). */
@@ -731,7 +737,7 @@ export const importProductsFromExcelRows = async (req, res) => {
           code,
           price: priceNum,
           netPrice: finalNet,
-          stock: stockNum,
+          stock: cat?.sellByWeight ? roundWeight(stockNum) : Math.max(0, Math.floor(stockNum)),
           discount: discountNum,
           category: String(cat._id),
           branch: branchId,
@@ -1219,7 +1225,7 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
+        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
         .skip(skip)
         .limit(Number(limit)),
@@ -1249,7 +1255,7 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
+      .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
       .populate('branch', 'name');
 
     if (!product) {
@@ -1331,10 +1337,29 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: msg, code: e?.code });
     }
 
-    const catRow = await Category.findById(categoryId).select('multiCodePerPiece code').lean();
+    const catRow = await Category.findById(categoryId).select('multiCodePerPiece sellByWeight code').lean();
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
     const categoryMultiCode = !!catRow?.multiCodePerPiece;
+    if (catRow?.sellByWeight && categoryMultiCode) {
+      return res.status(400).json({
+        error: 'Category cannot combine sell-by-weight with multi-code-per-piece',
+      });
+    }
+    const isWeightCategory = resolveSellByWeight({ weightSalesEnabled, category: catRow });
+    let normalizedStock = stockNum;
+    if (isWeightCategory) {
+      if (stockNum < 0) {
+        return res.status(400).json({ error: 'Invalid stock' });
+      }
+      normalizedStock = roundWeight(stockNum);
+    } else if (Number.isNaN(stockNum) || stockNum < 1) {
+      return res.status(400).json({ error: 'Stock must be at least 1' });
+    } else {
+      normalizedStock = Math.max(1, Math.floor(stockNum));
+    }
     const categoryPrefix = catRow?.code || '';
-    const unitCount = Math.max(1, Math.floor(stockNum));
+    const unitCount = categoryMultiCode ? Math.max(1, Math.floor(stockNum)) : 1;
 
     if (categoryMultiCode && unitCount > 1) {
       let codes = [];
@@ -1584,7 +1609,7 @@ export const createProduct = async (req, res) => {
         name,
         price: priceNum,
         netPrice: netNum,
-        stock: stockNum,
+        stock: normalizedStock,
         discount: discountNum,
         categoryId,
         imageUrl: imageUrlNorm,
@@ -1630,7 +1655,7 @@ export const createProduct = async (req, res) => {
       name,
       price: priceNum,
       netPrice: netNum,
-      stock: stockNum,
+      stock: normalizedStock,
       discount: discountNum,
       categoryId,
       imageUrl: imageUrlNorm,
@@ -1728,6 +1753,24 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: attrsReq.error });
     }
 
+    const catRowUpdate = await Category.findById(categoryId).select('sellByWeight multiCodePerPiece').lean();
+    const settingsDocUpdate = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const isWeightCategoryUpdate = resolveSellByWeight({
+      weightSalesEnabled: !!settingsDocUpdate?.weightSalesEnabled,
+      category: catRowUpdate,
+    });
+    let normalizedStock = stockNum;
+    if (isWeightCategoryUpdate) {
+      if (stockNum < 0) {
+        return res.status(400).json({ error: 'Invalid stock' });
+      }
+      normalizedStock = roundWeight(stockNum);
+    } else if (stockNum < 0) {
+      return res.status(400).json({ error: 'Invalid stock' });
+    } else {
+      normalizedStock = Math.max(0, Math.floor(stockNum));
+    }
+
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
       return res.status(400).json({ error: codeCheck.error });
@@ -1808,7 +1851,7 @@ export const updateProduct = async (req, res) => {
         category: categoryId,
         branch: null,
         inWarehouse: true,
-        stock: stockNum,
+        stock: normalizedStock,
         discount: discountNum,
         attributes: attrs,
       };
@@ -1872,7 +1915,7 @@ export const updateProduct = async (req, res) => {
       category: categoryId,
       branch: branch._id,
       inWarehouse: false,
-      stock: stockNum,
+      stock: normalizedStock,
       discount: discountNum,
       attributes: attrs,
     };

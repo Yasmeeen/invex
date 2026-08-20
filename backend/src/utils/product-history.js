@@ -191,7 +191,7 @@ export async function buildProductHistoryEvents(product, options = {}) {
     pushEvent(events, event);
   };
 
-  // Destination clones created by an approved branch transfer should not look like a fresh device.
+  // Destination clones created by an approved branch transfer should not look like a fresh product.
   const createdByTransferIds = new Set();
   for (const t of branchTransfers || []) {
     if (t.status !== 'approved') continue;

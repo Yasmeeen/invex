@@ -1,3 +1,49 @@
+.branch-modal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.branch-modal-tabs__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid #e8ede9;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  .fa {
+    font-size: 0.85rem;
+    opacity: 0.85;
+  }
+
+  &:hover {
+    background: #f0f7f2;
+    border-color: #c5d9cb;
+  }
+
+  &.is-active {
+    background: #1e4d2b;
+    border-color: #1e4d2b;
+    color: #fff;
+
+    .fa {
+      opacity: 1;
+    }
+  }
+}
+
+.branch-modal-panel {
+  min-height: 12rem;
+}
+
 .opening-date-field {
   position: relative;
 

@@ -8,12 +8,22 @@ import {
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
+type SettingsTabId = 'general' | 'features' | 'policies';
+
 @Component({
   selector: 'app-store-settings',
   templateUrl: './store-settings.component.html',
   styleUrls: ['./store-settings.component.scss'],
 })
 export class StoreSettingsComponent implements OnInit, OnDestroy {
+  readonly tabs: { id: SettingsTabId; labelKey: string; icon: string }[] = [
+    { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
+    { id: 'features', labelKey: 'tr_settings_tab_features', icon: 'fa-sliders' },
+    { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
+  ];
+
+  activeTab: SettingsTabId = 'general';
+
   form: StoreSettings = {
     storeName: '',
     storePhoneNumber: '',
@@ -28,6 +38,9 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     showReturnExchangePolicyOnReceipt: false,
     bookingPolicy: '',
     showBookingPolicyOnReceipt: false,
+    weightSalesEnabled: false,
+    deliveryOrdersEnabled: false,
+    cashierPurchaseExchangeEnabled: true,
   };
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
@@ -63,6 +76,9 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
         bookingPolicy: v.bookingPolicy || '',
         showBookingPolicyOnReceipt: Boolean(v.showBookingPolicyOnReceipt),
+        weightSalesEnabled: Boolean(v.weightSalesEnabled),
+        deliveryOrdersEnabled: Boolean(v.deliveryOrdersEnabled),
+        cashierPurchaseExchangeEnabled: v.cashierPurchaseExchangeEnabled !== false,
       };
       this.logoPreview = this.form.logoUrl || '';
     });
@@ -113,6 +129,9 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
         bookingPolicy: this.form.bookingPolicy?.trim() || '',
         showBookingPolicyOnReceipt: Boolean(this.form.showBookingPolicyOnReceipt),
+        weightSalesEnabled: Boolean(this.form.weightSalesEnabled),
+        deliveryOrdersEnabled: Boolean(this.form.deliveryOrdersEnabled),
+        cashierPurchaseExchangeEnabled: this.form.cashierPurchaseExchangeEnabled !== false,
       })
       .subscribe({
         next: () => {

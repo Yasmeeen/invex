@@ -97,6 +97,36 @@
                   </p>
                 </div>
 
+                <div
+                  class="form-group mb-0 category-multi-code-checkbox"
+                  *ngIf="storeSettings.snapshot.weightSalesEnabled"
+                >
+                  <span class="s-checkbox size-tiny flex align-items-start">
+                    <input
+                      type="checkbox"
+                      name="sellByWeight"
+                      [(ngModel)]="sellByWeight"
+                      [attr.id]="'category-sell-by-weight-' + (categoryId || 'new')"
+                    />
+                    <label
+                      class="category-multi-code-checkbox__label"
+                      [attr.for]="'category-sell-by-weight-' + (categoryId || 'new')"
+                    >
+                      {{ "tr_category_sell_by_weight" | translate }}
+                    </label>
+                  </span>
+                  <p class="category-multi-code-checkbox__hint text-muted size-small weight-normal m-0">
+                    {{ "tr_category_sell_by_weight_hint" | translate }}
+                  </p>
+                  <div class="form-group mt-2 mb-0" *ngIf="sellByWeight">
+                    <label>{{ "tr_weight_unit" | translate }}</label>
+                    <select class="s-control" name="weightUnit" [(ngModel)]="weightUnit">
+                      <option value="kg">{{ "tr_weight_unit_kg" | translate }}</option>
+                      <option value="g">{{ "tr_weight_unit_g" | translate }}</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div class="form-group category-delete-stock-select">
                   <label for="category-delete-when-out-of-stock">
                     {{ "tr_category_delete_when_out_of_stock" | translate }}

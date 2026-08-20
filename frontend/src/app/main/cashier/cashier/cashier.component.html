@@ -158,7 +158,7 @@
                   </div>
                 </div>
 
-                <div class="cashier-client-fields cashier-client-fields--row">
+                <div class="cashier-client-fields">
                   <div
                     class="cashier-client-fields__item cashier-client-fields__item--full"
                     *ngIf="partyType === 'supplier'"
@@ -198,91 +198,138 @@
                       <i class="fa fa-caret-down input-icon"></i>
                     </div>
                   </div>
-                  <div
-                    class="cashier-client-fields__item"
-                    [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
-                  >
-                    <label>{{ 'tr_client_phone' | translate }}</label>
-                    <div class="input-with-icon bg-white width-100">
-                      <input type="text" class="s-control width-100" formControlName="phone" />
-                    </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('phone')?.errors?.required && clientForm.get('phone')?.touched"
+
+                  <div class="cashier-client-fields__row">
+                    <div
+                      class="cashier-client-fields__item"
+                      [class.has-error]="clientForm.get('phone')?.invalid && clientForm.get('phone')?.touched"
                     >
-                      {{ 'tr_client_phone_required' | translate }}
-                    </span>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('phone')?.errors?.phoneFormat && clientForm.get('phone')?.touched"
-                    >
-                      {{ 'tr_client_phone_invalid' | translate }}
-                    </span>
-                  </div>
-                  <div
-                    class="cashier-client-fields__item"
-                    [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
-                  >
-                    <label>{{ partyNameLabelKey() | translate }}</label>
-                    <div class="input-with-icon bg-white width-100">
-                      <input type="text" class="s-control width-100" formControlName="name" />
-                    </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
-                    >
-                      {{ 'tr_client_name_required' | translate }}
-                    </span>
-                  </div>
-                  <div
-                    class="cashier-client-fields__item"
-                    [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
-                  >
-                    <label>{{ 'tr_client_address' | translate }}</label>
-                    <div class="input-with-icon bg-white width-100">
-                      <input type="text" class="s-control width-100" formControlName="address" />
-                    </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
-                    >
-                      {{ 'tr_client_address_required' | translate }}
-                    </span>
-                  </div>
-                  <div
-                    class="cashier-client-fields__item"
-                    *ngIf="partyType === 'supplier' && supplierCompanyName"
-                  >
-                    <label>{{ 'tr_legal_name' | translate }}</label>
-                    <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
-                  </div>
-                  <div
-                    class="cashier-client-fields__item"
-                    *ngIf="branchSalespeople.length"
-                    [class.has-error]="sellerFieldTouched && !selectedSellerName"
-                  >
-                    <label>{{ 'tr_seller_name' | translate }}</label>
-                    <div class="input-with-icon bg-white width-100">
-                      <ng-select
-                        class="s-control s-select"
-                        [items]="branchSalespeople"
-                        [clearable]="false"
-                        [searchable]="true"
-                        [placeholder]="'tr_cashier_select_seller' | translate"
-                        [(ngModel)]="selectedSellerName"
-                        [ngModelOptions]="{ standalone: true }"
-                        name="sellerName"
-                        (change)="sellerFieldTouched = false"
+                      <label>{{ 'tr_client_phone' | translate }}</label>
+                      <div class="input-with-icon bg-white width-100">
+                        <input type="text" class="s-control width-100" formControlName="phone" />
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="clientForm.get('phone')?.errors?.required && clientForm.get('phone')?.touched"
                       >
-                      </ng-select>
-                      <i class="fa fa-caret-down input-icon"></i>
+                        {{ 'tr_client_phone_required' | translate }}
+                      </span>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="clientForm.get('phone')?.errors?.phoneFormat && clientForm.get('phone')?.touched"
+                      >
+                        {{ 'tr_client_phone_invalid' | translate }}
+                      </span>
                     </div>
-                    <span
-                      class="text-error size-small validator"
-                      *ngIf="sellerFieldTouched && !selectedSellerName"
+                    <div
+                      class="cashier-client-fields__item"
+                      [class.has-error]="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
                     >
-                      {{ 'tr_seller_name_required' | translate }}
-                    </span>
+                      <label>{{ partyNameLabelKey() | translate }}</label>
+                      <div class="input-with-icon bg-white width-100">
+                        <input type="text" class="s-control width-100" formControlName="name" />
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="clientForm.get('name')?.invalid && clientForm.get('name')?.touched"
+                      >
+                        {{ 'tr_client_name_required' | translate }}
+                      </span>
+                    </div>
+                    <div
+                      class="cashier-client-fields__item"
+                      [class.has-error]="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                    >
+                      <label>{{ 'tr_client_address' | translate }}</label>
+                      <div class="input-with-icon bg-white width-100">
+                        <input type="text" class="s-control width-100" formControlName="address" />
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="clientForm.get('address')?.invalid && clientForm.get('address')?.touched"
+                      >
+                        {{ 'tr_client_address_required' | translate }}
+                      </span>
+                    </div>
+                    <div
+                      class="cashier-client-fields__item mt-1"
+                      *ngIf="deliveryOrdersEnabled"
+                    >
+                      <label>{{ 'tr_cashier_delivery_order' | translate }}</label>
+                      <div class="cashier-delivery-field">
+                        <label class="cashier-delivery-toggle">
+                          <input
+                            type="checkbox"
+                            [ngModel]="isDeliveryOrder"
+                            [ngModelOptions]="{ standalone: true }"
+                            (ngModelChange)="onDeliveryOrderChange($event)"
+                            name="isDeliveryOrder"
+                          />
+                          <span>{{ 'tr_cashier_delivery_order' | translate }}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="cashier-client-fields__row">
+                    <div
+                      class="cashier-client-fields__item"
+                      *ngIf="partyType === 'supplier' && supplierCompanyName"
+                    >
+                      <label>{{ 'tr_legal_name' | translate }}</label>
+                      <div class="s-control width-100 bg-light plr-2">{{ supplierCompanyName }}</div>
+                    </div>
+                    <div
+                      class="cashier-client-fields__item"
+                      *ngIf="branchSalespeople.length"
+                      [class.has-error]="sellerNameRequired && sellerFieldTouched && !selectedSellerName"
+                    >
+                      <label>{{ 'tr_seller_name' | translate }}</label>
+                      <div class="input-with-icon bg-white width-100">
+                        <ng-select
+                          class="s-control s-select"
+                          [items]="branchSalespeople"
+                          [clearable]="false"
+                          [searchable]="true"
+                          [placeholder]="'tr_cashier_select_seller' | translate"
+                          [(ngModel)]="selectedSellerName"
+                          [ngModelOptions]="{ standalone: true }"
+                          name="sellerName"
+                          (change)="sellerFieldTouched = false"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <span
+                        class="text-error size-small validator"
+                        *ngIf="sellerNameRequired && sellerFieldTouched && !selectedSellerName"
+                      >
+                        {{ 'tr_seller_name_required' | translate }}
+                      </span>
+                    </div>
+                    <div
+                      class="cashier-client-fields__item"
+                      *ngIf="isDeliveryOrder && branchDeliveryStaff.length"
+                    >
+                      <label>
+                        {{ 'tr_delivery_person_name' | translate }}
+                        <span class="size_tiny">({{ 'tr_optional' | translate }})</span>
+                      </label>
+                      <div class="input-with-icon bg-white width-100">
+                        <ng-select
+                          class="s-control s-select"
+                          [items]="branchDeliveryStaff"
+                          [clearable]="true"
+                          [searchable]="true"
+                          [placeholder]="'tr_cashier_select_delivery_person' | translate"
+                          [(ngModel)]="selectedDeliveryPersonName"
+                          [ngModelOptions]="{ standalone: true }"
+                          name="deliveryPersonName"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -297,11 +344,12 @@
         >
           <div class="product-card__image-wrap">
             <img
-              *ngIf="product.imageUrl"
+              *ngIf="productImageVisible(product)"
               [src]="product.imageUrl"
               alt=""
+              (error)="onProductImageError(product._id)"
             />
-            <div *ngIf="!product.imageUrl" class="product-card__image-placeholder" aria-hidden="true">
+            <div *ngIf="!productImageVisible(product)" class="product-card__image-placeholder" aria-hidden="true">
               <i class="fa fa-cube"></i>
             </div>
           </div>
@@ -353,16 +401,17 @@
     <div class="order-panel">
       <h3>{{ "tr_cashier.CURRENT_ORDER" | translate }}</h3>
 
-      <div class="cashier-desk-actions mb-3 ">
-        <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="openDeskPurchaseProductDialog()">
-          {{ 'tr_product_purchase_button' | translate }}
-        </button>
-        <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="startExchangeFlow()">
-          {{ 'tr_exchange_button' | translate }}
-        </button>
-      </div>
+      <ng-container *ngIf="cashierPurchaseExchangeEnabled()">
+        <div class="cashier-desk-actions mb-3 ">
+          <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="openDeskPurchaseProductDialog()">
+            {{ 'tr_product_purchase_button' | translate }}
+          </button>
+          <button type="button" class="s-btn btn-secondary cashier-desk-actions__btn" (click)="startExchangeFlow()">
+            {{ 'tr_exchange_button' | translate }}
+          </button>
+        </div>
 
-      <div class="card mb-3 plr-3 ptb-3" *ngIf="hasExchangeTradeIn()">
+        <div class="card mb-3 plr-3 ptb-3" *ngIf="hasExchangeTradeIn()">
         <div class="flex flex-space-between flex-wrap gap-sm mb-2">
           <span class="weight-bold">{{ 'tr_exchange_active_title' | translate }}</span>
           <div class="flex gap-sm flex-wrap">
@@ -400,9 +449,10 @@
             {{ exchangeStoreOwesCustomer() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
         </div>
-      </div>
+        </div>
 
-      <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
+        <p class="size-small text-muted mb-3">{{ 'tr_product_purchase_hint' | translate }}</p>
+      </ng-container>
 
       <div
         class="cashier-booking-bars"
@@ -479,15 +529,16 @@
             <td>
               <span class="order-line-product">
                 <img
-                  *ngIf="item.imageUrl"
+                  *ngIf="productImageVisible(item)"
                   class="order-line-thumb order-line-thumb--clickable"
                   [src]="item.imageUrl"
                   alt=""
                   (click)="openProductDetails(item)"
+                  (error)="onProductImageError(item.productId || item._id)"
                   [attr.title]="'tr_product_details' | translate"
                 />
                 <span
-                  *ngIf="!item.imageUrl"
+                  *ngIf="!productImageVisible(item)"
                   class="order-line-thumb order-line-thumb--placeholder order-line-thumb--clickable"
                   (click)="openProductDetails(item)"
                   [attr.title]="'tr_product_details' | translate"
@@ -510,9 +561,26 @@
               </span>
             </td>
             <td>
-              <button (click)="decreaseQty(i)">-</button>
-              {{ item.quantity }}
-              <button (click)="increaseQty(i)">+</button>
+              <ng-container *ngIf="isWeightLine(item); else pieceQtyControls">
+                <div class="order-line-weight-field">
+                  <input
+                    type="text"
+                    inputmode="decimal"
+                    class="order-line-weight-field__input s-control"
+                    [ngModel]="getWeightQtyInput(item)"
+                    (ngModelChange)="onWeightQtyInput(item, $event)"
+                    [ngModelOptions]="{ standalone: true }"
+                    (blur)="commitWeightQty(i)"
+                    [attr.aria-label]="'tr_weight' | translate"
+                  />
+                  <span class="order-line-weight-field__unit">{{ resolveWeightUnit(item) }}</span>
+                </div>
+              </ng-container>
+              <ng-template #pieceQtyControls>
+                <button (click)="decreaseQty(i)">-</button>
+                {{ item.quantity }}
+                <button (click)="increaseQty(i)">+</button>
+              </ng-template>
             </td>
             <td class="order-line-price-cell">
               <input
@@ -626,8 +694,8 @@
             {{ effectiveCheckoutTotal() | currency:'EGP ':'symbol':'1.2-2' }}
           </div>
         </div>
-        <button class="pay-btn" (click)="onPayClick()">
-          {{ "tr_cashier.PAY" | translate }}
+        <button class="pay-btn" (click)="onPayClick()" [disabled]="checkoutInProgress">
+          {{ checkoutInProgress ? ('tr_cashier.PROCESSING' | translate) : ('tr_cashier.PAY' | translate) }}
         </button>
       </div>
     </div>
@@ -653,6 +721,13 @@
       {{ st.storeName }}
     </div>
 
+    <div class="invoice-delivery-badge center" *ngIf="createdOrder?.isDelivery">
+      <span class="invoice-delivery-badge__icon" aria-hidden="true">🚚</span>
+      <span class="invoice-delivery-badge__label">
+        {{ 'tr_invoice_delivery_badge' | receiptTranslate: st.receiptLanguage }}
+      </span>
+    </div>
+
     <!-- Invoice Meta -->
     <table class="invoice-table meta-table">
       <tr>
@@ -666,6 +741,10 @@
       <tr>
         <td>{{ 'tr_date' | receiptTranslate: st.receiptLanguage }}</td>
         <td>{{ todayDate | date: 'dd MMM y' }}</td>
+      </tr>
+      <tr *ngIf="createdOrder?.isDelivery && createdOrder?.deliveryPersonName">
+        <td>{{ 'tr_receipt_delivery_person' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ createdOrder.deliveryPersonName }}</td>
       </tr>
     </table>
 
@@ -724,7 +803,7 @@
             </span>
           </div>
         </td>
-        <td>{{ item.quantity }}</td>
+        <td>{{ formatLineQuantity(item) }}</td>
         <td class="money">
           {{ formatReceiptAmount(item.price) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>

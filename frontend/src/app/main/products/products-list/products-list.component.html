@@ -309,10 +309,11 @@
               <td>
                 <span class="products-list__name-cell">
                   <img
-                    *ngIf="product.imageUrl"
+                    *ngIf="productImageVisible(product)"
                     class="products-list__thumb"
                     [src]="product.imageUrl"
                     alt=""
+                    (error)="onProductImageError(product._id)"
                   />
                   <span class="products-list__name-column">
                     <span
@@ -429,12 +430,13 @@
         <div class="product-card" *ngFor="let product of productsList">
           <div class="product-card__top">
             <img
-              *ngIf="product.imageUrl"
+              *ngIf="productImageVisible(product)"
               class="product-card__img"
               [src]="product.imageUrl"
               alt=""
+              (error)="onProductImageError(product._id)"
             />
-            <div *ngIf="!product.imageUrl" class="product-card__img product-card__img--placeholder">
+            <div *ngIf="!productImageVisible(product)" class="product-card__img product-card__img--placeholder">
               <i class="fa fa-cube" aria-hidden="true"></i>
             </div>
 

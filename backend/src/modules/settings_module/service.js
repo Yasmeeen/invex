@@ -62,6 +62,9 @@ function serializeSettings(doc) {
     showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
     bookingPolicy: doc.bookingPolicy || '',
     showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
+    weightSalesEnabled: Boolean(doc.weightSalesEnabled),
+    deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
+    cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
   };
 }
 
@@ -99,6 +102,9 @@ export const updateStoreSettings = async (req, res) => {
       showReturnExchangePolicyOnReceipt,
       bookingPolicy,
       showBookingPolicyOnReceipt,
+      weightSalesEnabled,
+      deliveryOrdersEnabled,
+      cashierPurchaseExchangeEnabled,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
@@ -344,6 +350,18 @@ export const updateStoreSettings = async (req, res) => {
     ) {
       return res.status(400).json({ error: 'showBookingPolicyOnReceipt must be a boolean' });
     }
+    if (weightSalesEnabled !== undefined && typeof weightSalesEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'weightSalesEnabled must be a boolean' });
+    }
+    if (deliveryOrdersEnabled !== undefined && typeof deliveryOrdersEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'deliveryOrdersEnabled must be a boolean' });
+    }
+    if (
+      cashierPurchaseExchangeEnabled !== undefined &&
+      typeof cashierPurchaseExchangeEnabled !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'cashierPurchaseExchangeEnabled must be a boolean' });
+    }
 
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
@@ -366,6 +384,15 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (showBookingPolicyOnReceipt !== undefined) {
       update.showBookingPolicyOnReceipt = showBookingPolicyOnReceipt;
+    }
+    if (weightSalesEnabled !== undefined) {
+      update.weightSalesEnabled = weightSalesEnabled;
+    }
+    if (deliveryOrdersEnabled !== undefined) {
+      update.deliveryOrdersEnabled = deliveryOrdersEnabled;
+    }
+    if (cashierPurchaseExchangeEnabled !== undefined) {
+      update.cashierPurchaseExchangeEnabled = cashierPurchaseExchangeEnabled;
     }
 
     const filter = existing ? { _id: existing._id } : {};

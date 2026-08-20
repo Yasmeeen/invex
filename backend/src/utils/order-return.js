@@ -12,6 +12,12 @@ import {
 } from './return-refund-mirror.js';
 import { getEffectivePurchaseTreasuryMethodsFromDb, treasuryMethodMap } from '../modules/settings_module/treasuryMethods.js';
 import { netSettlementFeesOnPaymentSplits } from './treasury-ledger.js';
+import {
+  isWeightSaleUnit,
+  normalizeSaleQuantity,
+  normalizeWeightQuantity,
+  roundWeight,
+} from './sale-quantity.util.js';
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -32,26 +38,38 @@ function lineProductId(raw) {
   return String(raw).trim();
 }
 
-function returnedQtyFromHistory(order, productId) {
+function lineQtyNumber(raw, line) {
+  if (isWeightSaleUnit(line?.saleUnit)) {
+    return normalizeWeightQuantity(raw);
+  }
+  return Math.max(0, Math.floor(Number(raw) || 0));
+}
+
+function returnedQtyFromHistory(order, productId, line = null) {
   const pid = lineProductId(productId);
   if (!pid) return 0;
   let sum = 0;
   for (const ret of order?.returns || []) {
     for (const item of ret.items || []) {
       if (lineProductId(item.productId) === pid) {
-        sum += Math.max(0, Math.floor(Number(item.quantity) || 0));
+        const orderLine =
+          line ||
+          (order?.products || []).find((p) => lineProductId(p?.productId) === pid);
+        sum += lineQtyNumber(item.quantity, orderLine);
       }
     }
   }
-  return sum;
+  return isWeightSaleUnit(line?.saleUnit) ? roundWeight(sum) : sum;
 }
 
 export function orderLineRemainingQty(line, order = null) {
-  const sold = Math.max(0, Math.floor(Number(line?.quantity) || 0));
-  const fromLine = Math.max(0, Math.floor(Number(line?.returnedQuantity) || 0));
-  const fromHistory = order ? returnedQtyFromHistory(order, line?.productId) : 0;
+  const isWeight = isWeightSaleUnit(line?.saleUnit);
+  const sold = lineQtyNumber(line?.quantity, line);
+  const fromLine = lineQtyNumber(line?.returnedQuantity, line);
+  const fromHistory = order ? returnedQtyFromHistory(order, line?.productId, line) : 0;
   const returned = Math.max(fromLine, fromHistory);
-  return Math.max(0, sold - returned);
+  const remaining = Math.max(0, sold - returned);
+  return isWeight ? roundWeight(remaining) : remaining;
 }
 
 export function orderIsFullyReturned(order) {
@@ -187,12 +205,15 @@ async function snapshotForDeletedProduct(order, line) {
  * Recreates hard-deleted legacy products when enough snapshot data exists.
  */
 export async function restoreProductStockForReturn(order, line, quantity) {
-  const qty = Math.max(0, Math.floor(Number(quantity) || 0));
+  const isWeight = isWeightSaleUnit(line?.saleUnit);
+  const qty = normalizeSaleQuantity(Number(quantity) || 0, isWeight);
   if (qty <= 0) return null;
 
   let product = await Product.findById(line.productId);
   if (product) {
-    product.stock = Math.max(0, (Number(product.stock) || 0) + qty);
+    product.stock = isWeight
+      ? roundWeight(Math.max(0, (Number(product.stock) || 0) + qty))
+      : Math.max(0, (Number(product.stock) || 0) + qty);
     product.removedWhenOutOfStock = false;
     await product.save();
     return product;
@@ -295,9 +316,10 @@ function normalizeReturnItems(order, { returnAll, items }) {
     if (!line) {
       throw new Error('Product not found on this invoice');
     }
-    const qty = Math.floor(Number(row?.quantity) || 0);
+    const isWeight = isWeightSaleUnit(line?.saleUnit);
+    const qty = normalizeSaleQuantity(Number(row?.quantity) || 0, isWeight);
     if (qty <= 0) {
-      throw new Error('Return quantity must be at least 1');
+      throw new Error(isWeight ? 'Return weight must be at least 0.001' : 'Return quantity must be at least 1');
     }
     const remaining = orderLineRemainingQty(line, order);
     if (qty > remaining) {
@@ -434,10 +456,12 @@ export async function processOrderReturn(order, body = {}) {
     const line = findOrderLine(order, row.productId);
     if (!line) continue;
     const alreadyReturned = Math.max(
-      Math.floor(Number(line.returnedQuantity) || 0),
-      returnedQtyFromHistory(order, line.productId)
+      lineQtyNumber(line.returnedQuantity, line),
+      returnedQtyFromHistory(order, line.productId, line)
     );
-    line.returnedQuantity = alreadyReturned + row.quantity;
+    line.returnedQuantity = isWeightSaleUnit(line?.saleUnit)
+      ? roundWeight(alreadyReturned + row.quantity)
+      : alreadyReturned + row.quantity;
 
     const product = await restoreProductStockForReturn(order, line, row.quantity);
     if (product) {

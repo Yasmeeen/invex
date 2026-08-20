@@ -48,6 +48,8 @@ const toCategoryResponse = (doc, extra = {}) => {
     ...o,
     code,
     multiCodePerPiece: !!o.multiCodePerPiece,
+    sellByWeight: !!o.sellByWeight,
+    weightUnit: o.weightUnit === 'g' ? 'g' : 'kg',
     deleteProductWhenOutOfStock: !!o.deleteProductWhenOutOfStock,
     // Legacy categories without the field → default true
     showProductCodeOnInvoice:
@@ -125,6 +127,15 @@ export const getCategoryById = async (req, res) => {
 
 const parseBool = (v) => v === true || v === 'true' || String(v).toLowerCase() === 'true';
 
+const normalizeWeightUnit = (raw) => (String(raw || 'kg').trim().toLowerCase() === 'g' ? 'g' : 'kg');
+
+const assertCategoryWeightFlags = (sellByWeight, multiCodePerPiece) => {
+  if (parseBool(sellByWeight) && parseBool(multiCodePerPiece)) {
+    return 'Category cannot combine sell-by-weight with multi-code-per-piece';
+  }
+  return null;
+};
+
 // Create category
 export const createCategory = async (req, res) => {
   try {
@@ -135,6 +146,8 @@ export const createCategory = async (req, res) => {
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
       showProductCodeOnInvoice,
+      sellByWeight,
+      weightUnit,
     } = req.body;
     const codeNorm = normalizeCategoryCode(code);
     if (!name || !name.trim()) {
@@ -159,11 +172,18 @@ export const createCategory = async (req, res) => {
       return res.status(400).json({ error: 'attributeDefs must be an array' });
     }
 
+    const weightFlagErr = assertCategoryWeightFlags(sellByWeight, multiCodePerPiece);
+    if (weightFlagErr) {
+      return res.status(400).json({ error: weightFlagErr });
+    }
+
     const newCategory = await Category.create({
       name: name.trim(),
       code: codeNorm,
       attributeDefs: attr,
       multiCodePerPiece: parseBool(multiCodePerPiece),
+      sellByWeight: parseBool(sellByWeight),
+      weightUnit: normalizeWeightUnit(weightUnit),
       deleteProductWhenOutOfStock: parseBool(deleteProductWhenOutOfStock),
       // Default true when omitted (schema default + product intent)
       showProductCodeOnInvoice:
@@ -193,6 +213,8 @@ export const updateCategory = async (req, res) => {
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
       showProductCodeOnInvoice,
+      sellByWeight,
+      weightUnit,
     } = req.body;
     const updates = {};
 
@@ -229,12 +251,42 @@ export const updateCategory = async (req, res) => {
       updates.multiCodePerPiece = parseBool(multiCodePerPiece);
     }
 
+    if (sellByWeight !== undefined) {
+      updates.sellByWeight = parseBool(sellByWeight);
+    }
+
+    if (weightUnit !== undefined) {
+      updates.weightUnit = normalizeWeightUnit(weightUnit);
+    }
+
     if (deleteProductWhenOutOfStock !== undefined) {
       updates.deleteProductWhenOutOfStock = parseBool(deleteProductWhenOutOfStock);
     }
 
     if (showProductCodeOnInvoice !== undefined) {
       updates.showProductCodeOnInvoice = parseBool(showProductCodeOnInvoice);
+    }
+
+    const nextSellByWeight =
+      updates.sellByWeight !== undefined
+        ? updates.sellByWeight
+        : undefined;
+    const nextMultiCode =
+      updates.multiCodePerPiece !== undefined
+        ? updates.multiCodePerPiece
+        : undefined;
+    if (nextSellByWeight !== undefined || nextMultiCode !== undefined) {
+      const existingCat = await Category.findById(req.params.id).lean();
+      if (!existingCat) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+      const weightFlagErr = assertCategoryWeightFlags(
+        nextSellByWeight ?? existingCat.sellByWeight,
+        nextMultiCode ?? existingCat.multiCodePerPiece
+      );
+      if (weightFlagErr) {
+        return res.status(400).json({ error: weightFlagErr });
+      }
     }
 
     if (Object.keys(updates).length === 0) {

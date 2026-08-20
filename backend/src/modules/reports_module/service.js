@@ -991,7 +991,7 @@ export const getDeskPurchasesTreasuryReport = async (req, res) => {
       }))
       .sort((a, b) => String(a.treasuryKey).localeCompare(String(b.treasuryKey)));
 
-    /** One detail row per device when bulk multi-code / different unitDetails. */
+    /** One detail row per product when bulk multi-code / different unitDetails. */
     const lines = rows.flatMap((r) =>
       expandDeskPurchaseDetailLines(r, { branchName: r.branch?.name || '' })
     );

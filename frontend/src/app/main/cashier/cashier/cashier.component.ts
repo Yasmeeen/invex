@@ -33,6 +33,13 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
 import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import {
+  formatWeightQuantity,
+  isWeightSaleUnit,
+  normalizeWeightQuantity,
+  resolveSellByWeight,
+  roundWeight,
+} from '@shared/utils/sale-quantity.util';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import {
   isPayLaterMethod,
@@ -117,8 +124,21 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   branches: Branch [] =[];
   adminSelectedBranchId: string
   branchSalespeople: string[] = [];
+  branchDeliveryStaff: string[] = [];
   selectedSellerName: string | null = null;
   sellerFieldTouched = false;
+  isDeliveryOrder = false;
+  selectedDeliveryPersonName: string | null = null;
+  checkoutInProgress = false;
+
+  /** Seller is required only when client info panel is expanded. */
+  get sellerNameRequired(): boolean {
+    return this.isClientInfoOpen && this.branchSalespeople.length > 0;
+  }
+
+  get deliveryOrdersEnabled(): boolean {
+    return Boolean(this.storeSettings.snapshot.deliveryOrdersEnabled);
+  }
 
   /** Cash left in drawer from the last close (opening balance for today). */
   drawerOpeningBalance = 0;
@@ -129,7 +149,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   createdDeskPurchase: any = null;
   printMode: 'sale' | 'deskPurchase' = 'sale';
 
-  /** Exchange: one trade-in purchase invoice (may contain multiple device lines). */
+  /** Exchange: one trade-in purchase invoice (may contain multiple product lines). */
   exchangeTradeInPurchase: any = null;
   /** After sale receipt print, print the single trade-in purchase receipt. */
   private pendingExchangePurchaseReceipt: any = null;
@@ -263,6 +283,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.selectedSellerName) {
       parts.push(this.selectedSellerName);
     }
+    if (this.isDeliveryOrder) {
+      parts.push(this.translate.instant('tr_cashier_delivery_preview'));
+      if (this.selectedDeliveryPersonName) {
+        parts.push(this.selectedDeliveryPersonName);
+      }
+    }
     return parts.join(' · ');
   }
 
@@ -393,7 +419,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return !!this.exchangeTradeInPurchase;
   }
 
-  /** All device lines on the current exchange purchase invoice. */
+  /** All product lines on the current exchange purchase invoice. */
   exchangeTradeInLines(): Array<{ productPayload: any; quantity: number }> {
     const p = this.exchangeTradeInPurchase;
     if (!p) return [];
@@ -1135,7 +1161,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const id = branchId || this.resolveCashierBranchId();
     if (!id) {
       this.branchSalespeople = [];
+      this.branchDeliveryStaff = [];
       this.selectedSellerName = null;
+      this.selectedDeliveryPersonName = null;
       return;
     }
 
@@ -1145,6 +1173,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
           .filter((sp: { active?: boolean; name?: string }) => sp.active !== false && String(sp.name || '').trim())
           .map((sp: { name: string }) => String(sp.name).trim());
 
+        this.branchDeliveryStaff = (branch?.deliveryStaff || [])
+          .filter((ds: { active?: boolean; name?: string }) => ds.active !== false && String(ds.name || '').trim())
+          .map((ds: { name: string }) => String(ds.name).trim());
+
         if (this.branchSalespeople.length === 1) {
           this.selectedSellerName = this.branchSalespeople[0];
         } else if (
@@ -1153,12 +1185,28 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         ) {
           this.selectedSellerName = null;
         }
+
+        if (
+          this.selectedDeliveryPersonName &&
+          !this.branchDeliveryStaff.includes(this.selectedDeliveryPersonName)
+        ) {
+          this.selectedDeliveryPersonName = null;
+        }
       },
       error: () => {
         this.branchSalespeople = [];
+        this.branchDeliveryStaff = [];
         this.selectedSellerName = null;
+        this.selectedDeliveryPersonName = null;
       },
     });
+  }
+
+  onDeliveryOrderChange(enabled: boolean): void {
+    this.isDeliveryOrder = enabled;
+    if (!enabled) {
+      this.selectedDeliveryPersonName = null;
+    }
   }
 
   private initClientForm() {
@@ -1456,6 +1504,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   toggleClientInfo() {
     this.isClientInfoOpen = !this.isClientInfoOpen;
     if (!this.isClientInfoOpen) {
+      this.sellerFieldTouched = false;
       this.resetClientFormFields();
     }
   }
@@ -1590,6 +1639,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.isClientInfoOpen = false;
     this.resetClientFormFields();
     this.resetSellerNameAfterCheckout();
+    this.resetDeliveryAfterCheckout();
+  }
+
+  private resetDeliveryAfterCheckout(): void {
+    this.isDeliveryOrder = false;
+    this.selectedDeliveryPersonName = null;
   }
 
   private resetSellerNameAfterCheckout(): void {
@@ -1653,7 +1708,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
    * `reset` (default): replace list from page 1 (branch change, checkout refresh).
    * `reset=false`: append next page (infinite scroll).
    */
-  loadProducts(reset = true): void {
+  loadProducts(reset = true, options?: { refreshDrawer?: boolean }): void {
     if (!reset && (this.productsLoading || !this.productsHasMore)) {
       return;
     }
@@ -1662,7 +1717,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.productsPage = 1;
       this.productsHasMore = true;
       this.products = [];
-      this.loadDrawerOpeningBalance();
+      if (options?.refreshDrawer !== false) {
+        this.loadDrawerOpeningBalance();
+      }
     }
 
     const page = this.productsPage;
@@ -1778,8 +1835,124 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Units sellable without touching reserved quantity. */
   freeSellableQty(product: Product | any): number {
+    if (this.isWeightProduct(product)) {
+      const stock = Math.max(0, roundWeight(Number(product?.stock ?? 0)));
+      return Math.max(0, stock - this.bookedQty(product));
+    }
     const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
     return Math.max(0, stock - this.bookedQty(product));
+  }
+
+  weightSalesEnabled(): boolean {
+    return !!this.storeSettings.snapshot.weightSalesEnabled;
+  }
+
+  cashierPurchaseExchangeEnabled(): boolean {
+    return this.storeSettings.snapshot.cashierPurchaseExchangeEnabled !== false;
+  }
+
+  isWeightProduct(product: any): boolean {
+    return resolveSellByWeight({
+      weightSalesEnabled: this.weightSalesEnabled(),
+      category: product?.category,
+      product,
+    });
+  }
+
+  isWeightLine(item: any): boolean {
+    if (isWeightSaleUnit(item?.saleUnit)) return true;
+    return this.isWeightProduct(item);
+  }
+
+  resolveWeightUnit(product: any): 'kg' | 'g' {
+    const cat = product?.category;
+    if (product?.weightUnit === 'g' || product?.weightUnit === 'kg') {
+      return product.weightUnit;
+    }
+    return cat?.weightUnit === 'g' ? 'g' : 'kg';
+  }
+
+  formatLineQuantity(item: any): string {
+    if (!this.isWeightLine(item)) {
+      return String(Math.max(1, Math.floor(Number(item?.quantity) || 0)));
+    }
+    return formatWeightQuantity(Number(item?.quantity) || 0, this.resolveWeightUnit(item));
+  }
+
+  /** Text draft while typing decimals — `type="number"` drops "." and turns 2.7 into 27. */
+  getWeightQtyInput(item: any): string {
+    if (item?._weightQtyDraft != null) {
+      return item._weightQtyDraft;
+    }
+    const q = Number(item?.quantity);
+    if (!Number.isFinite(q) || q <= 0) {
+      return '';
+    }
+    return String(q);
+  }
+
+  onWeightQtyInput(item: any, raw: string): void {
+    if (!item) return;
+    let cleaned = String(raw ?? '').replace(/[^\d.]/g, '');
+    const dotIdx = cleaned.indexOf('.');
+    if (dotIdx >= 0) {
+      cleaned =
+        cleaned.slice(0, dotIdx + 1) + cleaned.slice(dotIdx + 1).replace(/\./g, '');
+    }
+    item._weightQtyDraft = cleaned;
+    if (cleaned === '' || cleaned === '.') {
+      item.quantity = 0;
+      this.refreshExchangePaymentDefaults();
+      this.notifyMatchedBookingDeposit();
+      return;
+    }
+    const parsed = parseFloat(cleaned);
+    if (Number.isFinite(parsed)) {
+      item.quantity = parsed;
+    }
+    this.refreshExchangePaymentDefaults();
+    this.notifyMatchedBookingDeposit();
+  }
+
+  commitWeightQty(i: number): void {
+    const item = this.orderItems[i];
+    if (!item || !this.isWeightLine(item)) return;
+    const raw = item._weightQtyDraft ?? String(item.quantity ?? '');
+    delete item._weightQtyDraft;
+    const parsed = parseFloat(String(raw).replace(',', '.'));
+    item.quantity = normalizeWeightQuantity(Number.isFinite(parsed) ? parsed : 0);
+    item.saleUnit = 'weight';
+    item.weightUnit = this.resolveWeightUnit(item);
+    this.refreshExchangePaymentDefaults();
+    this.notifyMatchedBookingDeposit();
+  }
+
+  brokenProductImageIds = new Set<string>();
+
+  onProductImageError(productId: string): void {
+    if (productId) {
+      this.brokenProductImageIds.add(String(productId));
+    }
+  }
+
+  productImageVisible(product: { _id?: string; imageUrl?: string } | null | undefined): boolean {
+    return !!product?.imageUrl && !this.brokenProductImageIds.has(String(product?._id));
+  }
+
+  private validateOrderItemsForCheckout(): string | null {
+    for (const item of this.orderItems) {
+      if (this.isWeightLine(item)) {
+        const w = normalizeWeightQuantity(item.quantity);
+        if (w <= 0) {
+          return 'tr_weight_required_for_line';
+        }
+        const maxStock = Math.max(0, roundWeight(Number(item.stock ?? 0)));
+        if (w > maxStock + 0.0001) {
+          return 'tr_not_enough_stock';
+        }
+      }
+    }
+    return null;
   }
 
   /** UI label for a payment method id (uses store settings names when set). */
@@ -1820,8 +1993,22 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addProduct(product: any) {
-    if(product.stock == 0)
-      return
+    if (product.stock == 0) return;
+
+    if (this.isWeightProduct(product)) {
+      this.orderItems.push({
+        ...product,
+        quantity: 0,
+        productId: product._id,
+        saleUnit: 'weight',
+        weightUnit: this.resolveWeightUnit(product),
+        isApplyDiscount: Number(product?.discount) > 0,
+      });
+      this.focusBarcodeInput();
+      this.refreshExchangePaymentDefaults();
+      return;
+    }
+
     const index = this.orderItems.findIndex(i => i.productId === product._id);
     if (index > -1) {
       const item = this.orderItems[index];
@@ -1902,6 +2089,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   increaseQty(i: number) {
     const item = this.orderItems[i];
+    if (this.isWeightLine(item)) return;
     const maxStock = Math.max(0, Math.floor(Number(item.stock ?? 0)));
     if (item.quantity >= maxStock) {
       this.focusBarcodeInput();
@@ -1913,8 +2101,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.notifyMatchedBookingDeposit();
     this.focusBarcodeInput();
   }
-  decreaseQty(i: number) { 
-    if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--; 
+  decreaseQty(i: number) {
+    if (this.isWeightLine(this.orderItems[i])) return;
+    if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--;
     this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
   }
@@ -2140,8 +2329,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (this.branchSalespeople.length && !this.selectedSellerName) {
-      this.isClientInfoOpen = true;
+    if (this.sellerNameRequired && !this.selectedSellerName) {
       this.sellerFieldTouched = true;
       this.appNotificationService.push(
         this.translate.instant('tr_cashier_seller_required'),
@@ -2272,7 +2460,45 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     );
   }
 
+  /** Minimal product payload for checkout API (avoids sending full catalog rows). */
+  private toCheckoutProductLine(item: any): { selectedProduct: Record<string, unknown>; quantity: number } {
+    return {
+      selectedProduct: {
+        _id: item._id ?? item.productId,
+        name: item.name,
+        code: item.code,
+        price: item.price,
+        netPrice: item.netPrice ?? item.cost,
+        cost: item.cost ?? item.netPrice,
+        discount: item.discount,
+        isApplyDiscount: item.isApplyDiscount,
+        sellByWeightOverride: item.sellByWeightOverride,
+      },
+      quantity: item.quantity,
+    };
+  }
+
   private performCheckout(payment: PaymentSplitsResult): void {
+    if (this.checkoutInProgress) {
+      return;
+    }
+    this.checkoutInProgress = true;
+    const weightErrKey = this.validateOrderItemsForCheckout();
+    if (weightErrKey) {
+      this.translate.get(weightErrKey).subscribe((msg) =>
+        this.appNotificationService.push(msg, 'error')
+      );
+      return;
+    }
+
+    for (const item of this.orderItems) {
+      if (this.isWeightLine(item)) {
+        item.quantity = normalizeWeightQuantity(item.quantity);
+        item.saleUnit = 'weight';
+        item.weightUnit = this.resolveWeightUnit(item);
+      }
+    }
+
     const selectedBranchId = canPickBranchRole(this.curentUser?.role)
       ? this.adminSelectedBranchId
       : this.globals.currentUser.branch._id;
@@ -2290,8 +2516,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       : '';
 
     const orderData: Record<string, unknown> = {
-      products: this.orderItems.map((i) => ({ selectedProduct: i, quantity: i.quantity })),
+      products: this.orderItems.map((i) => this.toCheckoutProductLine(i)),
       partyType: clientDetails.linkParty ? clientDetails.partyType : 'client',
+      linkParty: clientDetails.linkParty,
       clientName: clientDetails.clientName,
       clientPhoneNumber: clientDetails.clientPhoneNumber,
       clientAddress: clientDetails.clientAddress,
@@ -2305,6 +2532,13 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (this.selectedSellerName) {
       orderData.sellerName = this.selectedSellerName;
+    }
+
+    if (this.isDeliveryOrder) {
+      orderData.isDelivery = true;
+      if (this.selectedDeliveryPersonName) {
+        orderData.deliveryPersonName = this.selectedDeliveryPersonName;
+      }
     }
 
     if (clientDetails.clientId) {
@@ -2350,6 +2584,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       Math.round((receiptSubtotal - receiptInvoiceDisc) * 100) / 100;
 
     this.ordersSerivce.createOrder(orderData).subscribe((res: any) => {
+      this.checkoutInProgress = false;
       const pendingPurchaseReceipt = this.exchangeTradeInPurchase;
       this.exchangeTradeInPurchase = null;
 
@@ -2379,10 +2614,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.clearClientActiveBookings();
       this.printInvoice();
 
-      this.loadProducts();
+      setTimeout(() => this.loadProducts(true, { refreshDrawer: false }), 800);
       this.focusBarcodeInput();
 
     }, (error: any) => {
+      this.checkoutInProgress = false;
       console.log('error', error);
       const apiCode = error?.error?.code;
       const msg =
@@ -2401,36 +2637,38 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   printInvoice(): void {
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       this.cdr.detectChanges();
-      this.runCashierPrint();
+      requestAnimationFrame(() => {
+        this.runCashierPrint();
 
-      this.orderItems = [];
-      this.cancelEditLinePrice();
-      this.resetPaymentLinesAfterCheckout();
-      this.invoiceDiscountMode = 'percent';
-      this.invoiceExtraValue = 0;
-      this.clearClientInformationAfterCheckout();
+        this.orderItems = [];
+        this.cancelEditLinePrice();
+        this.resetPaymentLinesAfterCheckout();
+        this.invoiceDiscountMode = 'percent';
+        this.invoiceExtraValue = 0;
+        this.clearClientInformationAfterCheckout();
 
-      const snap = this.pendingExchangePurchaseReceipt;
-      this.pendingExchangePurchaseReceipt = null;
+        const snap = this.pendingExchangePurchaseReceipt;
+        this.pendingExchangePurchaseReceipt = null;
 
-      if (snap) {
-        setTimeout(() => {
-          this.createdDeskPurchase = snap;
-          this.printMode = 'deskPurchase';
-          this.cdr.detectChanges();
+        if (snap) {
           setTimeout(() => {
-            this.runCashierPrint();
+            this.createdDeskPurchase = snap;
+            this.printMode = 'deskPurchase';
+            this.cdr.detectChanges();
             setTimeout(() => {
-              this.printMode = 'sale';
-              this.createdDeskPurchase = null;
-              this.cdr.detectChanges();
-            }, 400);
-          }, 320);
-        }, 650);
-      }
-    }, 300);
+              this.runCashierPrint();
+              setTimeout(() => {
+                this.printMode = 'sale';
+                this.createdDeskPurchase = null;
+                this.cdr.detectChanges();
+              }, 400);
+            }, 320);
+          }, 400);
+        }
+      });
+    });
   }
 
   /** Isolates cashier invoice from booking / order reprint hosts. */

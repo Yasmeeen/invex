@@ -13,6 +13,7 @@ import { UserSerivce } from '@shared/services/user.service';
 import { OrdersModule } from '../orders/orders.module';
 import { MatDialogModule } from '@angular/material/dialog';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
+import { PromiseToPayDialogModule } from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.module';
 
 
 @NgModule({
@@ -31,6 +32,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     MatDialogModule,
     PaymentSplitsDialogModule,
     ClientPayClientDialogModule,
+    PromiseToPayDialogModule,
   ],
   providers: [
     UserSerivce

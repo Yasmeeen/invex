@@ -1,0 +1,95 @@
+.ip-form {
+  display: block;
+  padding: 1.15rem 1.25rem 1.1rem;
+  min-width: min(100%, 440px);
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+}
+
+.ip-form__title {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.ip-form__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.ip-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.ip-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+
+  > span {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #6b7280;
+  }
+
+  .s-control {
+    width: 100%;
+  }
+}
+
+.ip-form__field--toggle {
+  gap: 0;
+}
+
+.ip-form__toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ip-form__toggle-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.ip-form__hint {
+  color: #6b7280;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.ip-form__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ip-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+@media (max-width: 480px) {
+  .ip-form__row {
+    grid-template-columns: 1fr;
+  }
+}

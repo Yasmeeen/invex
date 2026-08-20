@@ -21,6 +21,8 @@ export interface PaymentReceiptData {
   remainingAfter: number;
   payments: Array<{ method?: string; amount: number }>;
   paidAt?: string | Date | null;
+  /** Remaining unpaid installment rows after this payment (sale installments). */
+  remainingInstallments?: number | null;
 }
 
 @Component({
@@ -89,6 +91,12 @@ export class PaymentReceiptPrintComponent implements OnInit, AfterViewInit {
 
   isFullySettled(): boolean {
     return this.remainingAfter() <= 0.005;
+  }
+
+  remainingInstallments(): number | null {
+    const n = Number(this.receipt?.remainingInstallments);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.floor(n);
   }
 
   thisPayments(): Array<{ method?: string; amount: number }> {

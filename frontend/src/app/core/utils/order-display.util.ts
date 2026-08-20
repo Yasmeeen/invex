@@ -1,11 +1,29 @@
 import { InvoiceReturnRecord, Order, OrderProductLine } from '@core/models/products.model';
 import { normalizeMongoId } from './mongo-id.util';
 
-/** Pay later / بيع بالآجل — only method that can be partially paid after sale. */
+/** Pay later / بيع بالآجل / تقسيط — can be partially paid after sale. */
 export function isPayLaterMethod(method: string | null | undefined): boolean {
-  return String(method ?? '')
+  const m = String(method ?? '')
     .trim()
-    .toLowerCase() === 'credit';
+    .toLowerCase();
+  return m === 'credit' || m === 'installment';
+}
+
+/** Sale has an installment schedule (even if paymentMethod is mixed historically). */
+export function orderHasInstallmentSchedule(order: { installments?: unknown[] } | null | undefined): boolean {
+  return Array.isArray(order?.installments) && order!.installments!.length > 0;
+}
+
+export function countUnpaidSaleInstallments(
+  installments: Array<{ paid?: boolean; amount?: number; paidAmount?: number }> | null | undefined
+): number {
+  if (!Array.isArray(installments)) return 0;
+  return installments.filter((r) => {
+    if (r?.paid) return false;
+    const amount = Math.round((Number(r?.amount) || 0) * 100) / 100;
+    const paidAmount = Math.round((Number(r?.paidAmount) || 0) * 100) / 100;
+    return amount - paidAmount > 0.001;
+  }).length;
 }
 
 function toMoney(v: unknown): number {

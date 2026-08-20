@@ -30,6 +30,7 @@ export class CreateEditUserComponent implements OnInit {
     'Co Admin',
     'Branch Manager',
     'Cashier',
+    'Collector',
     'Warehouse',
     'Moderator',
   ];

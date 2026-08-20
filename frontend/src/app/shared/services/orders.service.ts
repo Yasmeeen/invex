@@ -41,6 +41,8 @@ addPayment(
     note?: string;
     /** Branch drawer that receives cash for this installment payment. */
     branchId?: string;
+    /** Prefer applying payment to this installment row first. */
+    installmentId?: string;
     /** Customer payment methods (cash, visa, …) — net amounts per method. */
     paymentSplits?: { method: string; amount: number }[];
     paymentFeeAllocations?: {
@@ -55,6 +57,17 @@ addPayment(
   }
 ) {
   return this.http.post(`${ORDERS_URL}/${orderId}/payments`, payload);
+}
+
+setInstallmentPromise(
+  orderId: string,
+  installmentId: string,
+  payload: { promiseToPayAt?: string | null; note?: string }
+): Observable<any> {
+  return this.http.post(
+    `${ORDERS_URL}/${orderId}/installments/${installmentId}/promise`,
+    payload
+  );
 }
 
 restoreOrder(

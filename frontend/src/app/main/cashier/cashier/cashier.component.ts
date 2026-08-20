@@ -2332,6 +2332,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       orderData.bookingDepositAllocations = bookingAllocations;
     }
 
+    if (payment.installmentPlanId) {
+      orderData.installmentPlanId = payment.installmentPlanId;
+      orderData.installmentStartDate = payment.installmentStartDate || undefined;
+    }
+
     const settlement = this.pendingExchangeSettlement;
     if (settlement?.paymentTreasurySplits?.length) {
       orderData.exchangeSettlementTreasurySplits = settlement.paymentTreasurySplits.map(

@@ -233,6 +233,24 @@
           </div>
         </div>
       </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_installment_plan_months' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="installmentMonthsOptions"
+              [clearable]="true"
+              [(ngModel)]="selectedInstallmentMonths"
+              name="orderInstallmentMonthsFilter"
+              placeholder="{{ 'tr_all_installment_plans' | translate }}"
+              (change)="onInstallmentMonthsFilterChange()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="row mt-2">
       <div class="col-md-3">

@@ -1,0 +1,70 @@
+<div class="installment-plans-page">
+  <header class="installment-plans-page__head">
+    <div class="installment-plans-page__head-row">
+      <div>
+        <h1 class="installment-plans-page__title">{{ 'tr_installment_plans_title' | translate }}</h1>
+        <p class="installment-plans-page__lead">{{ 'tr_installment_plans_lead' | translate }}</p>
+      </div>
+      <button
+        type="button"
+        class="s-btn btn-primary"
+        (click)="openAdd()"
+        [disabled]="loading || saving"
+      >
+        <i class="fa fa-plus" aria-hidden="true"></i>
+        {{ 'tr_installment_plan_add' | translate }}
+      </button>
+    </div>
+  </header>
+
+  <div class="installment-plans-card">
+    <h2 class="installment-plans-card__subtitle">{{ 'tr_installment_plans_list' | translate }}</h2>
+
+    <p *ngIf="loading" class="hint">{{ 'tr_loading' | translate }}</p>
+    <p *ngIf="!loading && !plans.length" class="hint">{{ 'tr_installment_plans_empty' | translate }}</p>
+
+    <table class="s-table table" *ngIf="!loading && plans.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_installment_plan_name' | translate }}</th>
+          <th>{{ 'tr_installment_plan_months' | translate }}</th>
+          <th>{{ 'tr_installment_plan_interest' | translate }}</th>
+          <th>{{ 'tr_status' | translate }}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let plan of plans">
+          <td>{{ plan.name }}</td>
+          <td>{{ plan.months }}</td>
+          <td>{{ plan.interestPercent }}%</td>
+          <td>
+            {{
+              plan.enabled !== false
+                ? ('tr_active' | translate)
+                : ('tr_inactive' | translate)
+            }}
+          </td>
+          <td class="text-right">
+            <button
+              type="button"
+              class="s-btn btn-secondary btn-sm mr-1"
+              (click)="openEdit(plan)"
+              [disabled]="saving"
+            >
+              {{ 'tr_edit' | translate }}
+            </button>
+            <button
+              type="button"
+              class="s-btn btn-secondary btn-sm"
+              (click)="remove(plan)"
+              [disabled]="saving"
+            >
+              {{ 'tr_remove' | translate }}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

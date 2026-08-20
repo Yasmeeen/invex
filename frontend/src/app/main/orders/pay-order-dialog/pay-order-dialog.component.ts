@@ -2,7 +2,12 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { Branch, Order } from '@core/models/products.model';
-import { orderDisplayPaid, orderDisplayRemaining } from '@core/utils/order-display.util';
+import {
+  countUnpaidSaleInstallments,
+  orderDisplayPaid,
+  orderDisplayRemaining,
+  orderHasInstallmentSchedule,
+} from '@core/utils/order-display.util';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { TranslateService } from '@ngx-translate/core';
@@ -17,15 +22,29 @@ import { InvoiceReprintService } from '@shared/services/invoice-reprint.service'
 import {
   PaymentSplitsResult,
   paymentSplitsNetTotal,
+  round2,
 } from '@shared/utils/payment-app-fee.util';
 
-export type PayOrderDialogData = { order: Order; forcedBranchId?: string | null };
+export type PayOrderDialogData = {
+  order: Order;
+  forcedBranchId?: string | null;
+  /** Prefill / lock to a specific installment row. */
+  installmentId?: string | null;
+};
 
 function orderBranchId(order: Order | null | undefined): string {
   const b = order?.branch as { _id?: string } | string | undefined;
   if (typeof b === 'string') return String(b).trim();
   if (b?._id) return String(b._id).trim();
   return '';
+}
+
+interface UnpaidInstallmentOption {
+  id: string;
+  sequence: number;
+  dueDate?: string;
+  remaining: number;
+  label: string;
 }
 
 @Component({
@@ -42,6 +61,10 @@ export class PayOrderDialogComponent implements OnInit {
   printReceipt = true;
   private paymentBranchId: string | null = null;
   confirmedPayment: PaymentSplitsResult | null = null;
+
+  hasInstallmentSchedule = false;
+  unpaidInstallments: UnpaidInstallmentOption[] = [];
+  selectedInstallmentId = '';
 
   constructor(
     private fb: FormBuilder,
@@ -74,6 +97,14 @@ export class PayOrderDialogComponent implements OnInit {
       paidAt: [`${yyyy}-${mm}-${dd}`, [Validators.required]],
       note: ['', Validators.maxLength(500)],
     });
+
+    this.hasInstallmentSchedule = orderHasInstallmentSchedule(this.order);
+    this.unpaidInstallments = this.buildUnpaidInstallments();
+    if (data.installmentId) {
+      this.selectedInstallmentId = String(data.installmentId);
+    } else if (this.unpaidInstallments.length) {
+      this.selectedInstallmentId = this.unpaidInstallments[0].id;
+    }
   }
 
   ngOnInit(): void {
@@ -107,12 +138,54 @@ export class PayOrderDialogComponent implements OnInit {
     }
   }
 
+  private buildUnpaidInstallments(): UnpaidInstallmentOption[] {
+    const rows = this.order?.installments || [];
+    return rows
+      .map((r) => {
+        const amount = round2(Number(r.amount) || 0);
+        const paidAmount = round2(Number(r.paidAmount) || 0);
+        const remaining = r.paid ? 0 : Math.max(0, round2(amount - paidAmount));
+        return {
+          id: String(r._id || ''),
+          sequence: Number(r.sequence) || 0,
+          dueDate: r.dueDate,
+          remaining,
+          label: '',
+        };
+      })
+      .filter((r) => r.id && r.remaining > 0.001)
+      .map((r) => ({
+        ...r,
+        label: this.translate.instant('tr_installment_option_label', {
+          n: r.sequence,
+          amount: r.remaining.toFixed(2),
+        }),
+      }));
+  }
+
   get remaining(): number {
+    const selected = this.selectedInstallment();
+    if (selected) {
+      return Math.min(selected.remaining, orderDisplayRemaining(this.order));
+    }
     return orderDisplayRemaining(this.order);
+  }
+
+  selectedInstallment(): UnpaidInstallmentOption | undefined {
+    if (!this.selectedInstallmentId) return undefined;
+    return this.unpaidInstallments.find((r) => r.id === this.selectedInstallmentId);
+  }
+
+  onInstallmentChange(): void {
+    this.confirmedPayment = null;
   }
 
   displayPaid(): number {
     return orderDisplayPaid(this.order);
+  }
+
+  unpaidInstallmentsCount(): number {
+    return countUnpaidSaleInstallments(this.order?.installments);
   }
 
   paymentSummaryText(): string {
@@ -222,12 +295,22 @@ export class PayOrderDialogComponent implements OnInit {
         userId: u?._id,
         note,
         branchId,
+        ...(this.selectedInstallmentId
+          ? { installmentId: this.selectedInstallmentId }
+          : {}),
       })
       .subscribe({
         next: (res: any) => {
           this.notify.push(this.translate.instant('tr_payment_added'), 'success');
           if (this.printReceipt) {
-            this.printPaymentReceipt(String(orderId), res?.order, netTotal, splits, paidAt);
+            this.printPaymentReceipt(
+              String(orderId),
+              res?.order,
+              netTotal,
+              splits,
+              paidAt,
+              Number(res?.remainingInstallments)
+            );
           } else {
             this.saving = false;
             this.ref.close(true);
@@ -249,11 +332,12 @@ export class PayOrderDialogComponent implements OnInit {
     fallback: any,
     paidNow: number,
     payments: Array<{ method?: string; amount: number }>,
-    paidAt: string
+    paidAt: string,
+    remainingInstallmentsFromApi?: number
   ): void {
     const remainingAfter = Math.max(
       0,
-      Math.round((this.remaining - paidNow) * 100) / 100
+      Math.round((orderDisplayRemaining(this.order) - paidNow) * 100) / 100
     );
     const unwrapOrder = (raw: any) =>
       raw?.products || raw?.orderNumber != null ? raw : raw?.order || raw;
@@ -266,13 +350,19 @@ export class PayOrderDialogComponent implements OnInit {
         ...(source || {}),
         products:
           (source?.products?.length ? source.products : null) || this.order?.products || [],
+        installments: source?.installments || this.order?.installments,
       };
+      const remainingInstallments =
+        Number.isFinite(remainingInstallmentsFromApi)
+          ? remainingInstallmentsFromApi
+          : countUnpaidSaleInstallments(merged.installments);
       this.invoiceReprint.printPayment({
         order: merged,
         paidNow,
         remainingAfter,
         payments,
         paidAt,
+        remainingInstallments,
       });
       this.ref.close(true);
     };

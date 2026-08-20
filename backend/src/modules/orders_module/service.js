@@ -38,6 +38,11 @@ import {
   creditOnAccountAmount,
   distributeAmountOntoLinePrices,
 } from '../../utils/credit-sale-markup.js';
+import InstallmentPlan from '../../DB/models/installmentPlan.model.js';
+import {
+  applyPaymentToInstallments,
+  buildSaleInstallmentSchedule,
+} from '../../utils/sale-installments.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -122,6 +127,7 @@ export const getOrders = async (req, res) => {
       searchBranch = '',
       status,
       paymentMethod,
+      installmentPlanMonths,
       from,
       to,
     } = req.query;
@@ -148,9 +154,18 @@ export const getOrders = async (req, res) => {
       query.status = status;
     }
 
-    // ✅ 1b. Optional payment method filter (cash, visa, valu, …)
+    // ✅ 1b. Optional payment method filter (cash, visa, valu, installment, …)
     if (paymentMethod && String(paymentMethod).trim() !== '') {
       query.paymentMethod = String(paymentMethod).trim();
+    }
+
+    // ✅ 1c. Filter installment invoices by plan months (6 / 12 / 24 …)
+    const monthsFilter = Math.floor(Number(installmentPlanMonths));
+    if (Number.isFinite(monthsFilter) && monthsFilter > 0) {
+      query['installmentPlanSnapshot.months'] = monthsFilter;
+      if (!query.paymentMethod) {
+        query.paymentMethod = 'installment';
+      }
     }
 
     // ✅ 2. Search by order number, client name, or phone number
@@ -189,7 +204,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -264,6 +279,8 @@ export const createOrder = async (req, res) => {
       bookingDepositAllocations: bookingDepositAllocationsRaw,
       partyType: partyTypeRaw,
       vendorId: vendorIdRaw,
+      installmentPlanId: installmentPlanIdRaw,
+      installmentStartDate: installmentStartDateRaw,
     } = req.body;
 
     const partyType =
@@ -621,6 +638,7 @@ export const createOrder = async (req, res) => {
         : undefined;
 
       const hasCreditSplit = splits.some((s) => s.method === 'credit');
+      const hasInstallmentSplit = splits.some((s) => s.method === 'installment');
 
       const checkoutPaidAt = new Date();
       const feeAllocations = normalizePaymentFeeAllocations(paymentFeeAllocationsRaw);
@@ -628,13 +646,18 @@ export const createOrder = async (req, res) => {
       for (const s of splits) {
         if (s.amount > 0) {
           const isCreditLine = s.method === 'credit';
+          const isInstallmentLine = s.method === 'installment';
           payments.push({
             amount: s.amount,
             paidAt: checkoutPaidAt,
             paidByUserId: uid,
-            method: isCreditLine ? undefined : s.method,
+            method: isCreditLine || isInstallmentLine ? undefined : s.method,
             countsTowardInvoice: true,
-            note: isCreditLine ? 'Initial payment (cashier)' : `Checkout · ${s.method}`,
+            note: isCreditLine
+              ? 'Initial payment (cashier)'
+              : isInstallmentLine
+                ? 'Installment down payment (cashier)'
+                : `Checkout · ${s.method}`,
           });
         }
       }
@@ -644,15 +667,21 @@ export const createOrder = async (req, res) => {
         paidByUserId: uid,
       });
 
-      const withMoney = splits.filter((s) => s.amount > 0 && s.method !== 'credit');
+      const withMoney = splits.filter(
+        (s) => s.amount > 0 && s.method !== 'credit' && s.method !== 'installment'
+      );
       if (paidAmount >= amountDueForPayment - 0.001) {
         resolvedPaymentMethod = hasCreditSplit
           ? 'credit'
-          : withMoney.length === 0
-            ? 'cash'
-            : withMoney.length === 1
-              ? withMoney[0].method
-              : 'mixed';
+          : hasInstallmentSplit
+            ? 'installment'
+            : withMoney.length === 0
+              ? 'cash'
+              : withMoney.length === 1
+                ? withMoney[0].method
+                : 'mixed';
+      } else if (hasInstallmentSplit) {
+        resolvedPaymentMethod = 'installment';
       } else {
         resolvedPaymentMethod = 'credit';
       }
@@ -688,8 +717,67 @@ export const createOrder = async (req, res) => {
 
     let creditFeePercent = 0;
     let creditFeeAmount = 0;
+    let installmentFields = null;
     const onAccount = creditOnAccountAmount(amountDueForPayment, paidAmount);
-    if (onAccount > 0.001) {
+    const wantsInstallment =
+      String(resolvedPaymentMethod || '').toLowerCase() === 'installment' ||
+      (Array.isArray(paymentSplitsRaw) &&
+        paymentSplitsRaw.some(
+          (s) => String(s?.method || '').trim().toLowerCase() === 'installment'
+        )) ||
+      Boolean(installmentPlanIdRaw);
+
+    if (wantsInstallment && onAccount > 0.001) {
+      if (!installmentPlanIdRaw || !mongoose.Types.ObjectId.isValid(String(installmentPlanIdRaw))) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Installment plan is required' });
+      }
+      const plan = await InstallmentPlan.findById(installmentPlanIdRaw).session(session);
+      if (!plan || plan.enabled === false) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Installment plan not found or disabled' });
+      }
+
+      const startRaw = installmentStartDateRaw || new Date();
+      const startDate = new Date(startRaw);
+      if (Number.isNaN(startDate.getTime())) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Invalid installment start date' });
+      }
+
+      const schedule = buildSaleInstallmentSchedule({
+        principal: onAccount,
+        interestPercent: plan.interestPercent,
+        months: plan.months,
+        startDate,
+      });
+
+      if (schedule.interestAmount > 0) {
+        const applied = distributeAmountOntoLinePrices(orderProducts, schedule.interestAmount);
+        if (applied > 0) {
+          subtotalPrice = Math.round((subtotalPrice + applied) * 100) / 100;
+          totalPrice = Math.round((totalPrice + applied) * 100) / 100;
+          amountDueForPayment = Math.round((amountDueForPayment + applied) * 100) / 100;
+        }
+      }
+
+      installmentFields = {
+        installmentPlanId: plan._id,
+        installmentPlanSnapshot: {
+          name: plan.name,
+          months: plan.months,
+          interestPercent: plan.interestPercent,
+        },
+        installmentStartDate: startDate,
+        installmentPrincipal: schedule.principal,
+        installmentInterestAmount: schedule.interestAmount,
+        installments: schedule.installments,
+      };
+      resolvedPaymentMethod = 'installment';
+    } else if (onAccount > 0.001) {
       const settingsDoc = await getOrCreateStoreSettings();
       const catalog = normalizePaymentMethodsCatalog({
         paymentMethodsCatalog: settingsDoc?.paymentMethodsCatalog,
@@ -781,7 +869,8 @@ export const createOrder = async (req, res) => {
           paymentStatus,
           payments,
           status,
-          cashierId: userId, 
+          cashierId: userId,
+          ...(installmentFields || {}),
           },
       ],
       { session }
@@ -980,6 +1069,7 @@ export const addOrderPayment = async (req, res) => {
       paymentMethodSplits: paymentMethodSplitsRaw,
       paymentFeeAllocations: paymentFeeAllocationsRaw,
       branchId: branchIdRaw,
+      installmentId: installmentIdRaw,
       /** @deprecated Sales installments use paymentSplits (customer methods), not purchase treasury. */
       paymentTreasurySplits: legacyTreasuryRaw,
     } = req.body || {};
@@ -1018,6 +1108,7 @@ export const addOrderPayment = async (req, res) => {
 
     order.payments = order.payments || [];
     const noteStr = String(note || '').trim();
+    let primaryMethod = '';
 
     if (hasPaymentSplits) {
       const splits = splitsRaw
@@ -1025,7 +1116,14 @@ export const addOrderPayment = async (req, res) => {
           method: String(s?.method ?? s?.key ?? '').trim().toLowerCase(),
           amount: Math.round((Number(s?.amount) || 0) * 100) / 100,
         }))
-        .filter((s) => s.method && s.method !== 'credit' && Number.isFinite(s.amount) && s.amount > 0);
+        .filter(
+          (s) =>
+            s.method &&
+            s.method !== 'credit' &&
+            s.method !== 'installment' &&
+            Number.isFinite(s.amount) &&
+            s.amount > 0
+        );
 
       if (!splits.length) {
         return res.status(400).json({ error: 'At least one payment method with amount is required' });
@@ -1034,6 +1132,8 @@ export const addOrderPayment = async (req, res) => {
       applied = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
       applied = Math.min(applied, remaining);
       if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
+
+      primaryMethod = splits.length === 1 ? splits[0].method : 'mixed';
 
       for (const s of splits) {
         order.payments.push({
@@ -1061,15 +1161,16 @@ export const addOrderPayment = async (req, res) => {
       if (applied <= 0) return res.status(400).json({ error: 'Nothing remaining to pay' });
 
       const methodSlug = String(methodRaw || 'cash').trim().toLowerCase();
-      if (methodSlug === 'credit') {
-        return res.status(400).json({ error: 'Use a customer payment method (not credit) for installments' });
+      if (methodSlug === 'credit' || methodSlug === 'installment') {
+        return res.status(400).json({ error: 'Use a customer payment method (not credit/installment) for payments' });
       }
+      primaryMethod = methodSlug || 'cash';
       order.payments.push({
         amount: applied,
         paidAt: dt,
         paidByUserId: uid,
         ...(resolvedPaymentBranch ? { branch: resolvedPaymentBranch } : {}),
-        method: methodSlug || 'cash',
+        method: primaryMethod,
         note: noteStr,
       });
     }
@@ -1079,6 +1180,18 @@ export const addOrderPayment = async (req, res) => {
       order.paymentStatus = 'paid';
     } else {
       order.paymentStatus = order.amountPaid > 0 ? 'partial' : 'unpaid';
+    }
+
+    let remainingInstallments = 0;
+    if (Array.isArray(order.installments) && order.installments.length) {
+      const scheduleResult = applyPaymentToInstallments(order.installments, applied, {
+        paidAt: dt,
+        paymentMethod: primaryMethod,
+        paidByUserId: uid,
+        installmentId: installmentIdRaw,
+      });
+      remainingInstallments = scheduleResult.remainingInstallments;
+      order.markModified('installments');
     }
 
     await order.save();
@@ -1140,13 +1253,58 @@ export const addOrderPayment = async (req, res) => {
         totalPrice: total,
         status: order?.status,
         paymentStatus: order?.paymentStatus,
+        remainingInstallments,
+        installmentId: installmentIdRaw || undefined,
       },
     });
 
-    res.json({ message: '✅ Payment added', order });
+    res.json({
+      message: '✅ Payment added',
+      order,
+      remainingInstallments,
+      remainingAfter: Math.max(0, Math.round((total - order.amountPaid) * 100) / 100),
+    });
   } catch (error) {
     console.error('addOrderPayment:', error);
     res.status(500).json({ error: 'Failed to add payment' });
+  }
+};
+
+/** POST set / clear promise-to-pay on one installment row. */
+export const setInstallmentPromise = async (req, res) => {
+  try {
+    const { orderId, installmentId } = req.params;
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!Array.isArray(order.installments) || !order.installments.length) {
+      return res.status(400).json({ error: 'Order has no installments' });
+    }
+
+    const row = order.installments.id(installmentId) ||
+      order.installments.find((r) => String(r._id) === String(installmentId));
+    if (!row) return res.status(404).json({ error: 'Installment not found' });
+    if (row.paid) return res.status(400).json({ error: 'Installment already paid' });
+
+    const raw = req.body?.promiseToPayAt;
+    if (raw === null || raw === '' || raw === undefined) {
+      row.promiseToPayAt = undefined;
+    } else {
+      const dt = new Date(raw);
+      if (Number.isNaN(dt.getTime())) {
+        return res.status(400).json({ error: 'Invalid promiseToPayAt' });
+      }
+      row.promiseToPayAt = dt;
+    }
+    if (req.body?.note !== undefined) {
+      row.note = String(req.body.note || '').trim();
+    }
+    order.markModified('installments');
+    await order.save();
+
+    res.json({ message: 'Promise updated', order, installment: row });
+  } catch (error) {
+    console.error('setInstallmentPromise:', error);
+    res.status(500).json({ error: 'Failed to update promise' });
   }
 };
 

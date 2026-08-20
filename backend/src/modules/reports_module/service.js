@@ -8,6 +8,8 @@ import ProductBooking from '../../DB/models/productBooking.model.js';
 import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import Vendor from '../../DB/models/vendor.model.js';
+import Client from '../../DB/models/client.model.js';
+import User from '../../DB/models/user.model.js';
 import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
 import TreasuryAccountOpening from '../../DB/models/treasuryAccountOpening.model.js';
@@ -845,47 +847,238 @@ export const getCustomersReport = async (req, res) => {
 export const getInstallmentsReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
-    const now = new Date();
-    const match = { createdAt: { $gte: f.from, $lte: f.to } };
+    const collectorIdRaw = String(req.query.collector_id || req.query.collectorId || '').trim();
+    const hasCollectorFilter = mongoose.Types.ObjectId.isValid(collectorIdRaw);
+    const collectorOid = hasCollectorFilter
+      ? new mongoose.Types.ObjectId(collectorIdRaw)
+      : null;
+    const statusKey = String(req.query.status || req.query.installment_status || 'all')
+      .trim()
+      .toLowerCase();
 
-    const upcomingInstallments = await PurchasingRequest.aggregate([
-      { $match: match },
-      { $unwind: '$installments' },
-      { $match: { 'installments.paid': false, 'installments.dueDate': { $gte: now } } },
-      { $project: { _id: 0, requestId: '$_id', supplier: '$supplier', dueDate: '$installments.dueDate', amount: '$installments.amount', paid: '$installments.paid', status: '$status' } },
-      { $sort: { dueDate: 1 } },
-      { $limit: 200 },
-    ]);
+    const timezone = REPORT_TZ;
+    const now = moment.tz(timezone);
+    const soonEnd = now.clone().add(7, 'days').endOf('day');
 
-    const overdueInstallments = await PurchasingRequest.aggregate([
-      { $match: match },
-      { $unwind: '$installments' },
-      { $match: { 'installments.paid': false, 'installments.dueDate': { $lt: now } } },
-      { $project: { _id: 0, requestId: '$_id', supplier: '$supplier', dueDate: '$installments.dueDate', amount: '$installments.amount', paid: '$installments.paid', status: '$status' } },
-      { $sort: { dueDate: 1 } },
-      { $limit: 200 },
-    ]);
+    let clientIdsFilter = null;
+    if (hasCollectorFilter) {
+      const clients = await Client.find({ collectorId: collectorOid }).select('_id').lean();
+      clientIdsFilter = clients.map((c) => c._id);
+      if (!clientIdsFilter.length) {
+        return res.json({
+          filters: { ...f, collectorId: collectorOid, status: statusKey },
+          summary: {
+            totalAmount: 0,
+            collectedAmount: 0,
+            remainingAmount: 0,
+            overdueAmount: 0,
+            dueSoonAmount: 0,
+            paidCount: 0,
+            unpaidCount: 0,
+            overdueCount: 0,
+            promisedCount: 0,
+            collectionRate: 0,
+          },
+          byCollector: [],
+          overTime: [],
+          rows: [],
+        });
+      }
+    }
 
-    const [paidVsUnpaid] = await PurchasingRequest.aggregate([
-      { $match: match },
-      { $unwind: '$installments' },
-      {
-        $group: {
-          _id: null,
-          paidCount: { $sum: { $cond: ['$installments.paid', 1, 0] } },
-          unpaidCount: { $sum: { $cond: ['$installments.paid', 0, 1] } },
-          paidAmount: { $sum: { $cond: ['$installments.paid', '$installments.amount', 0] } },
-          unpaidAmount: { $sum: { $cond: ['$installments.paid', 0, '$installments.amount'] } },
-        },
-      },
-      { $project: { _id: 0, paidCount: 1, unpaidCount: 1, paidAmount: { $round: ['$paidAmount', 2] }, unpaidAmount: { $round: ['$unpaidAmount', 2] } } },
-    ]);
+    const orderMatch = {
+      partyType: { $in: [null, 'client'] },
+      paymentMethod: 'installment',
+      status: { $ne: 'restored' },
+      'installments.0': { $exists: true },
+    };
+    if (f.branchId) orderMatch.branch = f.branchId;
+    if (clientIdsFilter) orderMatch.clientId = { $in: clientIdsFilter };
+    appendOrderCustomerFilters(orderMatch, f);
+
+    const orders = await Order.find(orderMatch)
+      .select(
+        'orderNumber clientId clientName clientPhoneNumber branch installmentPlanSnapshot installments totalPrice amountPaid paymentStatus'
+      )
+      .populate('branch', 'name')
+      .lean();
+
+    const clientIds = [
+      ...new Set(orders.map((o) => String(o.clientId || '')).filter(Boolean)),
+    ].filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    const clients = clientIds.length
+      ? await Client.find({ _id: { $in: clientIds } })
+          .select('name phoneNumber collectorId')
+          .populate('collectorId', 'name')
+          .lean()
+      : [];
+    const clientById = new Map(clients.map((c) => [String(c._id), c]));
+
+    const collectorStats = new Map();
+    const allCollectors = await User.find({ role: 'Collector' }).select('name').lean();
+    for (const c of allCollectors) {
+      collectorStats.set(String(c._id), {
+        collectorId: String(c._id),
+        collectorName: c.name || '',
+        totalAmount: 0,
+        collectedAmount: 0,
+        remainingAmount: 0,
+        overdueAmount: 0,
+      });
+    }
+
+    const periodFmt = f.groupBy === 'monthly' ? 'YYYY-MM' : 'YYYY-MM-DD';
+    const overTimeMap = new Map();
+
+    let totalAmount = 0;
+    let collectedAmount = 0;
+    let remainingAmount = 0;
+    let overdueAmount = 0;
+    let dueSoonAmount = 0;
+    let paidCount = 0;
+    let unpaidCount = 0;
+    let overdueCount = 0;
+    let promisedCount = 0;
+
+    const rows = [];
+
+    for (const order of orders) {
+      const client = clientById.get(String(order.clientId)) || null;
+      const colId = String(client?.collectorId?._id || client?.collectorId || '');
+      const colName = client?.collectorId?.name || '';
+      if (colId && !collectorStats.has(colId)) {
+        collectorStats.set(colId, {
+          collectorId: colId,
+          collectorName: colName,
+          totalAmount: 0,
+          collectedAmount: 0,
+          remainingAmount: 0,
+          overdueAmount: 0,
+        });
+      }
+      const colStat = colId ? collectorStats.get(colId) : null;
+
+      for (const inst of order.installments || []) {
+        const due = inst.dueDate ? moment(inst.dueDate).tz(timezone) : null;
+        if (!due || !due.isValid()) continue;
+        if (due.isBefore(moment(f.from)) || due.isAfter(moment(f.to))) continue;
+
+        const amount = round2(inst.amount);
+        const paidAmt = round2(
+          Number(inst.paidAmount) || (inst.paid ? amount : 0)
+        );
+        const rem = Math.max(0, round2(amount - paidAmt));
+        const isPaid = !!inst.paid || rem <= 0.001;
+        const promise = inst.promiseToPayAt
+          ? moment(inst.promiseToPayAt).tz(timezone)
+          : null;
+
+        let rowStatus = 'due';
+        if (isPaid) rowStatus = 'paid';
+        else if (promise && promise.isValid()) rowStatus = 'promised';
+        else if (due.clone().endOf('day').isBefore(now)) rowStatus = 'overdue';
+        else if (due.isSameOrBefore(soonEnd)) rowStatus = 'due_soon';
+
+        if (statusKey === 'unpaid') {
+          if (isPaid) continue;
+        } else if (statusKey !== 'all' && statusKey !== rowStatus) {
+          continue;
+        }
+
+        totalAmount = round2(totalAmount + amount);
+        collectedAmount = round2(collectedAmount + Math.min(paidAmt, amount));
+        remainingAmount = round2(remainingAmount + rem);
+        if (isPaid) paidCount += 1;
+        else unpaidCount += 1;
+        if (rowStatus === 'overdue') {
+          overdueAmount = round2(overdueAmount + rem);
+          overdueCount += 1;
+        }
+        if (rowStatus === 'due_soon') dueSoonAmount = round2(dueSoonAmount + rem);
+        if (rowStatus === 'promised') promisedCount += 1;
+
+        if (colStat) {
+          colStat.totalAmount = round2(colStat.totalAmount + amount);
+          colStat.collectedAmount = round2(
+            colStat.collectedAmount + Math.min(paidAmt, amount)
+          );
+          colStat.remainingAmount = round2(colStat.remainingAmount + rem);
+          if (rowStatus === 'overdue') {
+            colStat.overdueAmount = round2(colStat.overdueAmount + rem);
+          }
+        }
+
+        const period = due.format(periodFmt);
+        if (!overTimeMap.has(period)) {
+          overTimeMap.set(period, { period, dueAmount: 0, collectedAmount: 0 });
+        }
+        const ot = overTimeMap.get(period);
+        ot.dueAmount = round2(ot.dueAmount + amount);
+        ot.collectedAmount = round2(ot.collectedAmount + Math.min(paidAmt, amount));
+
+        rows.push({
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          clientId: order.clientId,
+          clientName: order.clientName || client?.name || '',
+          clientPhone: order.clientPhoneNumber || client?.phoneNumber || '',
+          collectorId: colId || null,
+          collectorName: colName || '—',
+          branchName: order.branch?.name || '',
+          planName: order.installmentPlanSnapshot?.name || '',
+          planMonths: order.installmentPlanSnapshot?.months || null,
+          sequence: inst.sequence,
+          dueDate: inst.dueDate,
+          amount,
+          paidAmount: Math.min(paidAmt, amount),
+          remaining: rem,
+          status: rowStatus,
+          promiseToPayAt: inst.promiseToPayAt || null,
+          paidAt: inst.paidAt || null,
+        });
+      }
+    }
+
+    rows.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+    const byCollector = [...collectorStats.values()]
+      .filter((c) => c.totalAmount > 0 || c.collectedAmount > 0)
+      .map((c) => ({
+        ...c,
+        collectionRate:
+          c.totalAmount > 0
+            ? Math.round((c.collectedAmount / c.totalAmount) * 1000) / 10
+            : 0,
+      }))
+      .sort((a, b) => b.collectedAmount - a.collectedAmount);
+
+    const overTime = [...overTimeMap.values()].sort((a, b) =>
+      String(a.period).localeCompare(String(b.period))
+    );
+
+    const collectionRate =
+      totalAmount > 0
+        ? Math.round((collectedAmount / totalAmount) * 1000) / 10
+        : 0;
 
     return res.json({
-      filters: f,
-      summary: paidVsUnpaid || { paidCount: 0, unpaidCount: 0, paidAmount: 0, unpaidAmount: 0 },
-      upcomingInstallments,
-      overdueInstallments,
+      filters: { ...f, collectorId: collectorOid, status: statusKey },
+      summary: {
+        totalAmount,
+        collectedAmount,
+        remainingAmount,
+        overdueAmount,
+        dueSoonAmount,
+        paidCount,
+        unpaidCount,
+        overdueCount,
+        promisedCount,
+        collectionRate,
+      },
+      byCollector,
+      overTime,
+      rows: rows.slice(0, 500),
     });
   } catch (error) {
     console.error('getInstallmentsReport:', error);

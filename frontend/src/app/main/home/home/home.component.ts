@@ -30,7 +30,7 @@ const DONUT_STOCK_OUT = '#d4a5a8';
 const DONUT_ORDER_DONE = '#1b4332';
 const DONUT_ORDER_RESTORED = '#74c69d';
 
-export type HomeDashboardSection = 'accounts' | 'sales';
+export type HomeDashboardSection = 'accounts' | 'sales' | 'collections';
 
 @Component({
   selector: 'app-home',
@@ -85,12 +85,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     const qp = String(this.route.snapshot.queryParamMap.get('section') || '')
       .trim()
       .toLowerCase();
-    if (qp === 'sales' || qp === 'accounts') {
+    if (qp === 'sales' || qp === 'accounts' || qp === 'collections') {
       this.activeSection = qp;
     } else {
       const saved = localStorage.getItem(this.storageKey);
-      if (saved === 'sales' || saved === 'accounts') {
-        this.activeSection = saved;
+      if (saved === 'sales' || saved === 'accounts' || saved === 'collections') {
+        this.activeSection = saved as HomeDashboardSection;
       }
     }
   }

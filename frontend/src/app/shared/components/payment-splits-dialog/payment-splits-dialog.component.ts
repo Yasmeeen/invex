@@ -23,6 +23,10 @@ import {
   catalogCreditFeePercent,
   creditMarkupAmount,
 } from '@shared/utils/credit-sale-markup.util';
+import {
+  InstallmentPlan,
+  InstallmentPlansService,
+} from '@shared/services/installment-plans.service';
 import { Subscription } from 'rxjs';
 
 export type PaymentSplitsDialogMode = 'checkout' | 'installment' | 'deposit';
@@ -60,17 +64,23 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   /** Stable ng-select items per fee-bearing method (avoid new array each CD cycle). */
   feeSourceOptionsMap: Record<string, FeeSourceOption[]> = {};
 
+  installmentPlans: InstallmentPlan[] = [];
+  selectedInstallmentPlanId = '';
+  installmentStartDate = '';
+
   readonly invoiceNetTotal: number;
   readonly mode: PaymentSplitsDialogMode;
 
   private settingsSub?: Subscription;
+  private plansSub?: Subscription;
 
   constructor(
     private dialogRef: MatDialogRef<PaymentSplitsDialogComponent, PaymentSplitsResult | null>,
     @Inject(MAT_DIALOG_DATA) data: PaymentSplitsDialogData,
     private storeSettings: StoreSettingsService,
     private translate: TranslateService,
-    private notify: AppNotificationService
+    private notify: AppNotificationService,
+    private installmentPlansService: InstallmentPlansService
   ) {
     this.invoiceNetTotal = round2(Number(data.invoiceNetTotal) || 0);
     this.mode =
@@ -93,10 +103,34 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
     this.ensureDefaultNetAmounts();
     this.syncFeeSources();
+    this.installmentStartDate = this.defaultInstallmentStartDate();
+    if (this.mode === 'checkout') {
+      this.plansSub = this.installmentPlansService.list(true).subscribe({
+        next: (res) => {
+          this.installmentPlans = res?.plans || [];
+          if (!this.selectedInstallmentPlanId && this.installmentPlans.length) {
+            this.selectedInstallmentPlanId = String(this.installmentPlans[0]._id || '');
+          }
+        },
+        error: () => {
+          this.installmentPlans = [];
+        },
+      });
+    }
   }
 
   ngOnDestroy(): void {
     this.settingsSub?.unsubscribe();
+    this.plansSub?.unsubscribe();
+  }
+
+  private defaultInstallmentStartDate(): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   private rebuildPaymentMethods(): void {
@@ -107,7 +141,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     );
     this.paymentMethods =
       this.mode === 'installment' || this.mode === 'deposit'
-        ? all.filter((m) => m.id !== 'credit')
+        ? all.filter((m) => m.id !== 'credit' && m.id !== 'installment')
         : all;
     this.paymentMethodsForSplit = this.paymentMethods;
 
@@ -131,16 +165,19 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     return catalogCreditFeePercent(this.storeSettings.snapshot.paymentMethodsCatalog);
   }
 
-  /** App-fee % or credit-sale markup % for badges in the picker. */
+  /** App-fee % or credit-sale / installment markup % for badges in the picker. */
   methodSalePercent(methodId: string | undefined | null): number {
     if (this.isCreditPayMethod(methodId)) {
       return this.creditFeePercent();
+    }
+    if (this.isInstallmentPayMethod(methodId)) {
+      return this.installmentInterestPercent();
     }
     return this.paymentAppFeePercent(methodId);
   }
 
   creditMarkupPreview(): number {
-    if (this.mode === 'deposit' || this.paymentOverAllocated()) {
+    if (this.mode === 'deposit' || this.paymentOverAllocated() || this.hasInstallmentPayMethodSelected()) {
       return 0;
     }
     const remaining = this.paymentRemaining();
@@ -148,6 +185,21 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       return 0;
     }
     return creditMarkupAmount(remaining, this.creditFeePercent());
+  }
+
+  installmentMarkupPreview(): number {
+    if (this.mode === 'deposit' || this.paymentOverAllocated() || !this.hasInstallmentPayMethodSelected()) {
+      return 0;
+    }
+    const remaining = this.paymentRemaining();
+    if (remaining <= 0.005) {
+      return 0;
+    }
+    return creditMarkupAmount(remaining, this.installmentInterestPercent());
+  }
+
+  installmentDueAfterMarkup(): number {
+    return round2(this.paymentRemaining() + this.installmentMarkupPreview());
   }
 
   creditDueAfterMarkup(): number {
@@ -170,23 +222,56 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     return String(id || '').trim().toLowerCase() === 'credit';
   }
 
+  isInstallmentPayMethod(id: string | undefined | null): boolean {
+    return String(id || '').trim().toLowerCase() === 'installment';
+  }
+
+  isFinancingPayMethod(id: string | undefined | null): boolean {
+    return this.isCreditPayMethod(id) || this.isInstallmentPayMethod(id);
+  }
+
   hasCreditPayMethodSelected(): boolean {
     return this.selectedPayMethods.some((id) => this.isCreditPayMethod(id));
   }
 
+  hasInstallmentPayMethodSelected(): boolean {
+    return this.selectedPayMethods.some((id) => this.isInstallmentPayMethod(id));
+  }
+
+  selectedInstallmentPlan(): InstallmentPlan | undefined {
+    const id = String(this.selectedInstallmentPlanId || '');
+    return this.installmentPlans.find((p) => String(p._id) === id);
+  }
+
+  installmentInterestPercent(): number {
+    return Number(this.selectedInstallmentPlan()?.interestPercent) || 0;
+  }
+
   payAmountInputMax(methodId: string): number | undefined {
-    if (this.isCreditPayMethod(methodId) || this.mode === 'installment') {
+    if (this.isFinancingPayMethod(methodId) || this.mode === 'installment') {
       return this.invoiceNetTotal;
     }
     return undefined;
   }
 
   onSelectedPayMethodsChange(ids: string[] | null): void {
-    const raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
+    let raw = Array.isArray(ids) ? ids.filter((x) => !!String(x || '').trim()) : [];
     if (!raw.length) {
       this.selectedPayMethods = ['cash'];
       this.reconcilePayAmountsKeys(['cash']);
       return;
+    }
+    // Credit and installment are mutually exclusive.
+    const hasCredit = raw.some((id) => this.isCreditPayMethod(id));
+    const hasInstallment = raw.some((id) => this.isInstallmentPayMethod(id));
+    if (hasCredit && hasInstallment) {
+      const last = String(raw[raw.length - 1] || '').toLowerCase();
+      if (last === 'installment') {
+        raw = raw.filter((id) => !this.isCreditPayMethod(id));
+      } else {
+        raw = raw.filter((id) => !this.isInstallmentPayMethod(id));
+      }
+      this.notify.push(this.translate.instant('tr_cashier_credit_or_installment'), 'error');
     }
     this.reconcilePayAmountsKeys(raw);
     this.syncFeeSources();
@@ -195,7 +280,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   private reconcilePayAmountsKeys(ids: string[]): void {
     const next: Record<string, number> = {};
     for (const id of ids) {
-      if (this.isCreditPayMethod(id) && !Number.isFinite(Number(this.payAmounts[id]))) {
+      if (this.isFinancingPayMethod(id) && !Number.isFinite(Number(this.payAmounts[id]))) {
         next[id] = 0;
       } else {
         next[id] = Number(this.payAmounts[id]) || 0;
@@ -215,9 +300,9 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     }
     const id = this.selectedPayMethods[0];
     const cur = Number(this.payAmounts[id]);
-    if (this.isCreditPayMethod(id)) {
+    if (this.isFinancingPayMethod(id)) {
       if (!Number.isFinite(cur) || cur < 0) {
-        this.payAmounts = { ...this.payAmounts, credit: 0 };
+        this.payAmounts = { ...this.payAmounts, [id]: 0 };
       }
       return;
     }
@@ -299,7 +384,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     );
 
     for (const m of this.paymentMethods) {
-      if (m.id === 'credit' || m.id === fm) {
+      if (m.id === 'credit' || m.id === 'installment' || m.id === fm) {
         continue;
       }
       pushOption(m.id, m.label, this.paymentAppFeePercent(m.id));
@@ -365,7 +450,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
         method: String(id).trim().toLowerCase(),
         amount: round2(Number(this.payAmounts[id]) || 0),
       }))
-      .filter((s) => s.method !== 'credit' || s.amount >= 0);
+      .filter((s) => !this.isFinancingPayMethod(s.method) || s.amount >= 0);
   }
 
   paymentSplitsTotal(): number {
@@ -482,9 +567,12 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       }));
 
     const hasCredit = paymentSplits.some((s) => s.method === 'credit');
-    const moneySplits = paymentSplits.filter((s) => s.method !== 'credit' && s.amount > 0);
+    const hasInstallment = paymentSplits.some((s) => s.method === 'installment');
+    const moneySplits = paymentSplits.filter(
+      (s) => s.method !== 'credit' && s.method !== 'installment' && s.amount > 0
+    );
 
-    if (!moneySplits.length && !hasCredit) {
+    if (!moneySplits.length && !hasCredit && !hasInstallment) {
       this.notify.push(this.translate.instant('tr_order_payment_method_required'), 'error');
       return;
     }
@@ -494,29 +582,58 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const netTotal = paymentSplitsNetTotal(paymentSplits.filter((s) => s.method !== 'credit'));
-    if (netTotal <= 0 && !hasCredit) {
+    const netTotal = paymentSplitsNetTotal(
+      paymentSplits.filter((s) => s.method !== 'credit' && s.method !== 'installment')
+    );
+    if (netTotal <= 0 && !hasCredit && !hasInstallment) {
       this.notify.push(this.translate.instant('tr_vendor_deferred_amount_required'), 'error');
       return;
+    }
+
+    if (hasInstallment) {
+      if (!this.selectedInstallmentPlanId) {
+        this.notify.push(this.translate.instant('tr_installment_plan_required'), 'error');
+        return;
+      }
+      if (!this.installmentStartDate) {
+        this.notify.push(this.translate.instant('tr_installment_start_date_required'), 'error');
+        return;
+      }
+      if (this.paymentRemaining() <= 0.005) {
+        this.notify.push(this.translate.instant('tr_installment_needs_remaining'), 'error');
+        return;
+      }
     }
 
     const feeSources = this.feeSources.length
       ? this.feeSources
       : defaultFeeSources(
-          paymentSplits.filter((s) => s.amount > 0),
+          paymentSplits.filter((s) => s.amount > 0 && s.method !== 'installment'),
           this.storeSettings.snapshot.paymentAppFeePercents
         );
 
     const result = buildPaymentSplitsResult(
-      paymentSplits.filter((s) => s.amount > 0),
+      paymentSplits.filter((s) => s.amount > 0 && s.method !== 'installment'),
       feeSources,
       this.storeSettings.snapshot.paymentAppFeePercents
     );
 
-    // Preserve credit line (including zero paid-now) for checkout resolution.
+    // Preserve credit / installment line (including zero paid-now) for checkout resolution.
     const creditLine = paymentSplits.find((s) => s.method === 'credit');
     if (creditLine && !result.paymentSplits.some((s) => s.method === 'credit')) {
       result.paymentSplits.push(creditLine);
+    }
+    const installmentLine = paymentSplits.find((s) => s.method === 'installment');
+    if (installmentLine && !result.paymentSplits.some((s) => s.method === 'installment')) {
+      result.paymentSplits.push({
+        method: 'installment',
+        amount: round2(Number(installmentLine.amount) || 0),
+      });
+    }
+
+    if (hasInstallment) {
+      result.installmentPlanId = this.selectedInstallmentPlanId;
+      result.installmentStartDate = this.installmentStartDate;
     }
 
     this.dialogRef.close(result);

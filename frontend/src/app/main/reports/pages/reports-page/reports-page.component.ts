@@ -670,25 +670,91 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'installments') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_card_paid_count', value: s.paidCount || 0 },
-        { titleKey: 'tr_report_card_unpaid_count', value: s.unpaidCount || 0 },
-        { titleKey: 'tr_report_card_paid_amount', value: s.paidAmount || 0, money: true },
-        { titleKey: 'tr_report_card_unpaid_amount', value: s.unpaidAmount || 0, money: true },
+        { titleKey: 'tr_collections_total_installments', value: s.totalAmount || 0, money: true },
+        { titleKey: 'tr_collections_collected', value: s.collectedAmount || 0, money: true },
+        { titleKey: 'tr_report_card_remaining_amount', value: s.remainingAmount || 0, money: true },
+        { titleKey: 'tr_collections_overdue_amount', value: s.overdueAmount || 0, money: true },
+        { titleKey: 'tr_collections_due_soon', value: s.dueSoonAmount || 0, money: true },
+        {
+          titleKey: 'tr_collections_rate',
+          value: `${Number(s.collectionRate || 0).toFixed(1)}%`,
+        },
       ];
       this.tableColumns = [
-        { key: 'dueDate', labelKey: 'tr_report_col_due_date' },
+        { key: 'orderNumber', labelKey: 'tr_order_number' },
+        { key: 'clientName', labelKey: 'tr_client_name' },
+        { key: 'clientPhone', labelKey: 'tr_phone' },
+        { key: 'collectorName', labelKey: 'tr_collector' },
+        { key: 'branchName', labelKey: 'tr_branch' },
+        { key: 'planName', labelKey: 'tr_installment_plan_select' },
+        { key: 'sequence', labelKey: 'tr_report_col_installment_seq' },
+        { key: 'dueDate', labelKey: 'tr_installment_due_date' },
         { key: 'amount', labelKey: 'tr_amount', format: 'money' },
-        { key: 'paid', labelKey: 'tr_paid' },
-        { key: 'status', labelKey: 'tr_report_col_request_status' },
+        { key: 'paidAmount', labelKey: 'tr_collections_collected', format: 'money' },
+        { key: 'remaining', labelKey: 'tr_remaining', format: 'money' },
+        { key: 'statusLabel', labelKey: 'tr_status' },
+        { key: 'promiseToPayAt', labelKey: 'tr_promise_to_pay' },
       ];
-      this.tableRows = [...(res.upcomingInstallments || []), ...(res.overdueInstallments || [])].map((x: any) => ({
-        ...x,
-        dueDate: new Date(x.dueDate).toLocaleDateString(),
-        paid: x.paid ? t('tr_yes') : t('tr_no'),
+      const statusKeyMap: Record<string, string> = {
+        paid: 'tr_paid',
+        overdue: 'tr_collections_status_overdue',
+        due_soon: 'tr_collections_due_soon',
+        promised: 'tr_collections_status_promised',
+        due: 'tr_collections_status_due',
+      };
+      this.tableRows = (res.rows || []).map((x: any) => ({
+        orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
+        clientName: x.clientName || '—',
+        clientPhone: x.clientPhone || '—',
+        collectorName: x.collectorName || '—',
+        branchName: x.branchName || '—',
+        planName: x.planName || (x.planMonths ? `${x.planMonths}` : '—'),
+        sequence: x.sequence ?? '—',
+        dueDate: x.dueDate ? new Date(x.dueDate).toLocaleDateString() : '—',
+        amount: x.amount,
+        paidAmount: x.paidAmount,
+        remaining: x.remaining,
+        statusLabel: t(statusKeyMap[x.status] || 'tr_collections_status_due'),
+        promiseToPayAt: x.promiseToPayAt
+          ? new Date(x.promiseToPayAt).toLocaleString()
+          : '—',
       }));
-      this.chartOptions = this.pieChart(t('tr_report_chart_paid_vs_unpaid'), [
-        { name: t('tr_paid'), y: Number(s.paidAmount || 0) },
-        { name: t('tr_unpaid'), y: Number(s.unpaidAmount || 0) },
+
+      this.salesPaymentColumns = [
+        { key: 'collectorName', labelKey: 'tr_collector' },
+        { key: 'totalAmount', labelKey: 'tr_collections_total_installments', format: 'money' },
+        { key: 'collectedAmount', labelKey: 'tr_collections_collected', format: 'money' },
+        { key: 'remainingAmount', labelKey: 'tr_remaining', format: 'money' },
+        { key: 'overdueAmount', labelKey: 'tr_collections_overdue_amount', format: 'money' },
+        { key: 'collectionRate', labelKey: 'tr_collections_rate' },
+      ];
+      this.salesPaymentRows = (res.byCollector || []).map((c: any) => ({
+        collectorName: c.collectorName || '—',
+        totalAmount: c.totalAmount,
+        collectedAmount: c.collectedAmount,
+        remainingAmount: c.remainingAmount,
+        overdueAmount: c.overdueAmount,
+        collectionRate: `${Number(c.collectionRate || 0).toFixed(1)}%`,
+      }));
+
+      const over = res.overTime || [];
+      this.chartOptions = this.lineChart(
+        t('tr_report_chart_collections_over_time'),
+        over.map((x: any) => x.period),
+        [
+          {
+            name: t('tr_collections_total_installments'),
+            data: over.map((x: any) => Number(x.dueAmount || 0)),
+          },
+          {
+            name: t('tr_collections_collected'),
+            data: over.map((x: any) => Number(x.collectedAmount || 0)),
+          },
+        ]
+      );
+      this.secondaryChartOptions = this.pieChart(t('tr_report_chart_paid_vs_unpaid'), [
+        { name: t('tr_collections_collected'), y: Number(s.collectedAmount || 0) },
+        { name: t('tr_remaining'), y: Number(s.remainingAmount || 0) },
       ]);
       return;
     }
@@ -854,6 +920,29 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           rows: this.mapRowsForExport(this.treasurySourceColumns, this.treasurySourceRows),
         });
       }
+      this.exportService.exportToExcelMultiSheet(filename, sheets);
+      return;
+    }
+
+    if (this.reportType === 'installments') {
+      const t = (key: string) => this.translate.instant(key);
+      const summaryRows = this.cards.map((c) => ({
+        [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+        [t('tr_report_col_value')]: this.formatCardExportValue(c),
+      }));
+      const sheets: { name: string; rows: Record<string, unknown>[] }[] = [
+        { name: t('tr_report_sheet_summary'), rows: summaryRows },
+      ];
+      if (this.salesPaymentRows.length > 0) {
+        sheets.push({
+          name: t('tr_collections_collectors_perf'),
+          rows: this.mapRowsForExport(this.salesPaymentColumns, this.salesPaymentRows),
+        });
+      }
+      sheets.push({
+        name: t('tr_report_title_installments'),
+        rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+      });
       this.exportService.exportToExcelMultiSheet(filename, sheets);
       return;
     }

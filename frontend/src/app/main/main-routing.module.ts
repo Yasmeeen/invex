@@ -94,6 +94,7 @@ const routes: Routes = [
             'Branch Manager',
             ...WAREHOUSE,
             'Cashier',
+            'Collector',
           ],
         },
       },
@@ -120,7 +121,16 @@ const routes: Routes = [
         path: 'clients',
         loadChildren:() => import('./clients/clients.module').then(m => m.ClientsModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'] }
+        data: { allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Collector'] }
+      },
+      {
+        path: 'collections',
+        loadChildren: () =>
+          import('./collections/collections.module').then((m) => m.CollectionsModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Collector'],
+        },
       },
       {
         path: 'purchasing',

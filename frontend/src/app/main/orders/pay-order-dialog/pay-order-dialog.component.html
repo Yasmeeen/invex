@@ -13,6 +13,10 @@
         {{ 'tr_party_type' | translate }}:
         <strong>{{ 'tr_party_supplier' | translate }}</strong>
       </div>
+      <div *ngIf="order?.installmentPlanSnapshot?.name">
+        {{ 'tr_installment_plan_select' | translate }}:
+        <strong>{{ order?.installmentPlanSnapshot?.name }}</strong>
+      </div>
       <div>
         {{ 'tr_final_after_extra_discount' | translate }}:
         <strong>{{ order?.totalPrice | currency:'EGP ':'symbol':'1.2-2' }}</strong>
@@ -25,9 +29,29 @@
         {{ 'tr_remaining' | translate }}:
         <strong>{{ remaining | currency:'EGP ':'symbol':'1.2-2' }}</strong>
       </div>
+      <div *ngIf="hasInstallmentSchedule">
+        {{ 'tr_unpaid_installments_count' | translate }}:
+        <strong>{{ unpaidInstallmentsCount() }}</strong>
+      </div>
     </div>
 
     <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-group" *ngIf="hasInstallmentSchedule && unpaidInstallments.length">
+        <label>{{ 'tr_pay_installment_select' | translate }}</label>
+        <select
+          class="s-control width-100"
+          [(ngModel)]="selectedInstallmentId"
+          [ngModelOptions]="{ standalone: true }"
+          name="selectedInstallmentId"
+          (ngModelChange)="onInstallmentChange()"
+        >
+          <option *ngFor="let row of unpaidInstallments" [value]="row.id">
+            {{ row.label }}
+            <ng-container *ngIf="row.dueDate"> — {{ row.dueDate | date:'dd/MM/yyyy' }}</ng-container>
+          </option>
+        </select>
+      </div>
+
       <div class="form-group" *ngIf="showBranchPicker">
         <label>{{ 'tr_branches' | translate }}</label>
         <div class="input-with-icon">

@@ -11,7 +11,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { Subscription } from 'rxjs';
-import { isBranchManager } from '@core/utils/role-utils';
+import { isBranchManager, isBranchlessUserRole } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-client-list',
@@ -130,7 +130,7 @@ export class ClientListComponent implements OnInit {
   createOrEditClient(isEdit: boolean, client?: Client): void {
     this.dialog
       .open(CreateEditClientComponent, {
-        width: '640px',
+        width: '820px',
         maxWidth: '96vw',
         data: { isEdit, client, clientId: client?._id },
         disableClose: true,
@@ -149,7 +149,11 @@ export class ClientListComponent implements OnInit {
 
   openClientDeposit(client: Client): void {
     const actor = this.auth.getUserFromLocalStorage();
-    const ctx = resolveActorBranchContext(actor, this.globals.currentUser?.branch?._id);
+    // Branchless roles (admin, collector, …) pick the branch at payment time.
+    const forcedBranchId = isBranchlessUserRole(actor?.role)
+      ? null
+      : this.globals.currentUser?.branch?._id;
+    const ctx = resolveActorBranchContext(actor, forcedBranchId);
     this.dialog
       .open(ClientDepositDialogComponent, {
         width: '520px',

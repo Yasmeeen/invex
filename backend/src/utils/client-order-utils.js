@@ -6,11 +6,12 @@ import { orderAmountRemaining } from './vendor-balance-utils.js';
 export const CLIENT_POINTS_PER_EGP = 0.1;
 
 export function isClientCreditOrder(order) {
-  return (
-    String(order?.paymentMethod || '')
-      .trim()
-      .toLowerCase() === 'credit'
-  );
+  const m = String(order?.paymentMethod || '')
+    .trim()
+    .toLowerCase();
+  if (m === 'credit' || m === 'installment') return true;
+  if (Array.isArray(order?.installments) && order.installments.length > 0) return true;
+  return false;
 }
 
 export function pointsEarnedForOrder(order) {
@@ -25,7 +26,7 @@ export async function computeClientCreditDueFromOrders(clientId) {
   const orders = await Order.find({
     clientId,
     partyType: { $in: [null, 'client'] },
-    paymentMethod: 'credit',
+    paymentMethod: { $in: ['credit', 'installment'] },
     paymentStatus: { $in: ['unpaid', 'partial'] },
     status: { $ne: 'restored' },
   }).lean();

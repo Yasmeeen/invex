@@ -34,6 +34,9 @@ export interface PaymentSplitsResult {
   feeAllocations: PaymentFeeAllocation[];
   grossByMethod: Record<string, number>;
   grossWithdrawals: GrossWithdrawalRow[];
+  /** When financing remaining balance via installment plan. */
+  installmentPlanId?: string;
+  installmentStartDate?: string;
 }
 
 export function round2(n: number): number {

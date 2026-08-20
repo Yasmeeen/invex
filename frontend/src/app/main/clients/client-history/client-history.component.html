@@ -74,6 +74,17 @@
         type="button"
         class="client-history-tabs__btn"
         role="tab"
+        [attr.aria-selected]="activeTab === 'installments'"
+        [class.client-history-tabs__btn--active]="activeTab === 'installments'"
+        (click)="setTab('installments')"
+      >
+        {{ 'tr_client_history_tab_installments' | translate }}
+        <span class="client-history-tabs__count client-history-tabs__count--warn" *ngIf="installmentCount">{{ installmentCount }}</span>
+      </button>
+      <button
+        type="button"
+        class="client-history-tabs__btn"
+        role="tab"
         [attr.aria-selected]="activeTab === 'orders'"
         [class.client-history-tabs__btn--active]="activeTab === 'orders'"
         (click)="setTab('orders')"
@@ -271,6 +282,87 @@
         (paginationUpdate)="onCreditPageChange($event)"
       ></pagination>
       <p *ngIf="!creditCount" class="text-muted">{{ 'tr_empty_state' | translate }}</p>
+    </div>
+
+    <!-- Installments -->
+    <div class="plr-4 ptb-3" *ngIf="activeTab === 'installments'" role="tabpanel">
+      <p class="size-small text-muted mb-3">{{ 'tr_client_installments_hint' | translate }}</p>
+      <div *ngIf="!installmentCount" class="text-muted">{{ 'tr_empty_state' | translate }}</div>
+      <div class="mb-4 installment-order-block" *ngFor="let o of installmentOrdersRows">
+        <div class="installment-order-head">
+          <div class="installment-order-head__meta">
+            <strong class="installment-order-head__invoice">#{{ o.orderNumber }}</strong>
+            <span class="installment-order-head__plan" *ngIf="o.installmentPlanSnapshot?.name">
+              {{ o.installmentPlanSnapshot?.name }}
+            </span>
+          </div>
+          <div class="installment-order-head__aside">
+            <div class="remaining-pill" [class.remaining-pill--zero]="orderRemaining(o) <= 0.005">
+              <span class="remaining-pill__label">{{ 'tr_remaining' | translate }}</span>
+              <strong class="remaining-pill__value">
+                {{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </strong>
+            </div>
+            <button
+              type="button"
+              class="s-btn btn-primary btn-sm installment-order-head__pay"
+              *ngIf="canPayOrder(o)"
+              (click)="openPayOrderDialog(o)"
+            >
+              {{ 'tr_add_payment' | translate }}
+            </button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="s-table table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ 'tr_installment_due_date' | translate }}</th>
+                <th>{{ 'tr_amount' | translate }}</th>
+                <th>{{ 'tr_paid' | translate }}</th>
+                <th>{{ 'tr_remaining' | translate }}</th>
+                <th>{{ 'tr_payment_date' | translate }}</th>
+                <th>{{ 'tr_promise_to_pay' | translate }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let row of o.installments || []"
+                [class.installment-row--paid]="installmentRowStatus(row) === 'paid'"
+                [class.installment-row--overdue]="installmentRowStatus(row) === 'overdue'"
+              >
+                <td>{{ row.sequence }}</td>
+                <td>{{ row.dueDate | date:'dd/MM/yyyy' }}</td>
+                <td>{{ row.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                <td>{{ (row.paidAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                <td>{{ installmentRowRemaining(row) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
+                <td>{{ row.paidAt ? (row.paidAt | date:'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ row.promiseToPayAt ? (row.promiseToPayAt | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="s-btn btn-primary btn-sm mr-1"
+                    *ngIf="canPayInstallmentRow(o, row)"
+                    (click)="openPayOrderDialog(o, row._id)"
+                  >
+                    {{ 'tr_pay_installment' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    class="s-btn btn-secondary btn-sm"
+                    *ngIf="canPayInstallmentRow(o, row)"
+                    (click)="setInstallmentPromise(o, row)"
+                  >
+                    {{ 'tr_promise_to_pay' | translate }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- All sales -->

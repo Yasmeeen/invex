@@ -88,6 +88,10 @@
           {{ formatReceiptAmount(remainingAfter()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
+      <tr class="bold" *ngIf="remainingInstallments() !== null">
+        <td>{{ 'tr_payment_receipt_remaining_installments' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">{{ remainingInstallments() }}</td>
+      </tr>
       <tr class="bold" *ngIf="isFullySettled()">
         <td colspan="2" class="center">
           {{ 'tr_credit_fully_settled' | receiptTranslate: st.receiptLanguage }}

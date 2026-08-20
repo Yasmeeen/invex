@@ -23,7 +23,19 @@ export class Client{
   _id:string;
   name?:string;
   phoneNumber: string;
+  additionalPhoneNumbers?: string[];
   address?:string;
+  additionalAddresses?: string[];
+  nationalIdImageUrl?: string;
+  guarantor?: {
+    name?: string;
+    phoneNumber?: string;
+    nationalId?: string;
+    address?: string;
+    nationalIdImageUrl?: string;
+    notes?: string;
+  };
+  collectorId?: string | null;
   numberOfOrders: number;
   totalOrdersPrice: number;
   created_at: string;
@@ -63,6 +75,22 @@ export interface ClientHistoryOrderRow {
   remaining?: number;
   pointsEarned?: number;
   isPayLater?: boolean;
+  isInstallment?: boolean;
+  unpaidInstallmentsCount?: number;
+  installmentPlanSnapshot?: { name?: string; months?: number; interestPercent?: number };
+  installmentStartDate?: string;
+  installments?: Array<{
+    _id?: string;
+    sequence?: number;
+    dueDate?: string;
+    amount?: number;
+    paid?: boolean;
+    paidAt?: string;
+    paidAmount?: number;
+    paymentMethod?: string;
+    promiseToPayAt?: string;
+    note?: string;
+  }>;
 }
 
 export interface ClientHistoryPurchaseRow {
@@ -110,6 +138,8 @@ export interface ClientHistoryResponse {
   creditOrdersCount: number;
   orders: ClientHistoryOrderRow[];
   creditOrders: ClientHistoryOrderRow[];
+  installmentOrders?: ClientHistoryOrderRow[];
+  installmentOrdersCount?: number;
   purchases?: ClientHistoryPurchaseRow[];
   purchasesCount?: number;
   ledgerEntries?: ClientLedgerEntry[];

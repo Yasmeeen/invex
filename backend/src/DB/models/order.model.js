@@ -121,6 +121,46 @@ const orderSchema = new mongoose.Schema(
       },
     ],
 
+    /**
+     * Customer sale installment schedule (separate from vendor purchase installments).
+     * Financed portion may be partial: pay some via cash/visa now, rest as installments.
+     */
+    installmentPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InstallmentPlan",
+      required: false,
+    },
+    installmentPlanSnapshot: {
+      name: { type: String, trim: true, default: "" },
+      months: { type: Number, min: 1 },
+      interestPercent: { type: Number, min: 0, default: 0 },
+    },
+    /** First installment due date (chosen at checkout). */
+    installmentStartDate: { type: Date, required: false },
+    /** Principal amount put on the installment plan (before interest). */
+    installmentPrincipal: { type: Number, min: 0, default: 0 },
+    /** Interest/markup amount included in schedule totals. */
+    installmentInterestAmount: { type: Number, min: 0, default: 0 },
+    installments: [
+      {
+        sequence: { type: Number, required: true, min: 1 },
+        dueDate: { type: Date, required: true },
+        amount: { type: Number, required: true, min: 0 },
+        paid: { type: Boolean, default: false },
+        paidAt: { type: Date, required: false },
+        paidAmount: { type: Number, min: 0, default: 0 },
+        paymentMethod: { type: String, trim: true, default: "" },
+        paidByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: false,
+        },
+        /** Customer promise to pay at this datetime (collections). */
+        promiseToPayAt: { type: Date, required: false },
+        note: { type: String, trim: true, default: "" },
+      },
+    ],
+
     /** Partial / full invoice returns (refunds, drawer, credit adjustments). */
     returns: [
       {

@@ -1,0 +1,76 @@
+.installment-plans-page {
+  padding: 1.25rem 1.5rem 2rem;
+  max-width: 1100px;
+}
+
+.installment-plans-page__head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.installment-plans-page__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.installment-plans-page__lead {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.installment-plans-page__head-row .s-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.installment-plans-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.installment-plans-card__subtitle {
+  font-size: 1rem;
+  font-weight: 650;
+  margin: 0 0 0.85rem;
+}
+
+.hint {
+  color: #6b7280;
+  margin: 0.5rem 0;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mr-1 {
+  margin-inline-end: 0.35rem;
+}
+
+@media (max-width: 640px) {
+  .installment-plans-page__head-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .installment-plans-page__head-row .s-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

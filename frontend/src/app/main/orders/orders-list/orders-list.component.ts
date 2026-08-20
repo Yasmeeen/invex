@@ -94,6 +94,9 @@ export class OrdersListComponent implements OnInit {
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
   readonly paymentMethodOptions: PaymentMethodOption[] = PAYMENT_METHOD_OPTIONS;
+  /** Filter installment invoices by plan months (null = all). */
+  selectedInstallmentMonths: number | null = null;
+  readonly installmentMonthsOptions = [6, 12, 18, 24, 36];
   viewMode: 'table' | 'cards' = 'cards';
 
   private subscriptions: Subscription[] = [];
@@ -272,6 +275,15 @@ export class OrdersListComponent implements OnInit {
       delete this.params['paymentMethod'];
     }
 
+    if (this.selectedInstallmentMonths) {
+      this.params['installmentPlanMonths'] = this.selectedInstallmentMonths;
+      if (!this.selectedPaymentMethod) {
+        this.params['paymentMethod'] = 'installment';
+      }
+    } else {
+      delete this.params['installmentPlanMonths'];
+    }
+
     if (this.listFromDate) {
       this.params.from = formatCairoYMD(this.listFromDate);
     } else {
@@ -315,6 +327,14 @@ export class OrdersListComponent implements OnInit {
   }
 
   onPaymentMethodFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  onInstallmentMonthsFilterChange(): void {
+    if (this.selectedInstallmentMonths && this.selectedPaymentMethod !== 'installment') {
+      this.selectedPaymentMethod = 'installment';
+    }
     this.params.page = 1;
     this.getOrders();
   }
@@ -434,7 +454,7 @@ export class OrdersListComponent implements OnInit {
       if (this.selectedBranchId) {
         params.branch = this.selectedBranchId;
       }
-    } else {
+    } else if (this.globals.currentUser?.branch?._id) {
       params.branch = this.globals.currentUser.branch._id;
     }
     if (this.fromDate) {

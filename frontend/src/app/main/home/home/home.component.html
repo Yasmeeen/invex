@@ -73,6 +73,17 @@
       type="button"
       class="dashboard-page__tab"
       role="tab"
+      [attr.aria-selected]="activeSection === 'collections'"
+      [class.dashboard-page__tab--active]="activeSection === 'collections'"
+      (click)="setSection('collections')"
+    >
+      <i class="fa fa-money" aria-hidden="true"></i>
+      {{ 'tr_dashboard_tab_collections' | translate }}
+    </button>
+    <button
+      type="button"
+      class="dashboard-page__tab"
+      role="tab"
       [attr.aria-selected]="activeSection === 'accounts'"
       [class.dashboard-page__tab--active]="activeSection === 'accounts'"
       (click)="setSection('accounts')"
@@ -92,6 +103,14 @@
       {{ 'tr_dashboard_tab_sales' | translate }}
     </button>
   </nav>
+
+  <section
+    class="dashboard-page__section"
+    *ngIf="activeSection === 'collections'"
+    role="tabpanel"
+  >
+    <app-collections-dashboard [asSection]="true"></app-collections-dashboard>
+  </section>
 
   <section
     class="dashboard-page__section"

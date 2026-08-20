@@ -73,7 +73,7 @@
         <div class="payment-splits-dialog__split-row__method">
           <img *ngIf="getPayMethodDef(mid) as pm" [src]="pm.logo" class="payment-logo" alt="" />
           <span class="payment-splits-dialog__split-row__label">
-            <ng-container *ngIf="isCreditPayMethod(mid); else payMethodRowLabel">
+            <ng-container *ngIf="isFinancingPayMethod(mid); else payMethodRowLabel">
               {{ 'tr_paid_now_amount' | translate }}
             </ng-container>
             <ng-template #payMethodRowLabel>{{ payMethodDisplayLabel(mid) }}</ng-template>
@@ -94,6 +94,54 @@
           (ngModelChange)="onPayAmountChange()"
         />
       </div>
+
+      <ng-container *ngIf="mode !== 'deposit' && hasInstallmentPayMethodSelected()">
+        <div class="payment-splits-dialog__installment mt-2">
+          <div class="form-group mb-2">
+            <label>{{ 'tr_installment_plan_select' | translate }}</label>
+            <select
+              class="s-control"
+              [(ngModel)]="selectedInstallmentPlanId"
+              [ngModelOptions]="{ standalone: true }"
+              name="installmentPlanId"
+            >
+              <option value="" disabled>{{ 'tr_installment_plan_select' | translate }}</option>
+              <option *ngFor="let plan of installmentPlans" [value]="plan._id">
+                {{ plan.name }} — {{ plan.months }} {{ 'tr_months_short' | translate }}
+                ({{ plan.interestPercent }}%)
+              </option>
+            </select>
+          </div>
+          <div class="form-group mb-2">
+            <label>{{ 'tr_installment_start_date' | translate }}</label>
+            <input
+              type="date"
+              class="s-control"
+              [(ngModel)]="installmentStartDate"
+              [ngModelOptions]="{ standalone: true }"
+              name="installmentStartDate"
+            />
+          </div>
+          <div
+            class="size-small text-muted"
+            *ngIf="paymentRemaining() > 0.005"
+          >
+            {{ 'tr_cashier_installment_balance_due' | translate }}:
+            <strong>{{ paymentRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+          <div class="size-small mt-1" *ngIf="installmentMarkupPreview() > 0">
+            {{
+              'tr_cashier_installment_markup_line'
+                | translate:{ percent: installmentInterestPercent() }
+            }}:
+            <strong>+{{ installmentMarkupPreview() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+          <div class="size-small mt-1" *ngIf="installmentMarkupPreview() > 0">
+            {{ 'tr_cashier_installment_due_after_markup' | translate }}:
+            <strong>{{ installmentDueAfterMarkup() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+        </div>
+      </ng-container>
 
       <ng-container *ngIf="mode !== 'deposit'">
         <div

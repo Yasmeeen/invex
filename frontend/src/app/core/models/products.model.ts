@@ -174,6 +174,28 @@ export interface Order {
     method?: string;
     note?: string;
   }>;
+  /** Customer sale installment schedule */
+  installmentPlanId?: string;
+  installmentPlanSnapshot?: {
+    name?: string;
+    months?: number;
+    interestPercent?: number;
+  };
+  installmentStartDate?: string;
+  installmentPrincipal?: number;
+  installmentInterestAmount?: number;
+  installments?: Array<{
+    _id?: string;
+    sequence?: number;
+    dueDate?: string;
+    amount?: number;
+    paid?: boolean;
+    paidAt?: string;
+    paidAmount?: number;
+    paymentMethod?: string;
+    promiseToPayAt?: string;
+    note?: string;
+  }>;
   products?: OrderProductLine[];
   orderNumber?: number;
   paymentMethod?: string;

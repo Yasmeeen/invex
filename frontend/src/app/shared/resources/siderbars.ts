@@ -79,6 +79,11 @@ export const AdminSidebar = [
         icon: 'fa fa-user-circle-o icon',
       },
       {
+        name: 'tr_collections_dashboard_title',
+        routerLink: '/collections',
+        icon: 'fa fa-money icon',
+      },
+      {
         name: 'tr_purchases',
         routerLink: '/purchasing',
         icon: 'fa fa-file-text-o icon',
@@ -145,6 +150,11 @@ export const AdminSidebar = [
         name: 'tr_store_settings_menu',
         routerLink: '/settings',
         icon: 'fa fa-wrench icon',
+      },
+      {
+        name: 'tr_installment_plans_title',
+        routerLink: '/settings/installment-plans',
+        icon: 'fa fa-calendar icon',
       },
       {
         name: 'tr_audit_title',
@@ -215,6 +225,30 @@ export const Cashier = [
     name: 'tr_drawer_close_history_menu',
     routerLink: '/drawer-close',
     icon: 'fa fa-inbox icon',
+  },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
+  },
+];
+
+/** Collector: follow-up installment collections for assigned clients. */
+export const CollectorSidebar = [
+  {
+    name: 'tr_collections_dashboard_title',
+    routerLink: '/collections',
+    icon: 'fa fa-money icon',
+  },
+  {
+    name: 'tr_clients',
+    routerLink: '/clients',
+    icon: 'fa fa-user-circle-o icon',
+  },
+  {
+    name: 'tr_orders',
+    routerLink: '/orders',
+    icon: 'fa fa-list-alt icon',
   },
   {
     name: 'tr_vixa',

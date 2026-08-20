@@ -82,7 +82,7 @@
     </div>
     <div
       class="report-filters__field report-filters__field--wide"
-      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury'"
+      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury' && reportType !== 'installments'"
     >
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
@@ -114,6 +114,33 @@
         [placeholder]="'tr_report_placeholder_customer_phone' | translate"
         autocomplete="tel"
       />
+    </div>
+    <div class="report-filters__field report-filters__field--wide" *ngIf="reportType === 'installments'">
+      <label>{{ 'tr_collector' | translate }}</label>
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_all_collectors' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="collectors"
+        [(ngModel)]="filters.collector_id"
+        name="reportCollector"
+        [clearable]="true"
+        [searchable]="true"
+      >
+      </ng-select>
+    </div>
+    <div class="report-filters__field" *ngIf="reportType === 'installments'">
+      <label>{{ 'tr_status' | translate }}</label>
+      <select class="s-control" [(ngModel)]="filters.installment_status" name="installmentStatus">
+        <option value="all">{{ 'tr_collections_all_statuses' | translate }}</option>
+        <option value="paid">{{ 'tr_paid' | translate }}</option>
+        <option value="unpaid">{{ 'tr_unpaid' | translate }}</option>
+        <option value="overdue">{{ 'tr_collections_overdue' | translate }}</option>
+        <option value="due_soon">{{ 'tr_collections_due_soon' | translate }}</option>
+        <option value="promised">{{ 'tr_collections_promised' | translate }}</option>
+        <option value="due">{{ 'tr_collections_due' | translate }}</option>
+      </select>
     </div>
     <div class="report-filters__field" *ngIf="reportType === 'sales' || reportType === 'profit'">
       <label>{{ 'tr_report_filter_seller' | translate }}</label>

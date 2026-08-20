@@ -16,6 +16,7 @@ import { CategoriesServce } from '@shared/services/categories.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
+import { CollectionsService, CollectorUser } from '@shared/services/collections.service';
 import { of, Subject, Subscription } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 
@@ -34,6 +35,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   products: any[] = [];
   categories: any[] = [];
   users: { _id: string; name: string }[] = [];
+  collectors: CollectorUser[] = [];
   salespeople: string[] = [];
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
   branchFilterLocked = false;
@@ -54,6 +56,8 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     product_id: null as string | null,
     customer_phone: '',
     seller_name: null as string | null,
+    collector_id: null as string | null,
+    installment_status: 'all',
     groupBy: 'daily',
     booking_status: 'all',
     booking_confirmed: 'all',
@@ -68,6 +72,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     private productsSerivce: ProductsSerivce,
     private userSerivce: UserSerivce,
     private vendorsSerivce: VendorsSerivce,
+    private collectionsService: CollectionsService,
     private authenticationService: AuthenticationService,
     public globals: Globals
   ) {}
@@ -83,6 +88,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     this.loadCategories();
     this.loadProducts();
     this.ensureBookingUsersLoaded();
+    this.ensureCollectorsLoaded();
     queueMicrotask(() => this.applyFilters());
   }
 
@@ -93,6 +99,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
+      this.ensureCollectorsLoaded();
       this.loadSalespeople();
       if (this.categoryFilterVisible) {
         this.loadCategories();
@@ -103,6 +110,17 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   private ensureBookingUsersLoaded(): void {
     if (this.reportType === 'bookings' && this.users.length === 0) {
       this.loadUsers();
+    }
+  }
+
+  private ensureCollectorsLoaded(): void {
+    if (this.reportType === 'installments' && this.collectors.length === 0) {
+      this.collectionsService.listCollectors().subscribe({
+        next: (res) => {
+          this.collectors = res?.collectors || [];
+        },
+        error: () => (this.collectors = []),
+      });
     }
   }
 
@@ -318,6 +336,12 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
         base.created_by = String(this.filters.booking_created_by);
       }
     }
+    if (this.reportType === 'installments') {
+      if (this.filters.collector_id) {
+        base.collector_id = String(this.filters.collector_id);
+      }
+      base.status = this.filters.installment_status || 'all';
+    }
     return base;
   }
 
@@ -342,6 +366,8 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     this.filters.product_id = null;
     this.filters.customer_phone = '';
     this.filters.seller_name = null;
+    this.filters.collector_id = null;
+    this.filters.installment_status = 'all';
     this.filters.groupBy = 'daily';
     this.filters.booking_status = 'all';
     this.filters.booking_confirmed = 'all';

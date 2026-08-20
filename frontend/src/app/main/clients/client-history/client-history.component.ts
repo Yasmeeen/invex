@@ -24,6 +24,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { AccountHistoryPdfService } from '@shared/services/account-history-pdf.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { UserSerivce } from '@shared/services/user.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { PayOrderDialogComponent } from '../../orders/pay-order-dialog/pay-order-dialog.component';
@@ -33,9 +34,13 @@ import { ClientDepositDialogComponent } from '../client-deposit-dialog/client-de
 import { ClientOpeningDebitDialogComponent } from '../client-opening-debit-dialog/client-opening-debit-dialog.component';
 import { ClientPayClientDialogComponent } from '../client-pay-client-dialog/client-pay-client-dialog.component';
 import { normalizeMongoId } from '@core/utils/mongo-id.util';
+import {
+  PromiseToPayDialogComponent,
+  PromiseToPayDialogResult,
+} from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.component';
 import { Subscription } from 'rxjs';
 
-export type ClientHistoryTab = 'overview' | 'credit' | 'orders' | 'purchases' | 'ledger';
+export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
 
 @Component({
   selector: 'app-client-history',
@@ -66,6 +71,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   constructor(
     private userService: UserSerivce,
+    private orders: OrdersSerivce,
     private branchesService: BranchesServce,
     private auth: AuthenticationService,
     private translate: TranslateService,
@@ -137,6 +143,10 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return this.history?.creditOrders || [];
   }
 
+  get installmentOrdersRows(): ClientHistoryOrderRow[] {
+    return this.history?.installmentOrders || [];
+  }
+
   get ordersRows(): ClientHistoryOrderRow[] {
     return this.history?.orders || [];
   }
@@ -151,6 +161,10 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   get creditCount(): number {
     return this.creditOrdersRows.length;
+  }
+
+  get installmentCount(): number {
+    return this.installmentOrdersRows.length;
   }
 
   get ordersCount(): number {
@@ -547,7 +561,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return this.orderRemaining(order) > 0.005;
   }
 
-  openPayOrderDialog(order: ClientHistoryOrderRow): void {
+  openPayOrderDialog(order: ClientHistoryOrderRow, installmentId?: string | null): void {
     if (!this.paymentBranchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
       return;
@@ -557,11 +571,88 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
       maxWidth: '96vw',
       panelClass: 'pay-order-dialog-panel',
       backdropClass: 'pay-order-dialog-backdrop',
-      data: { order: order as Order, forcedBranchId: this.paymentBranchId },
+      data: {
+        order: order as Order,
+        forcedBranchId: this.paymentBranchId,
+        installmentId: installmentId || null,
+      },
       disableClose: true,
     });
     ref.afterClosed().subscribe((ok) => {
       if (ok) this.afterBalanceChange();
+    });
+  }
+
+  installmentRowRemaining(row: {
+    paid?: boolean;
+    amount?: number;
+    paidAmount?: number;
+  }): number {
+    if (row?.paid) return 0;
+    return Math.max(
+      0,
+      Math.round(((Number(row?.amount) || 0) - (Number(row?.paidAmount) || 0)) * 100) / 100
+    );
+  }
+
+  /** paid = settled, overdue = unpaid past due, upcoming = unpaid not yet due. */
+  installmentRowStatus(row: {
+    paid?: boolean;
+    amount?: number;
+    paidAmount?: number;
+    dueDate?: string | Date;
+  }): 'paid' | 'overdue' | 'upcoming' {
+    if (this.installmentRowRemaining(row) <= 0.005) return 'paid';
+    const due = row?.dueDate ? new Date(row.dueDate) : null;
+    if (!due || Number.isNaN(due.getTime())) return 'upcoming';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDay = new Date(due);
+    dueDay.setHours(0, 0, 0, 0);
+    return dueDay.getTime() < today.getTime() ? 'overdue' : 'upcoming';
+  }
+
+  canPayInstallmentRow(
+    order: ClientHistoryOrderRow,
+    row: { _id?: string; paid?: boolean; amount?: number; paidAmount?: number }
+  ): boolean {
+    return this.canPayOrder(order) && this.installmentRowRemaining(row) > 0.005;
+  }
+
+  setInstallmentPromise(
+    order: ClientHistoryOrderRow,
+    row: { _id?: string; promiseToPayAt?: string; sequence?: number }
+  ): void {
+    const orderId = normalizeMongoId(order._id);
+    const installmentId = normalizeMongoId(row._id);
+    if (!orderId || !installmentId) return;
+
+    const ref = this.dialog.open(PromiseToPayDialogComponent, {
+      width: '440px',
+      maxWidth: '95vw',
+      panelClass: 'promise-to-pay-dialog-panel',
+      backdropClass: 'promise-to-pay-dialog-backdrop',
+      data: {
+        promiseToPayAt: row.promiseToPayAt || null,
+        orderNumber: order.orderNumber,
+        installmentSequence: row.sequence,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: PromiseToPayDialogResult | undefined) => {
+      if (result === false || result === undefined) return;
+      this.orders.setInstallmentPromise(orderId, installmentId, { promiseToPayAt: result }).subscribe({
+        next: () => {
+          this.notify.push(this.translate.instant('tr_promise_to_pay_ok'), 'success');
+          this.afterBalanceChange();
+        },
+        error: (err) => {
+          const msg =
+            err?.error?.error || err?.error?.message || this.translate.instant('tr_unexpected_error_message');
+          this.notify.push(msg, 'error');
+        },
+      });
     });
   }
 

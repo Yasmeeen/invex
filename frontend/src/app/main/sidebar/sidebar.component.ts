@@ -8,6 +8,7 @@ import {
   BranchManagerSidebar,
   Cashier,
   CoAdminSidebar,
+  CollectorSidebar,
   ModeratorSidebar,
   Warehouse,
 } from '@shared/resources';
@@ -52,6 +53,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
       this.appSidebar = Warehouse;
     } else if (globals.currentUser.role == 'Cashier'){
       this.appSidebar = Cashier;
+    } else if (globals.currentUser.role === 'Collector') {
+      this.appSidebar = CollectorSidebar;
     }
     else if (globals.currentUser.role === 'Co Admin') {
       this.appSidebar = CoAdminSidebar;

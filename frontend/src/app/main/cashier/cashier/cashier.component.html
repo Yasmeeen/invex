@@ -325,6 +325,14 @@
                 | translate : { n: bookedQty(product) }
             }}
           </div>
+          <div
+            *ngIf="product.listedOnEcommerce"
+            class="cashier-online-badge"
+            [attr.title]="'tr_product_online_badge_hint' | translate"
+          >
+            <i class="fa fa-globe" aria-hidden="true"></i>
+            {{ 'tr_product_online_badge' | translate }}
+          </div>
           <div class="product-name">{{ product.name }}</div>
           <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
           <div class="product-price" *ngIf="!cardHasDiscount(product)">

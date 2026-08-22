@@ -88,6 +88,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.storeSettingsService.load();
     this.settingsSub = this.storeSettingsService.settings$.subscribe((v) => {
       this.form = {
         storeName: v.storeName,

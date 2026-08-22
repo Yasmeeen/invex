@@ -10,6 +10,11 @@ import {
   pushFullCatalog,
 } from './catalogSync.js';
 import { ensureOnlineBranch } from './onlineBranch.js';
+import {
+  createBookingFromEcommerceOrder,
+  cancelBookingsForEcommerceOrder,
+  reconcileBookingsToStock,
+} from '../product_bookings_module/service.js';
 
 function sellable(product) {
   const stock = Number(product.stock) || 0;
@@ -60,8 +65,15 @@ export async function reserveFromEcommerce(req, res) {
       if (sellable(product) < qty) {
         throw new Error(`Not enough stock for ${product.name} (${product.code})`);
       }
-      product.ecommerceReservedQuantity = (Number(product.ecommerceReservedQuantity) || 0) + qty;
-      await product.save({ session });
+
+      const booking = await createBookingFromEcommerceOrder({
+        product,
+        quantity: qty,
+        customer,
+        unitPrice: Number(line.unitPrice ?? product.price) || 0,
+        ecommerceOrderId: String(ecommerceOrderId),
+        session,
+      });
 
       const [row] = await EcommerceChannelReservation.create(
         [
@@ -77,6 +89,7 @@ export async function reserveFromEcommerce(req, res) {
             customerPhone: String(customer?.phone || '').trim(),
             customerAddress: String(customer?.address || '').trim(),
             status: 'active',
+            invexBookingId: booking?._id || null,
           },
         ],
         { session }
@@ -130,6 +143,7 @@ export async function cancelReservationFromEcommerce(req, res) {
     }
 
     await session.commitTransaction();
+    await cancelBookingsForEcommerceOrder(ecommerceOrderId);
     for (const id of productIds) notifyProductChanged(id);
     res.json({ ok: true, cancelled: rows.length });
   } catch (err) {
@@ -245,14 +259,13 @@ export async function confirmOrderFromEcommerce(req, res) {
 
       const qty = row.quantity;
       const reserved = Number(product.ecommerceReservedQuantity) || 0;
-      if (reserved < qty) {
-        throw new Error(`Reservation mismatch for ${product.code}`);
+      if (reserved >= qty) {
+        product.ecommerceReservedQuantity = reserved - qty;
       }
       if ((Number(product.stock) || 0) < qty) {
         throw new Error(`Not enough stock to confirm ${product.code}`);
       }
 
-      product.ecommerceReservedQuantity = reserved - qty;
       product.stock = (Number(product.stock) || 0) - qty;
       await product.save({ session });
       touchedProductIds.push(product._id);
@@ -312,7 +325,11 @@ export async function confirmOrderFromEcommerce(req, res) {
     }
 
     await session.commitTransaction();
-    for (const id of touchedProductIds) notifyProductChanged(id);
+    await cancelBookingsForEcommerceOrder(ecommerceOrderId);
+    for (const id of touchedProductIds) {
+      await reconcileBookingsToStock(id, { reason: 'Converted from e-commerce order' });
+      notifyProductChanged(id);
+    }
 
     res.status(201).json({
       ok: true,

@@ -52,6 +52,10 @@
                   ><i class="fa fa-cubes" aria-hidden="true"></i>
                   {{ b.quantity ?? 1 }}</span
                 >
+                <span *ngIf="b.source === 'ecommerce'" class="booking-card__badge">
+                  <i class="fa fa-globe" aria-hidden="true"></i>
+                  {{ 'tr_booking_source_ecommerce' | translate }}
+                </span>
                 <span *ngIf="b.confirmed" class="booking-card__badge booking-card__badge--ok">
                   <i class="fa fa-check-circle" aria-hidden="true"></i>
                   {{ 'tr_booking_confirmed_status' | translate }}

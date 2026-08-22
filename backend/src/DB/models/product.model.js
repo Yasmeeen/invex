@@ -84,6 +84,15 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /**
+     * When store catalog mode is "all", only products with this flag are pushed to the website.
+     * Default false so the merchant opts in each SKU.
+     */
+    listedOnEcommerce: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

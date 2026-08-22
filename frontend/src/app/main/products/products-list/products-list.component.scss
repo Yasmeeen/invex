@@ -371,6 +371,22 @@ img{
   font-size: 11px;
 }
 
+.online-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0d47a1;
+  background: linear-gradient(135deg, #e3f2fd 0%, #90caf9 100%);
+  border: 1px solid #42a5f5;
+  white-space: nowrap;
+}
+
 .filters-card {
   // ::ng-deep .products-filter-ng-select.ng-select.ng-select-multiple .ng-select-container {
   //   min-height: 2.375rem;

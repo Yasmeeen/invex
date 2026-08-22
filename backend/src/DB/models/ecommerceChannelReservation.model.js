@@ -32,6 +32,11 @@ const ecommerceChannelReservationSchema = new mongoose.Schema(
       ref: 'Order',
       default: null,
     },
+    invexBookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductBooking',
+      default: null,
+    },
   },
   { timestamps: true }
 );

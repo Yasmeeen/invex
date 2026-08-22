@@ -24,6 +24,11 @@ export interface Product {
   bookedQuantity?: number;
   /** Active bookings that are confirmed (cashier reserved-qty warning) */
   confirmedBookedQuantity?: number;
+  /**
+   * When ecommerce catalog mode is "all", this SKU is listed on the website.
+   * Default false.
+   */
+  listedOnEcommerce?: boolean;
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
@@ -84,6 +89,8 @@ export interface ProductActiveBooking {
   confirmedAt?: string;
   confirmedBy?: { _id?: string; name?: string };
   productInWarehouse?: boolean;
+  source?: 'pos' | 'ecommerce';
+  ecommerceOrderId?: string;
 }
 export interface Category {
   _id: string;

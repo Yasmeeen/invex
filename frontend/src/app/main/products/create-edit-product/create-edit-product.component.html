@@ -993,6 +993,18 @@
 
                 </div>
                 <div class="row" [hidden]="activeTab !== 'extra'">
+                  <div class="col-md-12" *ngIf="showOnlineListingOption">
+                    <label class="checkbox-row mb-3">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="listedOnEcommerce"
+                        [ngModelOptions]="{ standalone: true }"
+                        name="listedOnEcommerce"
+                      />
+                      <span>{{ 'tr_product_listed_online' | translate }}</span>
+                    </label>
+                    <p class="text-muted size-small m-0 mb-3">{{ 'tr_product_listed_online_hint' | translate }}</p>
+                  </div>
                   <div class="col-md-12">
                     <div class="party-type-toggle mb-3">
                       <label class="mr-3">

@@ -702,6 +702,8 @@ export const createProductPurchaseRequest = async (req, res) => {
                 imageUrl: uf.imageUrl || payload.imageUrl || '',
                 attributes: uf.attributes,
                 ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+                listedOnEcommerce:
+                  payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
                 ...acquiredFromFields,
               },
             ],
@@ -878,6 +880,8 @@ export const createProductPurchaseRequest = async (req, res) => {
             imageUrl: payload.imageUrl,
             attributes: payload.attributes,
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+            listedOnEcommerce:
+              payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
             ...acquiredFromFields,
           },
         ],
@@ -1213,6 +1217,8 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
             imageUrl: uf.imageUrl || payload.imageUrl || '',
             attributes: uf.attributes,
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+            listedOnEcommerce:
+              payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
             ...acquiredFromFields,
           },
         ],
@@ -1266,6 +1272,8 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
         imageUrl: payload.imageUrl,
         attributes: payload.attributes,
         ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
+        listedOnEcommerce:
+          payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
         ...acquiredFromFields,
       },
     ],
@@ -1731,6 +1739,8 @@ export const approveProductPurchaseRequest = async (req, res) => {
               imageUrl: uf.imageUrl || normalizeImageUrl(pp.imageUrl) || '',
               attributes: uf.attributes,
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
+              listedOnEcommerce:
+                pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
               ...acquiredFromFields,
             },
           ],
@@ -1808,6 +1818,8 @@ export const approveProductPurchaseRequest = async (req, res) => {
               imageUrl: normalizeImageUrl(pp.imageUrl),
               attributes: attrsNorm,
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
+              listedOnEcommerce:
+                pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
               ...acquiredFromFields,
             },
           ],

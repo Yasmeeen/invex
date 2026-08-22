@@ -156,7 +156,7 @@ async function sumActiveConfirmedBookedQuantity(productOid) {
   return agg?.total || 0;
 }
 
-async function recalcProductBookingTotals(productId) {
+export async function recalcProductBookingTotals(productId) {
   const pid = new mongoose.Types.ObjectId(String(productId));
   const total = await sumActiveBookedQuantity(pid);
   const confirmedTotal = await sumActiveConfirmedBookedQuantity(pid);
@@ -172,6 +172,108 @@ async function recalcProductBookingTotals(productId) {
     }
   );
   return total;
+}
+
+async function resolveSystemBookingUserId() {
+  const admin = await User.findOne({ role: { $in: ['Super Admin', 'Co Admin'] } })
+    .select('_id')
+    .lean();
+  if (admin?._id) return admin._id;
+  const any = await User.findOne().select('_id').lean();
+  return any?._id || null;
+}
+
+/**
+ * Website paid order → same ProductBooking as cashier booking (customer name/phone/address).
+ * Holds stock via bookedQuantity (do not also increment ecommerceReservedQuantity).
+ */
+export async function createBookingFromEcommerceOrder({
+  product,
+  quantity,
+  customer,
+  unitPrice,
+  ecommerceOrderId,
+  session,
+}) {
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+  const name = String(customer?.name || '').trim() || 'Online customer';
+  const phone = String(customer?.phone || '').trim();
+  const address = String(customer?.address || '').trim() || 'Online order';
+  if (!phone) {
+    throw new Error('customer phone is required for booking');
+  }
+
+  const userId = await resolveSystemBookingUserId();
+  if (!userId) {
+    throw new Error('No Invex user available to own the website booking');
+  }
+
+  const branchOid = product.branch || null;
+  const client = await findOrCreateClient({
+    name,
+    phone,
+    registeredAddress: address,
+    branchOid,
+  });
+
+  const unit = Math.round((Number(unitPrice) || Number(product.price) || 0) * 100) / 100;
+  const dep = Math.round(unit * qty * 100) / 100;
+  const [booking] = await ProductBooking.create(
+    [
+      {
+        product: product._id,
+        branch: branchOid,
+        productInWarehouse: !!product.inWarehouse,
+        client: client._id,
+        customerName: name,
+        customerPhone: canonicalPhoneForStorage(phone),
+        quantity: qty,
+        pickupType: 'online_shipping',
+        shippingAddress: address,
+        depositAmount: dep,
+        depositPayments: dep > 0 ? [{ method: 'online', amount: dep }] : [],
+        productUnitPrice: unit,
+        productNameSnapshot: String(product.name || '').trim(),
+        productCodeSnapshot: String(product.code || '').trim(),
+        bookingDate: new Date(),
+        status: 'active',
+        confirmed: true,
+        confirmedAt: new Date(),
+        createdBy: userId,
+        source: 'ecommerce',
+        ecommerceOrderId: String(ecommerceOrderId || ''),
+      },
+    ],
+    session ? { session } : {}
+  );
+
+  await recalcProductBookingTotals(product._id);
+  return booking;
+}
+
+export async function cancelBookingsForEcommerceOrder(ecommerceOrderId, { session } = {}) {
+  const id = String(ecommerceOrderId || '');
+  if (!id) return [];
+  const q = ProductBooking.find({
+    ecommerceOrderId: id,
+    source: 'ecommerce',
+    status: 'active',
+  });
+  if (session) q.session(session);
+  const bookings = await q;
+  const productIds = [];
+  for (const b of bookings) {
+    b.status = 'cancelled';
+    b.cancelledAt = new Date();
+    b.cancelReason = 'E-commerce order cancelled or converted';
+    await b.save(session ? { session } : {});
+    productIds.push(b.product);
+  }
+  const unique = [...new Set(productIds.map(String))];
+  for (const pid of unique) {
+    await recalcProductBookingTotals(pid);
+  }
+  return unique;
 }
 
 /**

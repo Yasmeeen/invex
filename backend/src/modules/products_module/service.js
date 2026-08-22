@@ -23,6 +23,11 @@ import {
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
+function parseListedOnEcommerce(body) {
+  const v = body?.listedOnEcommerce;
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
 function pickActorUserId(req) {
   const body = req?.body || {};
   const query = req?.query || {};
@@ -1020,6 +1025,8 @@ function buildProductsListQuery(queryParams = {}) {
     warehouseOnly,
     excludeWarehouse,
     booked,
+    listedOnline,
+    listedOnEcommerce,
     categoryId,
     attrKey,
     attrValue,
@@ -1056,6 +1063,18 @@ function buildProductsListQuery(queryParams = {}) {
       $or: [
         { bookingStatus: { $ne: 'active' } },
         { bookingStatus: { $exists: false } },
+      ],
+    });
+  }
+
+  const listedFlag = listedOnline ?? listedOnEcommerce;
+  if (listedFlag === 'true' || listedFlag === true) {
+    query.listedOnEcommerce = true;
+  } else if (listedFlag === 'false' || listedFlag === false) {
+    andParts.push({
+      $or: [
+        { listedOnEcommerce: { $ne: true } },
+        { listedOnEcommerce: { $exists: false } },
       ],
     });
   }
@@ -1172,6 +1191,7 @@ export const createProduct = async (req, res) => {
   try {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes, addedBy } =
       req.body;
+    const listedOnEcommerce = parseListedOnEcommerce(req.body);
     const imageUrlNorm = normalizeImageUrl(imageUrl);
     const addedByNorm = normalizeAddedBy(addedBy);
     const isWarehouse =
@@ -1377,6 +1397,7 @@ export const createProduct = async (req, res) => {
             imageUrl: uf.imageUrl || imageUrlNorm,
             attributes: uf.attributes,
             addedBy: addedByNorm,
+            listedOnEcommerce,
             ...acquiredFromFields,
           });
           createdProducts.push(p);
@@ -1434,6 +1455,7 @@ export const createProduct = async (req, res) => {
           imageUrl: uf.imageUrl || imageUrlNorm,
           attributes: uf.attributes,
           addedBy: addedByNorm,
+          listedOnEcommerce,
           ...acquiredFromFields,
         });
         createdProducts.push(p);
@@ -1498,6 +1520,7 @@ export const createProduct = async (req, res) => {
         imageUrl: imageUrlNorm,
         attributes: attrs,
         addedBy: addedByNorm,
+        listedOnEcommerce,
         ...acquiredFromFields,
       });
 
@@ -1546,6 +1569,7 @@ export const createProduct = async (req, res) => {
       imageUrl: imageUrlNorm,
       attributes: attrs,
       addedBy: addedByNorm,
+      listedOnEcommerce,
       ...acquiredFromFields,
     });
 
@@ -1586,6 +1610,7 @@ export const updateProduct = async (req, res) => {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes, addedBy } = req.body;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
     const hasAddedBy = Object.prototype.hasOwnProperty.call(req.body, 'addedBy');
+    const hasListedOnEcommerce = Object.prototype.hasOwnProperty.call(req.body, 'listedOnEcommerce');
     const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
@@ -1725,6 +1750,9 @@ export const updateProduct = async (req, res) => {
       if (hasAddedBy) {
         updateDoc.addedBy = normalizeAddedBy(addedBy);
       }
+      if (hasListedOnEcommerce) {
+        updateDoc.listedOnEcommerce = parseListedOnEcommerce(req.body);
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -1788,6 +1816,9 @@ export const updateProduct = async (req, res) => {
     }
     if (hasAddedBy) {
       updateDocBranch.addedBy = normalizeAddedBy(addedBy);
+    }
+    if (hasListedOnEcommerce) {
+      updateDocBranch.listedOnEcommerce = parseListedOnEcommerce(req.body);
     }
 
     const updateOpBranch = acquiredFromUnset
@@ -2094,6 +2125,7 @@ export const approveBranchTransfer = async (req, res) => {
             imageUrl: imageUrlNorm,
             attributes: attrs,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),
@@ -2612,6 +2644,7 @@ export const transferProductStock = async (req, res) => {
             branch: toBranchId,
             inWarehouse: false,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),

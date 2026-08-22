@@ -105,6 +105,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
+  /** Show this SKU on the e-commerce website (catalog mode = all). Default off. */
+  listedOnEcommerce = false;
   /** Index of unit currently uploading an image, or null. */
   uploadingUnitImageIndex: number | null = null;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
@@ -204,6 +206,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   get isDeferredDeskPurchaseSelected(): boolean {
     return this.selectedDeskTreasuryKeys.includes(
       CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY
+    );
+  }
+
+  get showOnlineListingOption(): boolean {
+    const s = this.storeSettings.snapshot;
+    return (
+      Boolean(s.ecommerceIntegrationFeatureAvailable) &&
+      Boolean(s.ecommerceIntegrationEnabled) &&
+      s.ecommerceCatalogMode !== 'online_only'
     );
   }
 
@@ -1211,6 +1222,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         addedBy: response.addedBy || '',
       });
       this.productImageUrl = response.imageUrl || '';
+      this.listedOnEcommerce = Boolean(response.listedOnEcommerce);
       this.refreshCategoryDropdownItems();
       this.patchSourcePartyFromProduct(response);
     });
@@ -1953,6 +1965,9 @@ private submitDeskPurchaseRequest(): void {
   if (addedByTrim) {
     deskProduct.addedBy = addedByTrim;
   }
+  if (this.showOnlineListingOption) {
+    deskProduct.listedOnEcommerce = Boolean(this.listedOnEcommerce);
+  }
 
   const isExchangeTradeIn = !!this.data?.exchangeFlow;
   const appendToPurchaseId = String(this.data?.appendToExchangePurchaseId || '').trim();
@@ -2128,6 +2143,7 @@ createProduct() {
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
     userId: this.globals.currentUser?._id,
+    listedOnEcommerce: this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false,
   };
   if (createUnitDetails?.length) {
     payload.price = createUnitDetails[0].price;
@@ -2274,6 +2290,7 @@ updateProduct() {
   }
   this.attachAcquiredFromToPayload(payload);
   payload.userId = this.globals.currentUser?._id;
+  payload.listedOnEcommerce = this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false;
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {

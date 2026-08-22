@@ -78,9 +78,16 @@ export async function buildCatalogPayload() {
       branch: online._id,
       inWarehouse: { $ne: true },
     };
+  } else {
+    productQuery = {
+      ...productQuery,
+      listedOnEcommerce: true,
+    };
   }
 
-  const products = await Product.find(productQuery).populate('category').lean();
+  const products = (await Product.find(productQuery).populate('category').lean()).filter(
+    (p) => sellableStock(p) > 0
+  );
   const categoryIds = [
     ...new Set(
       products
@@ -198,7 +205,7 @@ export async function pushProductUpsert(productId) {
     });
   }
 
-  if (product.removedWhenOutOfStock) {
+  if (product.removedWhenOutOfStock || sellableStock(product) <= 0) {
     return postToEcommerce('/api/integration/invex/catalog/product-delete', {
       invexProductId: String(product._id),
     });
@@ -211,6 +218,10 @@ export async function pushProductUpsert(productId) {
         invexProductId: String(product._id),
       });
     }
+  } else if (!product.listedOnEcommerce) {
+    return postToEcommerce('/api/integration/invex/catalog/product-delete', {
+      invexProductId: String(product._id),
+    });
   }
 
   const cat = product.category;

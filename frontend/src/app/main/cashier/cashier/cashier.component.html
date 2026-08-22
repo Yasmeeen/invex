@@ -145,6 +145,7 @@
                     <button
                       type="button"
                       class="s-btn btn-secondary btn-sm"
+                      *ngIf="!isCheckoutFullyPrepaid()"
                       (click)="openPaymentSplitsDialog()"
                     >
                       {{ 'tr_payment_splits_open' | translate }}
@@ -420,7 +421,30 @@
           class="cashier-booking-bar cashier-booking-bar--warn"
           *ngFor="let bar of cartForeignBookingBars()"
         >
-          <span *ngIf="bar.days <= 0">
+          <span *ngIf="bar.fromWebsite && bar.days <= 0">
+            {{
+              'tr_cashier_booking_bar_website_today'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone
+                    }
+            }}
+          </span>
+          <span *ngIf="bar.fromWebsite && bar.days > 0">
+            {{
+              'tr_cashier_booking_bar_website'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone,
+                      days: bar.days
+                    }
+            }}
+          </span>
+          <span *ngIf="!bar.fromWebsite && bar.days <= 0">
             {{
               'tr_cashier_booking_bar_today'
                 | translate
@@ -431,7 +455,7 @@
                     }
             }}
           </span>
-          <span *ngIf="bar.days > 0">
+          <span *ngIf="!bar.fromWebsite && bar.days > 0">
             {{
               'tr_cashier_booking_bar'
                 | translate

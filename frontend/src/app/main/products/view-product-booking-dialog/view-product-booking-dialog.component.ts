@@ -135,7 +135,19 @@ export class ViewProductBookingDialogComponent implements OnInit {
       : this.translate.instant('tr_booking_branch_pickup');
   }
 
+  pickupBranchLabel(b: ProductActiveBooking): string {
+    const br = b.branch;
+    if (br && typeof br === 'object' && String(br.name || '').trim()) {
+      return String(br.name).trim();
+    }
+    return String(b.shippingAddress || '').trim();
+  }
+
   depositPaymentLabel(method: string | undefined | null): string {
+    const m = String(method || '').trim().toLowerCase();
+    if (m === 'online') {
+      return this.translate.instant('tr_online');
+    }
     return paymentMethodDisplayLabel(
       method,
       this.storeSettings.snapshot.paymentAppFeePercents,
@@ -186,6 +198,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
       depositPayments: this.depositPaymentLines(b),
       pickupType: b.pickupType,
       shippingAddress: b.shippingAddress,
+      pickupBranchName: this.pickupBranchLabel(b),
       createdAt: b.createdAt,
       bookingDate: b.bookingDate,
     };

@@ -97,14 +97,18 @@ function buildPhoneSearchCandidates(raw) {
   return [...set].filter(Boolean);
 }
 
-async function findClientByPhone(raw) {
+async function findClientByPhone(raw, session) {
   const candidates = buildPhoneSearchCandidates(raw);
   const last10 = digitsOnly(raw).slice(-10);
-  let client = await Client.findOne({ phoneNumber: { $in: candidates } });
+  let q = Client.findOne({ phoneNumber: { $in: candidates } });
+  if (session) q = q.session(session);
+  let client = await q;
   if (!client && last10 && last10.length === 10) {
-    client = await Client.findOne({
+    let q2 = Client.findOne({
       phoneNumber: { $regex: new RegExp(`${last10}$`) },
     });
+    if (session) q2 = q2.session(session);
+    client = await q2;
   }
   return client;
 }
@@ -118,16 +122,31 @@ function canonicalPhoneForStorage(raw) {
   return String(raw || '').trim();
 }
 
-async function findOrCreateClient({ name, phone, registeredAddress, branchOid }) {
-  const existing = await findClientByPhone(phone);
+async function findOrCreateClient({
+  name,
+  phone,
+  registeredAddress,
+  branchOid,
+  session,
+  fromEcommerce,
+}) {
+  const existing = await findClientByPhone(phone, session);
   if (existing) {
+    if (fromEcommerce) {
+      existing.isEcommerceOnline = true;
+      if (!existing.source || existing.source === 'store') existing.source = 'ecommerce';
+      const addr = String(registeredAddress || '').trim();
+      if (addr && !existing.address) existing.address = addr;
+      if (name && (!existing.name || existing.name === 'Customer')) existing.name = String(name).trim();
+      await existing.save(session ? { session } : undefined);
+    }
     return existing;
   }
   const phoneNumber = canonicalPhoneForStorage(phone);
-  if (!phoneNumber) {
+  if (!phoneNumber || digitsOnly(phoneNumber).length < 8) {
     throw new Error('INVALID_PHONE');
   }
-  const addr = String(registeredAddress || '').trim();
+  const addr = String(registeredAddress || '').trim() || (fromEcommerce ? 'Online order' : '');
   if (!addr) {
     throw new Error('INVALID_REGISTERED_ADDRESS');
   }
@@ -136,7 +155,12 @@ async function findOrCreateClient({ name, phone, registeredAddress, branchOid })
     phoneNumber,
     address: addr,
     branches: branchOid && mongoose.Types.ObjectId.isValid(String(branchOid)) ? [branchOid] : [],
+    ...(fromEcommerce ? { source: 'ecommerce', isEcommerceOnline: true } : {}),
   };
+  if (session) {
+    const [created] = await Client.create([doc], { session });
+    return created;
+  }
   return Client.create(doc);
 }
 
@@ -156,10 +180,25 @@ async function sumActiveConfirmedBookedQuantity(productOid) {
   return agg?.total || 0;
 }
 
-export async function recalcProductBookingTotals(productId) {
+export async function recalcProductBookingTotals(productId, { session } = {}) {
   const pid = new mongoose.Types.ObjectId(String(productId));
-  const total = await sumActiveBookedQuantity(pid);
-  const confirmedTotal = await sumActiveConfirmedBookedQuantity(pid);
+  const match = { product: pid, status: 'active' };
+  const totalPipeline = ProductBooking.aggregate([
+    { $match: match },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+  ]);
+  const confirmedPipeline = ProductBooking.aggregate([
+    { $match: { ...match, confirmed: true } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$quantity', 1] } } } },
+  ]);
+  if (session) {
+    totalPipeline.session(session);
+    confirmedPipeline.session(session);
+  }
+  const [agg] = await totalPipeline;
+  const [aggConfirmed] = await confirmedPipeline;
+  const total = agg?.total || 0;
+  const confirmedTotal = aggConfirmed?.total || 0;
   await Product.updateOne(
     { _id: pid },
     {
@@ -169,7 +208,8 @@ export async function recalcProductBookingTotals(productId) {
         bookingStatus: total > 0 ? 'active' : 'none',
         activeBooking: null,
       },
-    }
+    },
+    session ? { session } : undefined
   );
   return total;
 }
@@ -183,6 +223,78 @@ async function resolveSystemBookingUserId() {
   return any?._id || null;
 }
 
+export async function emitBookingCreatedNotification(booking, product, quantity, userId) {
+  try {
+    const recipients = await User.find({
+      role: { $in: ['Super Admin', 'Co Admin', 'Branch Manager'] },
+    })
+      .select('_id role branch')
+      .lean();
+    const recipientIds = recipients.map((u) => u._id);
+    if (!recipientIds.length) return;
+
+    const branchId = product.branch || null;
+    const branchName = branchId
+      ? (await Branch.findById(branchId).select('name').lean())?.name || null
+      : null;
+    const locationLabel = product.inWarehouse
+      ? 'Warehouse'
+      : branchName
+        ? branchName
+        : 'Branch';
+    const fromWeb = booking?.source === 'ecommerce';
+
+    const notification = await Notification.create({
+      type: 'booking_created',
+      title: fromWeb ? 'New website booking' : 'New booking',
+      body: `${product.name} ×${quantity} (${locationLabel})`,
+      data: {
+        bookingId: booking._id,
+        productId: product._id,
+        productName: product.name,
+        productCode: product.code,
+        quantity,
+        branchId,
+        branchName,
+        inWarehouse: !!product.inWarehouse,
+        createdById: userId,
+        bookingDate: booking.bookingDate,
+        source: booking.source || 'pos',
+        ecommerceOrderId: booking.ecommerceOrderId || '',
+        customerName: booking.customerName,
+        customerPhone: booking.customerPhone,
+      },
+      recipients: recipientIds,
+      readBy: [],
+    });
+
+    emitToUsers(recipientIds, 'notification:new', {
+      notification,
+    });
+  } catch (notifyErr) {
+    console.warn('⚠️ booking notification:', notifyErr?.message || notifyErr);
+  }
+}
+
+async function resolvePickupBranch({ pickupBranchId, pickupLocation, session }) {
+  const findById = async (raw) => {
+    const id = String(raw || '').trim();
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const q = Branch.findById(id).select('_id name');
+    const doc = session ? await q.session(session).lean() : await q.lean();
+    return doc || null;
+  };
+  const byId = await findById(pickupBranchId);
+  if (byId) return byId;
+  const loc = String(pickupLocation || '').trim();
+  if (!loc) return null;
+  const locAsId = await findById(loc);
+  if (locAsId) return locAsId;
+  const nameQ = Branch.findOne({ name: new RegExp(`^${escapeRegex(loc)}$`, 'i') }).select('_id name');
+  const byName = session ? await nameQ.session(session).lean() : await nameQ.lean();
+  return byName || null;
+}
+
 /**
  * Website paid order → same ProductBooking as cashier booking (customer name/phone/address).
  * Holds stock via bookedQuantity (do not also increment ecommerceReservedQuantity).
@@ -194,11 +306,26 @@ export async function createBookingFromEcommerceOrder({
   unitPrice,
   ecommerceOrderId,
   session,
+  pickupType = 'online_shipping',
+  pickupLocation = '',
+  pickupBranchId = '',
+  paidOnline = false,
 }) {
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
   const name = String(customer?.name || '').trim() || 'Online customer';
   const phone = String(customer?.phone || '').trim();
-  const address = String(customer?.address || '').trim() || 'Online order';
+  const isPickup = pickupType === 'branch_pickup';
+  const pickupBranch = isPickup
+    ? await resolvePickupBranch({ pickupBranchId, pickupLocation, session })
+    : null;
+  const pickupLabel =
+    (pickupBranch?.name && String(pickupBranch.name).trim()) ||
+    String(pickupLocation || '').trim() ||
+    String(customer?.address || '').trim() ||
+    'Branch pickup';
+  const address = isPickup
+    ? pickupLabel
+    : String(customer?.address || '').trim() || 'Online order';
   if (!phone) {
     throw new Error('customer phone is required for booking');
   }
@@ -208,16 +335,19 @@ export async function createBookingFromEcommerceOrder({
     throw new Error('No Invex user available to own the website booking');
   }
 
-  const branchOid = product.branch || null;
+  const branchOid = (isPickup && pickupBranch?._id) || product.branch || null;
   const client = await findOrCreateClient({
     name,
     phone,
     registeredAddress: address,
     branchOid,
+    session,
+    fromEcommerce: true,
   });
 
   const unit = Math.round((Number(unitPrice) || Number(product.price) || 0) * 100) / 100;
-  const dep = Math.round(unit * qty * 100) / 100;
+  const lineTotal = Math.round(unit * qty * 100) / 100;
+  const dep = paidOnline ? lineTotal : 0;
   const [booking] = await ProductBooking.create(
     [
       {
@@ -228,10 +358,10 @@ export async function createBookingFromEcommerceOrder({
         customerName: name,
         customerPhone: canonicalPhoneForStorage(phone),
         quantity: qty,
-        pickupType: 'online_shipping',
+        pickupType: isPickup ? 'branch_pickup' : 'online_shipping',
         shippingAddress: address,
         depositAmount: dep,
-        depositPayments: dep > 0 ? [{ method: 'online', amount: dep }] : [],
+        depositPayments: paidOnline && dep > 0 ? [{ method: 'online', amount: dep }] : [],
         productUnitPrice: unit,
         productNameSnapshot: String(product.name || '').trim(),
         productCodeSnapshot: String(product.code || '').trim(),
@@ -247,7 +377,10 @@ export async function createBookingFromEcommerceOrder({
     session ? { session } : {}
   );
 
-  await recalcProductBookingTotals(product._id);
+  if (!session) {
+    await recalcProductBookingTotals(product._id);
+    await emitBookingCreatedNotification(booking, product, qty, userId);
+  }
   return booking;
 }
 
@@ -274,6 +407,30 @@ export async function cancelBookingsForEcommerceOrder(ecommerceOrderId, { sessio
     await recalcProductBookingTotals(pid);
   }
   return unique;
+}
+
+/** Visa/card paid on the website → mark ecommerce bookings as fully paid online (not a cash deposit). */
+export async function markBookingsPaidOnlineForEcommerceOrder(ecommerceOrderId, { session } = {}) {
+  const id = String(ecommerceOrderId || '');
+  if (!id) return 0;
+  const q = ProductBooking.find({
+    ecommerceOrderId: id,
+    source: 'ecommerce',
+    status: 'active',
+  });
+  if (session) q.session(session);
+  const bookings = await q;
+  let n = 0;
+  for (const b of bookings) {
+    const qty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    const unit = Math.round((Number(b.productUnitPrice) || 0) * 100) / 100;
+    const total = Math.round(unit * qty * 100) / 100;
+    b.depositAmount = total;
+    b.depositPayments = total > 0 ? [{ method: 'online', amount: total }] : [];
+    await b.save(session ? { session } : {});
+    n += 1;
+  }
+  return n;
 }
 
 /**
@@ -585,51 +742,7 @@ export const createProductBooking = async (req, res) => {
       .populate('createdBy', 'name')
       .populate('client', 'name phoneNumber');
 
-    // Persist + emit notification (Super Admin / Co Admin / all Branch Managers)
-    try {
-      const recipients = await User.find({
-        role: { $in: ['Super Admin', 'Co Admin', 'Branch Manager'] },
-      })
-        .select('_id role branch')
-        .lean();
-      const recipientIds = recipients.map((u) => u._id);
-
-      const branchId = product.branch || null;
-      const branchName = branchId
-        ? (await Branch.findById(branchId).select('name').lean())?.name || null
-        : null;
-      const locationLabel = product.inWarehouse
-        ? 'Warehouse'
-        : branchName
-          ? branchName
-          : 'Branch';
-
-      const notification = await Notification.create({
-        type: 'booking_created',
-        title: 'New booking',
-        body: `${product.name} ×${quantity} (${locationLabel})`,
-        data: {
-          bookingId: booking._id,
-          productId: product._id,
-          productName: product.name,
-          productCode: product.code,
-          quantity,
-          branchId,
-          branchName,
-          inWarehouse: !!product.inWarehouse,
-          createdById: userId,
-          bookingDate: booking.bookingDate,
-        },
-        recipients: recipientIds,
-        readBy: [],
-      });
-
-      emitToUsers(recipientIds, 'notification:new', {
-        notification,
-      });
-    } catch (notifyErr) {
-      console.warn('⚠️ booking notification:', notifyErr?.message || notifyErr);
-    }
+    await emitBookingCreatedNotification(booking, product, quantity, userId);
 
     await auditLog(req, {
       action: 'create',
@@ -900,6 +1013,7 @@ export const getBookingByProductId = async (req, res) => {
         .populate('createdBy', 'name _id')
         .populate('confirmedBy', 'name _id')
         .populate('client', 'name phoneNumber address')
+        .populate('branch', 'name')
         .lean(),
       sumActiveBookedQuantity(new mongoose.Types.ObjectId(String(productId))),
     ]);
@@ -1255,7 +1369,7 @@ export const getActiveReservationsForProduct = async (req, res) => {
     })
       .sort({ bookingDate: 1, createdAt: 1 })
       .select(
-        '_id product client customerName customerPhone quantity depositAmount productUnitPrice confirmed createdAt bookingDate'
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice confirmed createdAt bookingDate source'
       )
       .lean();
 
@@ -1272,6 +1386,7 @@ export const getActiveReservationsForProduct = async (req, res) => {
         confirmed: Boolean(b.confirmed),
         createdAt: b.createdAt,
         bookingDate: b.bookingDate,
+        source: b.source === 'ecommerce' ? 'ecommerce' : 'pos',
       })),
     });
   } catch (error) {
@@ -1323,7 +1438,7 @@ export const getActiveBookingsForCheckout = async (req, res) => {
     const bookings = await ProductBooking.find(match)
       .sort({ createdAt: 1 })
       .select(
-        '_id product client customerName customerPhone quantity depositAmount productUnitPrice productNameSnapshot productCodeSnapshot confirmed createdAt bookingDate'
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice productNameSnapshot productCodeSnapshot confirmed createdAt bookingDate source'
       )
       .populate('product', 'name code price')
       .lean();
@@ -1343,6 +1458,7 @@ export const getActiveBookingsForCheckout = async (req, res) => {
         confirmed: Boolean(b.confirmed),
         createdAt: b.createdAt,
         bookingDate: b.bookingDate,
+        source: b.source === 'ecommerce' ? 'ecommerce' : 'pos',
       })),
     });
   } catch (error) {

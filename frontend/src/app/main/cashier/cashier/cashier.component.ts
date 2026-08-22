@@ -236,13 +236,30 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   hasValidConfirmedPayment(): boolean {
+    if (this.isCheckoutFullyPrepaid()) {
+      return true;
+    }
     if (!this.confirmedPayment || this.confirmedPaymentForTotal == null) {
       return false;
     }
     return Math.abs(this.confirmedPaymentForTotal - this.effectiveCheckoutTotal()) < 0.01;
   }
 
+  /** Sale remaining after trade-in / booking deposit is zero — no payment methods needed. */
+  isCheckoutFullyPrepaid(): boolean {
+    return this.effectiveCheckoutTotal() <= 0.01;
+  }
+
   paymentSummaryText(): string {
+    if (this.isCheckoutFullyPrepaid()) {
+      const deposit = this.bookingDepositCredit();
+      if (deposit > 0) {
+        return this.translate.instant('tr_cashier_booking_fully_paid', {
+          deposit: deposit.toFixed(2),
+        });
+      }
+      return this.translate.instant('tr_cashier_amount_due_after_credits') + ': 0';
+    }
     if (!this.confirmedPayment) {
       return '';
     }
@@ -274,6 +291,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   openPaymentSplitsDialog(autoCheckout = false): void {
+    if (this.isCheckoutFullyPrepaid()) {
+      const prepaid = this.buildDefaultCashPayment();
+      this.confirmedPayment = prepaid;
+      this.confirmedPaymentForTotal = this.effectiveCheckoutTotal();
+      if (autoCheckout) {
+        this.performCheckout(prepaid);
+      }
+      return;
+    }
+
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: this.effectiveCheckoutTotal(),
       mode: 'checkout',
@@ -911,6 +938,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     name: string;
     phone: string;
     days: number;
+    fromWebsite: boolean;
   } | null {
     const pid = this.orderLineProductId(item);
     const foreign = this.foreignReservationsForProduct(pid);
@@ -920,6 +948,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       name: String(b.customerName || '').trim() || '—',
       phone: String(b.customerPhone || '').trim() || '—',
       days: this.bookingDaysAgo(b),
+      fromWebsite: b.source === 'ecommerce',
     };
   }
 
@@ -930,6 +959,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     name: string;
     phone: string;
     days: number;
+    fromWebsite: boolean;
   }> {
     const bars: Array<{
       productId: string;
@@ -937,6 +967,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       name: string;
       phone: string;
       days: number;
+      fromWebsite: boolean;
     }> = [];
     const seen = new Set<string>();
     for (const item of this.orderItems || []) {
@@ -951,6 +982,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         name: wp?.name || '—',
         phone: wp?.phone || '—',
         days: wp?.days ?? 0,
+        fromWebsite: !!wp?.fromWebsite,
       });
     }
     return bars;
@@ -1058,10 +1090,15 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.foreignBookingToastShown.add(productId);
     const b = foreign[0];
     const days = this.bookingDaysAgo(b);
+    const fromWebsite = b.source === 'ecommerce';
     const key =
       days <= 0
-        ? 'tr_cashier_booked_for_customer_today'
-        : 'tr_cashier_booked_for_customer';
+        ? fromWebsite
+          ? 'tr_cashier_booked_for_customer_website_today'
+          : 'tr_cashier_booked_for_customer_today'
+        : fromWebsite
+          ? 'tr_cashier_booked_for_customer_website'
+          : 'tr_cashier_booked_for_customer';
     this.translate
       .get(key, {
         name: String(b.customerName || '').trim() || '—',
@@ -2229,6 +2266,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    if (this.isCheckoutFullyPrepaid()) {
+      this.performCheckout(this.buildDefaultCashPayment());
+      return;
+    }
+
     if (this.hasValidConfirmedPayment() && this.confirmedPayment) {
       this.performCheckout(this.confirmedPayment);
       return;
@@ -2239,10 +2281,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** After trade-in intake: collect due payment and/or record store payout treasury. */
   private continueExchangeCheckout(): void {
-    const amountDue = this.exchangeAmountDue();
-
     if (!this.isClientInfoOpen) {
-      if (amountDue > 0.01) {
+      if (!this.isCheckoutFullyPrepaid()) {
         this.openPaymentSplitsDialog(true);
         return;
       }
@@ -2258,7 +2298,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
-    if (amountDue <= 0.01) {
+    if (this.isCheckoutFullyPrepaid()) {
       this.performCheckout(this.buildDefaultCashPayment());
       return;
     }

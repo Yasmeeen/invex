@@ -894,7 +894,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       pickup:
         b.pickupType === 'online_shipping'
           ? t('tr_booking_online_shipping')
-          : t('tr_booking_branch_pickup'),
+          : [
+              t('tr_booking_branch_pickup'),
+              b.branch?.name || b.shippingAddress || '',
+            ]
+              .map((s) => String(s || '').trim())
+              .filter(Boolean)
+              .join(' — '),
       depositAmount: b.depositAmount ?? 0,
       depositProof: (() => {
         const urls = Array.isArray(b.depositTransferImageUrls) ? b.depositTransferImageUrls : [];

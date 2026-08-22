@@ -59,7 +59,7 @@
                 <span *ngIf="b.confirmed" class="booking-card__badge booking-card__badge--ok">
                   <i class="fa fa-check-circle" aria-hidden="true"></i>
                   {{ 'tr_booking_confirmed_status' | translate }}
-                  <ng-container *ngIf="b.confirmedBy?.name">
+                  <ng-container *ngIf="b.confirmedBy?.name && b.source !== 'ecommerce'">
                     — {{ b.confirmedBy?.name }}</ng-container
                   >
                 </span>
@@ -100,12 +100,26 @@
                 <dd>{{ b.customerPhone }}</dd>
                 <dt>{{ 'tr_booking_pickup_type' | translate }}</dt>
                 <dd>{{ pickupLabel(b) }}</dd>
+                <ng-container *ngIf="b.pickupType === 'branch_pickup' && pickupBranchLabel(b)">
+                  <dt>{{ 'tr_booking_pickup_branch' | translate }}</dt>
+                  <dd>{{ pickupBranchLabel(b) }}</dd>
+                </ng-container>
                 <ng-container *ngIf="b.pickupType === 'online_shipping' && b.shippingAddress">
                   <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>
                   <dd>{{ b.shippingAddress }}</dd>
                 </ng-container>
                 <dt>{{ 'tr_booking_deposit' | translate }}</dt>
-                <dd>{{ b.depositAmount }}</dd>
+                <dd>
+                  <ng-container *ngIf="b.source === 'ecommerce' && !(b.depositAmount > 0)">
+                    {{ 'tr_booking_customer_unpaid' | translate }}
+                  </ng-container>
+                  <ng-container *ngIf="b.source === 'ecommerce' && b.depositAmount > 0">
+                    {{ 'tr_booking_paid_online_full' | translate }} — {{ b.depositAmount }}
+                  </ng-container>
+                  <ng-container *ngIf="b.source !== 'ecommerce'">
+                    {{ b.depositAmount }}
+                  </ng-container>
+                </dd>
                 <ng-container *ngIf="depositPaymentLines(b).length">
                   <dt>{{ 'tr_booking_receipt_deposit_payments' | translate }}</dt>
                   <dd>
@@ -126,8 +140,8 @@
                     (b.createdAt ? b.createdAt : b.bookingDate) | date : 'medium'
                   }}
                 </dd>
-                <dt *ngIf="b.createdBy?.name">{{ 'tr_requested_by' | translate }}</dt>
-                <dd *ngIf="b.createdBy?.name">{{ b.createdBy?.name }}</dd>
+                <dt *ngIf="b.createdBy?.name && b.source !== 'ecommerce'">{{ 'tr_requested_by' | translate }}</dt>
+                <dd *ngIf="b.createdBy?.name && b.source !== 'ecommerce'">{{ b.createdBy?.name }}</dd>
                 <ng-container *ngIf="depositProofUrls(b).length">
                   <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
                   <dd class="booking-deposit-proof-dd">

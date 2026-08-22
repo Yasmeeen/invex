@@ -30,6 +30,7 @@ import {
   postTreasurySplitOutflows,
   safeTreasuryPost,
 } from '../../utils/treasury-ledger.js';
+import { notifyProductChanged } from '../integrations_module/catalogSync.js';
 import { getOrCreateStoreSettings } from '../settings_module/storeSettingsDoc.js';
 import { normalizePaymentMethodsCatalog } from '../settings_module/paymentMethodsCatalog.js';
 import {
@@ -66,6 +67,55 @@ function attrMapGet(attrs, key) {
   }
   const plain = attrs instanceof Map ? Object.fromEntries(attrs) : attrs;
   return String(plain[key] ?? '').trim();
+}
+
+function last10Digits(phone) {
+  return String(phone || '').replace(/\D/g, '').slice(-10);
+}
+
+function bookingBelongsToSaleClient(booking, finalClientId, saleClientPhone) {
+  const bookingClient = booking?.client ? String(booking.client) : '';
+  const orderClient = finalClientId ? String(finalClientId) : '';
+  const phoneOk =
+    last10Digits(saleClientPhone).length >= 10 &&
+    last10Digits(saleClientPhone) === last10Digits(booking?.customerPhone);
+  if (orderClient && bookingClient && orderClient !== bookingClient && !phoneOk) {
+    return false;
+  }
+  if (!orderClient && !phoneOk) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Units reserved for this checkout client (website/POS booking).
+ * Those units must be sellable to the same customer at cashier.
+ */
+async function clientReservedQtyByProductId({
+  session,
+  partyType,
+  finalClientId,
+  saleClientPhone,
+  productIds,
+}) {
+  const map = new Map();
+  if (partyType !== 'client' || !productIds.length) return map;
+  const oids = productIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+  if (!oids.length) return map;
+  const bookings = await ProductBooking.find({
+    product: { $in: oids.map((id) => new mongoose.Types.ObjectId(String(id))) },
+    status: 'active',
+  })
+    .session(session)
+    .lean();
+  for (const b of bookings) {
+    if (!bookingBelongsToSaleClient(b, finalClientId, saleClientPhone)) continue;
+    const pid = String(b.product);
+    const qty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+    map.set(pid, (map.get(pid) || 0) + qty);
+  }
+  return map;
 }
 
 /** Build receipt lines from product snapshot + category attributeDefs.showOnInvoice */
@@ -415,6 +465,17 @@ export const createOrder = async (req, res) => {
       return doc;
     };
 
+    const orderProductIds = (products || [])
+      .map((item) => item?.selectedProduct?._id)
+      .filter(Boolean);
+    const clientReservedByProduct = await clientReservedQtyByProductId({
+      session,
+      partyType,
+      finalClientId,
+      saleClientPhone,
+      productIds: orderProductIds,
+    });
+
     for (const item of products) {
       const selected = item.selectedProduct;
       if (!selected || !selected._id) continue;
@@ -437,8 +498,13 @@ export const createOrder = async (req, res) => {
       const transferReserved = Number(productDoc.transferReservedQuantity) || 0;
       const bookedQty = Number(productDoc.bookedQuantity) || 0;
       const ecomReserved = Number(productDoc.ecommerceReservedQuantity) || 0;
+      const clientReserved = Math.min(
+        bookedQty,
+        clientReservedByProduct.get(String(productDoc._id)) || 0
+      );
+      const othersBooked = Math.max(0, bookedQty - clientReserved);
       const maxSellable =
-        Number(productDoc.stock) - transferReserved - bookedQty - ecomReserved;
+        Number(productDoc.stock) - transferReserved - othersBooked - ecomReserved;
       if (maxSellable < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
 
       productDoc.stock -= quantity;
@@ -546,17 +612,7 @@ export const createOrder = async (req, res) => {
       for (const a of bookingAllocationsRawList) {
         const b = byId.get(a.bookingId);
         if (!b) continue;
-        // Must belong to this client (id or phone).
-        const bookingClient = b.client ? String(b.client) : '';
-        const orderClient = finalClientId ? String(finalClientId) : '';
-        const phoneOk =
-          saleClientPhone &&
-          String(b.customerPhone || '').replace(/\D/g, '').slice(-10) ===
-            String(saleClientPhone).replace(/\D/g, '').slice(-10);
-        if (orderClient && bookingClient && orderClient !== bookingClient && !phoneOk) {
-          continue;
-        }
-        if (!orderClient && !phoneOk) {
+        if (!bookingBelongsToSaleClient(b, finalClientId, saleClientPhone)) {
           continue;
         }
         const bookedQty = Math.max(1, Math.floor(Number(b.quantity) || 1));
@@ -601,6 +657,60 @@ export const createOrder = async (req, res) => {
       amountDueForPayment = Math.round(
         (amountDueForPayment - bookingDepositCreditApplied) * 100
       ) / 100;
+    }
+
+    // Consume this client's reservations on sold lines even when deposit credit is 0
+    // (website hold). Avoids leaving bookedQuantity on another customer's booking.
+    if (partyType === 'client' && orderProducts.length) {
+      const soldNeed = new Map();
+      for (const p of orderProducts) {
+        const pid = String(p.productId);
+        soldNeed.set(
+          pid,
+          (soldNeed.get(pid) || 0) + Math.max(0, Math.floor(Number(p.quantity) || 0))
+        );
+      }
+      const pidOids = [...soldNeed.keys()]
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      if (pidOids.length) {
+        const clientBookings = await ProductBooking.find({
+          product: { $in: pidOids },
+          status: 'active',
+        })
+          .session(session)
+          .sort({ createdAt: 1 })
+          .lean();
+        const allocatedIds = new Set(
+          validatedBookingAllocations.map((a) => String(a.bookingId))
+        );
+        for (const a of validatedBookingAllocations) {
+          const b = clientBookings.find((x) => String(x._id) === String(a.bookingId));
+          if (!b) continue;
+          const pid = String(b.product);
+          soldNeed.set(
+            pid,
+            Math.max(0, (soldNeed.get(pid) || 0) - (Number(a.quantityApplied) || 0))
+          );
+        }
+        for (const b of clientBookings) {
+          if (allocatedIds.has(String(b._id))) continue;
+          if (!bookingBelongsToSaleClient(b, finalClientId, saleClientPhone)) continue;
+          const pid = String(b.product);
+          const need = soldNeed.get(pid) || 0;
+          if (need <= 0) continue;
+          const bookedQty = Math.max(1, Math.floor(Number(b.quantity) || 1));
+          const take = Math.min(bookedQty, need);
+          if (take <= 0) continue;
+          validatedBookingAllocations.push({
+            bookingId: String(b._id),
+            quantityApplied: take,
+            creditApplied: 0,
+          });
+          allocatedIds.add(String(b._id));
+          soldNeed.set(pid, need - take);
+        }
+      }
     }
 
     const exchangePurchaseIdCandidates = [];
@@ -930,7 +1040,7 @@ export const createOrder = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    if (validatedBookingAllocations.length && bookingDepositCreditApplied > 0) {
+    if (validatedBookingAllocations.length) {
       try {
         await consumeBookingsForSale({
           allocations: validatedBookingAllocations,
@@ -1041,6 +1151,10 @@ export const createOrder = async (req, res) => {
         status: newOrder?.status,
       },
     });
+
+    for (const item of orderProducts) {
+      if (item?.productId) notifyProductChanged(item.productId);
+    }
 
     for (const removed of autoDeletedProducts) {
       await auditLog(req, {

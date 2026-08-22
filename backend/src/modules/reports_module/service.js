@@ -326,6 +326,17 @@ const getDateGroupExpr = (groupBy) =>
     ? { $dateToString: { format: '%Y-%m', date: '$createdAt', timezone: REPORT_TZ } }
     : { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: REPORT_TZ } };
 
+/** Date-group expression for an arbitrary date field path (e.g. payments.paidAt). */
+const getDateGroupExprForField = (groupBy, dateField) =>
+  groupBy === 'monthly'
+    ? { $dateToString: { format: '%Y-%m', date: dateField, timezone: REPORT_TZ } }
+    : { $dateToString: { format: '%Y-%m-%d', date: dateField, timezone: REPORT_TZ } };
+
+/** Orders with a customer installment schedule (profit is cash-basis on collection). */
+const hasInstallmentsExpr = {
+  $gt: [{ $size: { $ifNull: ['$installments', []] } }, 0],
+};
+
 /** Cash; credit; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
 const salesPaymentCategoryExpr = {
   $cond: [
@@ -444,17 +455,30 @@ export const getSalesReport = async (req, res) => {
 export const getProfitReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
-    const match = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
-    if (f.branchId) match.branch = f.branchId;
-    appendOrderCustomerFilters(match, f);
+    const baseOrderMatch = { status: { $ne: 'restored' } };
+    if (f.branchId) baseOrderMatch.branch = f.branchId;
+    appendOrderCustomerFilters(baseOrderMatch, f);
     const lineProductIdFilter = f.productId
       ? f.productId
       : await resolveCategoryProductIdFilter(f.categoryIds);
-    if (lineProductIdFilter) match['products.productId'] = lineProductIdFilter;
-    if (f.sellerName) match.sellerName = f.sellerName;
+    if (lineProductIdFilter) baseOrderMatch['products.productId'] = lineProductIdFilter;
+    if (f.sellerName) baseOrderMatch.sellerName = f.sellerName;
     const unwindMatch = lineProductIdFilter
       ? { 'products.productId': lineProductIdFilter }
       : {};
+
+    /** Accrual sales: exclude installment invoices (their profit is recognized on collection). */
+    const nonInstallmentMatch = {
+      ...baseOrderMatch,
+      createdAt: { $gte: f.from, $lte: f.to },
+      $expr: { $eq: [{ $size: { $ifNull: ['$installments', []] } }, 0] },
+    };
+
+    /** Installment orders (any createdAt) for cash-basis profit by payment date. */
+    const installmentOrderMatch = {
+      ...baseOrderMatch,
+      'installments.0': { $exists: true },
+    };
 
     const overhead = await getBranchOverheadForReport(f.branchId);
     const daysInPeriod = calendarDaysInclusive(f.from, f.to);
@@ -467,7 +491,7 @@ export const getProfitReport = async (req, res) => {
     });
 
     const [aggSummary] = await Order.aggregate([
-      { $match: match },
+      { $match: nonInstallmentMatch },
       { $unwind: '$products' },
       { $match: unwindMatch },
       {
@@ -487,20 +511,176 @@ export const getProfitReport = async (req, res) => {
       },
     ]);
 
+    /** Installment profit from payment lines (new data). */
+    const installmentProfitFromPayments = await Order.aggregate([
+      { $match: installmentOrderMatch },
+      { $unwind: '$payments' },
+      {
+        $match: {
+          'payments.paidAt': { $gte: f.from, $lte: f.to },
+          'payments.installmentProfit': { $gt: 0 },
+        },
+      },
+      {
+        $group: {
+          _id: getDateGroupExprForField(f.groupBy, '$payments.paidAt'),
+          installmentProfit: { $sum: { $ifNull: ['$payments.installmentProfit', 0] } },
+        },
+      },
+      { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
+    ]);
+
+    /**
+     * Legacy installment collections: no payment.installmentProfit recorded.
+     * Approximate from installment row paidAmount/amount × profitShare (or equal split of line profit).
+     */
+    const installmentProfitLegacy = await Order.aggregate([
+      { $match: installmentOrderMatch },
+      {
+        $addFields: {
+          trackedInstallmentProfit: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ['$payments', []] },
+                as: 'p',
+                in: { $ifNull: ['$$p.installmentProfit', 0] },
+              },
+            },
+          },
+          lineTradingProfit: {
+            $reduce: {
+              input: { $ifNull: ['$products', []] },
+              initialValue: 0,
+              in: {
+                $add: [
+                  '$$value',
+                  {
+                    $subtract: [
+                      {
+                        $multiply: [
+                          { $ifNull: ['$$this.price', 0] },
+                          { $ifNull: ['$$this.quantity', 0] },
+                        ],
+                      },
+                      {
+                        $multiply: [
+                          { $ifNull: ['$$this.cost', 0] },
+                          { $ifNull: ['$$this.quantity', 0] },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          installmentCount: { $size: { $ifNull: ['$installments', []] } },
+        },
+      },
+      { $match: { trackedInstallmentProfit: { $lte: 0.001 } } },
+      { $unwind: '$installments' },
+      {
+        $match: {
+          'installments.paidAt': { $gte: f.from, $lte: f.to },
+          'installments.paidAmount': { $gt: 0 },
+        },
+      },
+      {
+        $addFields: {
+          rowShare: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ['$installments.profitShare', null] },
+                  { $gt: [{ $ifNull: ['$installments.profitShare', 0] }, 0] },
+                ],
+              },
+              { $ifNull: ['$installments.profitShare', 0] },
+              {
+                $cond: [
+                  { $gt: ['$installmentCount', 0] },
+                  { $divide: ['$lineTradingProfit', '$installmentCount'] },
+                  0,
+                ],
+              },
+            ],
+          },
+          approxProfit: {
+            $cond: [
+              { $gt: [{ $ifNull: ['$installments.amount', 0] }, 0] },
+              {
+                $multiply: [
+                  {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: ['$installments.profitShare', null] },
+                          { $gt: [{ $ifNull: ['$installments.profitShare', 0] }, 0] },
+                        ],
+                      },
+                      { $ifNull: ['$installments.profitShare', 0] },
+                      {
+                        $cond: [
+                          { $gt: ['$installmentCount', 0] },
+                          { $divide: ['$lineTradingProfit', '$installmentCount'] },
+                          0,
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    $divide: [
+                      { $ifNull: ['$installments.paidAmount', 0] },
+                      { $ifNull: ['$installments.amount', 1] },
+                    ],
+                  },
+                ],
+              },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: getDateGroupExprForField(f.groupBy, '$installments.paidAt'),
+          installmentProfit: { $sum: '$approxProfit' },
+        },
+      },
+      { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
+    ]);
+
+    const installmentByPeriod = new Map();
+    for (const row of [...(installmentProfitFromPayments || []), ...(installmentProfitLegacy || [])]) {
+      const key = String(row.period);
+      installmentByPeriod.set(
+        key,
+        round2((installmentByPeriod.get(key) || 0) + (Number(row.installmentProfit) || 0))
+      );
+    }
+    const installmentProfitCollected = round2(
+      [...installmentByPeriod.values()].reduce((s, n) => s + n, 0)
+    );
+
     const totalRevenue = aggSummary?.totalRevenue ?? 0;
     const totalCost = aggSummary?.totalCost ?? 0;
-    const tradingProfit = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
+    const cashSalesTrading = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
+    const tradingProfit = round2(cashSalesTrading + installmentProfitCollected);
     const dailyExpensesTotal = dailyExpenses.total;
     const netProfitAfterBranch = round2(
       tradingProfit - branchOperatingCostTotal - dailyExpensesTotal
     );
     const profitMargin =
-      totalRevenue > 0 ? round2((netProfitAfterBranch / totalRevenue) * 100) : 0;
+      totalRevenue + installmentProfitCollected > 0
+        ? round2((netProfitAfterBranch / (totalRevenue + installmentProfitCollected)) * 100)
+        : 0;
 
     const summary = {
       totalRevenue,
       totalCost,
       tradingProfit,
+      installmentProfitCollected,
+      cashSalesTradingProfit: cashSalesTrading,
       branchOperatingCost: round2(branchOperatingCostTotal),
       dailyExpensesTotal,
       dailyExpensesCount: dailyExpenses.count,
@@ -522,7 +702,7 @@ export const getProfitReport = async (req, res) => {
     };
 
     const profitOverTimeRaw = await Order.aggregate([
-      { $match: match },
+      { $match: nonInstallmentMatch },
       { $unwind: '$products' },
       { $match: unwindMatch },
       {
@@ -547,14 +727,19 @@ export const getProfitReport = async (req, res) => {
       (profitOverTimeRaw || []).map((row) => [String(row.period), row])
     );
     const allPeriods = [
-      ...new Set([...salesByPeriod.keys(), ...dailyExpenses.byPeriod.keys()]),
+      ...new Set([
+        ...salesByPeriod.keys(),
+        ...installmentByPeriod.keys(),
+        ...dailyExpenses.byPeriod.keys(),
+      ]),
     ].sort();
 
     const profitOverTime = allPeriods.map((period) => {
       const row = salesByPeriod.get(period);
       const revenue = Number(row?.revenue) || 0;
       const cost = Number(row?.cost) || 0;
-      const trading = round2(revenue - cost);
+      const installmentProfit = installmentByPeriod.get(period) || 0;
+      const trading = round2(revenue - cost + installmentProfit);
       let overheadAlloc = 0;
       if (f.groupBy === 'monthly') {
         const d = daysInMonthOverlappingRange(period, f.from, f.to);
@@ -567,6 +752,7 @@ export const getProfitReport = async (req, res) => {
         period,
         revenue,
         cost,
+        installmentProfit,
         tradingProfit: trading,
         branchOverheadAllocated: overheadAlloc,
         dailyExpenses: periodDailyExpenses,
@@ -574,10 +760,204 @@ export const getProfitReport = async (req, res) => {
       };
     });
 
+    /** Invoices created in period (incl. installment — profit = recognized so far). */
+    const invoiceCreatedMatch = {
+      ...baseOrderMatch,
+      createdAt: { $gte: f.from, $lte: f.to },
+    };
+    const invoiceAll =
+      req.query.invoice_all === 'true' || req.query.invoice_all === true;
+    const invoicePage = Math.max(1, Number(req.query.invoice_page) || 1);
+    const invoiceLimit = Math.max(
+      1,
+      Math.min(100, Number(req.query.invoice_limit) || 25)
+    );
+    const invoiceSkip = (invoicePage - 1) * invoiceLimit;
+    const invoiceExportCap = 50000;
+
+    const [invoiceFacet] = await Order.aggregate([
+      { $match: invoiceCreatedMatch },
+      { $unwind: '$products' },
+      { $match: unwindMatch },
+      {
+        $addFields: {
+          lineRevenue: { $multiply: ['$products.price', '$products.quantity'] },
+          lineCost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id',
+          orderNumber: { $first: '$orderNumber' },
+          createdAt: { $first: '$createdAt' },
+          clientName: { $first: '$clientName' },
+          clientPhoneNumber: { $first: '$clientPhoneNumber' },
+          paymentStatus: { $first: '$paymentStatus' },
+          paymentMethod: { $first: '$paymentMethod' },
+          totalPrice: { $first: '$totalPrice' },
+          installments: { $first: '$installments' },
+          installmentTotalProfit: { $first: '$installmentTotalProfit' },
+          revenue: { $sum: '$lineRevenue' },
+          cost: { $sum: '$lineCost' },
+        },
+      },
+      {
+        $addFields: {
+          isInstallment: hasInstallmentsExpr,
+          installmentCount: { $size: { $ifNull: ['$installments', []] } },
+          lineTradingProfit: { $subtract: ['$revenue', '$cost'] },
+          recognizedProfit: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ['$installments', []] },
+                as: 'inst',
+                in: { $ifNull: ['$$inst.recognizedProfit', 0] },
+              },
+            },
+          },
+          installmentAmount: {
+            $ifNull: [{ $arrayElemAt: ['$installments.amount', 0] }, 0],
+          },
+          installmentProfitShare: {
+            $let: {
+              vars: {
+                firstShare: { $arrayElemAt: ['$installments.profitShare', 0] },
+                n: { $size: { $ifNull: ['$installments', []] } },
+              },
+              in: {
+                $cond: [
+                  { $gt: [{ $ifNull: ['$$firstShare', 0] }, 0] },
+                  '$$firstShare',
+                  {
+                    $cond: [
+                      { $gt: ['$$n', 0] },
+                      { $divide: [{ $subtract: ['$revenue', '$cost'] }, '$$n'] },
+                      0,
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          /** Legacy rows: derive recognized from paidAmount when recognizedProfit unset. */
+          recognizedProfitResolved: {
+            $cond: [
+              '$isInstallment',
+              {
+                $cond: [
+                  { $gt: ['$recognizedProfit', 0.001] },
+                  '$recognizedProfit',
+                  {
+                    $sum: {
+                      $map: {
+                        input: { $ifNull: ['$installments', []] },
+                        as: 'inst',
+                        in: {
+                          $cond: [
+                            { $gt: [{ $ifNull: ['$$inst.amount', 0] }, 0] },
+                            {
+                              $multiply: [
+                                {
+                                  $cond: [
+                                    { $gt: [{ $ifNull: ['$$inst.profitShare', 0] }, 0] },
+                                    { $ifNull: ['$$inst.profitShare', 0] },
+                                    {
+                                      $cond: [
+                                        { $gt: ['$installmentCount', 0] },
+                                        {
+                                          $divide: ['$lineTradingProfit', '$installmentCount'],
+                                        },
+                                        0,
+                                      ],
+                                    },
+                                  ],
+                                },
+                                {
+                                  $divide: [
+                                    { $ifNull: ['$$inst.paidAmount', 0] },
+                                    { $ifNull: ['$$inst.amount', 1] },
+                                  ],
+                                },
+                              ],
+                            },
+                            0,
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+              '$lineTradingProfit',
+            ],
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          orderId: '$_id',
+          orderNumber: 1,
+          createdAt: 1,
+          clientName: 1,
+          clientPhoneNumber: 1,
+          paymentStatus: 1,
+          paymentMethod: 1,
+          isInstallment: 1,
+          installmentAmount: { $round: [{ $ifNull: ['$installmentAmount', 0] }, 2] },
+          installmentProfitShare: {
+            $round: [{ $ifNull: ['$installmentProfitShare', 0] }, 2],
+          },
+          installmentTotalProfit: {
+            $round: [
+              {
+                $ifNull: ['$installmentTotalProfit', '$lineTradingProfit'],
+              },
+              2,
+            ],
+          },
+          totalPrice: { $round: [{ $ifNull: ['$totalPrice', 0] }, 2] },
+          revenue: { $round: ['$revenue', 2] },
+          cost: { $round: ['$cost', 2] },
+          tradingProfit: {
+            $round: [
+              {
+                $cond: ['$isInstallment', '$recognizedProfitResolved', '$lineTradingProfit'],
+              },
+              2,
+            ],
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          meta: [{ $count: 'totalCount' }],
+          rows: invoiceAll
+            ? [{ $limit: invoiceExportCap }]
+            : [{ $skip: invoiceSkip }, { $limit: invoiceLimit }],
+        },
+      },
+    ]);
+
+    const profitByInvoice = invoiceFacet?.rows || [];
+    const invoiceTotalCount = invoiceFacet?.meta?.[0]?.totalCount || 0;
+
     return res.json({
       filters: f,
       summary,
       profitOverTime,
+      profitByInvoice,
+      profitByInvoiceMeta: {
+        totalCount: invoiceTotalCount,
+        page: invoiceAll ? 1 : invoicePage,
+        limit: invoiceAll ? invoiceTotalCount || profitByInvoice.length : invoiceLimit,
+        all: !!invoiceAll,
+      },
     });
   } catch (error) {
     console.error('getProfitReport:', error);
@@ -864,26 +1244,6 @@ export const getInstallmentsReport = async (req, res) => {
     if (hasCollectorFilter) {
       const clients = await Client.find({ collectorId: collectorOid }).select('_id').lean();
       clientIdsFilter = clients.map((c) => c._id);
-      if (!clientIdsFilter.length) {
-        return res.json({
-          filters: { ...f, collectorId: collectorOid, status: statusKey },
-          summary: {
-            totalAmount: 0,
-            collectedAmount: 0,
-            remainingAmount: 0,
-            overdueAmount: 0,
-            dueSoonAmount: 0,
-            paidCount: 0,
-            unpaidCount: 0,
-            overdueCount: 0,
-            promisedCount: 0,
-            collectionRate: 0,
-          },
-          byCollector: [],
-          overTime: [],
-          rows: [],
-        });
-      }
     }
 
     const orderMatch = {
@@ -893,15 +1253,49 @@ export const getInstallmentsReport = async (req, res) => {
       'installments.0': { $exists: true },
     };
     if (f.branchId) orderMatch.branch = f.branchId;
-    if (clientIdsFilter) orderMatch.clientId = { $in: clientIdsFilter };
+    if (hasCollectorFilter) {
+      orderMatch.$or = [
+        { collectorId: collectorOid },
+        {
+          $and: [
+            { $or: [{ collectorId: null }, { collectorId: { $exists: false } }] },
+            ...(clientIdsFilter?.length
+              ? [{ clientId: { $in: clientIdsFilter } }]
+              : [{ _id: null }]),
+          ],
+        },
+      ];
+    }
     appendOrderCustomerFilters(orderMatch, f);
 
     const orders = await Order.find(orderMatch)
       .select(
-        'orderNumber clientId clientName clientPhoneNumber branch installmentPlanSnapshot installments totalPrice amountPaid paymentStatus'
+        'orderNumber clientId clientName clientPhoneNumber branch installmentPlanSnapshot installments totalPrice amountPaid paymentStatus collectorId'
       )
       .populate('branch', 'name')
+      .populate('collectorId', 'name')
       .lean();
+
+    if (hasCollectorFilter && !orders.length) {
+      return res.json({
+        filters: { ...f, collectorId: collectorOid, status: statusKey },
+        summary: {
+          totalAmount: 0,
+          collectedAmount: 0,
+          remainingAmount: 0,
+          overdueAmount: 0,
+          dueSoonAmount: 0,
+          paidCount: 0,
+          unpaidCount: 0,
+          overdueCount: 0,
+          promisedCount: 0,
+          collectionRate: 0,
+        },
+        byCollector: [],
+        overTime: [],
+        rows: [],
+      });
+    }
 
     const clientIds = [
       ...new Set(orders.map((o) => String(o.clientId || '')).filter(Boolean)),
@@ -945,8 +1339,17 @@ export const getInstallmentsReport = async (req, res) => {
 
     for (const order of orders) {
       const client = clientById.get(String(order.clientId)) || null;
-      const colId = String(client?.collectorId?._id || client?.collectorId || '');
-      const colName = client?.collectorId?.name || '';
+      const orderCol = order?.collectorId;
+      const clientCol = client?.collectorId;
+      const colId = String(
+        (orderCol && (orderCol._id || orderCol)) ||
+          (clientCol && (clientCol._id || clientCol)) ||
+          ''
+      );
+      const colName = String(
+        (orderCol && orderCol.name) || (clientCol && clientCol.name) || ''
+      ).trim();
+      if (hasCollectorFilter && colId !== String(collectorOid)) continue;
       if (colId && !collectorStats.has(colId)) {
         collectorStats.set(colId, {
           collectorId: colId,

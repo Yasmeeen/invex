@@ -41,8 +41,16 @@ import {
 import InstallmentPlan from '../../DB/models/installmentPlan.model.js';
 import {
   applyPaymentToInstallments,
+  allocateInstallmentProfitShares,
   buildSaleInstallmentSchedule,
+  ensureInstallmentProfitShares,
+  orderLineTradingProfit,
 } from '../../utils/sale-installments.js';
+import {
+  clearInstallmentPromiseToPay,
+  serializePastPromiseHistory,
+  setInstallmentPromiseToPay,
+} from '../../utils/promise-to-pay.js';
 
 const normalizeAttrKey = (raw) =>
   String(raw || '')
@@ -764,6 +772,9 @@ export const createOrder = async (req, res) => {
         }
       }
 
+      const installmentTotalProfit = orderLineTradingProfit(orderProducts);
+      allocateInstallmentProfitShares(schedule.installments, installmentTotalProfit);
+
       installmentFields = {
         installmentPlanId: plan._id,
         installmentPlanSnapshot: {
@@ -774,6 +785,7 @@ export const createOrder = async (req, res) => {
         installmentStartDate: startDate,
         installmentPrincipal: schedule.principal,
         installmentInterestAmount: schedule.interestAmount,
+        installmentTotalProfit,
         installments: schedule.installments,
       };
       resolvedPaymentMethod = 'installment';
@@ -815,6 +827,18 @@ export const createOrder = async (req, res) => {
     const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean();
     const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
 
+    // Inherit client collector onto installment invoices (can be reassigned later per invoice).
+    let inheritedCollectorId = null;
+    if (installmentFields && finalClientId) {
+      const clientForCollector = await Client.findById(finalClientId)
+        .select("collectorId")
+        .session(session)
+        .lean();
+      if (clientForCollector?.collectorId) {
+        inheritedCollectorId = clientForCollector.collectorId;
+      }
+    }
+
     // ======================
     // 4️⃣ CREATE ORDER WITH CASHIER
     // ======================
@@ -825,6 +849,7 @@ export const createOrder = async (req, res) => {
           partyType,
           ...(finalVendorId ? { vendorId: finalVendorId } : {}),
           ...(finalClientId ? { clientId: finalClientId } : {}),
+          ...(inheritedCollectorId ? { collectorId: inheritedCollectorId } : {}),
           clientName: saleClientName,
           clientPhoneNumber: saleClientPhone,
           clientAddress: saleClientAddress,
@@ -1183,7 +1208,9 @@ export const addOrderPayment = async (req, res) => {
     }
 
     let remainingInstallments = 0;
+    let recognizedInstallmentProfit = 0;
     if (Array.isArray(order.installments) && order.installments.length) {
+      ensureInstallmentProfitShares(order);
       const scheduleResult = applyPaymentToInstallments(order.installments, applied, {
         paidAt: dt,
         paymentMethod: primaryMethod,
@@ -1191,7 +1218,39 @@ export const addOrderPayment = async (req, res) => {
         installmentId: installmentIdRaw,
       });
       remainingInstallments = scheduleResult.remainingInstallments;
+      recognizedInstallmentProfit = Math.round((Number(scheduleResult.installmentProfit) || 0) * 100) / 100;
       order.markModified('installments');
+
+      if (recognizedInstallmentProfit > 0) {
+        const toward = (order.payments || []).filter(
+          (p) =>
+            p.paidAt &&
+            Math.abs(new Date(p.paidAt).getTime() - dt.getTime()) < 2000 &&
+            p.countsTowardInvoice !== false &&
+            !p.feeForMethod
+        );
+        if (toward.length === 1) {
+          toward[0].installmentProfit = recognizedInstallmentProfit;
+        } else if (toward.length > 1) {
+          const sumAmt = toward.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+          let allocated = 0;
+          toward.forEach((p, i) => {
+            if (i === toward.length - 1) {
+              p.installmentProfit = Math.round((recognizedInstallmentProfit - allocated) * 100) / 100;
+            } else {
+              const share =
+                sumAmt > 0
+                  ? Math.round(
+                      ((recognizedInstallmentProfit * (Number(p.amount) || 0)) / sumAmt) * 100
+                    ) / 100
+                  : 0;
+              p.installmentProfit = share;
+              allocated = Math.round((allocated + share) * 100) / 100;
+            }
+          });
+        }
+        order.markModified('payments');
+      }
     }
 
     await order.save();
@@ -1285,15 +1344,21 @@ export const setInstallmentPromise = async (req, res) => {
     if (!row) return res.status(404).json({ error: 'Installment not found' });
     if (row.paid) return res.status(400).json({ error: 'Installment already paid' });
 
+    const actorUserId = mongoose.Types.ObjectId.isValid(
+      String(req.body?.userId || req.user?._id || '')
+    )
+      ? new mongoose.Types.ObjectId(String(req.body?.userId || req.user?._id))
+      : undefined;
+
     const raw = req.body?.promiseToPayAt;
     if (raw === null || raw === '' || raw === undefined) {
-      row.promiseToPayAt = undefined;
+      clearInstallmentPromiseToPay(row, { userId: actorUserId });
     } else {
       const dt = new Date(raw);
       if (Number.isNaN(dt.getTime())) {
         return res.status(400).json({ error: 'Invalid promiseToPayAt' });
       }
-      row.promiseToPayAt = dt;
+      setInstallmentPromiseToPay(row, dt, { userId: actorUserId });
     }
     if (req.body?.note !== undefined) {
       row.note = String(req.body.note || '').trim();
@@ -1301,7 +1366,29 @@ export const setInstallmentPromise = async (req, res) => {
     order.markModified('installments');
     await order.save();
 
-    res.json({ message: 'Promise updated', order, installment: row });
+    await auditLog(req, {
+      action: 'update',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: order?.orderNumber != null ? `#${order.orderNumber}` : undefined,
+      message:
+        raw === null || raw === '' || raw === undefined
+          ? `Cleared installment #${row.sequence} promise to pay`
+          : `Set installment #${row.sequence} promise to pay`,
+      metadata: {
+        orderNumber: order?.orderNumber,
+        installmentId: row._id,
+        sequence: row.sequence,
+        promiseToPayAt: row.promiseToPayAt || null,
+        clientId: order.clientId,
+      },
+    });
+
+    const installment = typeof row.toObject === 'function' ? row.toObject() : { ...row };
+    installment.promiseToPayHistoryPast = serializePastPromiseHistory(row);
+
+    res.json({ message: 'Promise updated', order, installment });
   } catch (error) {
     console.error('setInstallmentPromise:', error);
     res.status(500).json({ error: 'Failed to update promise' });

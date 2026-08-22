@@ -16,6 +16,7 @@ import {
   isClientCreditOrder,
   pointsEarnedForOrder,
 } from "../../utils/client-order-utils.js";
+import { serializePastPromiseHistory } from "../../utils/promise-to-pay.js";
 import {
   buildClientNetBalanceMessage,
   buildClientSettlementPreview,
@@ -161,7 +162,12 @@ export const getClientByPhone = async (req, res) => {
 
 /**
  * GET all clients (pagination + search + order stats + balances)
- * Query: balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
+ * Query:
+ *  - name — filter by client name
+ *  - search — filter by primary + additional phone numbers
+ *  - balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
+ *  - lastInstallmentPlanId / lastInstallmentPlanMonths — نظام تقسيط آخر فاتورة
+ *  - lastInstallmentAmount — قيمة القسط الشهري لآخر فاتورة
  */
 export const getClients = async (req, res) => {
   try {
@@ -170,23 +176,54 @@ export const getClients = async (req, res) => {
       limit: limitQ,
       perPage,
       search = "",
+      name = "",
       branch_id = "",
       balanceSide = "",
+      lastInstallmentPlanId = "",
+      lastInstallmentPlanMonths = "",
+      lastInstallmentAmount = "",
     } = req.query;
     const limit = Number(limitQ || perPage || 10) || 10;
     const skip = (Number(page) - 1) * limit;
     const sideFilter = String(balanceSide || "")
       .trim()
       .toLowerCase();
+    const nameFilter = String(name || "").trim();
+    const phoneFilter = String(search || "").trim();
+    const planIdRaw = String(lastInstallmentPlanId || "").trim();
+    const planIdFilter =
+      planIdRaw && mongoose.Types.ObjectId.isValid(planIdRaw)
+        ? new mongoose.Types.ObjectId(planIdRaw)
+        : null;
+    const planMonthsFilter = Math.floor(Number(lastInstallmentPlanMonths));
+    const hasPlanMonthsFilter =
+      Number.isFinite(planMonthsFilter) && planMonthsFilter > 0;
+    const amountParsed = Number(lastInstallmentAmount);
+    const hasAmountFilter =
+      lastInstallmentAmount !== "" &&
+      lastInstallmentAmount != null &&
+      Number.isFinite(amountParsed) &&
+      amountParsed >= 0;
+    const amountFilter = hasAmountFilter ? round2(amountParsed) : null;
+    const needsLastInvoiceFilter =
+      !!planIdFilter || hasPlanMonthsFilter || hasAmountFilter;
 
     const matchStage = {};
-    if (search) {
-      const searchRe = { $regex: search, $options: "i" };
-      matchStage.$or = [
-        { phoneNumber: searchRe },
-        { additionalPhoneNumbers: searchRe },
-        { name: searchRe },
+    if (nameFilter) {
+      matchStage.name = { $regex: nameFilter, $options: "i" };
+    }
+    if (phoneFilter) {
+      const phoneRe = { $regex: phoneFilter, $options: "i" };
+      const phoneOr = [
+        { phoneNumber: phoneRe },
+        { additionalPhoneNumbers: phoneRe },
       ];
+      if (matchStage.name) {
+        matchStage.$and = [{ name: matchStage.name }, { $or: phoneOr }];
+        delete matchStage.name;
+      } else {
+        matchStage.$or = phoneOr;
+      }
     }
     if (branch_id && mongoose.Types.ObjectId.isValid(String(branch_id))) {
       const branchOid = new mongoose.Types.ObjectId(String(branch_id));
@@ -223,6 +260,23 @@ export const getClients = async (req, res) => {
           numberOfOrders: { $size: "$orders" },
           totalOrdersPrice: { $sum: "$orders.totalPrice" },
           lastOrderDate: { $max: "$orders.createdAt" },
+          _eligibleClientOrders: {
+            $filter: {
+              input: "$orders",
+              as: "o",
+              cond: {
+                $and: [
+                  { $ne: ["$$o.status", "restored"] },
+                  {
+                    $in: [
+                      { $ifNull: ["$$o.partyType", "client"] },
+                      ["client"],
+                    ],
+                  },
+                ],
+              },
+            },
+          },
           owesFromSales: {
             $reduce: {
               input: {
@@ -275,6 +329,26 @@ export const getClients = async (req, res) => {
 
       {
         $addFields: {
+          _lastEligibleOrderAt: { $max: "$_eligibleClientOrders.createdAt" },
+        },
+      },
+
+      {
+        $addFields: {
+          lastClientOrder: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: "$_eligibleClientOrders",
+                  as: "o",
+                  cond: {
+                    $eq: ["$$o.createdAt", "$_lastEligibleOrderAt"],
+                  },
+                },
+              },
+              0,
+            ],
+          },
           clientOwesUs: {
             $round: [{ $add: ["$owesFromSales", "$openingDebit"] }, 2],
           },
@@ -282,25 +356,139 @@ export const getClients = async (req, res) => {
       },
 
       {
-        $project: {
-          name: 1,
-          phoneNumber: 1,
-          additionalPhoneNumbers: 1,
-          address: 1,
-          additionalAddresses: 1,
-          nationalIdImageUrl: 1,
-          guarantor: 1,
-          collectorId: 1,
-          createdAt: 1,
-          branches: 1,
-          numberOfOrders: 1,
-          totalOrdersPrice: 1,
-          lastOrderDate: 1,
-          clientOwesUs: 1,
-          prepaidBalance: 1,
+        $addFields: {
+          lastInstallmentPlanId: "$lastClientOrder.installmentPlanId",
+          lastInstallmentPlanMonths: {
+            $ifNull: ["$lastClientOrder.installmentPlanSnapshot.months", null],
+          },
+          lastInstallmentAmount: {
+            $let: {
+              vars: {
+                fromSchedule: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $ifNull: ["$lastClientOrder.installments", []],
+                        },
+                        as: "inst",
+                        in: "$$inst.amount",
+                      },
+                    },
+                    0,
+                  ],
+                },
+                months: {
+                  $ifNull: ["$lastClientOrder.installmentPlanSnapshot.months", 0],
+                },
+                financed: {
+                  $add: [
+                    { $ifNull: ["$lastClientOrder.installmentPrincipal", 0] },
+                    {
+                      $ifNull: [
+                        "$lastClientOrder.installmentInterestAmount",
+                        0,
+                      ],
+                    },
+                  ],
+                },
+              },
+              in: {
+                $cond: [
+                  {
+                    $eq: [
+                      {
+                        $toLower: {
+                          $ifNull: ["$lastClientOrder.paymentMethod", ""],
+                        },
+                      },
+                      "installment",
+                    ],
+                  },
+                  {
+                    $cond: [
+                      { $ne: ["$$fromSchedule", null] },
+                      { $round: ["$$fromSchedule", 2] },
+                      {
+                        $cond: [
+                          { $gt: ["$$months", 0] },
+                          {
+                            $round: [{ $divide: ["$$financed", "$$months"] }, 2],
+                          },
+                          null,
+                        ],
+                      },
+                    ],
+                  },
+                  null,
+                ],
+              },
+            },
+          },
         },
       },
     ];
+
+    if (needsLastInvoiceFilter) {
+      const lastInvoiceAnd = [
+        {
+          $expr: {
+            $eq: [
+              {
+                $toLower: {
+                  $ifNull: ["$lastClientOrder.paymentMethod", ""],
+                },
+              },
+              "installment",
+            ],
+          },
+        },
+      ];
+
+      if (planIdFilter && hasPlanMonthsFilter) {
+        lastInvoiceAnd.push({
+          $or: [
+            { lastInstallmentPlanId: planIdFilter },
+            {
+              lastInstallmentPlanId: null,
+              lastInstallmentPlanMonths: planMonthsFilter,
+            },
+          ],
+        });
+      } else if (planIdFilter) {
+        lastInvoiceAnd.push({ lastInstallmentPlanId: planIdFilter });
+      } else if (hasPlanMonthsFilter) {
+        lastInvoiceAnd.push({
+          lastInstallmentPlanMonths: planMonthsFilter,
+        });
+      }
+
+      if (hasAmountFilter) {
+        lastInvoiceAnd.push({ lastInstallmentAmount: amountFilter });
+      }
+
+      pipeline.push({ $match: { $and: lastInvoiceAnd } });
+    }
+
+    pipeline.push({
+      $project: {
+        name: 1,
+        phoneNumber: 1,
+        additionalPhoneNumbers: 1,
+        address: 1,
+        additionalAddresses: 1,
+        nationalIdImageUrl: 1,
+        guarantor: 1,
+        collectorId: 1,
+        createdAt: 1,
+        branches: 1,
+        numberOfOrders: 1,
+        totalOrdersPrice: 1,
+        lastOrderDate: 1,
+        clientOwesUs: 1,
+        prepaidBalance: 1,
+      },
+    });
 
     const matched = await Client.aggregate(pipeline);
     const deferredMap = await computeClientDeferredPayablesByClients(matched);
@@ -653,8 +841,13 @@ export const getClientHistory = async (req, res) => {
           ) / 100;
         return rem > 0.001;
       });
+      const installmentsWithPromises = installments.map((r) => ({
+        ...r,
+        promiseToPayHistoryPast: serializePastPromiseHistory(r),
+      }));
       return {
         ...o,
+        installments: installmentsWithPromises,
         remaining,
         pointsEarned,
         isPayLater: isClientCreditOrder(o),

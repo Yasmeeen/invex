@@ -51,6 +51,7 @@ const toCategoryResponse = (doc, extra = {}) => {
   return {
     ...o,
     code,
+    imageUrl: o.imageUrl != null ? String(o.imageUrl).trim() : '',
     multiCodePerPiece: !!o.multiCodePerPiece,
     deleteProductWhenOutOfStock: !!o.deleteProductWhenOutOfStock,
     // Legacy categories without the field → default true
@@ -129,12 +130,18 @@ export const getCategoryById = async (req, res) => {
 
 const parseBool = (v) => v === true || v === 'true' || String(v).toLowerCase() === 'true';
 
+const normalizeImageUrl = (raw) => {
+  if (raw == null) return '';
+  return String(raw).trim();
+};
+
 // Create category
 export const createCategory = async (req, res) => {
   try {
     const {
       name,
       code,
+      imageUrl,
       attributeDefs,
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
@@ -166,6 +173,7 @@ export const createCategory = async (req, res) => {
     const newCategory = await Category.create({
       name: name.trim(),
       code: codeNorm,
+      imageUrl: normalizeImageUrl(imageUrl),
       attributeDefs: attr,
       multiCodePerPiece: parseBool(multiCodePerPiece),
       deleteProductWhenOutOfStock: parseBool(deleteProductWhenOutOfStock),
@@ -194,6 +202,7 @@ export const updateCategory = async (req, res) => {
     const {
       name,
       code,
+      imageUrl,
       attributeDefs,
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
@@ -203,6 +212,9 @@ export const updateCategory = async (req, res) => {
 
     if (name != null && String(name).trim() !== '') {
       updates.name = String(name).trim();
+    }
+    if (imageUrl !== undefined) {
+      updates.imageUrl = normalizeImageUrl(imageUrl);
     }
     if (code !== undefined) {
       const codeNorm = normalizeCategoryCode(code);

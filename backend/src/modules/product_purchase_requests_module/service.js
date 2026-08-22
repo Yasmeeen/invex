@@ -33,6 +33,19 @@ import {
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
 import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
 
+function ecommerceCatalogFieldsFromSource(src) {
+  return {
+    listedOnEcommerce: src?.listedOnEcommerce === true || src?.listedOnEcommerce === 'true',
+    ecommerceDescription: String(src?.ecommerceDescription || '').trim().slice(0, 50000),
+    ecommerceShortDescription: String(src?.ecommerceShortDescription || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160),
+    ecommerceIsFeatured: src?.ecommerceIsFeatured === true || src?.ecommerceIsFeatured === 'true',
+  };
+}
+
 async function postDeskPurchaseTreasuryLedger(purchase, { userId, branchId } = {}) {
   if (!purchase) return;
   const splits = Array.isArray(purchase.purchaseTreasurySplits)
@@ -113,6 +126,24 @@ function applyPurchaseRevive(existing, { name, payload, quantity, acquiredFromFi
   if (payload?.imageUrl != null) existing.imageUrl = payload.imageUrl;
   if (payload?.attributes) existing.attributes = payload.attributes;
   if (payload?.addedBy) existing.addedBy = payload.addedBy;
+  if (payload?.listedOnEcommerce !== undefined) {
+    existing.listedOnEcommerce =
+      payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true';
+  }
+  if (payload?.ecommerceDescription !== undefined) {
+    existing.ecommerceDescription = String(payload.ecommerceDescription || '').trim().slice(0, 50000);
+  }
+  if (payload?.ecommerceShortDescription !== undefined) {
+    existing.ecommerceShortDescription = String(payload.ecommerceShortDescription || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 160);
+  }
+  if (payload?.ecommerceIsFeatured !== undefined) {
+    existing.ecommerceIsFeatured =
+      payload.ecommerceIsFeatured === true || payload.ecommerceIsFeatured === 'true';
+  }
   if (acquiredFromFields && typeof acquiredFromFields === 'object') {
     Object.assign(existing, acquiredFromFields);
   }
@@ -619,6 +650,7 @@ export const createProductPurchaseRequest = async (req, res) => {
       imageUrl: imageUrlNorm,
       notes,
       ...(addedByNorm ? { addedBy: addedByNorm } : {}),
+      ...ecommerceCatalogFieldsFromSource(product),
     };
     if (categoryIsMulti && q > 1) {
       payload.unitCodes = unitCodesNorm;
@@ -772,6 +804,11 @@ export const createProductPurchaseRequest = async (req, res) => {
                 ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
                 listedOnEcommerce:
                   payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
+                ecommerceDescription: String(payload.ecommerceDescription || ''),
+            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
+            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
+                ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
+                ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
                 ...acquiredFromFields,
               },
             ],
@@ -944,6 +981,9 @@ export const createProductPurchaseRequest = async (req, res) => {
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
             listedOnEcommerce:
               payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
+            ecommerceDescription: String(payload.ecommerceDescription || ''),
+            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
+            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
             ...acquiredFromFields,
           },
         ],
@@ -1207,6 +1247,7 @@ async function buildPurchaseLinePayload(product, qtyRaw, { session, branchId }) 
     imageUrl: imageUrlNorm,
     notes,
     ...(addedByNorm ? { addedBy: addedByNorm } : {}),
+    ...ecommerceCatalogFieldsFromSource(product),
   };
   if (categoryIsMulti && q > 1) {
     payload.unitCodes = unitCodesNorm;
@@ -1314,6 +1355,9 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
             listedOnEcommerce:
               payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
+            ecommerceDescription: String(payload.ecommerceDescription || ''),
+            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
+            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
             ...acquiredFromFields,
           },
         ],
@@ -1363,6 +1407,9 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
         ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
         listedOnEcommerce:
           payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
+        ecommerceDescription: String(payload.ecommerceDescription || ''),
+        ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
+        ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
         ...acquiredFromFields,
       },
     ],
@@ -1867,6 +1914,9 @@ export const approveProductPurchaseRequest = async (req, res) => {
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
               listedOnEcommerce:
                 pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
+              ecommerceDescription: String(pp.ecommerceDescription || ''),
+              ecommerceShortDescription: String(pp.ecommerceShortDescription || ''),
+              ecommerceIsFeatured: Boolean(pp.ecommerceIsFeatured),
               ...acquiredFromFields,
             },
           ],
@@ -1948,6 +1998,9 @@ export const approveProductPurchaseRequest = async (req, res) => {
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
               listedOnEcommerce:
                 pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
+              ecommerceDescription: String(pp.ecommerceDescription || ''),
+              ecommerceShortDescription: String(pp.ecommerceShortDescription || ''),
+              ecommerceIsFeatured: Boolean(pp.ecommerceIsFeatured),
               ...acquiredFromFields,
             },
           ],

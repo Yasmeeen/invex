@@ -29,6 +29,10 @@ export interface Product {
    * Default false.
    */
   listedOnEcommerce?: boolean;
+  /** Description shown on the e-commerce store (edited in Invex). */
+  ecommerceDescription?: string;
+  ecommerceShortDescription?: string;
+  ecommerceIsFeatured?: boolean;
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
@@ -58,6 +62,8 @@ export interface ProductActiveBooking {
   quantity?: number;
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
+  /** Pickup branch snapshot (ecommerce customer choice or product branch). */
+  branch?: { _id?: string; name?: string } | string | null;
   depositAmount: number;
   /** Deposit payment method splits (cash / apps). */
   depositPayments?: Array<{ method: string; amount: number }>;
@@ -95,6 +101,8 @@ export interface ProductActiveBooking {
 export interface Category {
   _id: string;
   name: string;
+  /** Public image URL for the website */
+  imageUrl?: string;
   /** Prefix for product codes (e.g. ELEC → ELEC-001) */
   code?: string;
   /** Each unit gets its own SKU/code when quantity > 1 */

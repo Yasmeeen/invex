@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Client from '../../DB/models/client.model.js';
 import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
+import Category from '../../DB/models/category.model.js';
 import EcommerceChannelReservation from '../../DB/models/ecommerceChannelReservation.model.js';
 import {
   getIntegrationConfig,
@@ -13,7 +14,10 @@ import { ensureOnlineBranch } from './onlineBranch.js';
 import {
   createBookingFromEcommerceOrder,
   cancelBookingsForEcommerceOrder,
+  markBookingsPaidOnlineForEcommerceOrder,
   reconcileBookingsToStock,
+  recalcProductBookingTotals,
+  emitBookingCreatedNotification,
 } from '../product_bookings_module/service.js';
 
 function sellable(product) {
@@ -37,7 +41,20 @@ export async function reserveFromEcommerce(req, res) {
       ecommerceOrderNumber,
       customer,
       items,
+      pickupType,
+      pickupLocation,
+      pickupBranchId,
+      invexBranchId,
+      paymentMethod,
+      paymentStatus,
     } = req.body || {};
+    const bookingPickupType =
+      pickupType === 'branch_pickup' ? 'branch_pickup' : 'online_shipping';
+    const bookingPickupLocation = String(pickupLocation || '').trim();
+    const bookingPickupBranchId = String(pickupBranchId || invexBranchId || '').trim();
+    const paidOnline =
+      String(paymentMethod || '').toLowerCase() === 'online' &&
+      String(paymentStatus || '').toLowerCase() === 'paid';
 
     if (!ecommerceOrderId || !Array.isArray(items) || items.length === 0) {
       await session.abortTransaction();
@@ -54,6 +71,7 @@ export async function reserveFromEcommerce(req, res) {
     }
 
     const created = [];
+    const bookings = [];
     for (const line of items) {
       const productId = line.invexProductId;
       const qty = Math.max(1, Number(line.quantity) || 1);
@@ -73,6 +91,10 @@ export async function reserveFromEcommerce(req, res) {
         unitPrice: Number(line.unitPrice ?? product.price) || 0,
         ecommerceOrderId: String(ecommerceOrderId),
         session,
+        pickupType: bookingPickupType,
+        pickupLocation: String(line.pickupLocation || bookingPickupLocation).trim(),
+        pickupBranchId: String(line.pickupBranchId || line.invexBranchId || bookingPickupBranchId).trim(),
+        paidOnline,
       });
 
       const [row] = await EcommerceChannelReservation.create(
@@ -95,11 +117,14 @@ export async function reserveFromEcommerce(req, res) {
         { session }
       );
       created.push(row);
+      if (booking) bookings.push({ booking, product, qty });
     }
 
     await session.commitTransaction();
-    for (const row of created) {
-      notifyProductChanged(row.product);
+    for (const { booking, product, qty } of bookings) {
+      await recalcProductBookingTotals(product._id);
+      await emitBookingCreatedNotification(booking, product, qty, booking.createdBy);
+      notifyProductChanged(product._id);
     }
     res.status(201).json({ ok: true, reservations: created.map((r) => r._id) });
   } catch (err) {
@@ -152,6 +177,23 @@ export async function cancelReservationFromEcommerce(req, res) {
     res.status(400).json({ error: err.message || 'Cancel failed' });
   } finally {
     session.endSession();
+  }
+}
+
+/**
+ * Website Visa/card payment succeeded → full amount paid online on the Invex booking.
+ */
+export async function markPaidFromEcommerce(req, res) {
+  try {
+    const ecommerceOrderId = String(req.body?.ecommerceOrderId || '').trim();
+    if (!ecommerceOrderId) {
+      return res.status(400).json({ error: 'ecommerceOrderId is required' });
+    }
+    const updated = await markBookingsPaidOnlineForEcommerceOrder(ecommerceOrderId);
+    res.json({ ok: true, updated });
+  } catch (err) {
+    console.error('markPaidFromEcommerce:', err);
+    res.status(400).json({ error: err.message || 'Mark paid failed' });
   }
 }
 
@@ -267,6 +309,15 @@ export async function confirmOrderFromEcommerce(req, res) {
       }
 
       product.stock = (Number(product.stock) || 0) - qty;
+      if (Number(product.stock) <= 0) {
+        const cat = await Category.findById(product.category)
+          .session(session)
+          .select('deleteProductWhenOutOfStock')
+          .lean();
+        if (cat?.deleteProductWhenOutOfStock) {
+          product.removedWhenOutOfStock = true;
+        }
+      }
       await product.save({ session });
       touchedProductIds.push(product._id);
 

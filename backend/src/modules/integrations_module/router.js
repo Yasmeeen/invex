@@ -3,6 +3,7 @@ import { requireEcommerceIntegrationAuth } from './middleware.js';
 import {
   reserveFromEcommerce,
   cancelReservationFromEcommerce,
+  markPaidFromEcommerce,
   confirmOrderFromEcommerce,
   deliverOrderFromEcommerce,
   getCatalog,
@@ -25,6 +26,7 @@ router.use(requireEcommerceIntegrationAuth);
 router.get('/ecommerce/catalog', getCatalog);
 router.post('/ecommerce/orders/reserve', reserveFromEcommerce);
 router.post('/ecommerce/orders/cancel', cancelReservationFromEcommerce);
+router.post('/ecommerce/orders/paid', markPaidFromEcommerce);
 router.post('/ecommerce/orders/confirm', confirmOrderFromEcommerce);
 router.post('/ecommerce/orders/deliver', deliverOrderFromEcommerce);
 

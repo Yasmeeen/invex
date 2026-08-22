@@ -93,6 +93,21 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    /** Storefront product description (edited in Invex; pushed to the e-commerce catalog). */
+    ecommerceDescription: {
+      type: String,
+      default: '',
+    },
+    ecommerceShortDescription: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    ecommerceIsFeatured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

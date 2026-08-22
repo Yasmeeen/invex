@@ -38,6 +38,9 @@ export interface DeskPurchaseProductPayload {
   acquiredFrom?: ProductAcquiredFrom | null;
   /** Opt-in listing on the e-commerce catalog (default off). */
   listedOnEcommerce?: boolean;
+  ecommerceDescription?: string;
+  ecommerceShortDescription?: string;
+  ecommerceIsFeatured?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

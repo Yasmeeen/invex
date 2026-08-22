@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 const categorySchema = new mongoose.Schema({
   name: { type: String, required: true },
+  /** Public HTTPS URL (e.g. Cloudinary secure_url) shown on the website. */
+  imageUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   /** Short prefix for product codes (e.g. ELEC → ELEC-001). Uppercase in API. */
   code: { type: String, trim: true },
   /**
@@ -56,6 +62,7 @@ function ensureCodeInPlain(_doc, ret) {
   if (!Array.isArray(ret.attributeDefs)) {
     ret.attributeDefs = [];
   }
+  ret.imageUrl = ret.imageUrl != null ? String(ret.imageUrl).trim() : '';
   ret.multiCodePerPiece = !!ret.multiCodePerPiece;
   ret.deleteProductWhenOutOfStock = !!ret.deleteProductWhenOutOfStock;
   // Missing / null → true (legacy categories & schema default)

@@ -1,8 +1,9 @@
 import Category from '../../DB/models/category.model.js';
 import Product from '../../DB/models/product.model.js';
+import Branch from '../../DB/models/branch.model.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import { isEcommerceIntegrationFeatureAvailable } from './feature.js';
-import { ensureOnlineBranch } from './onlineBranch.js';
+import { ensureOnlineBranch, ONLINE_BRANCH_NAME } from './onlineBranch.js';
 
 const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
 
@@ -19,6 +20,16 @@ function mapCategory(cat) {
     invexCategoryId: String(cat._id),
     name: cat.name,
     code: cat.code || '',
+    imageUrl: cat.imageUrl || '',
+    deleteProductWhenOutOfStock: Boolean(cat.deleteProductWhenOutOfStock),
+  };
+}
+
+function mapBranch(branch) {
+  return {
+    invexBranchId: String(branch._id),
+    name: branch.name,
+    address: String(branch.storeAddress || '').trim(),
   };
 }
 
@@ -27,6 +38,14 @@ function mapProduct(product, categoryIdOnEcomHint) {
   const discount = Number(product.discount) || 0;
   const offerPrice =
     discount > 0 ? Math.max(0, price - (price * discount) / 100) : undefined;
+  const description = String(product.ecommerceDescription || '').trim();
+  const shortDescription = String(product.ecommerceShortDescription || '').trim();
+  const branchDoc = product.branch && typeof product.branch === 'object' ? product.branch : null;
+  const branchId = branchDoc?._id
+    ? String(branchDoc._id)
+    : product.branch
+      ? String(product.branch)
+      : null;
   return {
     invexProductId: String(product._id),
     invexCategoryId: product.category ? String(product.category._id || product.category) : null,
@@ -36,8 +55,17 @@ function mapProduct(product, categoryIdOnEcomHint) {
     offerPrice,
     stock: sellableStock(product),
     imageUrl: product.imageUrl || '',
+    description,
+    ecommerceDescription: description,
+    shortDescription,
+    isFeatured: Boolean(product.ecommerceIsFeatured),
     removedWhenOutOfStock: Boolean(product.removedWhenOutOfStock),
+    deleteProductWhenOutOfStock: Boolean(product.category?.deleteProductWhenOutOfStock),
     categoryHint: categoryIdOnEcomHint || null,
+    invexBranchId: product.inWarehouse ? null : branchId,
+    invexBranchName: product.inWarehouse ? '' : String(branchDoc?.name || ''),
+    invexBranchAddress: product.inWarehouse ? '' : String(branchDoc?.storeAddress || ''),
+    inWarehouse: Boolean(product.inWarehouse),
   };
 }
 
@@ -85,9 +113,12 @@ export async function buildCatalogPayload() {
     };
   }
 
-  const products = (await Product.find(productQuery).populate('category').lean()).filter(
-    (p) => sellableStock(p) > 0
-  );
+  const products = (
+    await Product.find(productQuery).populate('category').populate('branch').lean()
+  ).filter((p) => sellableStock(p) > 0);
+  const branches = await Branch.find({ name: { $ne: ONLINE_BRANCH_NAME } })
+    .select('name storeAddress')
+    .lean();
   const categoryIds = [
     ...new Set(
       products
@@ -104,6 +135,7 @@ export async function buildCatalogPayload() {
     catalogMode: cfg.catalogMode,
     categories: categories.map(mapCategory),
     products: products.map((p) => mapProduct(p)),
+    branches: branches.map(mapBranch),
   };
 }
 
@@ -160,6 +192,7 @@ export async function pushFullCatalog() {
     const body = {
       catalogMode: payload.catalogMode,
       categories: isFirst ? categories : [],
+      branches: payload.branches || [],
       products: chunk,
       /** When false, ecom must not delete products missing from this chunk. */
       replaceMissing: isFirst && chunk.length === products.length,
@@ -194,18 +227,27 @@ export async function pushFullCatalog() {
   };
 }
 
+function shouldDeleteFromStorefront(product) {
+  if (product.removedWhenOutOfStock) return true;
+  const cat = product.category;
+  const deleteWhenOos = Boolean(
+    cat && typeof cat === 'object' && cat.deleteProductWhenOutOfStock
+  );
+  return sellableStock(product) <= 0 && deleteWhenOos;
+}
+
 export async function pushProductUpsert(productId) {
   const cfg = await getIntegrationConfig();
   if (!cfg.enabled) return { ok: false, skipped: true, reason: cfg.reason };
 
-  const product = await Product.findById(productId).populate('category').lean();
+  const product = await Product.findById(productId).populate('category').populate('branch').lean();
   if (!product) {
     return postToEcommerce('/api/integration/invex/catalog/product-delete', {
       invexProductId: String(productId),
     });
   }
 
-  if (product.removedWhenOutOfStock || sellableStock(product) <= 0) {
+  if (shouldDeleteFromStorefront(product)) {
     return postToEcommerce('/api/integration/invex/catalog/product-delete', {
       invexProductId: String(product._id),
     });
@@ -225,9 +267,14 @@ export async function pushProductUpsert(productId) {
   }
 
   const cat = product.category;
+  const mapped = mapProduct(product);
   return postToEcommerce('/api/integration/invex/catalog/product-upsert', {
     category: cat ? mapCategory(cat) : null,
-    product: mapProduct(product),
+    product: mapped,
+    branch:
+      mapped.invexBranchId && product.branch && typeof product.branch === 'object'
+        ? mapBranch(product.branch)
+        : null,
   });
 }
 

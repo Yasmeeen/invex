@@ -178,6 +178,13 @@ updateProduct(product: Product, productId: string): Observable<Product> {
   );
 }
 
+updateProductPrice(productId: string, price: number): Observable<{ message: string; product: Product }> {
+  return this.http.patch<{ message: string; product: Product }>(
+    `${PRODUCTS_URL}/${productId}/price`,
+    { price }
+  );
+}
+
 deleteProduct(productId: string, userId?: string) {
   const params: Record<string, string> = {};
   if (userId) params.userId = String(userId);

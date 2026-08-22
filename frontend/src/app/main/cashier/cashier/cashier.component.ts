@@ -30,15 +30,20 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
+import { CollectionsService } from '@shared/services/collections.service';
 import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import {
+  isInstallmentSale as orderIsInstallmentSale,
   isPayLaterMethod,
   isPayLaterSettled,
   orderDisplayPaid,
   orderDisplayRemaining,
+  orderInstallmentMonthlyAmount,
+  orderInstallmentMonths,
+  orderInstallmentPlanName,
 } from '@core/utils/order-display.util';
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
@@ -189,6 +194,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private bookingReprint: BookingReprintService,
     private invoiceReprint: InvoiceReprintService,
     private productPurchaseRequests: ProductPurchaseRequestsService,
+    private collectionsService: CollectionsService,
     private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
@@ -1083,6 +1089,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return isPayLaterMethod(this.createdOrder?.paymentMethod);
   }
 
+  isInstallmentSale(): boolean {
+    return orderIsInstallmentSale(this.createdOrder);
+  }
+
   isCreditFullySettled(): boolean {
     return isPayLaterSettled(this.createdOrder);
   }
@@ -1093,6 +1103,26 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   receiptCreditRemaining(): number {
     return orderDisplayRemaining(this.createdOrder);
+  }
+
+  receiptInstallmentMonths(): number {
+    return orderInstallmentMonths(this.createdOrder);
+  }
+
+  receiptInstallmentMonthlyAmount(): number {
+    return orderInstallmentMonthlyAmount(this.createdOrder);
+  }
+
+  receiptInstallmentPlanName(): string {
+    return orderInstallmentPlanName(this.createdOrder);
+  }
+
+  receiptInstallmentStartDate(): string | Date | null {
+    return this.createdOrder?.installmentStartDate || null;
+  }
+
+  receiptInstallmentDownPayment(): number {
+    return orderDisplayPaid(this.createdOrder);
   }
 
   printDeskPurchaseReceipt(): void {
@@ -2378,6 +2408,13 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
             ? Number(base.bookingDepositCreditAmount)
             : bookingCredit,
       };
+
+      if (
+        String(base?.paymentMethod || '').toLowerCase() === 'installment' ||
+        payment.installmentPlanId
+      ) {
+        this.collectionsService.notifyInstallmentSaleCreated();
+      }
 
       this.pendingExchangePurchaseReceipt = pendingPurchaseReceipt;
 

@@ -3,10 +3,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Branch, Order } from '@core/models/products.model';
 import {
+  isInstallmentSale,
   isPayLaterMethod,
   isPayLaterSettled,
   orderDisplayPaid,
   orderDisplayRemaining,
+  orderInstallmentMonthlyAmount,
+  orderInstallmentPlanName,
 } from '@core/utils/order-display.util';
 import {
   Client,
@@ -474,9 +477,23 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return isPayLaterSettled(order as any);
   }
 
+  payLaterSettledLabelKey(order: ClientHistoryOrderRow): string {
+    return isInstallmentSale(order as any)
+      ? 'tr_installments_fully_settled'
+      : 'tr_credit_fully_settled';
+  }
+
+  installmentPlanName(order: ClientHistoryOrderRow): string {
+    return orderInstallmentPlanName(order as any);
+  }
+
+  installmentMonthlyAmount(order: ClientHistoryOrderRow): number {
+    return orderInstallmentMonthlyAmount(order as any);
+  }
+
   paymentStatusLabel(status?: string, order?: ClientHistoryOrderRow): string {
     if (order && this.isCreditFullySettled(order) && order.status !== 'restored') {
-      return this.translate.instant('tr_credit_fully_settled');
+      return this.translate.instant(this.payLaterSettledLabelKey(order));
     }
     switch (status) {
       case 'paid':
@@ -621,7 +638,21 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   setInstallmentPromise(
     order: ClientHistoryOrderRow,
-    row: { _id?: string; promiseToPayAt?: string; sequence?: number }
+    row: {
+      _id?: string;
+      promiseToPayAt?: string;
+      sequence?: number;
+      promiseToPayHistoryPast?: Array<{
+        promiseToPayAt?: string;
+        recordedAt?: string;
+        paidOnPromisedDay?: boolean | null;
+      }>;
+      promiseToPayHistory?: Array<{
+        promiseToPayAt?: string;
+        recordedAt?: string;
+        paidOnPromisedDay?: boolean | null;
+      }>;
+    }
   ): void {
     const orderId = normalizeMongoId(order._id);
     const installmentId = normalizeMongoId(row._id);
@@ -636,6 +667,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
         promiseToPayAt: row.promiseToPayAt || null,
         orderNumber: order.orderNumber,
         installmentSequence: row.sequence,
+        promiseToPayHistory: row.promiseToPayHistoryPast || row.promiseToPayHistory || [],
       },
       disableClose: true,
     });

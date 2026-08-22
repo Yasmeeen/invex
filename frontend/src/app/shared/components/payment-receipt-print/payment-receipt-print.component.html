@@ -94,7 +94,7 @@
       </tr>
       <tr class="bold" *ngIf="isFullySettled()">
         <td colspan="2" class="center">
-          {{ 'tr_credit_fully_settled' | receiptTranslate: st.receiptLanguage }}
+          {{ fullySettledLabelKey() | receiptTranslate: st.receiptLanguage }}
         </td>
       </tr>
     </table>

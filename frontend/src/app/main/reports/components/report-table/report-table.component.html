@@ -37,7 +37,10 @@
 
             <ng-container *ngSwitchDefault>
               <ng-container *ngIf="col.format === 'money'; else notMoney">
-                {{ row[col.key] | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
+                <ng-container *ngIf="row[col.key] == null || row[col.key] === ''; else moneyVal">—</ng-container>
+                <ng-template #moneyVal>
+                  {{ row[col.key] | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
+                </ng-template>
               </ng-container>
               <ng-template #notMoney>
                 <ng-container *ngIf="col.format === 'parts' && isParts(row[col.key]); else plainCell">

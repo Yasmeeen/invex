@@ -292,8 +292,22 @@
         <div class="installment-order-head">
           <div class="installment-order-head__meta">
             <strong class="installment-order-head__invoice">#{{ o.orderNumber }}</strong>
-            <span class="installment-order-head__plan" *ngIf="o.installmentPlanSnapshot?.name">
-              {{ o.installmentPlanSnapshot?.name }}
+            <span class="installment-order-head__plan" *ngIf="installmentPlanName(o)">
+              {{ installmentPlanName(o) }}
+            </span>
+            <span class="installment-order-head__meta-line" *ngIf="installmentMonthlyAmount(o) > 0">
+              {{ 'tr_invoice_installment_monthly' | translate }}:
+              {{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </span>
+            <span class="installment-order-head__meta-line" *ngIf="o.installmentStartDate">
+              {{ 'tr_installment_start_date' | translate }}:
+              {{ o.installmentStartDate | date:'dd/MM/yyyy' }}
+            </span>
+            <span
+              class="settled-badge"
+              *ngIf="isCreditFullySettled(o)"
+            >
+              {{ payLaterSettledLabelKey(o) | translate }}
             </span>
           </div>
           <div class="installment-order-head__aside">
@@ -339,7 +353,29 @@
                 <td>{{ (row.paidAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
                 <td>{{ installmentRowRemaining(row) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
                 <td>{{ row.paidAt ? (row.paidAt | date:'dd/MM/yyyy') : '—' }}</td>
-                <td>{{ row.promiseToPayAt ? (row.promiseToPayAt | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
+                <td>
+                  <div class="promise-cell">
+                    <span>{{ row.promiseToPayAt ? (row.promiseToPayAt | date:'dd/MM/yyyy HH:mm') : '—' }}</span>
+                    <ul
+                      class="promise-history"
+                      *ngIf="(row.promiseToPayHistoryPast || row.promiseToPayHistory)?.length"
+                    >
+                      <li *ngFor="let p of (row.promiseToPayHistoryPast || row.promiseToPayHistory)">
+                        <span>{{ p.promiseToPayAt | date:'dd/MM/yyyy' }}</span>
+                        <span
+                          class="promise-history__badge"
+                          [class.promise-history__badge--kept]="p.paidOnPromisedDay === true"
+                          [class.promise-history__badge--missed]="p.paidOnPromisedDay === false"
+                          [class.promise-history__badge--pending]="p.paidOnPromisedDay !== true && p.paidOnPromisedDay !== false"
+                        >
+                          <ng-container *ngIf="p.paidOnPromisedDay === true">{{ 'tr_promise_to_pay_kept' | translate }}</ng-container>
+                          <ng-container *ngIf="p.paidOnPromisedDay === false">{{ 'tr_promise_to_pay_missed' | translate }}</ng-container>
+                          <ng-container *ngIf="p.paidOnPromisedDay !== true && p.paidOnPromisedDay !== false">{{ 'tr_promise_to_pay_pending' | translate }}</ng-container>
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </td>
                 <td>
                   <button
                     type="button"
@@ -403,7 +439,7 @@
                   {{ orderRemaining(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
                 </span>
                 <span class="text-success weight-bold" *ngIf="isCreditFullySettled(o)">
-                  {{ 'tr_credit_fully_settled' | translate }}
+                  {{ payLaterSettledLabelKey(o) | translate }}
                 </span>
                 <span *ngIf="orderRemaining(o) <= 0 && !isCreditFullySettled(o)">—</span>
               </td>

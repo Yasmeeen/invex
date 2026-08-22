@@ -213,6 +213,23 @@
   line-height: 1.3;
 }
 
+.installment-order-head__meta-line {
+  font-size: 0.78rem;
+  color: #475569;
+  font-weight: 600;
+}
+
+.settled-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+  white-space: nowrap;
+}
+
 .installment-order-head__aside {
   display: flex;
   align-items: center;
@@ -282,6 +299,56 @@
 .installment-row--paid:hover > td,
 .installment-row--overdue:hover > td {
   filter: brightness(0.98);
+}
+
+.promise-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 9rem;
+}
+
+.promise-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.promise-history li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.promise-history__badge {
+  display: inline-flex;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.promise-history__badge--kept {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.promise-history__badge--missed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.promise-history__badge--pending {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 @media (max-width: 768px) {

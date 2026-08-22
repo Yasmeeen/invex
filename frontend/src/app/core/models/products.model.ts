@@ -194,6 +194,16 @@ export interface Order {
     paidAmount?: number;
     paymentMethod?: string;
     promiseToPayAt?: string;
+    promiseToPayHistory?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
+    promiseToPayHistoryPast?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
     note?: string;
   }>;
   products?: OrderProductLine[];

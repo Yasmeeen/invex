@@ -33,18 +33,72 @@
       <div class="row">
         <div class="col-md-3">
           <div class="form-group mb-0">
-            <label>{{ 'tr_phone_number' | translate }}</label>
+            <label>{{ 'tr_search_by_name' | translate }}</label>
             <div class="input-with-icon bg-white width-100">
               <input
                 class="s-control"
                 placeholder="{{ 'tr_search' | translate }}"
                 [(ngModel)]="nameSearchTerm"
-                (keyup)="filterClients($event, 'search')"
+                (keyup)="filterClientsByName($event)"
               />
             </div>
           </div>
         </div>
         <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_phone_number' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="phoneSearchTerm"
+                (keyup)="filterClientsByPhone($event)"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_installment_plan_select' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <ng-select
+                class="s-control s-select"
+                [items]="installmentPlans"
+                bindValue="_id"
+                [clearable]="true"
+                [(ngModel)]="selectedInstallmentPlanId"
+                (ngModelChange)="onInstallmentPlanFilterChange($event)"
+                placeholder="{{ 'tr_all_installment_plans' | translate }}"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ planLabel(item) }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ planLabel(item) }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_filter_last_installment_amount' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="lastInstallmentAmountTerm"
+                (keyup)="filterByLastInstallmentAmount($event)"
+                (change)="filterByLastInstallmentAmount($event)"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mt-2">
           <div class="form-group mb-0">
             <label>{{ 'tr_balance_filter' | translate }}</label>
             <div class="input-with-icon bg-white width-100">

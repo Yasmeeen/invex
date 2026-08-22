@@ -87,18 +87,32 @@
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
-        [placeholder]="'tr_report_all_products' | translate"
-        bindLabel="name"
-        bindValue="_id"
+        [placeholder]="'tr_report_product_search_placeholder' | translate"
         [items]="products"
+        [typeahead]="productTypeahead$"
+        [loading]="productsLoading"
+        bindLabel="label"
+        bindValue="_id"
         [(ngModel)]="filters.product_id"
+        (ngModelChange)="onProductIdChange($event)"
+        (open)="onProductSelectOpen()"
         name="reportProduct"
         [clearable]="true"
         [searchable]="true"
+        notFoundText="{{ 'tr_no_items_found' | translate }}"
       >
         <ng-template ng-option-tmp let-item="item">
-          <span>{{ item.name }}</span>
-          <span class="report-filters__opt-code" *ngIf="item?.code"> ({{ item.code }})</span>
+          <div class="weight-medium">{{ item.name }}</div>
+          <div class="size-small text-muted">
+            <span *ngIf="item?.code">{{ item.code }}</span>
+            <span *ngIf="item?.removedWhenOutOfStock || item?.stock === 0">
+              · {{ 'tr_report_product_sold_out' | translate }}
+            </span>
+          </div>
+        </ng-template>
+        <ng-template ng-label-tmp let-item="item">
+          {{ item.name }}
+          <span *ngIf="item?.code"> ({{ item.code }})</span>
         </ng-template>
       </ng-select>
     </div>

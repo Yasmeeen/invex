@@ -338,8 +338,10 @@
           <tbody>
             <tr
               *ngFor="let order of ordersList"
-              [class.order-row--pay-later]="isPayLaterOutstandingOrder(order)"
-              [class.order-row--pay-later-settled]="isPayLaterSettledOrder(order)"
+              [class.order-row--pay-later]="isCreditOutstandingOrder(order)"
+              [class.order-row--pay-later-settled]="isCreditSettledOrder(order)"
+              [class.order-row--installment]="isInstallmentOutstandingOrder(order)"
+              [class.order-row--installment-settled]="isInstallmentSettledOrder(order)"
             >
               <td>{{ order.orderNumber }}</td>
               <td>
@@ -372,13 +374,29 @@
               <td>{{ orderPaid(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
               <td>
                 <span class="settled-badge" *ngIf="isPayLaterSettledOrder(order)">
-                  {{ "tr_credit_fully_settled" | translate }}
+                  {{ payLaterSettledLabelKey(order) | translate }}
                 </span>
                 <ng-container *ngIf="!isPayLaterSettledOrder(order)">
                   {{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
                 </ng-container>
               </td>
-              <td>{{ paymentMethodLabel(order.paymentMethod) }}</td>
+              <td>
+                <div>{{ paymentMethodLabel(order.paymentMethod) }}</div>
+                <div class="order-installment-meta" *ngIf="isInstallmentOrder(order)">
+                  <div *ngIf="installmentPlanName(order)">
+                    {{ 'tr_installment_plan_select' | translate }}:
+                    <strong>{{ installmentPlanName(order) }}</strong>
+                  </div>
+                  <div *ngIf="installmentMonthlyAmount(order) > 0">
+                    {{ 'tr_invoice_installment_monthly' | translate }}:
+                    <strong>{{ installmentMonthlyAmount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+                  </div>
+                  <div *ngIf="order.installmentStartDate">
+                    {{ 'tr_installment_start_date' | translate }}:
+                    <strong>{{ installmentStartDateLabel(order) }}</strong>
+                  </div>
+                </div>
+              </td>
               <td>{{ createdAtCairo(order) }}</td>
               <td>{{ order.status }}</td>
               <td>
@@ -436,8 +454,10 @@
         <div
           class="order-card"
           *ngFor="let order of ordersList"
-          [class.order-card--pay-later]="isPayLaterOutstandingOrder(order)"
-          [class.order-card--pay-later-settled]="isPayLaterSettledOrder(order)"
+          [class.order-card--pay-later]="isCreditOutstandingOrder(order)"
+          [class.order-card--pay-later-settled]="isCreditSettledOrder(order)"
+          [class.order-card--installment]="isInstallmentOutstandingOrder(order)"
+          [class.order-card--installment-settled]="isInstallmentSettledOrder(order)"
         >
           <div class="order-card__top">
             <div class="order-card__icon">
@@ -453,7 +473,7 @@
                   {{ orderPartyTypeLabel(order) }}
                 </span>
                 <span class="settled-badge" *ngIf="isPayLaterSettledOrder(order)">
-                  {{ "tr_credit_fully_settled" | translate }}
+                  {{ payLaterSettledLabelKey(order) | translate }}
                 </span>
               </div>
               <div class="order-card__client">{{ order.clientName }}</div>
@@ -517,7 +537,7 @@
                 {{ orderRemaining(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
               </div>
               <div class="stat__value" *ngIf="isPayLaterSettledOrder(order)">
-                <span class="settled-badge">{{ "tr_credit_fully_settled" | translate }}</span>
+                <span class="settled-badge">{{ payLaterSettledLabelKey(order) | translate }}</span>
               </div>
             </div>
             <div class="stat">
@@ -562,6 +582,20 @@
               <b>{{ 'tr_payment_method' | translate }}:</b>
               {{ paymentMethodLabel(order.paymentMethod) }}
             </div>
+            <ng-container *ngIf="isInstallmentOrder(order)">
+              <div *ngIf="installmentPlanName(order)">
+                <b>{{ 'tr_installment_plan_select' | translate }}:</b>
+                {{ installmentPlanName(order) }}
+              </div>
+              <div *ngIf="installmentMonthlyAmount(order) > 0">
+                <b>{{ 'tr_invoice_installment_monthly' | translate }}:</b>
+                {{ installmentMonthlyAmount(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </div>
+              <div *ngIf="order.installmentStartDate">
+                <b>{{ 'tr_installment_start_date' | translate }}:</b>
+                {{ installmentStartDateLabel(order) }}
+              </div>
+            </ng-container>
             <div>
               <b>{{ 'tr_created_at' | translate }}:</b>
               {{ createdAtCairo(order) }}

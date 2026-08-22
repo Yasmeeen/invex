@@ -75,6 +75,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   salesPaymentColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   salesPaymentRows: any[] = [];
 
+  /** Profit report: per-invoice trading profit. */
+  profitInvoiceColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
+  profitInvoiceRows: any[] = [];
+  profitInvoicePage = 1;
+  profitInvoiceLimit = 25;
+  profitInvoiceMeta: { totalCount: number; page: number; limit: number } | null = null;
+
   /** Products report: inventory capital per branch. */
   branchCapitalColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   branchCapitalRows: any[] = [];
@@ -116,6 +123,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.reportType = d.reportType || 'sales';
       this.reportTitleKey = this.reportTitleKeys[this.reportType] || this.reportTitleKeys.sales;
       this.bookingsPage = 1;
+      this.profitInvoicePage = 1;
       this.secondaryChartOptions = null;
       // First paint: wait for report-filters to emit defaults (from/to/branch). Later navigations reuse `filters`.
       if (Object.keys(this.filters || {}).length > 0) {
@@ -132,6 +140,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.filters = this.mergeBranchScope({ ...filters });
     if (this.reportType === 'bookings') {
       this.bookingsPage = 1;
+    }
+    if (this.reportType === 'profit') {
+      this.profitInvoicePage = 1;
     }
     this.loadReport(this.filters);
   }
@@ -152,8 +163,21 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  setProfitInvoicePage(page: number): void {
+    this.profitInvoicePage = Math.max(1, page);
+    if (Object.keys(this.filters || {}).length > 0) {
+      this.loadReport(this.filters);
+    }
+  }
+
   get bookingsTotalPages(): number {
     const m = this.bookingsMeta;
+    if (!m || !m.limit) return 1;
+    return Math.max(1, Math.ceil((m.totalCount || 0) / m.limit));
+  }
+
+  get profitInvoiceTotalPages(): number {
+    const m = this.profitInvoiceMeta;
     if (!m || !m.limit) return 1;
     return Math.max(1, Math.ceil((m.totalCount || 0) / m.limit));
   }
@@ -185,6 +209,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.upcomingRows = [];
           this.salesPaymentColumns = [];
           this.salesPaymentRows = [];
+          this.profitInvoiceColumns = [];
+          this.profitInvoiceRows = [];
+          this.profitInvoiceMeta = null;
           this.deskPurchasesDetailColumns = [];
           this.deskPurchasesDetailRows = [];
           this.treasuryMethodColumns = [];
@@ -196,7 +223,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const scoped = this.mergeBranchScope({ ...filters });
+    const scoped =
+      this.reportType === 'profit'
+        ? this.mergeBranchScope({
+            ...filters,
+            invoice_page: this.profitInvoicePage,
+            invoice_limit: this.profitInvoiceLimit,
+          })
+        : this.mergeBranchScope({ ...filters });
     this.loading = true;
     const map: any = {
       sales: this.reportsService.getSalesReport.bind(this.reportsService),
@@ -225,6 +259,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.secondaryChartOptions = null;
         this.salesPaymentColumns = [];
         this.salesPaymentRows = [];
+        this.profitInvoiceColumns = [];
+        this.profitInvoiceRows = [];
+        this.profitInvoiceMeta = null;
         this.deskPurchasesDetailColumns = [];
         this.deskPurchasesDetailRows = [];
         this.treasuryMethodColumns = [];
@@ -243,6 +280,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.secondaryChartOptions = null;
     this.salesPaymentColumns = [];
     this.salesPaymentRows = [];
+    this.profitInvoiceColumns = [];
+    this.profitInvoiceRows = [];
+    this.profitInvoiceMeta = null;
     this.deskPurchasesDetailColumns = [];
     this.deskPurchasesDetailRows = [];
     this.treasuryMethodColumns = [];
@@ -330,7 +370,15 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           tone: tradingIsLoss ? 'loss' : undefined,
           trendLabel: tradingIsLoss ? lossBadge : undefined,
           trendPositive: tradingIsLoss ? false : undefined,
-          hintKey: tradingIsLoss ? 'tr_report_trading_loss_hint' : undefined,
+          hintKey: tradingIsLoss
+            ? 'tr_report_trading_loss_hint'
+            : 'tr_report_trading_profit_installment_hint',
+        },
+        {
+          titleKey: 'tr_report_card_installment_profit_collected',
+          value: s.installmentProfitCollected ?? 0,
+          money: true,
+          hintKey: 'tr_report_card_installment_profit_collected_hint',
         },
         {
           titleKey: 'tr_report_card_branch_overhead',
@@ -375,21 +423,58 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'period', labelKey: 'tr_report_col_period' },
         { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
         { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+        {
+          key: 'installmentProfit',
+          labelKey: 'tr_report_col_installment_profit_collected',
+          format: 'money',
+        },
         { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
         { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead', format: 'money' },
         { key: 'dailyExpenses', labelKey: 'tr_report_col_daily_expenses', format: 'money' },
         { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch', format: 'money' },
       ];
-      this.tableRows = res.profitOverTime || [];
+      const profitOverTimeAsc = res.profitOverTime || [];
+      /** Newest period first in the table; chart stays chronological (oldest → newest). */
+      this.tableRows = [...profitOverTimeAsc].reverse();
       this.chartOptions = this.lineChart(
         t('tr_report_chart_profit_over_time'),
-        (res.profitOverTime || []).map((x: any) => x.period),
+        profitOverTimeAsc.map((x: any) => x.period),
         [
-          { name: t('tr_report_series_revenue'), data: (res.profitOverTime || []).map((x: any) => Number(x.revenue || 0)) },
-          { name: t('tr_report_series_cost'), data: (res.profitOverTime || []).map((x: any) => Number(x.cost || 0)) },
-          { name: t('tr_report_series_net_after_branch'), data: (res.profitOverTime || []).map((x: any) => Number(x.netProfit || 0)) },
+          { name: t('tr_report_series_revenue'), data: profitOverTimeAsc.map((x: any) => Number(x.revenue || 0)) },
+          { name: t('tr_report_series_cost'), data: profitOverTimeAsc.map((x: any) => Number(x.cost || 0)) },
+          { name: t('tr_report_series_net_after_branch'), data: profitOverTimeAsc.map((x: any) => Number(x.netProfit || 0)) },
         ]
       );
+
+      this.profitInvoiceColumns = [
+        { key: 'orderNumber', labelKey: 'tr_order_number' },
+        { key: 'date', labelKey: 'tr_report_col_date' },
+        { key: 'clientName', labelKey: 'tr_report_col_customer' },
+        { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+        { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
+        { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+        { key: 'installmentAmount', labelKey: 'tr_report_col_installment_amount', format: 'money' },
+        {
+          key: 'installmentProfitShare',
+          labelKey: 'tr_report_col_installment_profit_share',
+          format: 'money',
+        },
+        { key: 'tradingProfit', labelKey: 'tr_report_col_profit_recognized', format: 'money' },
+        { key: 'paymentStatus', labelKey: 'tr_status' },
+      ];
+      this.profitInvoiceRows = this.mapProfitInvoiceRows(res.profitByInvoice || [], t);
+      const invMeta = res.profitByInvoiceMeta;
+      this.profitInvoiceMeta = invMeta
+        ? {
+            totalCount: Number(invMeta.totalCount) || 0,
+            page: Number(invMeta.page) || this.profitInvoicePage,
+            limit: Number(invMeta.limit) || this.profitInvoiceLimit,
+          }
+        : {
+            totalCount: this.profitInvoiceRows.length,
+            page: this.profitInvoicePage,
+            limit: this.profitInvoiceLimit,
+          };
       return;
     }
 
@@ -947,10 +1032,90 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.reportType === 'profit') {
+      this.exportProfitExcel();
+      return;
+    }
+
     this.exportService.exportToExcel(
       filename,
       this.mapRowsForExport(this.tableColumns, this.tableRows)
     );
+  }
+
+  private exportProfitExcel(): void {
+    const t = (key: string) => this.translate.instant(key);
+    const filename = this.translate
+      .instant(this.reportTitleKey)
+      .replace(/\s+/g, '_')
+      .toLowerCase();
+    const summaryRows = this.cards.map((c) => ({
+      [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+      [t('tr_report_col_value')]: this.formatCardExportValue(c),
+    }));
+    const sheets: { name: string; rows: Record<string, unknown>[] }[] = [
+      { name: t('tr_report_sheet_summary'), rows: summaryRows },
+      {
+        name: t('tr_report_chart_profit_over_time'),
+        rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+      },
+    ];
+    const invoiceCols =
+      this.profitInvoiceColumns.length > 0
+        ? this.profitInvoiceColumns
+        : [
+            { key: 'orderNumber', labelKey: 'tr_order_number' },
+            { key: 'date', labelKey: 'tr_report_col_date' },
+            { key: 'clientName', labelKey: 'tr_report_col_customer' },
+            { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+            { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' as const },
+            { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' as const },
+            {
+              key: 'installmentAmount',
+              labelKey: 'tr_report_col_installment_amount',
+              format: 'money' as const,
+            },
+            {
+              key: 'installmentProfitShare',
+              labelKey: 'tr_report_col_installment_profit_share',
+              format: 'money' as const,
+            },
+            {
+              key: 'tradingProfit',
+              labelKey: 'tr_report_col_profit_recognized',
+              format: 'money' as const,
+            },
+            { key: 'paymentStatus', labelKey: 'tr_status' },
+          ];
+
+    this.reportsService
+      .getProfitReport(
+        this.mergeBranchScope({
+          ...this.filters,
+          invoice_all: true,
+        })
+      )
+      .subscribe({
+        next: (res: any) => {
+          const invoiceRows = this.mapProfitInvoiceRows(res?.profitByInvoice || [], t);
+          if (invoiceRows.length > 0) {
+            sheets.push({
+              name: t('tr_report_profit_by_invoice'),
+              rows: this.mapRowsForExport(invoiceCols, invoiceRows),
+            });
+          }
+          this.exportService.exportToExcelMultiSheet(filename, sheets);
+        },
+        error: () => {
+          if (this.profitInvoiceRows.length > 0) {
+            sheets.push({
+              name: t('tr_report_profit_by_invoice'),
+              rows: this.mapRowsForExport(invoiceCols, this.profitInvoiceRows),
+            });
+          }
+          this.exportService.exportToExcelMultiSheet(filename, sheets);
+        },
+      });
   }
 
   async exportPdf(): Promise<void> {
@@ -1033,9 +1198,123 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.reportType === 'profit') {
+      const sections: {
+        title: string;
+        columns: string[];
+        rows: Record<string, unknown>[];
+      }[] = [];
+      if (this.tableRows.length > 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_chart_profit_over_time'),
+          columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        });
+      }
+      const invoiceCols =
+        this.profitInvoiceColumns.length > 0
+          ? this.profitInvoiceColumns
+          : [
+              { key: 'orderNumber', labelKey: 'tr_order_number' },
+              { key: 'date', labelKey: 'tr_report_col_date' },
+              { key: 'clientName', labelKey: 'tr_report_col_customer' },
+              { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+              { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' as const },
+              { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' as const },
+              {
+                key: 'installmentAmount',
+                labelKey: 'tr_report_col_installment_amount',
+                format: 'money' as const,
+              },
+              {
+                key: 'installmentProfitShare',
+                labelKey: 'tr_report_col_installment_profit_share',
+                format: 'money' as const,
+              },
+              {
+                key: 'tradingProfit',
+                labelKey: 'tr_report_col_profit_recognized',
+                format: 'money' as const,
+              },
+              { key: 'paymentStatus', labelKey: 'tr_status' },
+            ];
+      try {
+        const res: any = await this.reportsService
+          .getProfitReport(
+            this.mergeBranchScope({
+              ...this.filters,
+              invoice_all: true,
+            })
+          )
+          .toPromise();
+        const invoiceRows = this.mapProfitInvoiceRows(
+          res?.profitByInvoice || [],
+          (key: string) => this.translate.instant(key)
+        );
+        if (invoiceRows.length > 0) {
+          sections.push({
+            title: this.translate.instant('tr_report_profit_by_invoice'),
+            columns: invoiceCols.map((c) => this.translate.instant(c.labelKey)),
+            rows: this.mapRowsForExport(invoiceCols, invoiceRows),
+          });
+        }
+      } catch {
+        if (this.profitInvoiceRows.length > 0) {
+          sections.push({
+            title: this.translate.instant('tr_report_profit_by_invoice'),
+            columns: this.profitInvoiceColumns.map((c) => this.translate.instant(c.labelKey)),
+            rows: this.mapRowsForExport(this.profitInvoiceColumns, this.profitInvoiceRows),
+          });
+        }
+      }
+      if (sections.length === 0) {
+        sections.push({
+          title: this.translate.instant('tr_report_sheet_summary'),
+          columns: [
+            this.translate.instant('tr_report_col_label'),
+            this.translate.instant('tr_report_col_value'),
+          ],
+          rows: summaryRows.map((r) => ({
+            [this.translate.instant('tr_report_col_label')]: r.label,
+            [this.translate.instant('tr_report_col_value')]: r.value,
+          })),
+        });
+      }
+      await this.exportService.exportMultiSectionPdf(title, summaryRows, sections);
+      return;
+    }
+
     const colLabels = this.tableColumns.map((c) => this.translate.instant(c.labelKey));
     const pdfRows = this.mapRowsForExport(this.tableColumns, this.tableRows);
     await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
+  }
+
+  private mapProfitInvoiceRows(
+    rows: any[],
+    t: (key: string) => string
+  ): Record<string, unknown>[] {
+    const payStatusKey: Record<string, string> = {
+      paid: 'tr_paid',
+      partial: 'tr_partial',
+      unpaid: 'tr_unpaid',
+    };
+    return (rows || []).map((x: any) => {
+      const isInstallment = !!x.isInstallment;
+      return {
+        orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
+        date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
+        clientName: x.clientName || '—',
+        clientPhone: x.clientPhoneNumber || '—',
+        revenue: x.revenue,
+        cost: x.cost,
+        installmentAmount: isInstallment ? x.installmentAmount ?? 0 : null,
+        installmentProfitShare: isInstallment ? x.installmentProfitShare ?? 0 : null,
+        tradingProfit: x.tradingProfit,
+        paymentStatus: isInstallment
+          ? t('tr_report_status_installment')
+          : t(payStatusKey[x.paymentStatus] || 'tr_paid'),
+      };
+    });
   }
 
   private formatCardExportValue(c: ReportCardVM): string | number {
@@ -1053,8 +1332,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     return (rows || []).map((row) =>
       columns.reduce((acc: Record<string, unknown>, col) => {
         const raw = row[col.key];
-        acc[this.translate.instant(col.labelKey)] =
-          col.format === 'money' ? formatEgpMoney(raw) : raw;
+        if (col.format === 'money') {
+          acc[this.translate.instant(col.labelKey)] =
+            raw == null || raw === '' ? '—' : formatEgpMoney(raw);
+        } else {
+          acc[this.translate.instant(col.labelKey)] = raw;
+        }
         return acc;
       }, {})
     );

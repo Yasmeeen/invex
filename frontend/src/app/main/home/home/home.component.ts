@@ -12,6 +12,7 @@ import { Branch } from '@core/models/products.model';
 import { BranchesServce } from '@shared/services/branches.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
+import { CollectionsService } from '@shared/services/collections.service';
 import { openingCelebrationStorageKey } from '@core/utils/opening-celebration';
 
 HC_treemap(Highcharts);
@@ -39,6 +40,8 @@ export type HomeDashboardSection = 'accounts' | 'sales' | 'collections';
 })
 export class HomeComponent implements OnInit, OnDestroy {
   activeSection: HomeDashboardSection = 'accounts';
+  /** False when the store has never created installment sales. */
+  showCollectionsTab = false;
   fromDate: Date = new Date();
   toDate: Date = new Date();
   selectedBranch: any;
@@ -68,6 +71,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private langChangeSub?: Subscription;
   private celebrationSub?: Subscription;
+  private installmentUsageSub?: Subscription;
   private salesLoaded = false;
   private readonly storageKey = 'home.activeSection';
   celebratingBranch: Branch | null = null;
@@ -80,7 +84,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private storeSettings: StoreSettingsService,
-    private openingCelebration: OpeningCelebrationService
+    private openingCelebration: OpeningCelebrationService,
+    private collectionsService: CollectionsService
   ) {
     const qp = String(this.route.snapshot.queryParamMap.get('section') || '')
       .trim()
@@ -119,6 +124,20 @@ export class HomeComponent implements OnInit, OnDestroy {
     );
     this.syncOpeningPopup(this.openingCelebration.snapshot);
     this.openingCelebration.load();
+    this.installmentUsageSub = this.collectionsService.hasInstallments().subscribe({
+      next: (has) => {
+        this.showCollectionsTab = has;
+        if (!has && this.activeSection === 'collections') {
+          this.setSection('accounts');
+        }
+      },
+      error: () => {
+        this.showCollectionsTab = false;
+        if (this.activeSection === 'collections') {
+          this.setSection('accounts');
+        }
+      },
+    });
     if (this.activeSection === 'sales') {
       this.ensureSalesDashboard();
     }
@@ -152,6 +171,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.langChangeSub?.unsubscribe();
     this.celebrationSub?.unsubscribe();
+    this.installmentUsageSub?.unsubscribe();
   }
 
   @HostListener('document:keydown.escape')

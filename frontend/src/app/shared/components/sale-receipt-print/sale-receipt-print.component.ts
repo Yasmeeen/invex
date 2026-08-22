@@ -9,10 +9,14 @@ import {
 } from '@angular/core';
 import { OrderPartyType } from '@core/models/products.model';
 import {
+  isInstallmentSale as orderIsInstallmentSale,
   isPayLaterMethod,
   isPayLaterSettled,
   orderDisplayPaid,
   orderDisplayRemaining,
+  orderInstallmentMonthlyAmount,
+  orderInstallmentMonths,
+  orderInstallmentPlanName,
 } from '@core/utils/order-display.util';
 import { TranslateService } from '@ngx-translate/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
@@ -122,6 +126,10 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
     return isPayLaterMethod(this.order?.paymentMethod);
   }
 
+  isInstallmentSale(): boolean {
+    return orderIsInstallmentSale(this.order);
+  }
+
   isCreditFullySettled(): boolean {
     return isPayLaterSettled(this.order);
   }
@@ -132,6 +140,26 @@ export class SaleReceiptPrintComponent implements OnInit, AfterViewInit {
 
   receiptCreditRemaining(): number {
     return orderDisplayRemaining(this.order);
+  }
+
+  receiptInstallmentMonths(): number {
+    return orderInstallmentMonths(this.order);
+  }
+
+  receiptInstallmentMonthlyAmount(): number {
+    return orderInstallmentMonthlyAmount(this.order);
+  }
+
+  receiptInstallmentPlanName(): string {
+    return orderInstallmentPlanName(this.order);
+  }
+
+  receiptInstallmentStartDate(): string | Date | null {
+    return this.order?.installmentStartDate || null;
+  }
+
+  receiptInstallmentDownPayment(): number {
+    return orderDisplayPaid(this.order);
   }
 
   receiptCreditFeeAmount(): number {

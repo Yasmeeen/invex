@@ -54,9 +54,15 @@ export class CreateEditClientComponent implements OnInit, OnDestroy {
     this.isEdit = this.data?.isEdit || false;
 
     this.subscriptions.push(
-      this.collections.listCollectors().subscribe({
+      this.collections.listCollectors({ withWorkload: true }).subscribe({
         next: (res) => {
-          this.collectors = res?.collectors || [];
+          this.collectors = (res?.collectors || []).map((c) => ({
+            ...c,
+            name:
+              Number.isFinite(Number(c.openOrdersCount))
+                ? `${c.name || '—'} (${c.openOrdersCount})`
+                : c.name,
+          }));
         },
       })
     );

@@ -15,6 +15,11 @@ export const AdminSidebar = [
         icon: 'fa fa-cube icon',
       },
       {
+        name: 'tr_price_list',
+        routerLink: '/products/price-list',
+        icon: 'fa fa-list icon',
+      },
+      {
         name: 'tr_inventory',
         routerLink: '/inventory',
         icon: 'fa fa-cubes icon',
@@ -270,6 +275,11 @@ export const Warehouse = [
         icon: 'fa fa-cube icon',
       },
       {
+        name: 'tr_price_list',
+        routerLink: '/products/price-list',
+        icon: 'fa fa-list icon',
+      },
+      {
         name: 'tr_inventory',
         routerLink: '/inventory',
         icon: 'fa fa-cubes icon',
@@ -335,9 +345,9 @@ export const ModeratorSidebar = [
     icon: 'fa fa-cube icon',
   },
   {
-    name: 'tr_serial_track',
-    routerLink: '/products/serial-track',
-    icon: 'fa fa-barcode icon',
+    name: 'tr_price_list',
+    routerLink: '/products/price-list',
+    icon: 'fa fa-list icon',
   },
 ];
 

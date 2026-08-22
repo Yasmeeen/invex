@@ -5,6 +5,7 @@ import {
   ProductSerialTrackResponse,
 } from '@core/models/products.model';
 import { Globals } from '@core/globals';
+import { isModerator } from '@core/utils/role-utils';
 import { formatCairoDateTime } from '@core/utils/date-tz.util';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -58,6 +59,10 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    if (isModerator(this.globals.currentUser?.role)) {
+      this.router.navigate(['/products']);
+      return;
+    }
     this.showProductsLink = this.globals.currentUser?.role !== 'Cashier';
     this.querySub = this.route.queryParamMap.subscribe((params) => {
       const code = String(params.get('code') || '').trim();

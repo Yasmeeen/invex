@@ -63,6 +63,7 @@
           {{ 'tr_products_inventory_audit' | translate }}
         </button>
         <button
+          *ngIf="canUseSerialTrack"
           type="button"
           class="s-btn btn-secondary size-body"
           (click)="openSerialTrack()"
@@ -229,7 +230,7 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
+      <div class="col-md-4 mt-4" *ngIf="locationFilter !== 'warehouse'">
         <div class="form-group">
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon bg-white">
@@ -259,7 +260,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 mt-4" *ngIf="showSupplierFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_search_supplier' | translate }}</label>
           <ng-select

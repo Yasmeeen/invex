@@ -1,0 +1,36 @@
+.price-list-table {
+  td,
+  th {
+    vertical-align: middle;
+  }
+}
+
+.price-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 9rem;
+}
+
+.price-edit__input {
+  width: 100%;
+  min-width: 5.5rem;
+}
+
+.price-edit__icon {
+  flex-shrink: 0;
+}
+
+.stock-pill {
+  display: inline-block;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.stock-pill--out {
+  background: #fbe9e7;
+  color: #c62828;
+}

@@ -148,8 +148,18 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return !isModerator(this.globals.currentUser?.role);
   }
 
+  /** Moderator: serial track is not available. */
+  get canUseSerialTrack(): boolean {
+    return !isModerator(this.globals.currentUser?.role);
+  }
+
   /** Moderator: net price must not be visible in the products list. */
   get showNetPrice(): boolean {
+    return !isModerator(this.globals.currentUser?.role);
+  }
+
+  /** Moderator: supplier filter is not available. */
+  get showSupplierFilter(): boolean {
     return !isModerator(this.globals.currentUser?.role);
   }
 
@@ -293,7 +303,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     } else if (this.selectedBranches?.length) {
       filterParams['branchId'] = this.selectedBranches.filter(Boolean).join(',');
     }
-    if (this.selectedSupplierId) {
+    if (this.showSupplierFilter && this.selectedSupplierId) {
       filterParams['supplier_id'] = String(this.selectedSupplierId);
     }
     const search = String(this.nameSearchTerm || this.params['search'] || '').trim();
@@ -339,7 +349,9 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     }
     const saved = localStorage.getItem('products.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
-    this.initVendorTypeahead();
+    if (this.showSupplierFilter) {
+      this.initVendorTypeahead();
+    }
     this.getproducts();
     this.getcategorys();
     this.getBranches();

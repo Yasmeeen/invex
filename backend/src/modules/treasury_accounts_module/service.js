@@ -115,12 +115,37 @@ export const listTreasuryAccounts = async (req, res) => {
       moneyAccounts = (moneyAccounts || []).filter((a) => a.kind !== 'settlement');
     }
     const keys = (moneyAccounts || []).map((a) => a.key);
-    const [balances, lastByKey] = await Promise.all([
-      resolved.allBranches
-        ? computeAccountsExpectedBalancesAllBranches(keys, until)
-        : computeAccountsExpectedBalances(resolved.branchId, keys, until),
-      lastMovementsByAccount(resolved.allBranches ? null : resolved.branchId, keys),
-    ]);
+    const cashKeys = (moneyAccounts || [])
+      .filter((a) => a.kind === 'cash' || a.key === 'cash')
+      .map((a) => a.key);
+    const companyKeys = (moneyAccounts || [])
+      .filter((a) => a.kind !== 'cash' && a.key !== 'cash')
+      .map((a) => a.key);
+    const adminCompanyWideNonCash =
+      ADMIN_ROLES.includes(actor.role) && !resolved.allBranches;
+
+    let balances;
+    let lastByKey;
+    if (resolved.allBranches) {
+      [balances, lastByKey] = await Promise.all([
+        computeAccountsExpectedBalancesAllBranches(keys, until),
+        lastMovementsByAccount(null, keys),
+      ]);
+    } else if (adminCompanyWideNonCash) {
+      const [cashBal, companyBal, cashLast, companyLast] = await Promise.all([
+        computeAccountsExpectedBalances(resolved.branchId, cashKeys, until),
+        computeAccountsExpectedBalancesAllBranches(companyKeys, until),
+        lastMovementsByAccount(resolved.branchId, cashKeys),
+        lastMovementsByAccount(null, companyKeys),
+      ]);
+      balances = new Map([...cashBal, ...companyBal]);
+      lastByKey = new Map([...cashLast, ...companyLast]);
+    } else {
+      [balances, lastByKey] = await Promise.all([
+        computeAccountsExpectedBalances(resolved.branchId, keys, until),
+        lastMovementsByAccount(resolved.branchId, keys),
+      ]);
+    }
     const accounts = (moneyAccounts || []).map((acc) => {
       const bal = balances.get(acc.key) || {
         openingBalance: 0,
@@ -191,7 +216,10 @@ export const getTreasuryAccount = async (req, res) => {
     );
 
     const until = String(req.query.until || '').trim() || undefined;
-    const bal = resolved.allBranches
+    const isCash = acc.kind === 'cash' || key === 'cash';
+    const companyWide =
+      resolved.allBranches || (ADMIN_ROLES.includes(actor.role) && !isCash);
+    const bal = companyWide
       ? await computeAccountBalanceAllBranches(key, until)
       : await computeAccountExpectedBalance(resolved.branchId, key, until);
 
@@ -428,11 +456,23 @@ export const createTreasuryTransfer = async (req, res) => {
 
     const cashInvolved = from === 'cash' || to === 'cash';
     const isAdmin = ADMIN_ROLES.includes(actor.role);
-    const sourceType = isSettlement ? 'settlement' : 'transfer';
+    const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+    const fromKind = moneyAccounts.find((a) => a.key === from)?.kind;
+    const settlementMove = !!isSettlement || fromKind === 'settlement';
+    const sourceType = settlementMove ? 'settlement' : 'transfer';
     const transferNote = String(note || '').trim().slice(0, 2000);
 
     let result;
-    if (cashInvolved) {
+    if (settlementMove && isAdmin && !cashInvolved) {
+      result = await recordTreasuryTransferAcrossBranches({
+        fromAccountKey: from,
+        toAccountKey: to,
+        amount,
+        sourceType,
+        note: transferNote,
+        createdBy: userId,
+      });
+    } else if (cashInvolved) {
       const resolved = await resolveBranchParam(actor, isAdmin ? branch : branch || actor.branch);
       if (resolved.error) return res.status(400).json({ error: resolved.error });
       result = await recordTreasuryTransfer({
@@ -484,13 +524,15 @@ export const createTreasuryTransfer = async (req, res) => {
       return res.status(400).json(body);
     }
 
+    const first = result.transfers?.[0] || result;
     res.status(201).json({
-      transferGroupId: result.transferGroupId,
+      transferGroupId: first.transferGroupId,
       fromAccountKey: from,
       toAccountKey: to,
       amount: round2(amount),
-      outEntryId: result.outEntry?._id,
-      inEntryId: result.inEntry?._id,
+      outEntryId: first.outEntry?._id,
+      inEntryId: first.inEntry?._id,
+      appliedBranches: result.transfers?.length || 1,
     });
   } catch (error) {
     console.error('createTreasuryTransfer:', error);

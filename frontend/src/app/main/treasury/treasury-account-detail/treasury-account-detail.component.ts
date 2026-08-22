@@ -278,7 +278,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
       width: '480px',
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
-        branchId: this.filterBranchId,
+        branchId: isSettlement ? '' : this.filterBranchId,
         isSettlement,
         preferFrom: this.accountKey,
       },

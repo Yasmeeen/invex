@@ -22,8 +22,36 @@ import {
   resolveSellByWeight,
   roundWeight,
 } from '../../utils/sale-quantity.util.js';
+import {
+  notifyProductChanged,
+  notifyProductDeleted,
+} from '../integrations_module/catalogSync.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
+
+function parseListedOnEcommerce(body) {
+  const v = body?.listedOnEcommerce;
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+function normalizeEcommerceDescription(raw) {
+  if (raw == null) return '';
+  return String(raw).trim().slice(0, 50000);
+}
+
+function normalizeEcommerceShortDescription(raw) {
+  if (raw == null) return '';
+  return String(raw)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+}
+
+function parseEcommerceIsFeatured(body) {
+  const v = body?.ecommerceIsFeatured;
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
 
 function pickActorUserId(req) {
   const body = req?.body || {};
@@ -359,6 +387,10 @@ async function createOrReviveProductRow({
   imageUrl,
   attributes,
   addedBy,
+  listedOnEcommerce,
+  ecommerceDescription,
+  ecommerceShortDescription,
+  ecommerceIsFeatured,
   acquiredFromFields = {},
 }) {
   const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
@@ -375,7 +407,7 @@ async function createOrReviveProductRow({
     }
     const catMatch = assertReviveCategoryMatches(existing, categoryId);
     if (!catMatch.ok) return catMatch;
-    const addStock = Math.max(1, Math.floor(Number(stock) || 1));
+    const addStock = Math.max(0, Math.floor(Number(stock) || 0));
     existing.stock = Math.max(0, (Number(existing.stock) || 0) + addStock);
     existing.removedWhenOutOfStock = false;
     if (name) existing.name = name;
@@ -385,6 +417,12 @@ async function createOrReviveProductRow({
     if (imageUrl != null) existing.imageUrl = imageUrl;
     if (attributes) existing.attributes = attributes;
     if (addedBy) existing.addedBy = addedBy;
+    if (listedOnEcommerce !== undefined) existing.listedOnEcommerce = listedOnEcommerce;
+    if (ecommerceDescription !== undefined) existing.ecommerceDescription = ecommerceDescription;
+    if (ecommerceShortDescription !== undefined) {
+      existing.ecommerceShortDescription = ecommerceShortDescription;
+    }
+    if (ecommerceIsFeatured !== undefined) existing.ecommerceIsFeatured = ecommerceIsFeatured;
     Object.assign(existing, acquiredFromFields);
     await existing.save();
     return { ok: true, product: existing, revived: true };
@@ -394,7 +432,7 @@ async function createOrReviveProductRow({
     code,
     price,
     netPrice,
-    stock: Math.max(1, Math.floor(Number(stock) || 1)),
+    stock: Math.max(0, Math.floor(Number(stock) || 0)),
     discount,
     category: categoryId,
     branch: isWarehouse ? null : branchOid,
@@ -402,6 +440,10 @@ async function createOrReviveProductRow({
     imageUrl,
     attributes,
     addedBy,
+    listedOnEcommerce,
+    ecommerceDescription,
+    ecommerceShortDescription,
+    ecommerceIsFeatured,
     ...acquiredFromFields,
   });
   return { ok: true, product, revived: false };
@@ -1120,6 +1162,8 @@ function buildProductsListQuery(queryParams = {}) {
     warehouseOnly,
     excludeWarehouse,
     booked,
+    listedOnline,
+    listedOnEcommerce,
     categoryId,
     attrKey,
     attrValue,
@@ -1158,6 +1202,18 @@ function buildProductsListQuery(queryParams = {}) {
       $or: [
         { bookingStatus: { $ne: 'active' } },
         { bookingStatus: { $exists: false } },
+      ],
+    });
+  }
+
+  const listedFlag = listedOnline ?? listedOnEcommerce;
+  if (listedFlag === 'true' || listedFlag === true) {
+    query.listedOnEcommerce = true;
+  } else if (listedFlag === 'false' || listedFlag === false) {
+    andParts.push({
+      $or: [
+        { listedOnEcommerce: { $ne: true } },
+        { listedOnEcommerce: { $exists: false } },
       ],
     });
   }
@@ -1274,6 +1330,12 @@ export const createProduct = async (req, res) => {
   try {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes, addedBy } =
       req.body;
+    const listedOnEcommerce = parseListedOnEcommerce(req.body);
+    const ecommerceDescription = normalizeEcommerceDescription(req.body.ecommerceDescription);
+    const ecommerceShortDescription = normalizeEcommerceShortDescription(
+      req.body.ecommerceShortDescription
+    );
+    const ecommerceIsFeatured = parseEcommerceIsFeatured(req.body);
     const imageUrlNorm = normalizeImageUrl(imageUrl);
     const addedByNorm = normalizeAddedBy(addedBy);
     const isWarehouse =
@@ -1306,6 +1368,10 @@ export const createProduct = async (req, res) => {
       Number.isNaN(stockNum)
     ) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (stockNum < 0) {
+      return res.status(400).json({ error: 'stock must be a number >= 0' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
@@ -1497,7 +1563,11 @@ export const createProduct = async (req, res) => {
             imageUrl: uf.imageUrl || imageUrlNorm,
             attributes: uf.attributes,
             addedBy: addedByNorm,
-            acquiredFromFields,
+            listedOnEcommerce,
+            ecommerceDescription,
+            ecommerceShortDescription,
+            ecommerceIsFeatured,
+            ...acquiredFromFields,
           });
           if (!row.ok) {
             return res.status(409).json({ error: row.error, code: row.code });
@@ -1557,7 +1627,11 @@ export const createProduct = async (req, res) => {
           imageUrl: uf.imageUrl || imageUrlNorm,
           attributes: uf.attributes,
           addedBy: addedByNorm,
-          acquiredFromFields,
+          listedOnEcommerce,
+          ecommerceDescription,
+          ecommerceShortDescription,
+          ecommerceIsFeatured,
+          ...acquiredFromFields,
         });
         if (!row.ok) {
           return res.status(409).json({ error: row.error, code: row.code });
@@ -1615,7 +1689,11 @@ export const createProduct = async (req, res) => {
         imageUrl: imageUrlNorm,
         attributes: attrs,
         addedBy: addedByNorm,
-        acquiredFromFields,
+        listedOnEcommerce,
+        ecommerceDescription,
+        ecommerceShortDescription,
+        ecommerceIsFeatured,
+        ...acquiredFromFields,
       });
       if (!row.ok) {
         return res.status(409).json({ error: row.error, code: row.code });
@@ -1637,6 +1715,7 @@ export const createProduct = async (req, res) => {
         },
       });
 
+      notifyProductChanged(createdProduct?._id);
       return res.status(201).json({ message: '✅ Product created', createdProduct });
     }
 
@@ -1661,7 +1740,11 @@ export const createProduct = async (req, res) => {
       imageUrl: imageUrlNorm,
       attributes: attrs,
       addedBy: addedByNorm,
-      acquiredFromFields,
+      listedOnEcommerce,
+      ecommerceDescription,
+      ecommerceShortDescription,
+      ecommerceIsFeatured,
+      ...acquiredFromFields,
     });
     if (!row.ok) {
       return res.status(409).json({
@@ -1687,6 +1770,7 @@ export const createProduct = async (req, res) => {
       },
     });
 
+    notifyProductChanged(createdProduct?._id);
     res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
     console.error('❌ Error creating product:', error.message);
@@ -1707,6 +1791,19 @@ export const updateProduct = async (req, res) => {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes, addedBy } = req.body;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
     const hasAddedBy = Object.prototype.hasOwnProperty.call(req.body, 'addedBy');
+    const hasListedOnEcommerce = Object.prototype.hasOwnProperty.call(req.body, 'listedOnEcommerce');
+    const hasEcommerceDescription = Object.prototype.hasOwnProperty.call(req.body, 'ecommerceDescription');
+    const hasEcommerceShortDescription = Object.prototype.hasOwnProperty.call(
+      req.body,
+      'ecommerceShortDescription'
+    );
+    const hasEcommerceIsFeatured = Object.prototype.hasOwnProperty.call(req.body, 'ecommerceIsFeatured');
+    const ecommerceDescriptionNorm = hasEcommerceDescription
+      ? normalizeEcommerceDescription(req.body.ecommerceDescription)
+      : undefined;
+    const ecommerceShortDescriptionNorm = hasEcommerceShortDescription
+      ? normalizeEcommerceShortDescription(req.body.ecommerceShortDescription)
+      : undefined;
     const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
@@ -1864,6 +1961,18 @@ export const updateProduct = async (req, res) => {
       if (hasAddedBy) {
         updateDoc.addedBy = normalizeAddedBy(addedBy);
       }
+      if (hasListedOnEcommerce) {
+        updateDoc.listedOnEcommerce = parseListedOnEcommerce(req.body);
+      }
+      if (ecommerceDescriptionNorm !== undefined) {
+        updateDoc.ecommerceDescription = ecommerceDescriptionNorm;
+      }
+      if (ecommerceShortDescriptionNorm !== undefined) {
+        updateDoc.ecommerceShortDescription = ecommerceShortDescriptionNorm;
+      }
+      if (hasEcommerceIsFeatured) {
+        updateDoc.ecommerceIsFeatured = parseEcommerceIsFeatured(req.body);
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -1886,6 +1995,7 @@ export const updateProduct = async (req, res) => {
         after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
       });
 
+      notifyProductChanged(product?._id);
       return res.json({ message: '✅ Product updated', product });
     }
 
@@ -1928,6 +2038,18 @@ export const updateProduct = async (req, res) => {
     if (hasAddedBy) {
       updateDocBranch.addedBy = normalizeAddedBy(addedBy);
     }
+      if (hasListedOnEcommerce) {
+        updateDocBranch.listedOnEcommerce = parseListedOnEcommerce(req.body);
+      }
+      if (ecommerceDescriptionNorm !== undefined) {
+        updateDocBranch.ecommerceDescription = ecommerceDescriptionNorm;
+      }
+      if (ecommerceShortDescriptionNorm !== undefined) {
+        updateDocBranch.ecommerceShortDescription = ecommerceShortDescriptionNorm;
+      }
+      if (hasEcommerceIsFeatured) {
+        updateDocBranch.ecommerceIsFeatured = parseEcommerceIsFeatured(req.body);
+      }
 
     const updateOpBranch = acquiredFromUnset
       ? { $set: updateDocBranch, $unset: { acquiredFrom: 1 } }
@@ -1951,12 +2073,54 @@ export const updateProduct = async (req, res) => {
       after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
     });
 
+    notifyProductChanged(product?._id);
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product:', error.message);
     if (error.code === 11000) {
       return res.status(409).json({ error: 'Product code already exists for this storage location' });
     }
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message || 'Invalid product data' });
+    }
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+};
+
+/** Fast selling-price update for the price list screen (does not change netPrice/discount). */
+export const updateProductPrice = async (req, res) => {
+  try {
+    const priceNum = Number(req.body?.price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      return res.status(400).json({ error: 'Invalid price' });
+    }
+    const rounded = Math.round(priceNum * 100) / 100;
+    const before = await Product.findById(req.params.id).lean();
+    if (!before) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { $set: { price: rounded } },
+      { new: true, runValidators: true }
+    )
+      .populate('category', 'name code')
+      .populate('branch', 'name');
+
+    await auditLog(req, {
+      action: 'update',
+      module: 'products',
+      entityType: 'Product',
+      entityId: product?._id,
+      message: `Product price updated ${product?.code || ''}`.trim(),
+      before: { code: before.code, name: before.name, price: before.price },
+      after: { code: product?.code, name: product?.name, price: product?.price },
+    });
+
+    notifyProductChanged(product?._id);
+    res.json({ message: '✅ Product updated', product });
+  } catch (error) {
+    console.error('❌ Error updating product price:', error.message);
     if (error.name === 'ValidationError' || error.name === 'CastError') {
       return res.status(400).json({ error: error.message || 'Invalid product data' });
     }
@@ -2018,6 +2182,7 @@ export const deleteProduct = async (req, res) => {
       before: { code: product?.code, name: product?.name, stock: product?.stock, branch: product?.branch, inWarehouse: product?.inWarehouse },
     });
 
+    notifyProductDeleted(product?._id);
     res.json({ message: '✅ Product deleted' });
   } catch (error) {
     console.error('❌ Error deleting product:', error.message);
@@ -2256,6 +2421,10 @@ export const approveBranchTransfer = async (req, res) => {
             imageUrl: imageUrlNorm,
             attributes: attrs,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
+            ecommerceDescription: String(sourceProduct.ecommerceDescription || ''),
+            ecommerceShortDescription: String(sourceProduct.ecommerceShortDescription || ''),
+            ecommerceIsFeatured: Boolean(sourceProduct.ecommerceIsFeatured),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),
@@ -2833,6 +3002,10 @@ export const transferProductStock = async (req, res) => {
             branch: toBranchId,
             inWarehouse: false,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
+            ecommerceDescription: String(sourceProduct.ecommerceDescription || ''),
+            ecommerceShortDescription: String(sourceProduct.ecommerceShortDescription || ''),
+            ecommerceIsFeatured: Boolean(sourceProduct.ecommerceIsFeatured),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),

@@ -27,6 +27,7 @@ export interface BookingReceiptData {
   depositPayments?: Array<{ method?: string; amount?: number }>;
   pickupType?: string;
   shippingAddress?: string;
+  pickupBranchName?: string;
   createdAt?: string | Date;
   bookingDate?: string | Date;
 }

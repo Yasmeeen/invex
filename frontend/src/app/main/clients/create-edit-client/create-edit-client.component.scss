@@ -1,1 +1,169 @@
-/* Uses global complex-modal styles */
+.client-form-modal {
+  .modal-body {
+    max-height: 78vh;
+  }
+}
+
+.client-form-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1.15rem;
+}
+
+.client-form-tabs__btn {
+  border: none;
+  background: transparent;
+  padding: 0.7rem 1.1rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.client-form-tabs__btn--active {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+}
+
+.client-form-pane {
+  min-height: 12rem;
+}
+
+.client-form-section {
+  padding: 0.95rem 1rem;
+  margin-bottom: 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+}
+
+.client-form-section--last {
+  margin-bottom: 0;
+}
+
+.client-form-section__title {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.client-form-section__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .s-btn {
+    flex-shrink: 0;
+  }
+}
+
+.optional-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.hint-text {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.repeat-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  .s-control {
+    flex: 1;
+  }
+}
+
+.repeat-row__remove {
+  min-width: 2rem;
+  padding-inline: 0.55rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.id-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.id-upload__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.id-preview {
+  max-width: 240px;
+
+  img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    display: block;
+    background: #fff;
+  }
+}
+
+.client-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+label.disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .client-form-section__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .client-form-section__toolbar .s-btn {
+    width: 100%;
+  }
+}

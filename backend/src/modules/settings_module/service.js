@@ -9,9 +9,13 @@ import {
 } from './moneyAccounts.js';
 import {
   catalogToPaymentAppFeePercents,
+  catalogToPurchaseTreasuryMethods,
   mergeMoneyAccountsFromCatalog,
   normalizePaymentMethodsCatalog,
 } from './paymentMethodsCatalog.js';
+import { isEcommerceIntegrationFeatureAvailable } from '../integrations_module/feature.js';
+import { ensureOnlineBranch } from '../integrations_module/onlineBranch.js';
+import { pushFullCatalog } from '../integrations_module/catalogSync.js';
 
 const MAX_LOGO_LENGTH = 600000;
 
@@ -33,7 +37,11 @@ function serializeSettings(doc) {
   });
   moneyAccounts = normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(moneyAccounts),
-    moneyAccounts: mergeMoneyAccountsFromCatalog(moneyAccounts, paymentMethodsCatalog),
+    moneyAccounts: mergeMoneyAccountsFromCatalog(
+      moneyAccounts,
+      paymentMethodsCatalog,
+      doc.paymentMethodAccountMap
+    ),
   });
 
   const accountKeys = new Set(moneyAccounts.map((a) => a.key));
@@ -45,8 +53,12 @@ function serializeSettings(doc) {
   );
 
   const paymentAppFeePercents = catalogToPaymentAppFeePercents(paymentMethodsCatalog);
-  // Keep purchase pickers aligned with real cash/treasury accounts (not sale-only catalog rows)
-  const purchaseTreasuryMethods = moneyAccountsToPurchaseTreasuries(moneyAccounts);
+  const purchaseTreasuryMethods = catalogToPurchaseTreasuryMethods(
+    paymentMethodsCatalog,
+    paymentMethodAccountMap,
+    moneyAccounts
+  );
+  const featureAvailable = isEcommerceIntegrationFeatureAvailable();
 
   return {
     storeName: doc.storeName,
@@ -65,6 +77,13 @@ function serializeSettings(doc) {
     weightSalesEnabled: Boolean(doc.weightSalesEnabled),
     deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
     cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
+    ecommerceIntegrationFeatureAvailable: featureAvailable,
+    ecommerceIntegrationEnabled: featureAvailable && Boolean(doc.ecommerceIntegrationEnabled),
+    ecommerceBaseUrl: featureAvailable ? doc.ecommerceBaseUrl || '' : '',
+    ecommerceSharedKey: featureAvailable ? doc.ecommerceSharedKey || '' : '',
+    ecommerceCatalogMode:
+      featureAvailable && doc.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+    onlineBranchId: featureAvailable && doc.onlineBranchId ? String(doc.onlineBranchId) : null,
   };
 }
 
@@ -105,9 +124,14 @@ export const updateStoreSettings = async (req, res) => {
       weightSalesEnabled,
       deliveryOrdersEnabled,
       cashierPurchaseExchangeEnabled,
+      ecommerceIntegrationEnabled,
+      ecommerceBaseUrl,
+      ecommerceSharedKey,
+      ecommerceCatalogMode,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
+    const featureAvailable = isEcommerceIntegrationFeatureAvailable();
 
     if (storeName !== undefined && typeof storeName !== 'string') {
       return res.status(400).json({ error: 'storeName must be a string' });
@@ -241,7 +265,11 @@ export const updateStoreSettings = async (req, res) => {
         });
       moneyAccountsNormalized = normalizeMoneyAccounts({
         purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(baseMoney),
-        moneyAccounts: mergeMoneyAccountsFromCatalog(baseMoney, catalogNormalized),
+        moneyAccounts: mergeMoneyAccountsFromCatalog(
+          baseMoney,
+          catalogNormalized,
+          existing?.paymentMethodAccountMap
+        ),
       });
       treasuryNormalized = moneyAccountsToPurchaseTreasuries(moneyAccountsNormalized);
     } else if (treasuryNormalized !== undefined || moneyAccountsNormalized !== undefined) {
@@ -395,9 +423,31 @@ export const updateStoreSettings = async (req, res) => {
       update.cashierPurchaseExchangeEnabled = cashierPurchaseExchangeEnabled;
     }
 
+    let shouldPushCatalog = false;
+    if (featureAvailable) {
+      if (ecommerceIntegrationEnabled !== undefined) {
+        update.ecommerceIntegrationEnabled = ecommerceIntegrationEnabled === true;
+        shouldPushCatalog = update.ecommerceIntegrationEnabled;
+      }
+      if (ecommerceBaseUrl !== undefined) {
+        update.ecommerceBaseUrl = String(ecommerceBaseUrl || '')
+          .trim()
+          .replace(/\/$/, '')
+          .slice(0, 500);
+      }
+      if (ecommerceSharedKey !== undefined) {
+        update.ecommerceSharedKey = String(ecommerceSharedKey || '').trim().slice(0, 200);
+      }
+      if (ecommerceCatalogMode !== undefined) {
+        update.ecommerceCatalogMode =
+          ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all';
+        shouldPushCatalog = true;
+      }
+    }
+
     const filter = existing ? { _id: existing._id } : {};
 
-    const doc = await StoreSettings.findOneAndUpdate(
+    let doc = await StoreSettings.findOneAndUpdate(
       filter,
       { $set: update },
       {
@@ -407,6 +457,26 @@ export const updateStoreSettings = async (req, res) => {
         runValidators: true,
       }
     );
+
+    if (
+      featureAvailable &&
+      doc.ecommerceIntegrationEnabled &&
+      doc.ecommerceCatalogMode === 'online_only'
+    ) {
+      const online = await ensureOnlineBranch();
+      if (String(doc.onlineBranchId || '') !== String(online._id)) {
+        doc.onlineBranchId = online._id;
+        await doc.save();
+      }
+    }
+
+    if (shouldPushCatalog && doc.ecommerceIntegrationEnabled) {
+      setImmediate(() => {
+        pushFullCatalog().catch((err) =>
+          console.error('[settings] push catalog after save', err.message)
+        );
+      });
+    }
 
     res.status(200).json(serializeSettings(doc));
   } catch (error) {

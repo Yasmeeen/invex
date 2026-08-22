@@ -1,5 +1,9 @@
 import Category from '../../DB/models/category.model.js';
 import Product from '../../DB/models/product.model.js';
+import {
+  notifyCategoryChanged,
+  notifyCategoryDeleted,
+} from '../integrations_module/catalogSync.js';
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -47,6 +51,7 @@ const toCategoryResponse = (doc, extra = {}) => {
   return {
     ...o,
     code,
+    imageUrl: o.imageUrl != null ? String(o.imageUrl).trim() : '',
     multiCodePerPiece: !!o.multiCodePerPiece,
     sellByWeight: !!o.sellByWeight,
     weightUnit: o.weightUnit === 'g' ? 'g' : 'kg',
@@ -136,12 +141,18 @@ const assertCategoryWeightFlags = (sellByWeight, multiCodePerPiece) => {
   return null;
 };
 
+const normalizeImageUrl = (raw) => {
+  if (raw == null) return '';
+  return String(raw).trim();
+};
+
 // Create category
 export const createCategory = async (req, res) => {
   try {
     const {
       name,
       code,
+      imageUrl,
       attributeDefs,
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
@@ -180,6 +191,7 @@ export const createCategory = async (req, res) => {
     const newCategory = await Category.create({
       name: name.trim(),
       code: codeNorm,
+      imageUrl: normalizeImageUrl(imageUrl),
       attributeDefs: attr,
       multiCodePerPiece: parseBool(multiCodePerPiece),
       sellByWeight: parseBool(sellByWeight),
@@ -190,6 +202,7 @@ export const createCategory = async (req, res) => {
         showProductCodeOnInvoice == null ? true : parseBool(showProductCodeOnInvoice),
     });
 
+    notifyCategoryChanged(newCategory._id);
     res.status(201).json({
       message: '✅ Category created',
       category: toCategoryResponse(newCategory),
@@ -209,6 +222,7 @@ export const updateCategory = async (req, res) => {
     const {
       name,
       code,
+      imageUrl,
       attributeDefs,
       multiCodePerPiece,
       deleteProductWhenOutOfStock,
@@ -220,6 +234,9 @@ export const updateCategory = async (req, res) => {
 
     if (name != null && String(name).trim() !== '') {
       updates.name = String(name).trim();
+    }
+    if (imageUrl !== undefined) {
+      updates.imageUrl = normalizeImageUrl(imageUrl);
     }
     if (code !== undefined) {
       const codeNorm = normalizeCategoryCode(code);
@@ -301,6 +318,7 @@ export const updateCategory = async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
+    notifyCategoryChanged(updatedCategory._id);
     res.json({
       message: '✅ Category updated',
       category: toCategoryResponse(updatedCategory),
@@ -323,6 +341,7 @@ export const deleteCategory = async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
+    notifyCategoryDeleted(deletedCategory._id);
     res.json({ message: '✅ Category deleted' });
   } catch (err) {
     console.error('❌ Error deleting category:', err.message);

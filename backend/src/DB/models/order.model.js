@@ -15,6 +15,17 @@ const orderSchema = new mongoose.Schema(
       ref: "Client",
     },
 
+    /**
+     * Collector assigned to this installment invoice (optional).
+     * Overrides Client.collectorId when set; used for per-invoice distribution.
+     */
+    collectorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
+
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vendor",
@@ -111,6 +122,11 @@ const orderSchema = new mongoose.Schema(
         /** Amount collected on paidVia, including that method's own % if any. */
         feeGrossOnPaidVia: { type: Number, required: false, min: 0 },
         feePercentSnapshot: { type: Number, required: false, min: 0 },
+        /**
+         * Installment trading profit recognized by this payment (cash-basis).
+         * Down payment at checkout is 0; follow-up collections get a proportional share.
+         */
+        installmentProfit: { type: Number, required: false, min: 0, default: 0 },
         /** Purchase treasuries when recording pay-later settlement (same keys as desk purchase). */
         paymentTreasurySplits: {
           type: [
@@ -123,6 +139,75 @@ const orderSchema = new mongoose.Schema(
           default: undefined,
         },
         note: { type: String, default: '', trim: true },
+      },
+    ],
+
+    /**
+     * Customer sale installment schedule (separate from vendor purchase installments).
+     * Financed portion may be partial: pay some via cash/visa now, rest as installments.
+     */
+    installmentPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InstallmentPlan",
+      required: false,
+    },
+    installmentPlanSnapshot: {
+      name: { type: String, trim: true, default: "" },
+      months: { type: Number, min: 1 },
+      interestPercent: { type: Number, min: 0, default: 0 },
+    },
+    /** First installment due date (chosen at checkout). */
+    installmentStartDate: { type: Date, required: false },
+    /** Principal amount put on the installment plan (before interest). */
+    installmentPrincipal: { type: Number, min: 0, default: 0 },
+    /** Interest/markup amount included in schedule totals. */
+    installmentInterestAmount: { type: Number, min: 0, default: 0 },
+    /**
+     * Full trading profit deferred onto installments (Σ price×qty − Σ cost×qty after interest).
+     * Recognized over time as installments are collected.
+     */
+    installmentTotalProfit: { type: Number, min: 0, default: 0 },
+    installments: [
+      {
+        sequence: { type: Number, required: true, min: 1 },
+        dueDate: { type: Date, required: true },
+        amount: { type: Number, required: true, min: 0 },
+        paid: { type: Boolean, default: false },
+        paidAt: { type: Date, required: false },
+        paidAmount: { type: Number, min: 0, default: 0 },
+        /** This row's share of installmentTotalProfit (equal split; last row absorbs rounding). */
+        profitShare: { type: Number, min: 0, default: 0 },
+        /** Cumulative profit recognized from payments applied to this row. */
+        recognizedProfit: { type: Number, min: 0, default: 0 },
+        paymentMethod: { type: String, trim: true, default: "" },
+        paidByUserId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: false,
+        },
+        /** Customer promise to pay at this datetime (collections). */
+        promiseToPayAt: { type: Date, required: false },
+        /** When the current promiseToPayAt was set. */
+        promiseToPayRecordedAt: { type: Date, required: false },
+        /** Past promise-to-pay entries (kept when a new promise is set or installment is paid). */
+        promiseToPayHistory: [
+          {
+            promiseToPayAt: { type: Date, required: true },
+            recordedAt: { type: Date, required: true },
+            recordedByUserId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "User",
+              required: false,
+            },
+            /**
+             * true = paid on promised calendar day (Africa/Cairo),
+             * false = day passed without payment that day,
+             * null/undefined = still pending.
+             */
+            paidOnPromisedDay: { type: Boolean, required: false, default: null },
+          },
+        ],
+        note: { type: String, trim: true, default: "" },
       },
     ],
 
@@ -231,6 +316,17 @@ const orderSchema = new mongoose.Schema(
     restoredAt: { type: Date, required: false, index: true },
 
     orderNumber: { type: Number, unique: true, required: true },
+
+    /** pos = cashier; ecommerce = confirmed online store order (invoice source). */
+    source: {
+      type: String,
+      enum: ['pos', 'ecommerce'],
+      default: 'pos',
+      trim: true,
+      index: true,
+    },
+    ecommerceOrderId: { type: String, default: '', trim: true, index: true },
+    ecommerceOrderNumber: { type: String, default: '', trim: true },
   },
   { timestamps: true }
 );

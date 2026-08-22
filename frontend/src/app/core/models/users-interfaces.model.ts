@@ -23,7 +23,19 @@ export class Client{
   _id:string;
   name?:string;
   phoneNumber: string;
+  additionalPhoneNumbers?: string[];
   address?:string;
+  additionalAddresses?: string[];
+  nationalIdImageUrl?: string;
+  guarantor?: {
+    name?: string;
+    phoneNumber?: string;
+    nationalId?: string;
+    address?: string;
+    nationalIdImageUrl?: string;
+    notes?: string;
+  };
+  collectorId?: string | null;
   numberOfOrders: number;
   totalOrdersPrice: number;
   created_at: string;
@@ -37,6 +49,9 @@ export class Client{
   balanceSide?: 'debit' | 'credit' | 'even' | 'none';
   netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
   clientPayableDeferred?: number;
+  /** Client originated / ordered via e-commerce storefront. */
+  source?: 'store' | 'ecommerce';
+  isEcommerceOnline?: boolean;
 }
 
 export interface ClientSettlementPreview {
@@ -63,6 +78,32 @@ export interface ClientHistoryOrderRow {
   remaining?: number;
   pointsEarned?: number;
   isPayLater?: boolean;
+  isInstallment?: boolean;
+  unpaidInstallmentsCount?: number;
+  installmentPlanSnapshot?: { name?: string; months?: number; interestPercent?: number };
+  installmentStartDate?: string;
+  installments?: Array<{
+    _id?: string;
+    sequence?: number;
+    dueDate?: string;
+    amount?: number;
+    paid?: boolean;
+    paidAt?: string;
+    paidAmount?: number;
+    paymentMethod?: string;
+    promiseToPayAt?: string;
+    promiseToPayHistory?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
+    promiseToPayHistoryPast?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
+    note?: string;
+  }>;
 }
 
 export interface ClientHistoryPurchaseRow {
@@ -110,6 +151,8 @@ export interface ClientHistoryResponse {
   creditOrdersCount: number;
   orders: ClientHistoryOrderRow[];
   creditOrders: ClientHistoryOrderRow[];
+  installmentOrders?: ClientHistoryOrderRow[];
+  installmentOrdersCount?: number;
   purchases?: ClientHistoryPurchaseRow[];
   purchasesCount?: number;
   ledgerEntries?: ClientLedgerEntry[];

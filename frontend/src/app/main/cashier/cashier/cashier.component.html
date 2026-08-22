@@ -145,6 +145,7 @@
                     <button
                       type="button"
                       class="s-btn btn-secondary btn-sm"
+                      *ngIf="!isCheckoutFullyPrepaid()"
                       (click)="openPaymentSplitsDialog()"
                     >
                       {{ 'tr_payment_splits_open' | translate }}
@@ -373,6 +374,14 @@
                 | translate : { n: bookedQty(product) }
             }}
           </div>
+          <div
+            *ngIf="product.listedOnEcommerce"
+            class="cashier-online-badge"
+            [attr.title]="'tr_product_online_badge_hint' | translate"
+          >
+            <i class="fa fa-globe" aria-hidden="true"></i>
+            {{ 'tr_product_online_badge' | translate }}
+          </div>
           <div class="product-name">{{ product.name }}</div>
           <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
           <div class="product-price" *ngIf="!cardHasDiscount(product)">
@@ -462,7 +471,30 @@
           class="cashier-booking-bar cashier-booking-bar--warn"
           *ngFor="let bar of cartForeignBookingBars()"
         >
-          <span *ngIf="bar.days <= 0">
+          <span *ngIf="bar.fromWebsite && bar.days <= 0">
+            {{
+              'tr_cashier_booking_bar_website_today'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone
+                    }
+            }}
+          </span>
+          <span *ngIf="bar.fromWebsite && bar.days > 0">
+            {{
+              'tr_cashier_booking_bar_website'
+                | translate
+                  : {
+                      product: bar.productName,
+                      name: bar.name,
+                      phone: bar.phone,
+                      days: bar.days
+                    }
+            }}
+          </span>
+          <span *ngIf="!bar.fromWebsite && bar.days <= 0">
             {{
               'tr_cashier_booking_bar_today'
                 | translate
@@ -473,7 +505,7 @@
                     }
             }}
           </span>
-          <span *ngIf="bar.days > 0">
+          <span *ngIf="!bar.fromWebsite && bar.days > 0">
             {{
               'tr_cashier_booking_bar'
                 | translate
@@ -777,7 +809,7 @@
     </ng-container>
 
     <!-- Products Table: fixed column widths (Name / Qty / Price / Total) -->
-    <table class="invoice-table products-table">
+    <table class="invoice-table products-table" *ngIf="!isInstallmentSale()">
       <colgroup>
         <col class="products-table__col-name" />
         <col class="products-table__col-qty" />
@@ -813,8 +845,34 @@
       </tr>
     </table>
 
+    <table class="invoice-table products-table" *ngIf="isInstallmentSale()">
+      <colgroup>
+        <col class="products-table__col-name" />
+        <col class="products-table__col-qty" />
+      </colgroup>
+      <tr class="header bold">
+        <td>{{ 'tr_name' | receiptTranslate: st.receiptLanguage }}</td>
+        <td>{{ 'tr_cashier.QTY' | receiptTranslate: st.receiptLanguage }}</td>
+      </tr>
+
+      <tr *ngFor="let item of createdOrder?.products">
+        <td class="item-name">
+          {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
+            {{ item.code }}
+          </div>
+          <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
+            <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
+              <bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi>
+            </span>
+          </div>
+        </td>
+        <td>{{ item.quantity }}</td>
+      </tr>
+    </table>
+
     <!-- Totals (from saved order; includes invoice-level extra discount) -->
-    <table class="invoice-table totals-table">
+    <table class="invoice-table totals-table" *ngIf="!isInstallmentSale()">
       <tr class="bold">
         <td>{{ 'tr_order_subtotal' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
@@ -868,20 +926,83 @@
           {{ formatReceiptAmount(receiptExchangeCollected()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr *ngIf="isCreditSale()">
+      <tr *ngIf="isCreditSale() && !isInstallmentSale()">
         <td>{{ 'tr_pay_credit' | receiptTranslate: st.receiptLanguage }} — {{ 'tr_paid' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptCreditPaid()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
-      <tr *ngIf="isCreditSale() && !isCreditFullySettled()">
+      <tr *ngIf="isCreditSale() && !isInstallmentSale() && !isCreditFullySettled()">
+        <td>{{ 'tr_remaining' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptCreditRemaining()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="isInstallmentSale()">
+        <td>{{ 'tr_pay_installment' | receiptTranslate: st.receiptLanguage }} — {{ 'tr_paid' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptCreditPaid()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="isInstallmentSale() && receiptInstallmentPlanName()">
+        <td>{{ 'tr_installment_plan_select' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">{{ receiptInstallmentPlanName() }}</td>
+      </tr>
+      <tr *ngIf="isInstallmentSale() && receiptInstallmentMonthlyAmount() > 0">
+        <td>
+          {{ 'tr_invoice_installment_monthly' | receiptTranslate: st.receiptLanguage }}
+          <span *ngIf="receiptInstallmentMonths() > 0">
+            ({{ receiptInstallmentMonths() }})
+          </span>
+        </td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptInstallmentMonthlyAmount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="isInstallmentSale() && receiptInstallmentStartDate()">
+        <td>{{ 'tr_installment_start_date' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">{{ receiptInstallmentStartDate() | date: 'dd/MM/yyyy' }}</td>
+      </tr>
+      <tr *ngIf="isInstallmentSale() && !isCreditFullySettled()">
         <td>{{ 'tr_remaining' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">
           {{ formatReceiptAmount(receiptCreditRemaining()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
       <tr class="bold" *ngIf="isCreditFullySettled()">
-        <td colspan="2" class="center">{{ 'tr_credit_fully_settled' | receiptTranslate: st.receiptLanguage }}</td>
+        <td colspan="2" class="center">
+          {{
+            (isInstallmentSale() ? 'tr_installments_fully_settled' : 'tr_credit_fully_settled')
+              | receiptTranslate: st.receiptLanguage
+          }}
+        </td>
+      </tr>
+    </table>
+
+    <table class="invoice-table totals-table" *ngIf="isInstallmentSale()">
+      <tr *ngIf="receiptInvoiceExtraDiscount() > 0">
+        <td>{{ 'tr_invoice_extra_discount' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(-receiptInvoiceExtraDiscount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr class="bold">
+        <td>{{ 'tr_receipt_installment_down_payment' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptInstallmentDownPayment()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
+      <tr *ngIf="receiptInstallmentMonths() > 0">
+        <td>{{ 'tr_receipt_installment_months' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">{{ receiptInstallmentMonths() }}</td>
+      </tr>
+      <tr class="bold" *ngIf="receiptInstallmentMonthlyAmount() > 0">
+        <td>{{ 'tr_receipt_installment_amount' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(receiptInstallmentMonthlyAmount()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
       </tr>
     </table>
 
@@ -921,13 +1042,27 @@
     <div class="separator double-border"></div>
 
     <div class="final-total center bold">
-      <ng-container *ngIf="receiptExchangeCredit() <= 0 && receiptBookingDepositCredit() <= 0">
+      <ng-container *ngIf="isInstallmentSale()">
+        {{ 'tr_receipt_installment_down_payment' | receiptTranslate: st.receiptLanguage }} <br />
+        <span class="money">
+          {{ formatReceiptAmount(receiptInstallmentDownPayment()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </span>
+        <div class="size-small mt-2" *ngIf="receiptInstallmentMonths() > 0 && receiptInstallmentMonthlyAmount() > 0">
+          {{ receiptInstallmentMonths() }}
+          {{ 'tr_months_short' | receiptTranslate: st.receiptLanguage }}
+          ×
+          <span class="money">
+            {{ formatReceiptAmount(receiptInstallmentMonthlyAmount()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
+          </span>
+        </div>
+      </ng-container>
+      <ng-container *ngIf="!isInstallmentSale() && receiptExchangeCredit() <= 0 && receiptBookingDepositCredit() <= 0">
         {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </span>
       </ng-container>
-      <ng-container *ngIf="receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0">
+      <ng-container *ngIf="!isInstallmentSale() && (receiptExchangeCredit() > 0 || receiptBookingDepositCredit() > 0)">
         {{ 'tr_final_invoice_value' | receiptTranslate: st.receiptLanguage }} <br />
         <span class="money">
           {{ formatReceiptAmount(receiptFinalTotal()) }} {{ receiptCurrencyLabel(st.receiptLanguage) }}

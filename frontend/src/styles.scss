@@ -429,6 +429,54 @@ body[dir=rtl] {
   overflow: visible !important;
 }
 
+.cdk-overlay-backdrop.assign-collector-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.assign-collector-dialog-panel {
+  box-shadow: none;
+}
+
+.assign-collector-dialog-panel .mat-dialog-container,
+.assign-collector-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
+.cdk-overlay-backdrop.promise-to-pay-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.promise-to-pay-dialog-panel {
+  box-shadow: none;
+}
+
+.promise-to-pay-dialog-panel .mat-dialog-container,
+.promise-to-pay-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
+.cdk-overlay-backdrop.installment-plan-form-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.installment-plan-form-dialog-panel {
+  box-shadow: none;
+}
+
+.installment-plan-form-dialog-panel .mat-dialog-container,
+.installment-plan-form-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
 .cdk-overlay-backdrop.money-account-form-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

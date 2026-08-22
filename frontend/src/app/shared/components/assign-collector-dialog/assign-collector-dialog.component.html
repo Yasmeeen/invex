@@ -1,0 +1,37 @@
+<div class="assign-collector-dialog">
+  <header class="assign-collector-dialog__head">
+    <h2 class="assign-collector-dialog__title">{{ 'tr_assign_collector' | translate }}</h2>
+    <p class="assign-collector-dialog__meta" *ngIf="data?.orderNumber || data?.clientName">
+      <span *ngIf="data?.orderNumber">#{{ data.orderNumber }}</span>
+      <span *ngIf="data?.orderNumber && data?.clientName"> · </span>
+      <span *ngIf="data?.clientName">{{ data.clientName }}</span>
+    </p>
+  </header>
+
+  <label class="assign-collector-dialog__label" for="assignCollectorSelect">
+    {{ 'tr_collector' | translate }}
+  </label>
+  <select
+    id="assignCollectorSelect"
+    class="s-control"
+    [(ngModel)]="selectedCollectorId"
+  >
+    <option value="">{{ 'tr_no_collector' | translate }}</option>
+    <option *ngFor="let c of data.collectors" [value]="c._id">
+      {{ collectorLabel(c) }}
+    </option>
+  </select>
+  <p class="assign-collector-dialog__hint">{{ 'tr_assign_collector_workload_hint' | translate }}</p>
+
+  <footer class="assign-collector-dialog__actions">
+    <button type="button" class="btn btn-light" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="btn btn-outline-secondary" (click)="clear()">
+      {{ 'tr_unassign_collector' | translate }}
+    </button>
+    <button type="button" class="btn btn-primary" (click)="submit()">
+      {{ 'tr_save' | translate }}
+    </button>
+  </footer>
+</div>

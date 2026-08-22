@@ -1,0 +1,57 @@
+<div class="ptp-form">
+  <h2 class="ptp-form__title">{{ 'tr_promise_to_pay' | translate }}</h2>
+
+  <p class="ptp-form__lead">{{ 'tr_promise_to_pay_dialog_hint' | translate }}</p>
+
+  <div class="ptp-form__meta" *ngIf="data?.orderNumber != null || data?.installmentSequence != null">
+    <span *ngIf="data?.orderNumber != null">#{{ data.orderNumber }}</span>
+    <span *ngIf="data?.installmentSequence != null">
+      {{ 'tr_installments' | translate }} #{{ data.installmentSequence }}
+    </span>
+  </div>
+
+  <div class="ptp-form__history" *ngIf="history?.length">
+    <div class="ptp-form__history-title">{{ 'tr_promise_to_pay_history' | translate }}</div>
+    <ul class="ptp-form__history-list">
+      <li *ngFor="let item of history" class="ptp-form__history-item">
+        <span class="ptp-form__history-date">
+          {{ item.promiseToPayAt | date:'dd/MM/yyyy HH:mm' }}
+        </span>
+        <span
+          class="ptp-form__history-badge"
+          [class.ptp-form__history-badge--kept]="outcomeKey(item) === 'kept'"
+          [class.ptp-form__history-badge--missed]="outcomeKey(item) === 'missed'"
+          [class.ptp-form__history-badge--pending]="outcomeKey(item) === 'pending'"
+        >
+          <ng-container [ngSwitch]="outcomeKey(item)">
+            <ng-container *ngSwitchCase="'kept'">{{ 'tr_promise_to_pay_kept' | translate }}</ng-container>
+            <ng-container *ngSwitchCase="'missed'">{{ 'tr_promise_to_pay_missed' | translate }}</ng-container>
+            <ng-container *ngSwitchDefault>{{ 'tr_promise_to_pay_pending' | translate }}</ng-container>
+          </ng-container>
+        </span>
+      </li>
+    </ul>
+  </div>
+
+  <label class="ptp-form__field">
+    <span>{{ 'tr_promise_to_pay_datetime' | translate }}</span>
+    <input
+      type="datetime-local"
+      class="s-control"
+      name="promiseAt"
+      [(ngModel)]="promiseAt"
+    />
+  </label>
+
+  <div class="ptp-form__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-secondary" (click)="clear()" *ngIf="!!data?.promiseToPayAt">
+      {{ 'tr_promise_to_pay_clear' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()">
+      {{ 'tr_action.save' | translate }}
+    </button>
+  </div>
+</div>

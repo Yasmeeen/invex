@@ -16,6 +16,7 @@ import {
   isClientCreditOrder,
   pointsEarnedForOrder,
 } from "../../utils/client-order-utils.js";
+import { serializePastPromiseHistory } from "../../utils/promise-to-pay.js";
 import {
   buildClientNetBalanceMessage,
   buildClientSettlementPreview,
@@ -49,6 +50,67 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
+/** Trim + unique non-empty strings from an array (or single value). */
+function normalizeStringList(raw) {
+  const arr = Array.isArray(raw) ? raw : raw != null && raw !== "" ? [raw] : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of arr) {
+    const s = String(item || "").trim();
+    if (!s) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+function normalizeGuarantor(raw) {
+  if (!raw || typeof raw !== "object") {
+    return {
+      name: "",
+      phoneNumber: "",
+      nationalId: "",
+      address: "",
+      nationalIdImageUrl: "",
+      notes: "",
+    };
+  }
+  return {
+    name: String(raw.name || "").trim(),
+    phoneNumber: String(raw.phoneNumber || raw.phone || "").trim(),
+    nationalId: String(raw.nationalId || "").trim(),
+    address: String(raw.address || "").trim(),
+    nationalIdImageUrl: String(raw.nationalIdImageUrl || "").trim(),
+    notes: String(raw.notes || "").trim(),
+  };
+}
+
+/**
+ * Ensure primary + additional phones are not used by another client
+ * (primary or additional).
+ */
+async function assertPhonesAvailable(phones, excludeClientId) {
+  const cleaned = normalizeStringList(phones);
+  if (!cleaned.length) return;
+
+  const or = [
+    { phoneNumber: { $in: cleaned } },
+    { additionalPhoneNumbers: { $in: cleaned } },
+  ];
+  const query = { $or: or };
+  if (excludeClientId && mongoose.Types.ObjectId.isValid(String(excludeClientId))) {
+    query._id = { $ne: excludeClientId };
+  }
+  const conflict = await Client.findOne(query).select("phoneNumber name").lean();
+  if (conflict) {
+    const err = new Error("Phone number already in use");
+    err.status = 409;
+    throw err;
+  }
+}
+
 /**
  * GET client by phone (cashier / lookup). Must match stored phoneNumber flexibly.
  */
@@ -63,13 +125,20 @@ export const getClientByPhone = async (req, res) => {
     const last10 = digitsOnly(param).slice(-10);
 
     let client = await Client.findOne({
-      phoneNumber: { $in: candidates },
+      $or: [
+        { phoneNumber: { $in: candidates } },
+        { additionalPhoneNumbers: { $in: candidates } },
+      ],
     });
 
     // Fallback: last 10 digits match (handles spacing/format differences)
     if (!client && last10 && last10.length === 10) {
+      const last10Re = new RegExp(`${last10}$`);
       client = await Client.findOne({
-        phoneNumber: { $regex: new RegExp(`${last10}$`) },
+        $or: [
+          { phoneNumber: { $regex: last10Re } },
+          { additionalPhoneNumbers: { $regex: last10Re } },
+        ],
       });
     }
 
@@ -82,6 +151,8 @@ export const getClientByPhone = async (req, res) => {
       name: client.name,
       address: client.address,
       phoneNumber: client.phoneNumber,
+      additionalPhoneNumbers: client.additionalPhoneNumbers || [],
+      additionalAddresses: client.additionalAddresses || [],
     });
   } catch (error) {
     console.error("❌ Error fetching client by phone:", error.message);
@@ -91,7 +162,12 @@ export const getClientByPhone = async (req, res) => {
 
 /**
  * GET all clients (pagination + search + order stats + balances)
- * Query: balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
+ * Query:
+ *  - name — filter by client name
+ *  - search — filter by primary + additional phone numbers
+ *  - balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
+ *  - lastInstallmentPlanId / lastInstallmentPlanMonths — نظام تقسيط آخر فاتورة
+ *  - lastInstallmentAmount — قيمة القسط الشهري لآخر فاتورة
  */
 export const getClients = async (req, res) => {
   try {
@@ -100,18 +176,54 @@ export const getClients = async (req, res) => {
       limit: limitQ,
       perPage,
       search = "",
+      name = "",
       branch_id = "",
       balanceSide = "",
+      lastInstallmentPlanId = "",
+      lastInstallmentPlanMonths = "",
+      lastInstallmentAmount = "",
     } = req.query;
     const limit = Number(limitQ || perPage || 10) || 10;
     const skip = (Number(page) - 1) * limit;
     const sideFilter = String(balanceSide || "")
       .trim()
       .toLowerCase();
+    const nameFilter = String(name || "").trim();
+    const phoneFilter = String(search || "").trim();
+    const planIdRaw = String(lastInstallmentPlanId || "").trim();
+    const planIdFilter =
+      planIdRaw && mongoose.Types.ObjectId.isValid(planIdRaw)
+        ? new mongoose.Types.ObjectId(planIdRaw)
+        : null;
+    const planMonthsFilter = Math.floor(Number(lastInstallmentPlanMonths));
+    const hasPlanMonthsFilter =
+      Number.isFinite(planMonthsFilter) && planMonthsFilter > 0;
+    const amountParsed = Number(lastInstallmentAmount);
+    const hasAmountFilter =
+      lastInstallmentAmount !== "" &&
+      lastInstallmentAmount != null &&
+      Number.isFinite(amountParsed) &&
+      amountParsed >= 0;
+    const amountFilter = hasAmountFilter ? round2(amountParsed) : null;
+    const needsLastInvoiceFilter =
+      !!planIdFilter || hasPlanMonthsFilter || hasAmountFilter;
 
     const matchStage = {};
-    if (search) {
-      matchStage.phoneNumber = { $regex: search, $options: "i" };
+    if (nameFilter) {
+      matchStage.name = { $regex: nameFilter, $options: "i" };
+    }
+    if (phoneFilter) {
+      const phoneRe = { $regex: phoneFilter, $options: "i" };
+      const phoneOr = [
+        { phoneNumber: phoneRe },
+        { additionalPhoneNumbers: phoneRe },
+      ];
+      if (matchStage.name) {
+        matchStage.$and = [{ name: matchStage.name }, { $or: phoneOr }];
+        delete matchStage.name;
+      } else {
+        matchStage.$or = phoneOr;
+      }
     }
     if (branch_id && mongoose.Types.ObjectId.isValid(String(branch_id))) {
       const branchOid = new mongoose.Types.ObjectId(String(branch_id));
@@ -119,10 +231,16 @@ export const getClients = async (req, res) => {
         branch: branchOid,
         clientId: { $exists: true, $ne: null },
       });
-      matchStage.$or = [
+      const branchOr = [
         { branches: branchOid },
         { _id: { $in: clientIdsFromOrders } },
       ];
+      if (matchStage.$or) {
+        matchStage.$and = [{ $or: matchStage.$or }, { $or: branchOr }];
+        delete matchStage.$or;
+      } else {
+        matchStage.$or = branchOr;
+      }
     }
 
     const pipeline = [
@@ -142,6 +260,23 @@ export const getClients = async (req, res) => {
           numberOfOrders: { $size: "$orders" },
           totalOrdersPrice: { $sum: "$orders.totalPrice" },
           lastOrderDate: { $max: "$orders.createdAt" },
+          _eligibleClientOrders: {
+            $filter: {
+              input: "$orders",
+              as: "o",
+              cond: {
+                $and: [
+                  { $ne: ["$$o.status", "restored"] },
+                  {
+                    $in: [
+                      { $ifNull: ["$$o.partyType", "client"] },
+                      ["client"],
+                    ],
+                  },
+                ],
+              },
+            },
+          },
           owesFromSales: {
             $reduce: {
               input: {
@@ -194,6 +329,26 @@ export const getClients = async (req, res) => {
 
       {
         $addFields: {
+          _lastEligibleOrderAt: { $max: "$_eligibleClientOrders.createdAt" },
+        },
+      },
+
+      {
+        $addFields: {
+          lastClientOrder: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: "$_eligibleClientOrders",
+                  as: "o",
+                  cond: {
+                    $eq: ["$$o.createdAt", "$_lastEligibleOrderAt"],
+                  },
+                },
+              },
+              0,
+            ],
+          },
           clientOwesUs: {
             $round: [{ $add: ["$owesFromSales", "$openingDebit"] }, 2],
           },
@@ -201,20 +356,139 @@ export const getClients = async (req, res) => {
       },
 
       {
-        $project: {
-          name: 1,
-          phoneNumber: 1,
-          address: 1,
-          createdAt: 1,
-          branches: 1,
-          numberOfOrders: 1,
-          totalOrdersPrice: 1,
-          lastOrderDate: 1,
-          clientOwesUs: 1,
-          prepaidBalance: 1,
+        $addFields: {
+          lastInstallmentPlanId: "$lastClientOrder.installmentPlanId",
+          lastInstallmentPlanMonths: {
+            $ifNull: ["$lastClientOrder.installmentPlanSnapshot.months", null],
+          },
+          lastInstallmentAmount: {
+            $let: {
+              vars: {
+                fromSchedule: {
+                  $arrayElemAt: [
+                    {
+                      $map: {
+                        input: {
+                          $ifNull: ["$lastClientOrder.installments", []],
+                        },
+                        as: "inst",
+                        in: "$$inst.amount",
+                      },
+                    },
+                    0,
+                  ],
+                },
+                months: {
+                  $ifNull: ["$lastClientOrder.installmentPlanSnapshot.months", 0],
+                },
+                financed: {
+                  $add: [
+                    { $ifNull: ["$lastClientOrder.installmentPrincipal", 0] },
+                    {
+                      $ifNull: [
+                        "$lastClientOrder.installmentInterestAmount",
+                        0,
+                      ],
+                    },
+                  ],
+                },
+              },
+              in: {
+                $cond: [
+                  {
+                    $eq: [
+                      {
+                        $toLower: {
+                          $ifNull: ["$lastClientOrder.paymentMethod", ""],
+                        },
+                      },
+                      "installment",
+                    ],
+                  },
+                  {
+                    $cond: [
+                      { $ne: ["$$fromSchedule", null] },
+                      { $round: ["$$fromSchedule", 2] },
+                      {
+                        $cond: [
+                          { $gt: ["$$months", 0] },
+                          {
+                            $round: [{ $divide: ["$$financed", "$$months"] }, 2],
+                          },
+                          null,
+                        ],
+                      },
+                    ],
+                  },
+                  null,
+                ],
+              },
+            },
+          },
         },
       },
     ];
+
+    if (needsLastInvoiceFilter) {
+      const lastInvoiceAnd = [
+        {
+          $expr: {
+            $eq: [
+              {
+                $toLower: {
+                  $ifNull: ["$lastClientOrder.paymentMethod", ""],
+                },
+              },
+              "installment",
+            ],
+          },
+        },
+      ];
+
+      if (planIdFilter && hasPlanMonthsFilter) {
+        lastInvoiceAnd.push({
+          $or: [
+            { lastInstallmentPlanId: planIdFilter },
+            {
+              lastInstallmentPlanId: null,
+              lastInstallmentPlanMonths: planMonthsFilter,
+            },
+          ],
+        });
+      } else if (planIdFilter) {
+        lastInvoiceAnd.push({ lastInstallmentPlanId: planIdFilter });
+      } else if (hasPlanMonthsFilter) {
+        lastInvoiceAnd.push({
+          lastInstallmentPlanMonths: planMonthsFilter,
+        });
+      }
+
+      if (hasAmountFilter) {
+        lastInvoiceAnd.push({ lastInstallmentAmount: amountFilter });
+      }
+
+      pipeline.push({ $match: { $and: lastInvoiceAnd } });
+    }
+
+    pipeline.push({
+      $project: {
+        name: 1,
+        phoneNumber: 1,
+        additionalPhoneNumbers: 1,
+        address: 1,
+        additionalAddresses: 1,
+        nationalIdImageUrl: 1,
+        guarantor: 1,
+        collectorId: 1,
+        createdAt: 1,
+        branches: 1,
+        numberOfOrders: 1,
+        totalOrdersPrice: 1,
+        lastOrderDate: 1,
+        clientOwesUs: 1,
+        prepaidBalance: 1,
+      },
+    });
 
     const matched = await Client.aggregate(pipeline);
     const deferredMap = await computeClientDeferredPayablesByClients(matched);
@@ -318,7 +592,12 @@ export const getClientById = async (req, res) => {
         $project: {
           name: 1,
           phoneNumber: 1,
+          additionalPhoneNumbers: 1,
           address: 1,
+          additionalAddresses: 1,
+          nationalIdImageUrl: 1,
+          guarantor: 1,
+          collectorId: 1,
           branches: 1,
           createdAt: 1,
           numberOfOrders: 1,
@@ -343,7 +622,19 @@ export const getClientById = async (req, res) => {
  */
 export const createClient = async (req, res) => {
   try {
-    const { name, address, phoneNumber, phone, branches, branchs } = req.body;
+    const {
+      name,
+      address,
+      phoneNumber,
+      phone,
+      branches,
+      branchs,
+      additionalPhoneNumbers,
+      additionalAddresses,
+      nationalIdImageUrl,
+      guarantor,
+      collectorId,
+    } = req.body;
     const phoneRaw = String(phoneNumber || phone || "").trim();
 
     if (!name) {
@@ -368,10 +659,25 @@ export const createClient = async (req, res) => {
       }
     }
 
+    const extraPhones = normalizeStringList(additionalPhoneNumbers).filter(
+      (p) => p !== phoneRaw
+    );
+    await assertPhonesAvailable([phoneRaw, ...extraPhones]);
+
+    const collectorOid =
+      collectorId && mongoose.Types.ObjectId.isValid(String(collectorId))
+        ? new mongoose.Types.ObjectId(String(collectorId))
+        : null;
+
     const client = await Client.create({
       name: String(name).trim(),
       phoneNumber: phoneRaw,
+      additionalPhoneNumbers: extraPhones,
       address: String(address || "").trim(),
+      additionalAddresses: normalizeStringList(additionalAddresses),
+      nationalIdImageUrl: String(nationalIdImageUrl || "").trim(),
+      guarantor: normalizeGuarantor(guarantor),
+      collectorId: collectorOid,
       branches: branchIds,
     });
 
@@ -380,6 +686,9 @@ export const createClient = async (req, res) => {
       client,
     });
   } catch (error) {
+    if (error?.status === 409 || error?.code === 11000) {
+      return res.status(409).json({ error: "Phone number already in use" });
+    }
     console.error("❌ Error creating client:", error.message);
     res.status(500).json({ error: "Failed to create client" });
   }
@@ -390,7 +699,19 @@ export const createClient = async (req, res) => {
  */
 export const updateClient = async (req, res) => {
   try {
-    const { name, address, phoneNumber, phone, branches, branchs } = req.body;
+    const {
+      name,
+      address,
+      phoneNumber,
+      phone,
+      branches,
+      branchs,
+      additionalPhoneNumbers,
+      additionalAddresses,
+      nationalIdImageUrl,
+      guarantor,
+      collectorId,
+    } = req.body;
 
     const branchIds = Array.isArray(branches)
       ? branches
@@ -405,20 +726,49 @@ export const updateClient = async (req, res) => {
     const update = {};
     if (name !== undefined) update.name = String(name).trim();
     if (address !== undefined) update.address = String(address || "").trim();
+    if (additionalAddresses !== undefined) {
+      update.additionalAddresses = normalizeStringList(additionalAddresses);
+    }
+    if (nationalIdImageUrl !== undefined) {
+      update.nationalIdImageUrl = String(nationalIdImageUrl || "").trim();
+    }
+    if (guarantor !== undefined) {
+      update.guarantor = normalizeGuarantor(guarantor);
+    }
+    if (collectorId !== undefined) {
+      update.collectorId =
+        collectorId && mongoose.Types.ObjectId.isValid(String(collectorId))
+          ? new mongoose.Types.ObjectId(String(collectorId))
+          : null;
+    }
+
+    let nextPrimary = undefined;
     if (phoneNumber !== undefined || phone !== undefined) {
       const phoneRaw = String(phoneNumber || phone || "").trim();
       if (!phoneRaw) {
         return res.status(400).json({ error: "Client phone number is required" });
       }
-      const duplicate = await Client.findOne({
-        phoneNumber: phoneRaw,
-        _id: { $ne: req.params.id },
-      });
-      if (duplicate) {
-        return res.status(409).json({ error: "Phone number already in use" });
-      }
+      nextPrimary = phoneRaw;
       update.phoneNumber = phoneRaw;
     }
+
+    if (additionalPhoneNumbers !== undefined || nextPrimary !== undefined) {
+      const existing = await Client.findById(req.params.id).select(
+        "phoneNumber additionalPhoneNumbers"
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      const primary = nextPrimary ?? existing.phoneNumber;
+      const extras =
+        additionalPhoneNumbers !== undefined
+          ? normalizeStringList(additionalPhoneNumbers).filter((p) => p !== primary)
+          : (existing.additionalPhoneNumbers || []).filter((p) => p !== primary);
+      await assertPhonesAvailable([primary, ...extras], req.params.id);
+      update.additionalPhoneNumbers = extras;
+      if (nextPrimary !== undefined) update.phoneNumber = primary;
+    }
+
     if (branchIds !== undefined) {
       if (branchIds.length) {
         const count = await Branch.countDocuments({ _id: { $in: branchIds } });
@@ -442,7 +792,7 @@ export const updateClient = async (req, res) => {
       client: updatedClient,
     });
   } catch (error) {
-    if (error?.code === 11000) {
+    if (error?.status === 409 || error?.code === 11000) {
       return res.status(409).json({ error: "Phone number already in use" });
     }
     console.error("❌ Error updating client:", error.message);
@@ -470,7 +820,7 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName"
+        "orderNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments"
       )
       .populate("branch", "name")
       .sort({ createdAt: -1 })
@@ -482,11 +832,27 @@ export const getClientHistory = async (req, res) => {
       const remaining = isClientCreditOrder(o) ? orderAmountRemaining(o) : 0;
       const pointsEarned = pointsEarnedForOrder(o);
       totalPointsEarned += pointsEarned;
+      const installments = Array.isArray(o.installments) ? o.installments : [];
+      const unpaidInstallments = installments.filter((r) => {
+        if (r?.paid) return false;
+        const rem =
+          Math.round(
+            ((Number(r.amount) || 0) - (Number(r.paidAmount) || 0)) * 100
+          ) / 100;
+        return rem > 0.001;
+      });
+      const installmentsWithPromises = installments.map((r) => ({
+        ...r,
+        promiseToPayHistoryPast: serializePastPromiseHistory(r),
+      }));
       return {
         ...o,
+        installments: installmentsWithPromises,
         remaining,
         pointsEarned,
         isPayLater: isClientCreditOrder(o),
+        isInstallment: String(o.paymentMethod || "").toLowerCase() === "installment",
+        unpaidInstallmentsCount: unpaidInstallments.length,
       };
     });
 
@@ -508,6 +874,9 @@ export const getClientHistory = async (req, res) => {
     const settlementPreview = buildClientSettlementPreview(clientOwesUs, weOweClient);
     const creditOrders = ordersWithMeta.filter(
       (o) => o.isPayLater && o.remaining > 0 && o.status !== "restored"
+    );
+    const installmentOrders = ordersWithMeta.filter(
+      (o) => o.isInstallment && o.status !== "restored"
     );
 
     const phoneCandidates = buildPhoneSearchCandidates(client.phoneNumber);
@@ -573,7 +942,12 @@ export const getClientHistory = async (req, res) => {
         _id: client._id,
         name: client.name,
         phoneNumber: client.phoneNumber,
+        additionalPhoneNumbers: client.additionalPhoneNumbers || [],
         address: client.address,
+        additionalAddresses: client.additionalAddresses || [],
+        nationalIdImageUrl: client.nationalIdImageUrl || "",
+        guarantor: client.guarantor || null,
+        collectorId: client.collectorId || null,
       },
       totalPointsEarned,
       clientOwesUs,
@@ -590,6 +964,8 @@ export const getClientHistory = async (req, res) => {
       creditOrdersCount: creditOrders.length,
       orders: ordersWithMeta,
       creditOrders,
+      installmentOrders,
+      installmentOrdersCount: installmentOrders.length,
       purchases,
       purchasesCount: purchases.length,
       ledgerEntries: (client.ledgerEntries || []).slice().reverse(),

@@ -1,34 +1,34 @@
-import StoreSettings from '../../DB/models/storeSettings.model.js';
-
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 
-/** Starter list — admins can edit in Store Settings (Arabic labels typical). */
-export const DEFAULT_PURCHASE_TREASURY_METHODS = [
-  { key: 'cash', label: 'نقدي' },
-  { key: 'bank_misr', label: 'بنك مصر' },
-  { key: 'bank_ahli', label: 'بنك الأهلي' },
-  { key: 'bank_ahli_corp', label: 'بنك الأهلي شركات' },
-  { key: 'etisalat_cash', label: 'اتصالات كاش' },
-  { key: 'vodafone_cash', label: 'فودافون كاش' },
-  { key: 'orange_30_cash', label: 'أورانج ٣٠ كاش' },
-  { key: 'orange_40_cash', label: 'أورانج ٤٠ كاش' },
-];
+/** Only cash is built-in. Banks/wallets are created by the store under money accounts. */
+export const DEFAULT_PURCHASE_TREASURY_METHODS = [{ key: 'cash', label: 'نقدي' }];
+
+/** Old starter treasuries — never seed these; purchase lists come from payment-method showIn. */
+export const RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS = new Set([
+  'bank_misr',
+  'bank_ahli',
+  'bank_ahli_corp',
+  'etisalat_cash',
+  'vodafone_cash',
+  'orange_30_cash',
+  'orange_40_cash',
+]);
 
 function uniqNormalize(rawList) {
-  if (!Array.isArray(rawList) || rawList.length === 0) {
-    return DEFAULT_PURCHASE_TREASURY_METHODS.map((x) => ({ ...x }));
-  }
   const seen = new Set();
   const out = [];
-  for (const row of rawList) {
-    const key = String(row?.key ?? '')
-      .trim()
-      .toLowerCase()
-      .slice(0, 40);
-    const label = String(row?.label ?? '').trim().slice(0, 120);
-    if (!key || !label || !KEY_PATTERN.test(key) || seen.has(key)) continue;
-    seen.add(key);
-    out.push({ key, label });
+  if (Array.isArray(rawList)) {
+    for (const row of rawList) {
+      const key = String(row?.key ?? '')
+        .trim()
+        .toLowerCase()
+        .slice(0, 40);
+      const label = String(row?.label ?? '').trim().slice(0, 120);
+      if (!key || !label || !KEY_PATTERN.test(key) || seen.has(key)) continue;
+      if (RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS.has(key)) continue;
+      seen.add(key);
+      out.push({ key, label });
+    }
   }
   if (!out.some((x) => x.key === 'cash')) {
     out.unshift({ key: 'cash', label: 'نقدي' });
@@ -44,8 +44,15 @@ export function normalizePurchaseTreasuryMethods(rawList) {
 }
 
 export async function getEffectivePurchaseTreasuryMethodsFromDb() {
-  const doc = await StoreSettings.findOne().sort({ updatedAt: -1 }).select('purchaseTreasuryMethods').lean();
-  return normalizePurchaseTreasuryMethods(doc?.purchaseTreasuryMethods);
+  const { getEffectiveMoneyAccountsFromDb } = await import('./moneyAccounts.js');
+  const { catalogToPurchaseTreasuryMethods } = await import('./paymentMethodsCatalog.js');
+  const { moneyAccounts, paymentMethodAccountMap, paymentMethodsCatalog } =
+    await getEffectiveMoneyAccountsFromDb();
+  return catalogToPurchaseTreasuryMethods(
+    paymentMethodsCatalog,
+    paymentMethodAccountMap,
+    moneyAccounts
+  );
 }
 
 export function treasuryMethodMap(methods) {

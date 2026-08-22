@@ -20,7 +20,7 @@ import {
   MoneyAccountBalance,
   TreasuryAccountsService,
 } from '@shared/services/treasury-accounts.service';
-import { forkJoin, Subscription } from 'rxjs';
+import { Subscription } from 'rxjs';
 import {
   MoneyAccountFormDialogComponent,
   MoneyAccountFormResult,
@@ -654,61 +654,6 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     this.clampPage();
   }
 
-  /** Identical opening across branches is company-wide and counted once. */
-  private combineCompanyOpening(a: number, b: number): number {
-    const x = Math.round((Number(a) || 0) * 100) / 100;
-    const y = Math.round((Number(b) || 0) * 100) / 100;
-    if (x === y) return x;
-    if (!x) return y;
-    if (!y) return x;
-    return Math.round((x + y) * 100) / 100;
-  }
-
-  private mergeAccountBalances(lists: MoneyAccountBalance[][]): MoneyAccountBalance[] {
-    const map = new Map<string, MoneyAccountBalance>();
-    for (const list of lists) {
-      for (const acc of list || []) {
-        const key = String(acc.key || '').toLowerCase();
-        if (!key) continue;
-        const prev = map.get(key);
-        if (!prev) {
-          const opening = Number(acc.openingBalance) || 0;
-          const inn = Number(acc.inTotal) || 0;
-          const out = Number(acc.outTotal) || 0;
-          map.set(key, {
-            ...acc,
-            openingBalance: opening,
-            inTotal: inn,
-            outTotal: out,
-            periodNet: inn - out,
-            expectedBalance: opening + inn - out,
-          });
-          continue;
-        }
-        const opening =
-          key === 'cash'
-            ? (Number(prev.openingBalance) || 0) + (Number(acc.openingBalance) || 0)
-            : this.combineCompanyOpening(
-                Number(prev.openingBalance) || 0,
-                Number(acc.openingBalance) || 0
-              );
-        const inn = (Number(prev.inTotal) || 0) + (Number(acc.inTotal) || 0);
-        const out = (Number(prev.outTotal) || 0) + (Number(acc.outTotal) || 0);
-        prev.openingBalance = opening;
-        prev.inTotal = inn;
-        prev.outTotal = out;
-        prev.periodNet = inn - out;
-        prev.expectedBalance = opening + inn - out;
-        const prevAt = prev.lastMovement?.occurredAt || '';
-        const nextAt = acc.lastMovement?.occurredAt || '';
-        if (nextAt && (!prevAt || nextAt > prevAt)) {
-          prev.lastMovement = acc.lastMovement;
-        }
-      }
-    }
-    return Array.from(map.values());
-  }
-
   private toUiRowFromApi(a: MoneyAccountBalance): AccountUiRow {
     const kind: AccountUiRow['kind'] =
       a.kind === 'cash' ? 'cash' : a.kind === 'settlement' ? 'settlement' : 'treasury';
@@ -727,30 +672,36 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   private loadList(opts?: { silent?: boolean }): void {
     const uid = this.globals.currentUser?._id;
-    const branchIds = this.effectiveBranchIds;
-    if (!uid || !branchIds.length) {
+    if (!uid) {
       this.listLoading = false;
       return;
     }
+    if (!this.showBranchFilter && !this.lockedBranchId) {
+      this.listLoading = false;
+      return;
+    }
+    const branch = !this.showBranchFilter
+      ? this.lockedBranchId
+      : this.selectedBranchIds.length === 1
+        ? this.selectedBranchIds[0]
+        : undefined;
     if (!opts?.silent) this.listLoading = true;
     this.loadingBalances = true;
     this.subscriptions.push(
-      forkJoin(
-        branchIds.map((branch) =>
-          this.treasury.listAccounts({ userId: uid, branch, includeSettlement: true })
-        )
-      ).subscribe({
-        next: (results) => {
-          this.applyAccountsFromApi(this.mergeAccountBalances(results.map((r) => r.accounts || [])));
-          this.listLoading = false;
-          this.loadingBalances = false;
-        },
-        error: () => {
-          this.listLoading = false;
-          this.loadingBalances = false;
-          if (!this.treasuryRows.length) this.loadRowsFromSettings();
-        },
-      })
+      this.treasury
+        .listAccounts({ userId: uid, branch, includeSettlement: true })
+        .subscribe({
+          next: (res) => {
+            this.applyAccountsFromApi(res.accounts || []);
+            this.listLoading = false;
+            this.loadingBalances = false;
+          },
+          error: () => {
+            this.listLoading = false;
+            this.loadingBalances = false;
+            if (!this.treasuryRows.length) this.loadRowsFromSettings();
+          },
+        })
     );
   }
 

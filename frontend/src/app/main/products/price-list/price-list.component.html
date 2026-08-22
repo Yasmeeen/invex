@@ -1,0 +1,191 @@
+<div
+  class="content-shadow bg-white mb-5"
+  not-authorized
+  [notAuthorized]="isNotAuthorized"
+>
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">
+      <span class="text-primary">{{ totalNumberOfProducts }}-</span>
+      {{ 'tr_price_list' | translate }}
+    </span>
+  </h2>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_name' | translate }}/{{ 'tr_code' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              (keyup)="filterproducts($event)"
+              placeholder="{{ 'tr_search' | translate }}"
+              [(ngModel)]="nameSearchTerm"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_category' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select products-filter-ng-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              appendTo="body"
+              [(ngModel)]="selectedCategories"
+              name="categoryIds"
+              [items]="categorys"
+              [clearable]="true"
+              (ngModelChange)="onFilterChange()"
+            >
+              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                <div class="ng-value" *ngFor="let item of items">
+                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                  <span class="ng-value-label">{{ item.name }}</span>
+                </div>
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group">
+          <label>{{ 'tr_branches' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select products-filter-ng-select"
+              placeholder="{{ 'tr_select' | translate }}"
+              bindLabel="name"
+              bindValue="_id"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              appendTo="body"
+              [(ngModel)]="selectedBranches"
+              name="branchIds"
+              [items]="branches"
+              [clearable]="true"
+              (ngModelChange)="onFilterChange()"
+            >
+              <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                <div class="ng-value" *ngFor="let item of items">
+                  <span class="ng-value-icon left" (click)="clear(item)" aria-hidden="true">×</span>
+                  <span class="ng-value-label">{{ item.name }}</span>
+                </div>
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_products_stock_filter' | translate }}</label>
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="stockFilterOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
+            [(ngModel)]="stockFilter"
+            name="stockFilter"
+            (ngModelChange)="onFilterChange()"
+          >
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="plr-4 mt-4" *ngIf="!productsLoading">
+      <div class="table-container" *ngIf="productsList.length > 0">
+        <table class="s-table table layout-fixed price-list-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>{{ 'tr_product_name' | translate }}</th>
+              <th>{{ 'tr_code' | translate }}</th>
+              <th>{{ 'tr_category' | translate }}</th>
+              <th>{{ 'tr_branch' | translate }}</th>
+              <th>{{ 'tr_products_stock_filter' | translate }}</th>
+              <th>{{ 'tr_sell_price' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of productsList; let i = index; trackBy: trackById">
+              <td>{{ i + 1 }}</td>
+              <td>{{ product.name }}</td>
+              <td>{{ product.code }}</td>
+              <td>{{ product.category?.name }}</td>
+              <td>{{ locationLabel(product) }}</td>
+              <td>
+                <span class="stock-pill" [class.stock-pill--out]="!isInStock(product)">
+                  {{
+                    isInStock(product)
+                      ? ('tr_products_stock_filter_available' | translate)
+                      : ('tr_products_stock_filter_out' | translate)
+                  }}
+                  ({{ product.stock }})
+                </span>
+              </td>
+              <td>
+                <div class="price-edit">
+                  <input
+                    class="s-control price-edit__input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    [(ngModel)]="product.draftPrice"
+                    [disabled]="!canEditProduct(product) || isSaving(product)"
+                    (blur)="savePrice(product)"
+                    (keydown)="onPriceKeydown($event, product)"
+                  />
+                  <i
+                    *ngIf="isSaving(product)"
+                    class="fa fa-spinner fa-spin price-edit__icon"
+                    aria-hidden="true"
+                  ></i>
+                  <i
+                    *ngIf="isSaved(product)"
+                    class="fa fa-check text-primary price-edit__icon"
+                    [attr.title]="'tr_price_list_saved' | translate"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty-state-here text-center ptb-8" *ngIf="productsList.length == 0">
+        <i class="fa fa-folder-open empty-icon text-primary"></i>
+        <p>{{ 'tr_empty_state' | translate }}</p>
+      </div>
+
+      <div class="plr-4 ptb-4">
+        <pagination
+          [paginationData]="paginationData"
+          [perPage]="paginationPerPage"
+          (paginationUpdate)="paginationUpdate($event)"
+        ></pagination>
+      </div>
+    </div>
+
+    <div *ngIf="productsLoading">
+      <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
+    </div>
+  </div>
+</div>

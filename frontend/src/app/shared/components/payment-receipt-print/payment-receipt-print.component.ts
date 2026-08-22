@@ -8,6 +8,7 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { OrderPartyType } from '@core/models/products.model';
+import { isInstallmentSale } from '@core/utils/order-display.util';
 import { TranslateService } from '@ngx-translate/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
@@ -21,6 +22,8 @@ export interface PaymentReceiptData {
   remainingAfter: number;
   payments: Array<{ method?: string; amount: number }>;
   paidAt?: string | Date | null;
+  /** Remaining unpaid installment rows after this payment (sale installments). */
+  remainingInstallments?: number | null;
 }
 
 @Component({
@@ -89,6 +92,18 @@ export class PaymentReceiptPrintComponent implements OnInit, AfterViewInit {
 
   isFullySettled(): boolean {
     return this.remainingAfter() <= 0.005;
+  }
+
+  fullySettledLabelKey(): string {
+    return isInstallmentSale(this.order)
+      ? 'tr_installments_fully_settled'
+      : 'tr_credit_fully_settled';
+  }
+
+  remainingInstallments(): number | null {
+    const n = Number(this.receipt?.remainingInstallments);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.floor(n);
   }
 
   thisPayments(): Array<{ method?: string; amount: number }> {

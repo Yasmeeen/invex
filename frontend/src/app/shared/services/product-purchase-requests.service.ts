@@ -36,6 +36,11 @@ export interface DeskPurchaseProductPayload {
   /** When units do not share price/discount/attributes — one entry per unit */
   unitDetails?: DeskPurchaseUnitDetail[];
   acquiredFrom?: ProductAcquiredFrom | null;
+  /** Opt-in listing on the e-commerce catalog (default off). */
+  listedOnEcommerce?: boolean;
+  ecommerceDescription?: string;
+  ecommerceShortDescription?: string;
+  ecommerceIsFeatured?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -46,6 +46,12 @@
           </td>
           <td>{{ booking.customerPhone }}</td>
         </tr>
+        <tr *ngIf="booking.pickupType === 'branch_pickup' && (booking.pickupBranchName || booking.shippingAddress)">
+          <td class="invoice-client-block__label">
+            {{ 'tr_booking_pickup_branch' | receiptTranslate: st.receiptLanguage }}
+          </td>
+          <td>{{ booking.pickupBranchName || booking.shippingAddress }}</td>
+        </tr>
         <tr *ngIf="booking.pickupType === 'online_shipping' && booking.shippingAddress">
           <td class="invoice-client-block__label">
             {{ 'tr_booking_shipping_address' | receiptTranslate: st.receiptLanguage }}

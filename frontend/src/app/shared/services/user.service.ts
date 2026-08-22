@@ -85,6 +85,18 @@ export class UserSerivce {
     phoneNumber: string;
     address?: string;
     branches?: string[];
+    additionalPhoneNumbers?: string[];
+    additionalAddresses?: string[];
+    nationalIdImageUrl?: string;
+    guarantor?: {
+      name?: string;
+      phoneNumber?: string;
+      nationalId?: string;
+      address?: string;
+      nationalIdImageUrl?: string;
+      notes?: string;
+    };
+    collectorId?: string | null;
   }): Observable<any> {
     return this.http.post(`${CLIENTS_URL}/create`, payload);
   }
@@ -96,6 +108,18 @@ export class UserSerivce {
       phoneNumber: string;
       address?: string;
       branches?: string[];
+      additionalPhoneNumbers?: string[];
+      additionalAddresses?: string[];
+      nationalIdImageUrl?: string;
+      guarantor?: {
+        name?: string;
+        phoneNumber?: string;
+        nationalId?: string;
+        address?: string;
+        nationalIdImageUrl?: string;
+        notes?: string;
+      };
+      collectorId?: string | null;
     }
   ): Observable<any> {
     return this.http.put(`${CLIENTS_URL}/update/${clientId}`, payload);

@@ -24,6 +24,7 @@ const CORE_METHOD_IDS = new Set(['cash', 'credit']);
 export const CASHIER_PAYMENT_LOGOS: Record<string, string> = {
   cash: 'assets/images/payment/cash.svg',
   credit: 'assets/images/payment/cash.svg',
+  installment: 'assets/images/payment/cash.svg',
   visa: 'assets/images/payment/visa.svg',
   mastercard: 'assets/images/payment/mastercard.svg',
   meeza: 'assets/images/payment/meeza.svg',
@@ -83,6 +84,9 @@ function defaultLabelForMethod(
   if (m === 'mixed') {
     return labelFromOption({ id: 'mixed', labelKey: 'tr_pay_mixed' }, translate, lang);
   }
+  if (m === 'installment') {
+    return translate.instant('tr_pay_installment');
+  }
   return m.replace(/_/g, ' ');
 }
 
@@ -115,6 +119,13 @@ export function buildCashierPaymentMethods(
         logo: paymentLogo(id),
       });
       seen.add(id);
+    }
+    if (!seen.has('installment')) {
+      out.push({
+        id: 'installment',
+        label: translate.instant('tr_pay_installment'),
+        logo: paymentLogo('installment'),
+      });
     }
     return out;
   }
@@ -150,6 +161,15 @@ export function buildCashierPaymentMethods(
       logo: paymentLogo(opt.id),
     });
     seen.add(opt.id);
+  }
+
+  // Customer installment financing — not a treasury payment method; always offer at sale.
+  if (!seen.has('installment')) {
+    out.push({
+      id: 'installment',
+      label: translate.instant('tr_pay_installment'),
+      logo: paymentLogo('installment'),
+    });
   }
 
   return out;

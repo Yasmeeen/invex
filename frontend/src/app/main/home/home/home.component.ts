@@ -12,6 +12,7 @@ import { Branch } from '@core/models/products.model';
 import { BranchesServce } from '@shared/services/branches.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
+import { CollectionsService } from '@shared/services/collections.service';
 import { openingCelebrationStorageKey } from '@core/utils/opening-celebration';
 
 HC_treemap(Highcharts);
@@ -30,7 +31,7 @@ const DONUT_STOCK_OUT = '#d4a5a8';
 const DONUT_ORDER_DONE = '#1b4332';
 const DONUT_ORDER_RESTORED = '#74c69d';
 
-export type HomeDashboardSection = 'accounts' | 'sales';
+export type HomeDashboardSection = 'accounts' | 'sales' | 'collections';
 
 @Component({
   selector: 'app-home',
@@ -39,6 +40,8 @@ export type HomeDashboardSection = 'accounts' | 'sales';
 })
 export class HomeComponent implements OnInit, OnDestroy {
   activeSection: HomeDashboardSection = 'accounts';
+  /** False when the store has never created installment sales. */
+  showCollectionsTab = false;
   fromDate: Date = new Date();
   toDate: Date = new Date();
   selectedBranch: any;
@@ -68,6 +71,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private langChangeSub?: Subscription;
   private celebrationSub?: Subscription;
+  private installmentUsageSub?: Subscription;
   private salesLoaded = false;
   private readonly storageKey = 'home.activeSection';
   celebratingBranch: Branch | null = null;
@@ -80,17 +84,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private storeSettings: StoreSettingsService,
-    private openingCelebration: OpeningCelebrationService
+    private openingCelebration: OpeningCelebrationService,
+    private collectionsService: CollectionsService
   ) {
     const qp = String(this.route.snapshot.queryParamMap.get('section') || '')
       .trim()
       .toLowerCase();
-    if (qp === 'sales' || qp === 'accounts') {
+    if (qp === 'sales' || qp === 'accounts' || qp === 'collections') {
       this.activeSection = qp;
     } else {
       const saved = localStorage.getItem(this.storageKey);
-      if (saved === 'sales' || saved === 'accounts') {
-        this.activeSection = saved;
+      if (saved === 'sales' || saved === 'accounts' || saved === 'collections') {
+        this.activeSection = saved as HomeDashboardSection;
       }
     }
   }
@@ -119,6 +124,21 @@ export class HomeComponent implements OnInit, OnDestroy {
     );
     this.syncOpeningPopup(this.openingCelebration.snapshot);
     this.openingCelebration.load();
+    this.collectionsService.refreshHasInstallments();
+    this.installmentUsageSub = this.collectionsService.hasInstallments().subscribe({
+      next: (has) => {
+        this.showCollectionsTab = has;
+        if (!has && this.activeSection === 'collections') {
+          this.setSection('accounts');
+        }
+      },
+      error: () => {
+        this.showCollectionsTab = false;
+        if (this.activeSection === 'collections') {
+          this.setSection('accounts');
+        }
+      },
+    });
     if (this.activeSection === 'sales') {
       this.ensureSalesDashboard();
     }
@@ -152,6 +172,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.langChangeSub?.unsubscribe();
     this.celebrationSub?.unsubscribe();
+    this.installmentUsageSub?.unsubscribe();
   }
 
   @HostListener('document:keydown.escape')

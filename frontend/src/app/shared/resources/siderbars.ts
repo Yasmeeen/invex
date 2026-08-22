@@ -15,6 +15,11 @@ export const AdminSidebar = [
         icon: 'fa fa-cube icon',
       },
       {
+        name: 'tr_price_list',
+        routerLink: '/products/price-list',
+        icon: 'fa fa-list icon',
+      },
+      {
         name: 'tr_inventory',
         routerLink: '/inventory',
         icon: 'fa fa-cubes icon',
@@ -77,6 +82,11 @@ export const AdminSidebar = [
         name: 'tr_clients',
         routerLink: '/clients',
         icon: 'fa fa-user-circle-o icon',
+      },
+      {
+        name: 'tr_due_installments_title',
+        routerLink: '/collections/due',
+        icon: 'fa fa-calendar-check-o icon',
       },
       {
         name: 'tr_purchases',
@@ -145,6 +155,11 @@ export const AdminSidebar = [
         name: 'tr_store_settings_menu',
         routerLink: '/settings',
         icon: 'fa fa-wrench icon',
+      },
+      {
+        name: 'tr_installment_plans_title',
+        routerLink: '/settings/installment-plans',
+        icon: 'fa fa-calendar icon',
       },
       {
         name: 'tr_audit_title',
@@ -223,6 +238,30 @@ export const Cashier = [
   },
 ];
 
+/** Collector: follow-up installment collections for assigned clients. */
+export const CollectorSidebar = [
+  {
+    name: 'tr_due_installments_title',
+    routerLink: '/collections/due',
+    icon: 'fa fa-calendar-check-o icon',
+  },
+  {
+    name: 'tr_clients',
+    routerLink: '/clients',
+    icon: 'fa fa-user-circle-o icon',
+  },
+  {
+    name: 'tr_orders',
+    routerLink: '/orders',
+    icon: 'fa fa-list-alt icon',
+  },
+  {
+    name: 'tr_vixa',
+    routerLink: '/vixa',
+    icon: 'fa fa-comments icon',
+  },
+];
+
 /** Formerly Operation Manager — orders, inventory, products, branches, categories, reports. */
 export const Warehouse = [
   {
@@ -234,6 +273,11 @@ export const Warehouse = [
         name: 'tr_products',
         routerLink: '/products',
         icon: 'fa fa-cube icon',
+      },
+      {
+        name: 'tr_price_list',
+        routerLink: '/products/price-list',
+        icon: 'fa fa-list icon',
       },
       {
         name: 'tr_inventory',
@@ -301,9 +345,9 @@ export const ModeratorSidebar = [
     icon: 'fa fa-cube icon',
   },
   {
-    name: 'tr_serial_track',
-    routerLink: '/products/serial-track',
-    icon: 'fa fa-barcode icon',
+    name: 'tr_price_list',
+    routerLink: '/products/price-list',
+    icon: 'fa fa-list icon',
   },
 ];
 

@@ -6,21 +6,27 @@
 
   <nav class="store-settings-tabs" role="tablist" [attr.aria-label]="'tr_store_settings_menu' | translate">
     <button
-      *ngFor="let tab of tabs"
+      *ngFor="let tab of visibleTabs"
       type="button"
-      class="store-settings-tabs__btn"
       role="tab"
-      [class.is-active]="activeTab === tab.id"
+      class="store-settings-tabs__btn"
+      [class.store-settings-tabs__btn--active]="activeTab === tab.id"
       [attr.aria-selected]="activeTab === tab.id"
-      (click)="activeTab = tab.id"
+      (click)="setTab(tab.id)"
     >
       <i class="fa" [ngClass]="tab.icon" aria-hidden="true"></i>
       <span>{{ tab.labelKey | translate }}</span>
     </button>
   </nav>
 
-  <div class="store-settings-card">
-    <div *ngIf="activeTab === 'general'" role="tabpanel">
+  <div class="store-settings-card" role="tabpanel">
+    <!-- General -->
+    <ng-container *ngIf="activeTab === 'general'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_general' | translate }}</h2>
+        <p class="store-settings-card__hint">{{ 'tr_settings_tab_general_hint' | translate }}</p>
+      </div>
+
       <div class="store-settings-card__field">
         <label class="store-settings-card__label">{{ 'tr_store_name' | translate }}</label>
         <input
@@ -80,9 +86,14 @@
           </div>
         </div>
       </div>
-    </div>
+    </ng-container>
 
-    <div *ngIf="activeTab === 'features'" role="tabpanel">
+    <!-- Features -->
+    <ng-container *ngIf="activeTab === 'features'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_features' | translate }}</h2>
+      </div>
+
       <div class="store-settings-card__field">
         <label class="store-settings-card__policy-toggle checkbox-row">
           <input type="checkbox" name="weightSalesEnabled" [(ngModel)]="form.weightSalesEnabled" />
@@ -114,9 +125,15 @@
         </label>
         <p class="store-settings-card__hint">{{ 'tr_cashier_purchase_exchange_enabled_hint' | translate }}</p>
       </div>
-    </div>
+    </ng-container>
 
-    <div *ngIf="activeTab === 'policies'" role="tabpanel">
+    <!-- Policies -->
+    <ng-container *ngIf="activeTab === 'policies'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_policies' | translate }}</h2>
+        <p class="store-settings-card__hint">{{ 'tr_settings_tab_policies_hint' | translate }}</p>
+      </div>
+
       <div class="store-settings-card__field">
         <div class="store-settings-card__policy-head">
           <label class="store-settings-card__label" for="returnExchangePolicy">
@@ -168,7 +185,70 @@
           [placeholder]="'tr_booking_policy_placeholder' | translate"
         ></textarea>
       </div>
-    </div>
+    </ng-container>
+
+    <!-- E-commerce store -->
+    <ng-container *ngIf="activeTab === 'ecommerce'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_ecommerce' | translate }}</h2>
+        <p class="store-settings-card__hint">{{ 'tr_ecommerce_integration_hint' | translate }}</p>
+      </div>
+
+      <ng-container *ngIf="form.ecommerceIntegrationFeatureAvailable; else ecommerceLocked">
+        <div class="store-settings-card__field">
+          <label class="store-settings-card__enable checkbox-row">
+            <input
+              type="checkbox"
+              name="ecommerceIntegrationEnabled"
+              [(ngModel)]="form.ecommerceIntegrationEnabled"
+            />
+            <span>{{ 'tr_ecommerce_integration_enable' | translate }}</span>
+          </label>
+        </div>
+
+        <ng-container *ngIf="form.ecommerceIntegrationEnabled">
+          <div class="store-settings-card__field">
+            <label class="store-settings-card__label">{{ 'tr_ecommerce_base_url' | translate }}</label>
+            <p class="store-settings-card__hint">{{ 'tr_ecommerce_base_url_hint' | translate }}</p>
+            <input
+              type="text"
+              class="s-control"
+              name="ecommerceBaseUrl"
+              [(ngModel)]="form.ecommerceBaseUrl"
+              maxlength="500"
+              [placeholder]="'tr_ecommerce_base_url_ph' | translate"
+            />
+          </div>
+
+          <div class="store-settings-card__field">
+            <label class="store-settings-card__label">{{ 'tr_ecommerce_shared_key' | translate }}</label>
+            <p class="store-settings-card__hint">{{ 'tr_ecommerce_shared_key_hint' | translate }}</p>
+            <input
+              type="text"
+              class="s-control"
+              name="ecommerceSharedKey"
+              [(ngModel)]="form.ecommerceSharedKey"
+              maxlength="200"
+              autocomplete="off"
+              [placeholder]="'tr_ecommerce_shared_key_ph' | translate"
+            />
+          </div>
+
+          <div class="store-settings-card__field">
+            <label class="store-settings-card__label">{{ 'tr_ecommerce_catalog_mode' | translate }}</label>
+            <p class="store-settings-card__hint">{{ 'tr_ecommerce_catalog_mode_hint' | translate }}</p>
+            <select class="s-control" name="ecommerceCatalogMode" [(ngModel)]="form.ecommerceCatalogMode">
+              <option value="all">{{ 'tr_ecommerce_catalog_all' | translate }}</option>
+              <option value="online_only">{{ 'tr_ecommerce_catalog_online' | translate }}</option>
+            </select>
+          </div>
+        </ng-container>
+      </ng-container>
+
+      <ng-template #ecommerceLocked>
+        <p class="store-settings-card__locked">{{ 'tr_ecommerce_feature_locked' | translate }}</p>
+      </ng-template>
+    </ng-container>
 
     <div class="store-settings-card__actions">
       <button

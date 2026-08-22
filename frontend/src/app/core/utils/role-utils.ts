@@ -20,9 +20,14 @@ export function isModerator(role: string | undefined | null): boolean {
   return role === 'Moderator';
 }
 
+/** Collects installments across any branch (not tied to one store). */
+export function isCollector(role: string | undefined | null): boolean {
+  return role === 'Collector';
+}
+
 /** Roles stored without a fixed branch — see data across all branches. */
 export function isBranchlessUserRole(role: string | undefined | null): boolean {
-  return canPickBranchRole(role) || isModerator(role);
+  return canPickBranchRole(role) || isModerator(role) || isCollector(role);
 }
 
 /** Book/reserve on any product (all branches + warehouse). */

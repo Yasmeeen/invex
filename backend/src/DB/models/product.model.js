@@ -80,6 +80,36 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Units held for open e-commerce channel orders (not yet converted to a sale). */
+    ecommerceReservedQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /**
+     * When store catalog mode is "all", only products with this flag are pushed to the website.
+     * Default false so the merchant opts in each SKU.
+     */
+    listedOnEcommerce: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    /** Storefront product description (edited in Invex; pushed to the e-commerce catalog). */
+    ecommerceDescription: {
+      type: String,
+      default: '',
+    },
+    ecommerceShortDescription: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    ecommerceIsFeatured: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

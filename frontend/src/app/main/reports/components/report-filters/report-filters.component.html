@@ -82,23 +82,37 @@
     </div>
     <div
       class="report-filters__field report-filters__field--wide"
-      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury'"
+      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury' && reportType !== 'installments'"
     >
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
-        [placeholder]="'tr_report_all_products' | translate"
-        bindLabel="name"
-        bindValue="_id"
+        [placeholder]="'tr_report_product_search_placeholder' | translate"
         [items]="products"
+        [typeahead]="productTypeahead$"
+        [loading]="productsLoading"
+        bindLabel="label"
+        bindValue="_id"
         [(ngModel)]="filters.product_id"
+        (ngModelChange)="onProductIdChange($event)"
+        (open)="onProductSelectOpen()"
         name="reportProduct"
         [clearable]="true"
         [searchable]="true"
+        notFoundText="{{ 'tr_no_items_found' | translate }}"
       >
         <ng-template ng-option-tmp let-item="item">
-          <span>{{ item.name }}</span>
-          <span class="report-filters__opt-code" *ngIf="item?.code"> ({{ item.code }})</span>
+          <div class="weight-medium">{{ item.name }}</div>
+          <div class="size-small text-muted">
+            <span *ngIf="item?.code">{{ item.code }}</span>
+            <span *ngIf="item?.removedWhenOutOfStock || item?.stock === 0">
+              · {{ 'tr_report_product_sold_out' | translate }}
+            </span>
+          </div>
+        </ng-template>
+        <ng-template ng-label-tmp let-item="item">
+          {{ item.name }}
+          <span *ngIf="item?.code"> ({{ item.code }})</span>
         </ng-template>
       </ng-select>
     </div>
@@ -114,6 +128,33 @@
         [placeholder]="'tr_report_placeholder_customer_phone' | translate"
         autocomplete="tel"
       />
+    </div>
+    <div class="report-filters__field report-filters__field--wide" *ngIf="reportType === 'installments'">
+      <label>{{ 'tr_collector' | translate }}</label>
+      <ng-select
+        class="s-control s-select report-filters__select"
+        [placeholder]="'tr_all_collectors' | translate"
+        bindLabel="name"
+        bindValue="_id"
+        [items]="collectors"
+        [(ngModel)]="filters.collector_id"
+        name="reportCollector"
+        [clearable]="true"
+        [searchable]="true"
+      >
+      </ng-select>
+    </div>
+    <div class="report-filters__field" *ngIf="reportType === 'installments'">
+      <label>{{ 'tr_status' | translate }}</label>
+      <select class="s-control" [(ngModel)]="filters.installment_status" name="installmentStatus">
+        <option value="all">{{ 'tr_collections_all_statuses' | translate }}</option>
+        <option value="paid">{{ 'tr_paid' | translate }}</option>
+        <option value="unpaid">{{ 'tr_unpaid' | translate }}</option>
+        <option value="overdue">{{ 'tr_collections_overdue' | translate }}</option>
+        <option value="due_soon">{{ 'tr_collections_due_soon' | translate }}</option>
+        <option value="promised">{{ 'tr_collections_promised' | translate }}</option>
+        <option value="due">{{ 'tr_collections_due' | translate }}</option>
+      </select>
     </div>
     <div class="report-filters__field" *ngIf="reportType === 'sales' || reportType === 'profit'">
       <label>{{ 'tr_report_filter_seller' | translate }}</label>

@@ -5,6 +5,7 @@ import {
     getOrderById,
     createOrder,
     addOrderPayment,
+    setInstallmentPromise,
     updateOrder,
     deleteOrder,
     restoreOrder
@@ -14,8 +15,9 @@ router.get('/', getOrders);              // GET all with pagination/search
 router.get('/:id', getOrderById);        // GET one by ID
 router.post('/createOrder', createOrder);           // POST create
 router.post('/:orderId/payments', addOrderPayment);
+router.post('/:orderId/installments/:installmentId/promise', setInstallmentPromise);
 router.put('/:id', updateOrder);         // PUT update
 router.delete('/deleteOrder/:id', deleteOrder);      // DELETE product
 router.put('/:orderId/restore', restoreOrder);
 
-export default router; 
+export default router;

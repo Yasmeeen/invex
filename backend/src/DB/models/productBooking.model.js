@@ -83,6 +83,19 @@ const productBookingSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    /** pos = cashier/app booking; ecommerce = paid order from the website. */
+    source: {
+      type: String,
+      enum: ['pos', 'ecommerce'],
+      default: 'pos',
+      index: true,
+    },
+    ecommerceOrderId: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
     cancelledAt: { type: Date },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     cancelReason: { type: String, trim: true },

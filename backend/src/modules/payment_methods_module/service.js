@@ -30,7 +30,11 @@ function accountsFrom(doc, catalog) {
   });
   return normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(accounts),
-    moneyAccounts: mergeMoneyAccountsFromCatalog(accounts, catalog || catalogFrom(doc)),
+    moneyAccounts: mergeMoneyAccountsFromCatalog(
+      accounts,
+      catalog || catalogFrom(doc),
+      doc?.paymentMethodAccountMap
+    ),
   });
 }
 
@@ -117,7 +121,7 @@ function buildMapRow(method, effectMode, accountKey, settlementBankAccountKey, a
 }
 
 async function persistCatalogAndMap(doc, catalog, mapRows, accounts) {
-  let nextAccounts = mergeMoneyAccountsFromCatalog(accounts, catalog);
+  let nextAccounts = mergeMoneyAccountsFromCatalog(accounts, catalog, mapRows);
   nextAccounts = normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(nextAccounts),
     moneyAccounts: nextAccounts,

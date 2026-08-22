@@ -1,11 +1,65 @@
 import { InvoiceReturnRecord, Order, OrderProductLine } from '@core/models/products.model';
 import { normalizeMongoId } from './mongo-id.util';
 
-/** Pay later / بيع بالآجل — only method that can be partially paid after sale. */
+/** Pay later / بيع بالآجل / تقسيط — can be partially paid after sale. */
 export function isPayLaterMethod(method: string | null | undefined): boolean {
-  return String(method ?? '')
+  const m = String(method ?? '')
     .trim()
-    .toLowerCase() === 'credit';
+    .toLowerCase();
+  return m === 'credit' || m === 'installment';
+}
+
+/** Sale has an installment schedule (even if paymentMethod is mixed historically). */
+export function orderHasInstallmentSchedule(order: { installments?: unknown[] } | null | undefined): boolean {
+  return Array.isArray(order?.installments) && order!.installments!.length > 0;
+}
+
+/** Customer sale paid via installment plan (not plain credit). */
+export function isInstallmentSale(order: {
+  paymentMethod?: string | null;
+  installments?: unknown[];
+} | null | undefined): boolean {
+  if (!order) return false;
+  if (String(order.paymentMethod ?? '').trim().toLowerCase() === 'installment') {
+    return true;
+  }
+  return orderHasInstallmentSchedule(order);
+}
+
+export function orderInstallmentMonths(order: {
+  installmentPlanSnapshot?: { months?: number } | null;
+  installments?: unknown[];
+} | null | undefined): number {
+  const fromSnap = Number(order?.installmentPlanSnapshot?.months);
+  if (Number.isFinite(fromSnap) && fromSnap > 0) {
+    return Math.floor(fromSnap);
+  }
+  if (Array.isArray(order?.installments) && order!.installments!.length) {
+    return order!.installments!.length;
+  }
+  return 0;
+}
+
+/** Typical monthly installment amount (first schedule row; last may differ by rounding). */
+export function orderInstallmentMonthlyAmount(order: {
+  installments?: Array<{ amount?: number }> | null;
+} | null | undefined): number {
+  const list = order?.installments;
+  if (!Array.isArray(list) || !list.length) return 0;
+  const n = Number(list[0]?.amount);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+export function countUnpaidSaleInstallments(
+  installments: Array<{ paid?: boolean; amount?: number; paidAmount?: number }> | null | undefined
+): number {
+  if (!Array.isArray(installments)) return 0;
+  return installments.filter((r) => {
+    if (r?.paid) return false;
+    const amount = Math.round((Number(r?.amount) || 0) * 100) / 100;
+    const paidAmount = Math.round((Number(r?.paidAmount) || 0) * 100) / 100;
+    return amount - paidAmount > 0.001;
+  }).length;
 }
 
 function toMoney(v: unknown): number {
@@ -47,14 +101,60 @@ export function orderDisplayRemaining(order: Order | null | undefined): number {
   return Math.max(0, Math.round((total - paidStored) * 100) / 100);
 }
 
-/** Credit invoice with no remaining balance (fully settled). */
+/** Plain deferred credit (بيع بالآجل) — not installment. */
+export function isCreditOnlySale(order: {
+  paymentMethod?: string | null;
+  installments?: unknown[];
+} | null | undefined): boolean {
+  if (!order) return false;
+  if (isInstallmentSale(order)) return false;
+  return String(order.paymentMethod ?? '').trim().toLowerCase() === 'credit';
+}
+
+/** Fully or partially returned — balance may be zero without installments being paid off. */
+export function isOrderReturned(order: { status?: string | null } | null | undefined): boolean {
+  const s = String(order?.status ?? '')
+    .trim()
+    .toLowerCase();
+  return s === 'restored' || s === 'partially_restored';
+}
+
+/** Credit invoice with no remaining balance (fully settled by payment — not by return). */
 export function isPayLaterSettled(order: Order | null | undefined): boolean {
-  return isPayLaterMethod(order?.paymentMethod) && orderDisplayRemaining(order) <= 0;
+  if (!order || isOrderReturned(order)) return false;
+  return isPayLaterMethod(order.paymentMethod) && orderDisplayRemaining(order) <= 0;
 }
 
 /** Credit invoice still owed (unpaid or partial). */
 export function isPayLaterOutstanding(order: Order | null | undefined): boolean {
-  return isPayLaterMethod(order?.paymentMethod) && orderDisplayRemaining(order) > 0;
+  if (!order || isOrderReturned(order)) return false;
+  return isPayLaterMethod(order.paymentMethod) && orderDisplayRemaining(order) > 0;
+}
+
+export function isInstallmentOutstanding(order: Order | null | undefined): boolean {
+  if (!order || isOrderReturned(order)) return false;
+  return isInstallmentSale(order) && orderDisplayRemaining(order) > 0;
+}
+
+export function isInstallmentSettled(order: Order | null | undefined): boolean {
+  if (!order || isOrderReturned(order)) return false;
+  return isInstallmentSale(order) && orderDisplayRemaining(order) <= 0;
+}
+
+export function isCreditOnlyOutstanding(order: Order | null | undefined): boolean {
+  if (!order || isOrderReturned(order)) return false;
+  return isCreditOnlySale(order) && orderDisplayRemaining(order) > 0;
+}
+
+export function isCreditOnlySettled(order: Order | null | undefined): boolean {
+  if (!order || isOrderReturned(order)) return false;
+  return isCreditOnlySale(order) && orderDisplayRemaining(order) <= 0;
+}
+
+export function orderInstallmentPlanName(order: {
+  installmentPlanSnapshot?: { name?: string } | null;
+} | null | undefined): string {
+  return String(order?.installmentPlanSnapshot?.name || '').trim();
 }
 
 /** Normalize product id on order line items (string / ObjectId / `{ _id }`). */

@@ -23,6 +23,9 @@ import drawerCloseRoutes from './modules/drawer_close_module/router.js';
 import treasuryAccountsRoutes from './modules/treasury_accounts_module/router.js';
 import moneyAccountsRoutes from './modules/money_accounts_module/router.js';
 import paymentMethodsRoutes from './modules/payment_methods_module/router.js';
+import installmentPlansRoutes from './modules/installment_plans_module/router.js';
+import collectionsRoutes from './modules/collections_module/router.js';
+import integrationsRoutes from './modules/integrations_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -72,6 +75,9 @@ const bootstrap = (app, express) => {
   app.use('/api/treasury', treasuryAccountsRoutes);
   app.use('/api/money-accounts', moneyAccountsRoutes);
   app.use('/api/payment-methods', paymentMethodsRoutes);
+  app.use('/api/installment-plans', installmentPlansRoutes);
+  app.use('/api/collections', collectionsRoutes);
+  app.use('/api/integrations', integrationsRoutes);
 
   return app;
 };

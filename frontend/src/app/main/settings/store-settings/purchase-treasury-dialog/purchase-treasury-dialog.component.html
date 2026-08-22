@@ -225,7 +225,7 @@
                   </div>
                   <div
                     class="single-option"
-                    *ngIf="row.kind === 'settlement' && singleBranchId"
+                    *ngIf="row.kind === 'settlement'"
                     (click)="openQuickSettle(row)"
                   >
                     {{ 'tr_treasury_quick_settle' | translate }}

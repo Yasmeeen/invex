@@ -16,6 +16,7 @@ import { CategoriesServce } from '@shared/services/categories.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { UserSerivce } from '@shared/services/user.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
+import { CollectionsService, CollectorUser } from '@shared/services/collections.service';
 import { of, Subject, Subscription } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 
@@ -34,6 +35,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   products: any[] = [];
   categories: any[] = [];
   users: { _id: string; name: string }[] = [];
+  collectors: CollectorUser[] = [];
   salespeople: string[] = [];
   /** Branch Manager: fixed to assigned branch (no “all branches”). */
   branchFilterLocked = false;
@@ -45,6 +47,12 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   readonly vendorTypeahead$ = new Subject<string>();
   private vendorTypeaheadSub?: Subscription;
 
+  /** Product filter typeahead (includes sold/soft-removed rows for historical reports). */
+  productsLoading = false;
+  readonly productTypeahead$ = new Subject<string>();
+  private productTypeaheadSub?: Subscription;
+  selectedProductLabel = '';
+
   filters: any = {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
@@ -54,6 +62,8 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     product_id: null as string | null,
     customer_phone: '',
     seller_name: null as string | null,
+    collector_id: null as string | null,
+    installment_status: 'all',
     groupBy: 'daily',
     booking_status: 'all',
     booking_confirmed: 'all',
@@ -68,6 +78,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     private productsSerivce: ProductsSerivce,
     private userSerivce: UserSerivce,
     private vendorsSerivce: VendorsSerivce,
+    private collectionsService: CollectionsService,
     private authenticationService: AuthenticationService,
     public globals: Globals
   ) {}
@@ -79,20 +90,24 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
       this.filters.branch_id = String(u.branch._id);
     }
     this.initVendorTypeahead();
+    this.initProductTypeahead();
     this.loadBranches();
     this.loadCategories();
     this.loadProducts();
     this.ensureBookingUsersLoaded();
+    this.ensureCollectorsLoaded();
     queueMicrotask(() => this.applyFilters());
   }
 
   ngOnDestroy(): void {
     this.vendorTypeaheadSub?.unsubscribe();
+    this.productTypeaheadSub?.unsubscribe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['reportType']) {
       this.ensureBookingUsersLoaded();
+      this.ensureCollectorsLoaded();
       this.loadSalespeople();
       if (this.categoryFilterVisible) {
         this.loadCategories();
@@ -103,6 +118,17 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   private ensureBookingUsersLoaded(): void {
     if (this.reportType === 'bookings' && this.users.length === 0) {
       this.loadUsers();
+    }
+  }
+
+  private ensureCollectorsLoaded(): void {
+    if (this.reportType === 'installments' && this.collectors.length === 0) {
+      this.collectionsService.listCollectors().subscribe({
+        next: (res) => {
+          this.collectors = res?.collectors || [];
+        },
+        error: () => (this.collectors = []),
+      });
     }
   }
 
@@ -155,22 +181,92 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   loadProducts(): void {
-    const params: Record<string, string | number> = { page: 1, limit: 2000 };
-    if (this.filters.branch_id) {
-      params.branchId = String(this.filters.branch_id);
+    this.productTypeahead$.next('');
+  }
+
+  private initProductTypeahead(): void {
+    this.productTypeaheadSub = this.productTypeahead$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        tap(() => (this.productsLoading = true)),
+        switchMap((term: string) => {
+          const search = String(term || '').trim();
+          const params: Record<string, string | number | boolean> = {
+            page: 1,
+            limit: 40,
+            /** Keep sold / soft-removed products selectable for sales & profit history. */
+            includeRemoved: true,
+          };
+          if (this.filters.branch_id) {
+            params.branchId = String(this.filters.branch_id);
+          }
+          const categoryIds = this.selectedCategoryIds;
+          if (categoryIds.length) {
+            params.categoryId = categoryIds.join(',');
+          }
+          if (search) {
+            params.search = search;
+          }
+          return this.productsSerivce.getProducts(params).pipe(
+            catchError(() => of({ products: [] })),
+            tap(() => (this.productsLoading = false))
+          );
+        })
+      )
+      .subscribe((res: any) => {
+        const list = Array.isArray(res?.products) ? res.products : [];
+        this.products = list.map((p: any) => this.withProductLabel(p));
+        if (
+          this.filters.product_id &&
+          this.selectedProductLabel &&
+          !this.products.some((p) => String(p._id) === String(this.filters.product_id))
+        ) {
+          this.products = [
+            {
+              _id: this.filters.product_id,
+              name: this.selectedProductLabel,
+              label: this.selectedProductLabel,
+            },
+            ...this.products,
+          ];
+        }
+      });
+  }
+
+  onProductSelectOpen(): void {
+    this.productTypeahead$.next('');
+  }
+
+  private withProductLabel(product: any): any {
+    if (!product) {
+      return product;
     }
-    const categoryIds = this.selectedCategoryIds;
-    if (categoryIds.length) {
-      params.categoryId = categoryIds.join(',');
+    const name = String(product.name || '').trim();
+    const code = String(product.code || '').trim();
+    const bits = [name];
+    if (code) {
+      bits.push(`(${code})`);
     }
-    this.productsSerivce.getProducts(params).subscribe({
-      next: (res: any) => (this.products = res.products || []),
-      error: () => (this.products = []),
-    });
+    return {
+      ...product,
+      label: bits.filter(Boolean).join(' '),
+    };
+  }
+
+  onProductIdChange(productId: string | null): void {
+    this.filters.product_id = productId ? String(productId) : null;
+    if (!productId) {
+      this.selectedProductLabel = '';
+      return;
+    }
+    const found = this.products.find((p) => String(p._id) === String(productId));
+    this.selectedProductLabel = found?.label || found?.name || '';
   }
 
   onBranchChange(): void {
     this.filters.product_id = null;
+    this.selectedProductLabel = '';
     this.filters.seller_name = null;
     this.loadProducts();
     this.loadSalespeople();
@@ -178,6 +274,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
 
   onCategoryChange(): void {
     this.filters.product_id = null;
+    this.selectedProductLabel = '';
     this.loadProducts();
   }
 
@@ -318,6 +415,12 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
         base.created_by = String(this.filters.booking_created_by);
       }
     }
+    if (this.reportType === 'installments') {
+      if (this.filters.collector_id) {
+        base.collector_id = String(this.filters.collector_id);
+      }
+      base.status = this.filters.installment_status || 'all';
+    }
     return base;
   }
 
@@ -340,8 +443,11 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedSupplierLabel = '';
     this.vendorSearchItems = [];
     this.filters.product_id = null;
+    this.selectedProductLabel = '';
     this.filters.customer_phone = '';
     this.filters.seller_name = null;
+    this.filters.collector_id = null;
+    this.filters.installment_status = 'all';
     this.filters.groupBy = 'daily';
     this.filters.booking_status = 'all';
     this.filters.booking_confirmed = 'all';

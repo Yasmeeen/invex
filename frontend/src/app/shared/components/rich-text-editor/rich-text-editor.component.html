@@ -1,0 +1,32 @@
+<div class="rte">
+  <div class="rte__toolbar">
+    <button type="button" class="rte__btn rte__btn--bold" (click)="cmd('bold')">B</button>
+    <button type="button" class="rte__btn rte__btn--italic" (click)="cmd('italic')">I</button>
+    <button type="button" class="rte__btn rte__btn--underline" (click)="cmd('underline')">U</button>
+    <button type="button" class="rte__btn" (click)="cmd('insertUnorderedList')">•</button>
+    <button type="button" class="rte__btn" (click)="cmd('insertOrderedList')">1.</button>
+    <span class="rte__sep"></span>
+    <button
+      *ngFor="let c of presets"
+      type="button"
+      class="rte__swatch"
+      [style.backgroundColor]="c"
+      (mousedown)="saveSelection($event)"
+      (click)="applyColor(c)"
+      [attr.title]="c"
+    ></button>
+    <input
+      type="color"
+      class="rte__color"
+      (mousedown)="saveSelection($event)"
+      (input)="onColorInput($event)"
+    />
+  </div>
+  <div
+    #editor
+    class="rte__editor"
+    contenteditable="true"
+    (input)="onInput()"
+    (blur)="onTouched()"
+  ></div>
+</div>

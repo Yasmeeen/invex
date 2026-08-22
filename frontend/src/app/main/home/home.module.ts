@@ -5,6 +5,7 @@ import { HomeRoutingModule } from './home-routing.module';
 import { HomeComponent } from './home/home.component';
 import { SharedModule } from '@shared/shared.module';
 import { TreasuryAccountsListModule } from '../treasury/treasury-accounts-list/treasury-accounts-list.module';
+import { CollectionsDashboardModule } from '../collections/collections-dashboard.module';
 
 @NgModule({
   declarations: [HomeComponent],
@@ -14,6 +15,7 @@ import { TreasuryAccountsListModule } from '../treasury/treasury-accounts-list/t
     HomeRoutingModule,
     SharedModule,
     TreasuryAccountsListModule,
+    CollectionsDashboardModule,
   ],
 })
 export class HomeModule {}

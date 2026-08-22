@@ -1,5 +1,5 @@
 import { User } from '@core/models/users-interfaces.model';
-import { canPickBranchRole } from './role-utils';
+import { canPickBranchRole, isCollector } from './role-utils';
 
 /** Branch id for cash-drawer / expense recording from logged-in user. */
 export function branchIdFromUser(user: User | null | undefined): string {
@@ -24,7 +24,8 @@ export function resolveActorBranchContext(
     return { branchId: forced, showBranchPicker: false };
   }
   const role = actor?.role != null ? String(actor.role) : undefined;
-  if (canPickBranchRole(role)) {
+  // Admins and collectors choose which branch receives the payment/collection.
+  if (canPickBranchRole(role) || isCollector(role)) {
     return { branchId: null, showBranchPicker: true };
   }
   const bm = branchIdFromUser(actor);

@@ -163,20 +163,19 @@
                   <td class="tdash-actions">
                     <button
                       type="button"
+                      class="s-btn btn-primary tdash-settle-row-btn"
+                      *ngIf="acc.kind === 'settlement'"
+                      (click)="openQuickSettle(acc); $event.stopPropagation()"
+                    >
+                      {{ 'tr_treasury_quick_settle' | translate }}
+                    </button>
+                    <button
+                      type="button"
                       class="tdash-icon-btn"
                       (click)="openAccount(acc)"
                       [attr.title]="'tr_view' | translate"
                     >
                       <i class="fa fa-eye" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="tdash-icon-btn"
-                      *ngIf="acc.kind === 'settlement'"
-                      (click)="openQuickSettle(acc)"
-                      [attr.title]="'tr_treasury_quick_settle' | translate"
-                    >
-                      <i class="fa fa-exchange" aria-hidden="true"></i>
                     </button>
                   </td>
                 </tr>
@@ -333,7 +332,6 @@
                 type="button"
                 class="s-btn btn-primary tdash-settle__btn"
                 (click)="openQuickSettle(acc)"
-                [disabled]="(acc.expectedBalance || 0) <= 0"
               >
                 {{ 'tr_treasury_quick_settle' | translate }}
               </button>

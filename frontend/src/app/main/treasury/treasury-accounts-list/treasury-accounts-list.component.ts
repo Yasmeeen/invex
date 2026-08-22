@@ -254,8 +254,9 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
   }
 
   openAccount(acc: MoneyAccountBalance): void {
+    const isSettlement = acc?.kind === 'settlement';
     this.router.navigate(['/treasury', acc.key], {
-      queryParams: this.filterBranchId ? { branch: this.filterBranchId } : {},
+      queryParams: !isSettlement && this.filterBranchId ? { branch: this.filterBranchId } : {},
     });
   }
 
@@ -281,7 +282,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
       width: '480px',
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
-        branchId: this.filterBranchId,
+        branchId: isSettlement ? '' : this.filterBranchId,
         accounts: this.accounts,
         isSettlement,
       },

@@ -63,6 +63,7 @@
           {{ 'tr_products_inventory_audit' | translate }}
         </button>
         <button
+          *ngIf="canUseSerialTrack"
           type="button"
           class="s-btn btn-secondary size-body"
           (click)="openSerialTrack()"
@@ -209,7 +210,27 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4" *ngIf="locationFilter !== 'warehouse'">
+      <div class="col-md-4" *ngIf="showOnlineListingUi">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_product_online_filter' | translate }}</label>
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="onlineFilterOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
+            [(ngModel)]="onlineFilter"
+            name="onlineFilter"
+            (ngModelChange)="getproducts()"
+          >
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
+        </div>
+      </div>
+      <div class="col-md-4 mt-4" *ngIf="locationFilter !== 'warehouse'">
         <div class="form-group">
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon bg-white">
@@ -239,7 +260,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 mt-4" *ngIf="showSupplierFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_search_supplier' | translate }}</label>
           <ng-select
@@ -318,8 +339,16 @@
                   <span class="products-list__name-column">
                     <span
                       class="products-list__name-badges"
-                      *ngIf="bookedQty(product) > 0 || transferReservedQty(product) > 0"
+                      *ngIf="bookedQty(product) > 0 || transferReservedQty(product) > 0 || product.listedOnEcommerce"
                     >
+                      <span
+                        *ngIf="product.listedOnEcommerce"
+                        class="online-badge"
+                        [attr.title]="'tr_product_online_badge_hint' | translate"
+                      >
+                        <i class="fa fa-globe" aria-hidden="true"></i>
+                        {{ 'tr_product_online_badge' | translate }}
+                      </span>
                       <span
                         *ngIf="bookedQty(product) > 0"
                         class="booking-badge"
@@ -442,6 +471,14 @@
 
             <div class="product-card__title">
               <div class="product-card__name">
+                <span
+                  *ngIf="product.listedOnEcommerce"
+                  class="online-badge"
+                  [attr.title]="'tr_product_online_badge_hint' | translate"
+                >
+                  <i class="fa fa-globe" aria-hidden="true"></i>
+                  {{ 'tr_product_online_badge' | translate }}
+                </span>
                 <span
                   *ngIf="bookedQty(product) > 0"
                   class="booking-badge"

@@ -25,11 +25,17 @@ import { canPickBranchRole } from '@core/utils/role-utils';
 import {
   canReturnOrder as canReturnOrderCheck,
   hasOrderReturns,
+  isCreditOnlyOutstanding,
+  isCreditOnlySettled,
+  isInstallmentOutstanding,
+  isInstallmentSale,
+  isInstallmentSettled,
   isPayLaterMethod,
-  isPayLaterOutstanding,
   isPayLaterSettled,
   orderDisplayPaid,
   orderDisplayRemaining,
+  orderInstallmentMonthlyAmount,
+  orderInstallmentPlanName,
 } from '@core/utils/order-display.util';
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -94,6 +100,9 @@ export class OrdersListComponent implements OnInit {
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
   readonly paymentMethodOptions: PaymentMethodOption[] = PAYMENT_METHOD_OPTIONS;
+  /** Filter installment invoices by plan months (null = all). */
+  selectedInstallmentMonths: number | null = null;
+  readonly installmentMonthsOptions = [6, 12, 18, 24, 36];
   viewMode: 'table' | 'cards' = 'cards';
 
   private subscriptions: Subscription[] = [];
@@ -132,19 +141,49 @@ export class OrdersListComponent implements OnInit {
       : this.translateService.instant('tr_party_client');
   }
 
-  /** بيع بالآجل (paymentMethod = credit). */
-  isPayLaterOrder(order: Order): boolean {
-    return isPayLaterMethod(order?.paymentMethod);
-  }
-
-  /** بيع بالآجل وما زال عليه متبقي. */
-  isPayLaterOutstandingOrder(order: Order): boolean {
-    return isPayLaterOutstanding(order);
+  /** بيع بالآجل (paymentMethod = credit) بدون تقسيط. */
+  isCreditOutstandingOrder(order: Order): boolean {
+    return isCreditOnlyOutstanding(order);
   }
 
   /** بيع بالآجل وتم السداد بالكامل. */
+  isCreditSettledOrder(order: Order): boolean {
+    return isCreditOnlySettled(order);
+  }
+
+  isInstallmentOrder(order: Order): boolean {
+    return isInstallmentSale(order);
+  }
+
+  isInstallmentOutstandingOrder(order: Order): boolean {
+    return isInstallmentOutstanding(order);
+  }
+
+  isInstallmentSettledOrder(order: Order): boolean {
+    return isInstallmentSettled(order);
+  }
+
+  /** أي فاتورة آجل/تقسيط تم سدادها بالكامل (للـ badge). */
   isPayLaterSettledOrder(order: Order): boolean {
     return isPayLaterSettled(order);
+  }
+
+  payLaterSettledLabelKey(order: Order): string {
+    return isInstallmentSale(order)
+      ? 'tr_installments_fully_settled'
+      : 'tr_credit_fully_settled';
+  }
+
+  installmentPlanName(order: Order): string {
+    return orderInstallmentPlanName(order);
+  }
+
+  installmentMonthlyAmount(order: Order): number {
+    return orderInstallmentMonthlyAmount(order);
+  }
+
+  installmentStartDateLabel(order: Order): string {
+    return formatCairoDMY(order?.installmentStartDate as any) || '—';
   }
 
   canPayOrder(order: Order): boolean {
@@ -272,6 +311,15 @@ export class OrdersListComponent implements OnInit {
       delete this.params['paymentMethod'];
     }
 
+    if (this.selectedInstallmentMonths) {
+      this.params['installmentPlanMonths'] = this.selectedInstallmentMonths;
+      if (!this.selectedPaymentMethod) {
+        this.params['paymentMethod'] = 'installment';
+      }
+    } else {
+      delete this.params['installmentPlanMonths'];
+    }
+
     if (this.listFromDate) {
       this.params.from = formatCairoYMD(this.listFromDate);
     } else {
@@ -315,6 +363,14 @@ export class OrdersListComponent implements OnInit {
   }
 
   onPaymentMethodFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  onInstallmentMonthsFilterChange(): void {
+    if (this.selectedInstallmentMonths && this.selectedPaymentMethod !== 'installment') {
+      this.selectedPaymentMethod = 'installment';
+    }
     this.params.page = 1;
     this.getOrders();
   }
@@ -434,7 +490,7 @@ export class OrdersListComponent implements OnInit {
       if (this.selectedBranchId) {
         params.branch = this.selectedBranchId;
       }
-    } else {
+    } else if (this.globals.currentUser?.branch?._id) {
       params.branch = this.globals.currentUser.branch._id;
     }
     if (this.fromDate) {

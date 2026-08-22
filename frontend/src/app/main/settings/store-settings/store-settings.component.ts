@@ -8,7 +8,15 @@ import {
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
-type SettingsTabId = 'general' | 'features' | 'policies';
+type SettingsTabId = 'general' | 'features' | 'policies' | 'ecommerce';
+
+interface SettingsTab {
+  id: SettingsTabId;
+  labelKey: string;
+  icon: string;
+  /** When true, tab only shows if ecommerce feature env is unlocked. */
+  requiresEcommerceFeature?: boolean;
+}
 
 @Component({
   selector: 'app-store-settings',
@@ -16,14 +24,6 @@ type SettingsTabId = 'general' | 'features' | 'policies';
   styleUrls: ['./store-settings.component.scss'],
 })
 export class StoreSettingsComponent implements OnInit, OnDestroy {
-  readonly tabs: { id: SettingsTabId; labelKey: string; icon: string }[] = [
-    { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
-    { id: 'features', labelKey: 'tr_settings_tab_features', icon: 'fa-sliders' },
-    { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
-  ];
-
-  activeTab: SettingsTabId = 'general';
-
   form: StoreSettings = {
     storeName: '',
     storePhoneNumber: '',
@@ -41,6 +41,12 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     weightSalesEnabled: false,
     deliveryOrdersEnabled: false,
     cashierPurchaseExchangeEnabled: true,
+    ecommerceIntegrationFeatureAvailable: false,
+    ecommerceIntegrationEnabled: false,
+    ecommerceBaseUrl: '',
+    ecommerceSharedKey: '',
+    ecommerceCatalogMode: 'all',
+    onlineBranchId: null,
   };
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
@@ -50,6 +56,19 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     { value: 'fr', labelKey: 'tr_lang_fr' },
   ];
 
+  readonly allTabs: SettingsTab[] = [
+    { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
+    { id: 'features', labelKey: 'tr_settings_tab_features', icon: 'fa-sliders' },
+    { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
+    {
+      id: 'ecommerce',
+      labelKey: 'tr_settings_tab_ecommerce',
+      icon: 'fa-globe',
+      requiresEcommerceFeature: true,
+    },
+  ];
+
+  activeTab: SettingsTabId = 'general';
   logoPreview = '';
   saving = false;
   private settingsSub?: Subscription;
@@ -60,7 +79,18 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     private translate: TranslateService
   ) {}
 
+  get visibleTabs(): SettingsTab[] {
+    return this.allTabs.filter(
+      (t) => !t.requiresEcommerceFeature || this.form.ecommerceIntegrationFeatureAvailable
+    );
+  }
+
+  setTab(id: SettingsTabId): void {
+    this.activeTab = id;
+  }
+
   ngOnInit(): void {
+    this.storeSettingsService.load();
     this.settingsSub = this.storeSettingsService.settings$.subscribe((v) => {
       this.form = {
         storeName: v.storeName,
@@ -79,8 +109,20 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         weightSalesEnabled: Boolean(v.weightSalesEnabled),
         deliveryOrdersEnabled: Boolean(v.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: v.cashierPurchaseExchangeEnabled !== false,
+        ecommerceIntegrationFeatureAvailable: Boolean(v.ecommerceIntegrationFeatureAvailable),
+        ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
+        ecommerceBaseUrl: v.ecommerceBaseUrl || '',
+        ecommerceSharedKey: v.ecommerceSharedKey || '',
+        ecommerceCatalogMode: v.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+        onlineBranchId: v.onlineBranchId || null,
       };
       this.logoPreview = this.form.logoUrl || '';
+      if (
+        this.activeTab === 'ecommerce' &&
+        !this.form.ecommerceIntegrationFeatureAvailable
+      ) {
+        this.activeTab = 'general';
+      }
     });
   }
 
@@ -132,6 +174,11 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         weightSalesEnabled: Boolean(this.form.weightSalesEnabled),
         deliveryOrdersEnabled: Boolean(this.form.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: this.form.cashierPurchaseExchangeEnabled !== false,
+        ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
+        ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
+        ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',
+        ecommerceCatalogMode:
+          this.form.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
       })
       .subscribe({
         next: () => {

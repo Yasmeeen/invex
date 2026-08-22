@@ -5,6 +5,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 
 import { ProductsRoutingModule } from './products-routing.module';
 import { ProductsListComponent } from './products-list/products-list.component';
+import { PriceListComponent } from './price-list/price-list.component';
 import { SharedModule } from '@shared/shared.module';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { CreateEditProductModule } from './create-edit-product/create-edit-product.module';
@@ -22,6 +23,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
 @NgModule({
   declarations: [
     ProductsListComponent,
+    PriceListComponent,
     BookProductDialogComponent,
     ViewProductBookingDialogComponent,
     ImportProductsDialogComponent,

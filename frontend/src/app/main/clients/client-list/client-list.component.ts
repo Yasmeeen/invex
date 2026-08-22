@@ -10,8 +10,12 @@ import { CreateEditClientComponent } from '../create-edit-client/create-edit-cli
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
+import {
+  InstallmentPlan,
+  InstallmentPlansService,
+} from '@shared/services/installment-plans.service';
 import { Subscription } from 'rxjs';
-import { isBranchManager } from '@core/utils/role-utils';
+import { isBranchManager, isBranchlessUserRole } from '@core/utils/role-utils';
 
 @Component({
   selector: 'app-client-list',
@@ -24,8 +28,11 @@ export class ClientListComponent implements OnInit {
   clientsLoading = true;
   isFilterOpen = true;
   isNotAuthorized = false;
-  searchTerm: string = '';
   nameSearchTerm: string = '';
+  phoneSearchTerm: string = '';
+  lastInstallmentAmountTerm: string = '';
+  selectedInstallmentPlanId: string | null = null;
+  installmentPlans: InstallmentPlan[] = [];
   balanceSideFilter: 'all' | 'debit' | 'credit' = 'all';
   balanceSideOptions = [
     { value: 'all', labelKey: 'tr_balance_filter_all' },
@@ -36,11 +43,14 @@ export class ClientListComponent implements OnInit {
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
   params: any = { page: 1, perPage: this.paginationPerPage };
-  private searchTimeout: any;
+  private nameSearchTimeout: any;
+  private phoneSearchTimeout: any;
+  private amountTimeout: any;
   private subscriptions: Subscription[] = [];
 
   constructor(
     private userSerivce: UserSerivce,
+    private installmentPlansService: InstallmentPlansService,
     private dialog: MatDialog,
     private auth: AuthenticationService,
     private notificationService: AppNotificationService,
@@ -55,7 +65,27 @@ export class ClientListComponent implements OnInit {
     if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
       this.params.branch_id = this.globals.currentUser.branch._id;
     }
+    this.loadInstallmentPlans();
     this.getClients();
+  }
+
+  private loadInstallmentPlans(): void {
+    this.subscriptions.push(
+      this.installmentPlansService.list(false).subscribe({
+        next: (res) => {
+          this.installmentPlans = res?.plans || [];
+        },
+        error: () => {
+          this.installmentPlans = [];
+        },
+      })
+    );
+  }
+
+  planLabel(plan: InstallmentPlan): string {
+    if (!plan) return '';
+    const months = plan.months != null ? ` (${plan.months})` : '';
+    return `${plan.name || ''}${months}`.trim();
   }
 
   setViewMode(mode: 'table' | 'cards'): void {
@@ -83,10 +113,29 @@ export class ClientListComponent implements OnInit {
     );
   }
 
-  filterClients(event: any, key: string): void {
-    clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => {
-      this.params.search = event.target.value.trim();
+  filterClientsByName(event: any): void {
+    clearTimeout(this.nameSearchTimeout);
+    this.nameSearchTimeout = setTimeout(() => {
+      const value = (event?.target?.value ?? this.nameSearchTerm ?? '').toString().trim();
+      if (value) {
+        this.params.name = value;
+      } else {
+        delete this.params.name;
+      }
+      this.params.page = 1;
+      this.getClients();
+    }, 500);
+  }
+
+  filterClientsByPhone(event: any): void {
+    clearTimeout(this.phoneSearchTimeout);
+    this.phoneSearchTimeout = setTimeout(() => {
+      const value = (event?.target?.value ?? this.phoneSearchTerm ?? '').toString().trim();
+      if (value) {
+        this.params.search = value;
+      } else {
+        delete this.params.search;
+      }
       this.params.page = 1;
       this.getClients();
     }, 500);
@@ -101,6 +150,44 @@ export class ClientListComponent implements OnInit {
     }
     this.params.page = 1;
     this.getClients();
+  }
+
+  onInstallmentPlanFilterChange(planId: string | null): void {
+    this.selectedInstallmentPlanId = planId || null;
+    if (this.selectedInstallmentPlanId) {
+      this.params.lastInstallmentPlanId = this.selectedInstallmentPlanId;
+      const plan = this.installmentPlans.find((p) => p._id === this.selectedInstallmentPlanId);
+      if (plan?.months != null) {
+        this.params.lastInstallmentPlanMonths = plan.months;
+      } else {
+        delete this.params.lastInstallmentPlanMonths;
+      }
+    } else {
+      delete this.params.lastInstallmentPlanId;
+      delete this.params.lastInstallmentPlanMonths;
+    }
+    this.params.page = 1;
+    this.getClients();
+  }
+
+  filterByLastInstallmentAmount(event: any): void {
+    clearTimeout(this.amountTimeout);
+    this.amountTimeout = setTimeout(() => {
+      const raw = (event?.target?.value ?? this.lastInstallmentAmountTerm ?? '')
+        .toString()
+        .trim();
+      if (raw === '') {
+        delete this.params.lastInstallmentAmount;
+      } else {
+        const amount = Number(raw);
+        if (!Number.isFinite(amount) || amount < 0) {
+          return;
+        }
+        this.params.lastInstallmentAmount = amount;
+      }
+      this.params.page = 1;
+      this.getClients();
+    }, 500);
   }
 
   clientNetBalanceText(client: Client): string {
@@ -130,7 +217,7 @@ export class ClientListComponent implements OnInit {
   createOrEditClient(isEdit: boolean, client?: Client): void {
     this.dialog
       .open(CreateEditClientComponent, {
-        width: '640px',
+        width: '820px',
         maxWidth: '96vw',
         data: { isEdit, client, clientId: client?._id },
         disableClose: true,
@@ -149,7 +236,11 @@ export class ClientListComponent implements OnInit {
 
   openClientDeposit(client: Client): void {
     const actor = this.auth.getUserFromLocalStorage();
-    const ctx = resolveActorBranchContext(actor, this.globals.currentUser?.branch?._id);
+    // Branchless roles (admin, collector, …) pick the branch at payment time.
+    const forcedBranchId = isBranchlessUserRole(actor?.role)
+      ? null
+      : this.globals.currentUser?.branch?._id;
+    const ctx = resolveActorBranchContext(actor, forcedBranchId);
     this.dialog
       .open(ClientDepositDialogComponent, {
         width: '520px',

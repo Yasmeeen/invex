@@ -88,6 +88,13 @@ export interface StoreSettings {
   deliveryOrdersEnabled: boolean;
   /** Master switch for desk product purchase + exchange at cashier. */
   cashierPurchaseExchangeEnabled: boolean;
+  /** Env-gated e-commerce integration. */
+  ecommerceIntegrationFeatureAvailable?: boolean;
+  ecommerceIntegrationEnabled?: boolean;
+  ecommerceBaseUrl?: string;
+  ecommerceSharedKey?: string;
+  ecommerceCatalogMode?: 'all' | 'online_only';
+  onlineBranchId?: string | null;
 }
 
 const DEFAULTS: StoreSettings = {
@@ -114,6 +121,12 @@ const DEFAULTS: StoreSettings = {
   weightSalesEnabled: false,
   deliveryOrdersEnabled: false,
   cashierPurchaseExchangeEnabled: true,
+  ecommerceIntegrationFeatureAvailable: false,
+  ecommerceIntegrationEnabled: false,
+  ecommerceBaseUrl: '',
+  ecommerceSharedKey: '',
+  ecommerceCatalogMode: 'all',
+  onlineBranchId: null,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -314,6 +327,13 @@ export class StoreSettingsService {
           weightSalesEnabled: Boolean(data.weightSalesEnabled),
           deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
           cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
+          ecommerceIntegrationFeatureAvailable: Boolean(data.ecommerceIntegrationFeatureAvailable),
+          ecommerceIntegrationEnabled: Boolean(data.ecommerceIntegrationEnabled),
+          ecommerceBaseUrl: data.ecommerceBaseUrl ?? '',
+          ecommerceSharedKey: data.ecommerceSharedKey ?? '',
+          ecommerceCatalogMode:
+            data.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+          onlineBranchId: data.onlineBranchId ?? null,
         });
         this.ensureReceiptTranslationPacks();
       },
@@ -407,6 +427,11 @@ export class StoreSettingsService {
           moneyAccounts: mergedMoney,
           paymentMethodAccountMap: mergedMap,
           paymentAppFeePercents: mergedFees,
+          ecommerceCatalogMode:
+            (data as StoreSettings).ecommerceCatalogMode === 'online_only' ||
+            body.ecommerceCatalogMode === 'online_only'
+              ? 'online_only'
+              : 'all',
         });
         this.ensureReceiptTranslationPacks();
       })

@@ -33,18 +33,72 @@
       <div class="row">
         <div class="col-md-3">
           <div class="form-group mb-0">
-            <label>{{ 'tr_phone_number' | translate }}</label>
+            <label>{{ 'tr_search_by_name' | translate }}</label>
             <div class="input-with-icon bg-white width-100">
               <input
                 class="s-control"
                 placeholder="{{ 'tr_search' | translate }}"
                 [(ngModel)]="nameSearchTerm"
-                (keyup)="filterClients($event, 'search')"
+                (keyup)="filterClientsByName($event)"
               />
             </div>
           </div>
         </div>
         <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_phone_number' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="phoneSearchTerm"
+                (keyup)="filterClientsByPhone($event)"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_installment_plan_select' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <ng-select
+                class="s-control s-select"
+                [items]="installmentPlans"
+                bindValue="_id"
+                [clearable]="true"
+                [(ngModel)]="selectedInstallmentPlanId"
+                (ngModelChange)="onInstallmentPlanFilterChange($event)"
+                placeholder="{{ 'tr_all_installment_plans' | translate }}"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ planLabel(item) }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ planLabel(item) }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_filter_last_installment_amount' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="{{ 'tr_search' | translate }}"
+                [(ngModel)]="lastInstallmentAmountTerm"
+                (keyup)="filterByLastInstallmentAmount($event)"
+                (change)="filterByLastInstallmentAmount($event)"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mt-2">
           <div class="form-group mb-0">
             <label>{{ 'tr_balance_filter' | translate }}</label>
             <div class="input-with-icon bg-white width-100">
@@ -98,7 +152,16 @@
             <tr *ngFor="let client of clientsList; let i = index">
               <td>{{ i + 1 }}</td>
               <td>{{ client.phoneNumber }}</td>
-              <td>{{ client.name }}</td>
+              <td>
+                {{ client.name }}
+                <span
+                  *ngIf="client.isEcommerceOnline"
+                  class="badge badge-info ml-1"
+                  style="font-size: 10px; vertical-align: middle;"
+                >
+                  {{ 'tr_client_online_ecommerce' | translate }}
+                </span>
+              </td>
               <td>{{ client.address }}</td>
               <td><div *ngFor="let branch of  client.branches ">
                 {{branch}}
@@ -146,7 +209,16 @@
               <i class="fa fa-user" aria-hidden="true"></i>
             </div>
             <div class="client-card__title">
-              <div class="client-card__name">{{ client.name || ('tr_phone_number' | translate) }}</div>
+              <div class="client-card__name">
+                {{ client.name || ('tr_phone_number' | translate) }}
+                <span
+                  *ngIf="client.isEcommerceOnline"
+                  class="badge badge-info ml-1"
+                  style="font-size: 10px;"
+                >
+                  {{ 'tr_client_online_ecommerce' | translate }}
+                </span>
+              </div>
               <div class="client-card__meta muted">
                 <span>{{ client.phoneNumber }}</span>
                 <span class="dot" *ngIf="client.address">•</span>

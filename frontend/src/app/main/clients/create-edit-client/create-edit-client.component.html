@@ -1,4 +1,4 @@
-<div class="complex-modal">
+<div class="complex-modal client-form-modal">
   <div class="modal-wrapper">
     <div class="close-modal-icon" (click)="closeModal()"></div>
     <div class="modal-content">
@@ -17,60 +17,302 @@
             {{ 'tr_fill_required_fields' | translate }}
           </div>
 
+          <div class="client-form-tabs" role="tablist">
+            <button
+              type="button"
+              class="client-form-tabs__btn"
+              role="tab"
+              [class.client-form-tabs__btn--active]="activeTab === 'basic'"
+              (click)="setTab('basic')"
+            >
+              {{ 'tr_client_tab_basic' | translate }}
+            </button>
+            <button
+              type="button"
+              class="client-form-tabs__btn"
+              role="tab"
+              [class.client-form-tabs__btn--active]="activeTab === 'guarantor'"
+              (click)="setTab('guarantor')"
+            >
+              {{ 'tr_client_tab_guarantor' | translate }}
+            </button>
+          </div>
+
           <form #clientForm="ngForm" (ngSubmit)="submit()">
-            <div class="row">
-              <div class="col-md-6">
-                <div class="form-group" [class.has-error]="name.invalid && clientForm.submitted">
-                  <label>{{ 'tr_name' | translate }}</label>
-                  <input type="text" class="s-control" name="name" ngModel #name="ngModel" required />
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="form-group" [class.has-error]="phoneNumber.invalid && clientForm.submitted">
-                  <label>{{ 'tr_phone_number' | translate }}</label>
-                  <input
-                    type="text"
-                    class="s-control"
-                    name="phoneNumber"
-                    ngModel
-                    #phoneNumber="ngModel"
-                    required
-                  />
-                </div>
-              </div>
-              <div class="col-md-12">
-                <div class="form-group">
-                  <label>{{ 'tr_address' | translate }}</label>
-                  <input type="text" class="s-control" name="address" ngModel />
-                </div>
-              </div>
-              <div class="col-md-12">
-                <div class="form-group">
-                  <label>{{ 'tr_branches' | translate }}</label>
-                  <div class="input-with-icon">
-                    <ng-select
-                      class="s-control s-select"
-                      name="branches"
-                      ngModel
-                      [items]="branches"
-                      bindLabel="name"
-                      bindValue="_id"
-                      [multiple]="true"
-                      [closeOnSelect]="false"
-                      placeholder="{{ 'tr_branches' | translate }}"
+            <div class="client-form-pane" [hidden]="activeTab !== 'basic'">
+              <section class="client-form-section">
+                <h4 class="client-form-section__title">{{ 'tr_client_section_identity' | translate }}</h4>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group" [class.has-error]="name.invalid && clientForm.submitted">
+                      <label>{{ 'tr_name' | translate }}</label>
+                      <input type="text" class="s-control" name="name" ngModel #name="ngModel" required />
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div
+                      class="form-group"
+                      [class.has-error]="phoneNumber.invalid && clientForm.submitted"
                     >
-                    </ng-select>
-                    <i class="fa fa-caret-down input-icon"></i>
+                      <label>{{ 'tr_phone_number' | translate }}</label>
+                      <input
+                        type="text"
+                        class="s-control"
+                        name="phoneNumber"
+                        ngModel
+                        #phoneNumber="ngModel"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="col-md-12">
+                    <div class="form-group mb-0">
+                      <div class="client-form-section__toolbar">
+                        <label class="m-0">
+                          {{ 'tr_additional_phones' | translate }}
+                          <span class="optional-tag">{{ 'tr_optional_field_hint' | translate }}</span>
+                        </label>
+                        <button type="button" class="s-btn btn-secondary btn-sm" (click)="addPhone()">
+                          + {{ 'tr_add_phone' | translate }}
+                        </button>
+                      </div>
+                      <div
+                        class="repeat-row"
+                        *ngFor="let phone of additionalPhones; let i = index; trackBy: trackByIndex"
+                      >
+                        <input
+                          type="text"
+                          class="s-control"
+                          [(ngModel)]="additionalPhones[i]"
+                          [name]="'additionalPhone_' + i"
+                          [placeholder]="'tr_phone_number' | translate"
+                        />
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary btn-sm repeat-row__remove"
+                          (click)="removePhone(i)"
+                          [attr.aria-label]="'tr_remove' | translate"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <p class="hint-text m-0" *ngIf="!additionalPhones.length">
+                        {{ 'tr_additional_phones_empty' | translate }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="client-form-section">
+                <h4 class="client-form-section__title">{{ 'tr_client_section_location' | translate }}</h4>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>{{ 'tr_address' | translate }}</label>
+                      <input type="text" class="s-control" name="address" ngModel />
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>{{ 'tr_branches' | translate }}</label>
+                      <div class="input-with-icon">
+                        <ng-select
+                          class="s-control s-select"
+                          name="branches"
+                          ngModel
+                          [items]="branches"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [multiple]="true"
+                          [closeOnSelect]="false"
+                          placeholder="{{ 'tr_branches' | translate }}"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>
+                        {{ 'tr_collector' | translate }}
+                        <span class="optional-tag">{{ 'tr_optional_field_hint' | translate }}</span>
+                      </label>
+                      <div class="input-with-icon">
+                        <ng-select
+                          class="s-control s-select"
+                          name="collectorId"
+                          [(ngModel)]="selectedCollectorId"
+                          [items]="collectors"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [clearable]="true"
+                          placeholder="{{ 'tr_collector' | translate }}"
+                        >
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-12">
+                    <div class="form-group mb-0">
+                      <div class="client-form-section__toolbar">
+                        <label class="m-0">
+                          {{ 'tr_additional_addresses' | translate }}
+                          <span class="optional-tag">{{ 'tr_optional_field_hint' | translate }}</span>
+                        </label>
+                        <button type="button" class="s-btn btn-secondary btn-sm" (click)="addAddress()">
+                          + {{ 'tr_add_address' | translate }}
+                        </button>
+                      </div>
+                      <div
+                        class="repeat-row"
+                        *ngFor="let addr of additionalAddresses; let i = index; trackBy: trackByIndex"
+                      >
+                        <input
+                          type="text"
+                          class="s-control"
+                          [(ngModel)]="additionalAddresses[i]"
+                          [name]="'additionalAddress_' + i"
+                          [placeholder]="'tr_address' | translate"
+                        />
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary btn-sm repeat-row__remove"
+                          (click)="removeAddress(i)"
+                          [attr.aria-label]="'tr_remove' | translate"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <p class="hint-text m-0" *ngIf="!additionalAddresses.length">
+                        {{ 'tr_additional_addresses_empty' | translate }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="client-form-section client-form-section--last">
+                <h4 class="client-form-section__title">
+                  {{ 'tr_client_national_id_image' | translate }}
+                  <span class="optional-tag">{{ 'tr_optional_field_hint' | translate }}</span>
+                </h4>
+                <div class="id-upload">
+                  <div class="id-upload__actions">
+                    <label class="s-btn btn-secondary btn-sm mb-0" [class.disabled]="isUploadingClientId">
+                      {{
+                        isUploadingClientId
+                          ? ('tr_uploading' | translate)
+                          : ('tr_upload_image' | translate)
+                      }}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        [disabled]="isUploadingClientId"
+                        (change)="onClientIdSelected($event)"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      class="s-btn btn-secondary btn-sm"
+                      *ngIf="nationalIdImageUrl"
+                      (click)="clearClientIdImage()"
+                    >
+                      {{ 'tr_remove' | translate }}
+                    </button>
+                  </div>
+                  <div class="id-preview" *ngIf="nationalIdImageUrl">
+                    <img [src]="nationalIdImageUrl" alt="" />
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="client-form-pane" [hidden]="activeTab !== 'guarantor'">
+              <p class="hint-text mb-3">{{ 'tr_guarantor_optional_hint' | translate }}</p>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label>{{ 'tr_guarantor_name' | translate }}</label>
+                    <input type="text" class="s-control" name="guarantorName" ngModel />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label>{{ 'tr_guarantor_phone' | translate }}</label>
+                    <input type="text" class="s-control" name="guarantorPhone" ngModel />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label>{{ 'tr_guarantor_national_id' | translate }}</label>
+                    <input type="text" class="s-control" name="guarantorNationalId" ngModel />
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label>{{ 'tr_guarantor_address' | translate }}</label>
+                    <input type="text" class="s-control" name="guarantorAddress" ngModel />
+                  </div>
+                </div>
+                <div class="col-md-12">
+                  <div class="form-group">
+                    <label>{{ 'tr_guarantor_notes' | translate }}</label>
+                    <textarea class="s-control" name="guarantorNotes" ngModel rows="2"></textarea>
+                  </div>
+                </div>
+                <div class="col-md-12">
+                  <div class="form-group mb-0">
+                    <label>{{ 'tr_guarantor_national_id_image' | translate }}</label>
+                    <div class="id-upload">
+                      <div class="id-upload__actions">
+                        <label
+                          class="s-btn btn-secondary btn-sm mb-0"
+                          [class.disabled]="isUploadingGuarantorId"
+                        >
+                          {{
+                            isUploadingGuarantorId
+                              ? ('tr_uploading' | translate)
+                              : ('tr_upload_image' | translate)
+                          }}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            [disabled]="isUploadingGuarantorId"
+                            (change)="onGuarantorIdSelected($event)"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          class="s-btn btn-secondary btn-sm"
+                          *ngIf="guarantorNationalIdImageUrl"
+                          (click)="clearGuarantorIdImage()"
+                        >
+                          {{ 'tr_remove' | translate }}
+                        </button>
+                      </div>
+                      <div class="id-preview" *ngIf="guarantorNationalIdImageUrl">
+                        <img [src]="guarantorNationalIdImageUrl" alt="" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="flex flex-end gap-2 mt-3">
+            <div class="client-form-footer">
               <button type="button" class="s-btn btn-secondary" (click)="closeModal()" [disabled]="isSubmitting">
                 {{ 'tr_action.cancel' | translate }}
               </button>
-              <button type="submit" class="s-btn btn-primary" [disabled]="isSubmitting">
+              <button
+                type="submit"
+                class="s-btn btn-primary"
+                [disabled]="isSubmitting || isUploadingClientId || isUploadingGuarantorId"
+              >
                 {{ 'tr_action.save' | translate }}
               </button>
             </div>

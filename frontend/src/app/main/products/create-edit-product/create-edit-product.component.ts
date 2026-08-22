@@ -44,7 +44,7 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
   styleUrls: ['./create-edit-product.component.scss']
 })
 export class CreateEditProductComponent implements OnInit, OnDestroy {
-  activeTab: 'basic' | 'units' | 'payment' | 'extra' = 'basic';
+  activeTab: 'basic' | 'units' | 'payment' | 'extra' | 'ecommerce' = 'basic';
   sourcePartyForm: FormGroup;
   sourcePartyType: OrderPartyType = 'client';
   isExistingSourceClient = false;
@@ -106,6 +106,12 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   /** Saved Cloudinary (or other HTTPS) URL */
   productImageUrl = '';
   isUploadingImage = false;
+  /** Show this SKU on the e-commerce website (catalog mode = all). Default off. */
+  listedOnEcommerce = false;
+  /** Storefront description pushed to the e-commerce catalog. */
+  ecommerceDescription = '';
+  ecommerceShortDescription = '';
+  ecommerceIsFeatured = false;
   /** Index of unit currently uploading an image, or null. */
   uploadingUnitImageIndex: number | null = null;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
@@ -205,6 +211,23 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   get isDeferredDeskPurchaseSelected(): boolean {
     return this.selectedDeskTreasuryKeys.includes(
       CreateEditProductComponent.DESK_PURCHASE_DEFERRED_KEY
+    );
+  }
+
+  get showOnlineListingOption(): boolean {
+    const s = this.storeSettings.snapshot;
+    return (
+      Boolean(s.ecommerceIntegrationFeatureAvailable) &&
+      Boolean(s.ecommerceIntegrationEnabled) &&
+      s.ecommerceCatalogMode !== 'online_only'
+    );
+  }
+
+  get showEcommerceTab(): boolean {
+    const s = this.storeSettings.snapshot;
+    return (
+      Boolean(s.ecommerceIntegrationFeatureAvailable) &&
+      Boolean(s.ecommerceIntegrationEnabled)
     );
   }
 
@@ -360,6 +383,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.activeTab === 'payment' && !this.showPaymentTab) {
       this.activeTab = 'basic';
     }
+    if (this.activeTab === 'ecommerce' && !this.showEcommerceTab) {
+      this.activeTab = 'basic';
+    }
   }
 
   /** Popup title: desk purchase vs exchange trade-in vs default. */
@@ -398,7 +424,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.isWeightCategory) {
       return Math.max(0, Number(v) || 0);
     }
-    return Math.max(1, Math.floor(Number(v) || 1));
+    const n = Math.floor(Number(v));
+    if (this.cashDeskPurchase) {
+      return Math.max(1, Number.isFinite(n) ? n : 1);
+    }
+    return Math.max(0, Number.isFinite(n) ? n : 0);
   }
 
   /** One SKU per physical unit: category flag + quantity > 1 + new product. */
@@ -1222,6 +1252,10 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         addedBy: response.addedBy || '',
       });
       this.productImageUrl = response.imageUrl || '';
+      this.listedOnEcommerce = Boolean(response.listedOnEcommerce);
+      this.ecommerceDescription = String(response.ecommerceDescription || '');
+      this.ecommerceShortDescription = String(response.ecommerceShortDescription || '');
+      this.ecommerceIsFeatured = Boolean(response.ecommerceIsFeatured);
       this.refreshCategoryDropdownItems();
       this.patchSourcePartyFromProduct(response);
     });
@@ -1964,6 +1998,14 @@ private submitDeskPurchaseRequest(): void {
   if (addedByTrim) {
     deskProduct.addedBy = addedByTrim;
   }
+  if (this.showOnlineListingOption) {
+    deskProduct.listedOnEcommerce = Boolean(this.listedOnEcommerce);
+  }
+  if (this.showEcommerceTab) {
+    deskProduct.ecommerceDescription = String(this.ecommerceDescription || '').trim();
+    deskProduct.ecommerceShortDescription = String(this.ecommerceShortDescription || '').trim();
+    deskProduct.ecommerceIsFeatured = Boolean(this.ecommerceIsFeatured);
+  }
 
   const isExchangeTradeIn = !!this.data?.exchangeFlow;
   const appendToPurchaseId = String(this.data?.appendToExchangePurchaseId || '').trim();
@@ -2063,7 +2105,7 @@ createProduct() {
   }
   if (!this.basicInfoForm.valid && this.isPerUnitVariantMode) {
     const nameOk = String(this.basicInfoForm.value?.name || '').trim();
-    const stockOk = Number(this.basicInfoForm.value?.stock) >= 1;
+    const stockOk = Number(this.basicInfoForm.value?.stock) >= 0;
     if (!nameOk || !stockOk) {
       this.notifyRequiredFieldsMissing();
       return;
@@ -2134,11 +2176,18 @@ createProduct() {
 
   const payload: any = {
     ...this.basicInfoForm.value,
+    stock: this.getStockQty(),
     code: createMultiUnits?.length ? createMultiUnits[0] : this.codeValue,
     inWarehouse,
     imageUrl: this.productImageUrl || '',
     attributes: this.buildAttributesPayload(),
     userId: this.globals.currentUser?._id,
+    listedOnEcommerce: this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false,
+    ecommerceDescription: this.showEcommerceTab ? String(this.ecommerceDescription || '').trim() : '',
+    ecommerceShortDescription: this.showEcommerceTab
+      ? String(this.ecommerceShortDescription || '').trim()
+      : '',
+    ecommerceIsFeatured: this.showEcommerceTab ? Boolean(this.ecommerceIsFeatured) : false,
   };
   if (createUnitDetails?.length) {
     payload.price = createUnitDetails[0].price;
@@ -2285,6 +2334,12 @@ updateProduct() {
   }
   this.attachAcquiredFromToPayload(payload);
   payload.userId = this.globals.currentUser?._id;
+  payload.listedOnEcommerce = this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false;
+  payload.ecommerceDescription = this.showEcommerceTab ? String(this.ecommerceDescription || '').trim() : '';
+  payload.ecommerceShortDescription = this.showEcommerceTab
+    ? String(this.ecommerceShortDescription || '').trim()
+    : '';
+  payload.ecommerceIsFeatured = this.showEcommerceTab ? Boolean(this.ecommerceIsFeatured) : false;
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {

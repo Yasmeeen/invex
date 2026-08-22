@@ -15,9 +15,60 @@ const clientSchema = new mongoose.Schema(
       trim: true,
     },
 
+    /** Extra phones (optional). Primary stays in phoneNumber for cashier lookup. */
+    additionalPhoneNumbers: {
+      type: [String],
+      default: [],
+    },
+
     address: {
       type: String,
       trim: true,
+    },
+
+    /** Extra addresses (optional). Primary stays in address. */
+    additionalAddresses: {
+      type: [String],
+      default: [],
+    },
+
+    /** Client national ID / card image URL (optional). */
+    nationalIdImageUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    /** Guarantor details (optional) — shown in a separate UI tab. */
+    guarantor: {
+      name: { type: String, trim: true, default: "" },
+      phoneNumber: { type: String, trim: true, default: "" },
+      nationalId: { type: String, trim: true, default: "" },
+      address: { type: String, trim: true, default: "" },
+      nationalIdImageUrl: { type: String, trim: true, default: "" },
+      notes: { type: String, trim: true, default: "" },
+    },
+
+    /** Collector assigned to follow up installments (optional). */
+    collectorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
+
+    /** Where the client originated: in-store POS vs e-commerce. */
+    source: {
+      type: String,
+      enum: ['store', 'ecommerce'],
+      default: 'store',
+      trim: true,
+    },
+    /** Label: client came from / ordered via the online e-commerce store. */
+    isEcommerceOnline: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
 
     branches: [

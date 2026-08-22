@@ -24,6 +24,15 @@ export interface Product {
   bookedQuantity?: number;
   /** Active bookings that are confirmed (cashier reserved-qty warning) */
   confirmedBookedQuantity?: number;
+  /**
+   * When ecommerce catalog mode is "all", this SKU is listed on the website.
+   * Default false.
+   */
+  listedOnEcommerce?: boolean;
+  /** Description shown on the e-commerce store (edited in Invex). */
+  ecommerceDescription?: string;
+  ecommerceShortDescription?: string;
+  ecommerceIsFeatured?: boolean;
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */
@@ -58,6 +67,8 @@ export interface ProductActiveBooking {
   quantity?: number;
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
+  /** Pickup branch snapshot (ecommerce customer choice or product branch). */
+  branch?: { _id?: string; name?: string } | string | null;
   depositAmount: number;
   /** Deposit payment method splits (cash / apps). */
   depositPayments?: Array<{ method: string; amount: number }>;
@@ -89,10 +100,14 @@ export interface ProductActiveBooking {
   confirmedAt?: string;
   confirmedBy?: { _id?: string; name?: string };
   productInWarehouse?: boolean;
+  source?: 'pos' | 'ecommerce';
+  ecommerceOrderId?: string;
 }
 export interface Category {
   _id: string;
   name: string;
+  /** Public image URL for the website */
+  imageUrl?: string;
   /** Prefix for product codes (e.g. ELEC → ELEC-001) */
   code?: string;
   /** Each unit gets its own SKU/code when quantity > 1 */
@@ -187,6 +202,38 @@ export interface Order {
     paidAt: string;
     paidByUserId?: string;
     method?: string;
+    note?: string;
+  }>;
+  /** Customer sale installment schedule */
+  installmentPlanId?: string;
+  installmentPlanSnapshot?: {
+    name?: string;
+    months?: number;
+    interestPercent?: number;
+  };
+  installmentStartDate?: string;
+  installmentPrincipal?: number;
+  installmentInterestAmount?: number;
+  installments?: Array<{
+    _id?: string;
+    sequence?: number;
+    dueDate?: string;
+    amount?: number;
+    paid?: boolean;
+    paidAt?: string;
+    paidAmount?: number;
+    paymentMethod?: string;
+    promiseToPayAt?: string;
+    promiseToPayHistory?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
+    promiseToPayHistoryPast?: Array<{
+      promiseToPayAt?: string;
+      recordedAt?: string;
+      paidOnPromisedDay?: boolean | null;
+    }>;
     note?: string;
   }>;
   products?: OrderProductLine[];

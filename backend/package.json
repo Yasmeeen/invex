@@ -11,7 +11,8 @@
     "seed:product-images": "node scripts/seedProductImages.js",
     "seed:product-images:force": "node scripts/seedProductImages.js --force",
     "seed:warehouse": "node scripts/seedWarehouseStock.js",
-    "seed:demo": "node scripts/seedSupermarketDemo.js --fresh"
+    "seed:demo": "node scripts/seedSupermarketDemo.js --fresh",
+    "seed:collections": "node src/DB/seedCollectionsDemo.js"
   },
   "keywords": [],
   "author": "",

@@ -1281,10 +1281,12 @@ export const getProducts = async (req, res) => {
 
     const [products, total] = await Promise.all([
       Product.find(query)
+        .select('-ecommerceDescription')
         .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Product.countDocuments(query),
     ]);
 

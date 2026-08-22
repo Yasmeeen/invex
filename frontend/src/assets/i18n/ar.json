@@ -1490,6 +1490,7 @@
   "tr_report_group_monthly": "شهري",
   "tr_report_placeholder_optional": "اختياري",
   "tr_report_card_total_sales": "إجمالي المبيعات",
+  "tr_report_card_sold_qty": "الكمية المباعة",
   "tr_report_card_total_orders": "إجمالي الفواتير",
   "tr_report_card_avg_order": "متوسط قيمة الطلب",
   "tr_report_card_revenue": "الإيرادات",

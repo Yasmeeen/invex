@@ -1196,6 +1196,7 @@
   "tr_report_group_monthly": "Monatlich",
   "tr_report_placeholder_optional": "Optional",
   "tr_report_card_total_sales": "Gesamtumsatz",
+  "tr_report_card_sold_qty": "Verkaufte Menge",
   "tr_report_card_total_orders": "Bestellungen gesamt",
   "tr_report_card_avg_order": "Durchschnittlicher Bestellwert",
   "tr_report_card_revenue": "Umsatz",

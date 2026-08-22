@@ -1492,6 +1492,7 @@
   "tr_report_group_monthly": "Monthly",
   "tr_report_placeholder_optional": "Optional",
   "tr_report_card_total_sales": "Total sales",
+  "tr_report_card_sold_qty": "Sold quantity",
   "tr_report_card_total_orders": "Total orders",
   "tr_report_card_avg_order": "Average order value",
   "tr_report_card_revenue": "Revenue",

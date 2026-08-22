@@ -1196,6 +1196,7 @@
   "tr_report_group_monthly": "Mensuel",
   "tr_report_placeholder_optional": "Facultatif",
   "tr_report_card_total_sales": "Ventes totales",
+  "tr_report_card_sold_qty": "Quantité vendue",
   "tr_report_card_total_orders": "Commandes totales",
   "tr_report_card_avg_order": "Panier moyen",
   "tr_report_card_revenue": "Chiffre d'affaires",

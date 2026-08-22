@@ -236,6 +236,64 @@ const resolveCategoryProductIdFilter = async (categoryIds) => {
   return { $in: productIds };
 };
 
+/**
+ * When filtering sales by product/category, measure matching lines only
+ * (qty + line value), not the full mixed invoice total.
+ */
+const salesLineScopeStages = (lineProductIdFilter) => {
+  if (!lineProductIdFilter) return [];
+  return [
+    { $unwind: '$products' },
+    { $match: { 'products.productId': lineProductIdFilter } },
+    {
+      $addFields: {
+        lineQty: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                { $ifNull: ['$products.quantity', 0] },
+                { $ifNull: ['$products.returnedQuantity', 0] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $addFields: {
+        lineGross: {
+          $multiply: [{ $ifNull: ['$products.price', 0] }, '$lineQty'],
+        },
+      },
+    },
+    {
+      $addFields: {
+        lineSales: {
+          $cond: [
+            { $gt: [{ $ifNull: ['$subtotalPrice', 0] }, 0] },
+            {
+              $multiply: [
+                '$lineGross',
+                { $divide: [{ $ifNull: ['$totalPrice', 0] }, '$subtotalPrice'] },
+              ],
+            },
+            '$lineGross',
+          ],
+        },
+      },
+    },
+  ];
+};
+
+const salesAmountExpr = (scopedToLines) =>
+  scopedToLines ? { $sum: '$lineSales' } : { $sum: '$totalPrice' };
+
+const salesQtyExpr = (scopedToLines) =>
+  scopedToLines
+    ? { $sum: '$lineQty' }
+    : { $sum: { $ifNull: ['$numberOfProducts', 0] } };
+
 /** Resolve vendor ids matching a supplier phone (exact candidates or last-10 / substring). */
 const resolveVendorIdsByPhone = async (supplierPhone) => {
   if (!supplierPhone) return null;
@@ -366,29 +424,54 @@ const salesPaymentCategoryExpr = {
 export const getSalesReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
+    const lineProductIdFilter = f.productId
+      ? f.productId
+      : await resolveCategoryProductIdFilter(f.categoryIds);
+    const scopedToLines = Boolean(lineProductIdFilter);
+    const lineStages = salesLineScopeStages(lineProductIdFilter);
+
     const baseMatch = {
       createdAt: { $gte: f.from, $lte: f.to },
       status: { $ne: 'restored' },
     };
     if (f.branchId) baseMatch.branch = f.branchId;
     appendOrderCustomerFilters(baseMatch, f);
-    if (f.productId) {
-      baseMatch['products.productId'] = f.productId;
-    } else if (f.categoryIds.length) {
-      baseMatch['products.productId'] = await resolveCategoryProductIdFilter(f.categoryIds);
-    }
+    if (lineProductIdFilter) baseMatch['products.productId'] = lineProductIdFilter;
     if (f.sellerName) baseMatch.sellerName = f.sellerName;
+
+    const orderCountGroup = scopedToLines ? { $addToSet: '$_id' } : { $sum: 1 };
+    const projectOrderCount = scopedToLines
+      ? { $size: '$orderIds' }
+      : '$totalOrders';
 
     const [summary] = await Order.aggregate([
       { $match: baseMatch },
-      { $group: { _id: null, totalSales: { $sum: '$totalPrice' }, totalOrders: { $sum: 1 } } },
+      ...lineStages,
+      {
+        $group: {
+          _id: null,
+          totalSales: salesAmountExpr(scopedToLines),
+          soldQty: salesQtyExpr(scopedToLines),
+          ...(scopedToLines ? { orderIds: orderCountGroup } : { totalOrders: orderCountGroup }),
+        },
+      },
+      {
+        $addFields: {
+          totalOrders: projectOrderCount,
+        },
+      },
       {
         $project: {
           _id: 0,
           totalSales: { $round: ['$totalSales', 2] },
+          soldQty: { $round: ['$soldQty', 2] },
           totalOrders: 1,
           averageOrderValue: {
-            $cond: [{ $gt: ['$totalOrders', 0] }, { $round: [{ $divide: ['$totalSales', '$totalOrders'] }, 2] }, 0],
+            $cond: [
+              { $gt: ['$totalOrders', 0] },
+              { $round: [{ $divide: ['$totalSales', '$totalOrders'] }, 2] },
+              0,
+            ],
           },
         },
       },
@@ -396,22 +479,53 @@ export const getSalesReport = async (req, res) => {
 
     const salesOverTime = await Order.aggregate([
       { $match: baseMatch },
-      { $group: { _id: getDateGroupExpr(f.groupBy), totalSales: { $sum: '$totalPrice' }, totalOrders: { $sum: 1 } } },
+      ...lineStages,
+      {
+        $group: {
+          _id: getDateGroupExpr(f.groupBy),
+          totalSales: salesAmountExpr(scopedToLines),
+          soldQty: salesQtyExpr(scopedToLines),
+          ...(scopedToLines ? { orderIds: orderCountGroup } : { totalOrders: orderCountGroup }),
+        },
+      },
       { $sort: { _id: 1 } },
-      { $project: { _id: 0, period: '$_id', totalSales: { $round: ['$totalSales', 2] }, totalOrders: 1 } },
+      {
+        $addFields: { totalOrders: projectOrderCount },
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          totalSales: { $round: ['$totalSales', 2] },
+          soldQty: { $round: ['$soldQty', 2] },
+          totalOrders: 1,
+        },
+      },
     ]);
 
     const salesPerBranch = await Order.aggregate([
       { $match: baseMatch },
-      { $group: { _id: '$branch', totalSales: { $sum: '$totalPrice' }, totalOrders: { $sum: 1 } } },
+      ...lineStages,
+      {
+        $group: {
+          _id: '$branch',
+          totalSales: salesAmountExpr(scopedToLines),
+          soldQty: salesQtyExpr(scopedToLines),
+          ...(scopedToLines ? { orderIds: orderCountGroup } : { totalOrders: orderCountGroup }),
+        },
+      },
       { $lookup: { from: 'branches', localField: '_id', foreignField: '_id', as: 'branch' } },
       { $unwind: { path: '$branch', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: { totalOrders: projectOrderCount },
+      },
       {
         $project: {
           _id: 0,
           branchId: '$_id',
           branchName: { $ifNull: ['$branch.name', 'N/A'] },
           totalSales: { $round: ['$totalSales', 2] },
+          soldQty: { $round: ['$soldQty', 2] },
           totalOrders: 1,
         },
       },
@@ -421,19 +535,25 @@ export const getSalesReport = async (req, res) => {
     const salesByPaymentCategory = await Order.aggregate([
       { $match: baseMatch },
       { $addFields: { paymentCategory: salesPaymentCategoryExpr } },
+      ...lineStages,
       {
         $group: {
           _id: '$paymentCategory',
-          totalSales: { $sum: '$totalPrice' },
-          totalOrders: { $sum: 1 },
+          totalSales: salesAmountExpr(scopedToLines),
+          soldQty: salesQtyExpr(scopedToLines),
+          ...(scopedToLines ? { orderIds: orderCountGroup } : { totalOrders: orderCountGroup }),
         },
       },
       { $sort: { _id: 1 } },
+      {
+        $addFields: { totalOrders: projectOrderCount },
+      },
       {
         $project: {
           _id: 0,
           category: '$_id',
           totalSales: { $round: ['$totalSales', 2] },
+          soldQty: { $round: ['$soldQty', 2] },
           totalOrders: 1,
         },
       },
@@ -441,7 +561,7 @@ export const getSalesReport = async (req, res) => {
 
     return res.json({
       filters: f,
-      summary: summary || { totalSales: 0, totalOrders: 0, averageOrderValue: 0 },
+      summary: summary || { totalSales: 0, soldQty: 0, totalOrders: 0, averageOrderValue: 0 },
       salesOverTime,
       salesPerBranch,
       salesByPaymentCategory,

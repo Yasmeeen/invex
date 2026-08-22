@@ -302,12 +302,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       const s = res.summary || {};
       this.cards = [
         { titleKey: 'tr_report_card_total_sales', value: s.totalSales || 0, money: true },
+        { titleKey: 'tr_report_card_sold_qty', value: s.soldQty || 0 },
         { titleKey: 'tr_report_card_total_orders', value: s.totalOrders || 0 },
         { titleKey: 'tr_report_card_avg_order', value: s.averageOrderValue || 0, money: true },
       ];
       this.tableColumns = [
         { key: 'period', labelKey: 'tr_report_col_period' },
         { key: 'totalSales', labelKey: 'tr_report_col_sales', format: 'money' },
+        { key: 'soldQty', labelKey: 'tr_report_col_sold_qty' },
         { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
       ];
       this.tableRows = res.salesOverTime || [];
@@ -330,11 +332,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.salesPaymentColumns = [
         { key: 'paymentType', labelKey: 'tr_report_col_payment_type' },
         { key: 'totalSales', labelKey: 'tr_report_col_sales', format: 'money' },
+        { key: 'soldQty', labelKey: 'tr_report_col_sold_qty' },
         { key: 'totalOrders', labelKey: 'tr_report_col_orders' },
       ];
       this.salesPaymentRows = sortedPayment.map((x: any) => ({
         paymentType: t(catLabelKey[x.category] || x.category),
         totalSales: x.totalSales,
+        soldQty: x.soldQty,
         totalOrders: x.totalOrders,
       }));
       const piePay = sortedPayment

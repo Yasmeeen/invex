@@ -10,6 +10,29 @@
     </span>
   </div>
 
+  <div class="ptp-form__history" *ngIf="history?.length">
+    <div class="ptp-form__history-title">{{ 'tr_promise_to_pay_history' | translate }}</div>
+    <ul class="ptp-form__history-list">
+      <li *ngFor="let item of history" class="ptp-form__history-item">
+        <span class="ptp-form__history-date">
+          {{ item.promiseToPayAt | date:'dd/MM/yyyy HH:mm' }}
+        </span>
+        <span
+          class="ptp-form__history-badge"
+          [class.ptp-form__history-badge--kept]="outcomeKey(item) === 'kept'"
+          [class.ptp-form__history-badge--missed]="outcomeKey(item) === 'missed'"
+          [class.ptp-form__history-badge--pending]="outcomeKey(item) === 'pending'"
+        >
+          <ng-container [ngSwitch]="outcomeKey(item)">
+            <ng-container *ngSwitchCase="'kept'">{{ 'tr_promise_to_pay_kept' | translate }}</ng-container>
+            <ng-container *ngSwitchCase="'missed'">{{ 'tr_promise_to_pay_missed' | translate }}</ng-container>
+            <ng-container *ngSwitchDefault>{{ 'tr_promise_to_pay_pending' | translate }}</ng-container>
+          </ng-container>
+        </span>
+      </li>
+    </ul>
+  </div>
+
   <label class="ptp-form__field">
     <span>{{ 'tr_promise_to_pay_datetime' | translate }}</span>
     <input

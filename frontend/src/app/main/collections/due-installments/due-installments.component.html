@@ -1,0 +1,279 @@
+<div class="cdash">
+  <header class="cdash__header">
+    <div class="cdash__title-wrap">
+      <div class="cdash__title-icon" aria-hidden="true">
+        <i class="fa fa-calendar-check-o"></i>
+      </div>
+      <div>
+        <h1 class="cdash__title">{{ 'tr_due_installments_title' | translate }}</h1>
+        <p class="cdash__subtitle">{{ 'tr_due_installments_lead' | translate }}</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="cdash-filters" [attr.aria-label]="'tr_dashboard_filters' | translate">
+    <div class="cdash-filters__field" *ngIf="isAdminView">
+      <label class="cdash-filters__label">{{ 'tr_branch' | translate }}</label>
+      <ng-select
+        class="s-control s-select"
+        [(ngModel)]="selectedBranchId"
+        [items]="branches"
+        bindLabel="name"
+        bindValue="_id"
+        [clearable]="true"
+        [placeholder]="'tr_report_all_branches' | translate"
+        (change)="applyFilters()"
+      >
+      </ng-select>
+    </div>
+
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_due_date_from' | translate }}</label>
+      <div class="input-with-icon cdash-filters__control">
+        <input
+          [(ngModel)]="fromDate"
+          name="dueFrom"
+          [placeholder]="'tr_pick_date' | translate"
+          [matDatepicker]="pickFrom"
+          class="s-control bg-white"
+        />
+        <mat-datepicker #pickFrom></mat-datepicker>
+        <mat-datepicker-toggle class="input-icon date-picker" [for]="pickFrom"></mat-datepicker-toggle>
+      </div>
+    </div>
+
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_due_date_to' | translate }}</label>
+      <div class="input-with-icon cdash-filters__control">
+        <input
+          [(ngModel)]="toDate"
+          name="dueTo"
+          [placeholder]="'tr_pick_date' | translate"
+          [matDatepicker]="pickTo"
+          class="s-control bg-white"
+        />
+        <mat-datepicker #pickTo></mat-datepicker>
+        <mat-datepicker-toggle class="input-icon date-picker" [for]="pickTo"></mat-datepicker-toggle>
+      </div>
+    </div>
+
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_promise_to_pay_from' | translate }}</label>
+      <div class="input-with-icon cdash-filters__control">
+        <input
+          [(ngModel)]="promiseFromDate"
+          name="promiseFrom"
+          [placeholder]="'tr_pick_date' | translate"
+          [matDatepicker]="pickPromiseFrom"
+          class="s-control bg-white"
+        />
+        <mat-datepicker #pickPromiseFrom></mat-datepicker>
+        <mat-datepicker-toggle class="input-icon date-picker" [for]="pickPromiseFrom"></mat-datepicker-toggle>
+      </div>
+    </div>
+
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_promise_to_pay_to' | translate }}</label>
+      <div class="input-with-icon cdash-filters__control">
+        <input
+          [(ngModel)]="promiseToDate"
+          name="promiseTo"
+          [placeholder]="'tr_pick_date' | translate"
+          [matDatepicker]="pickPromiseTo"
+          class="s-control bg-white"
+        />
+        <mat-datepicker #pickPromiseTo></mat-datepicker>
+        <mat-datepicker-toggle class="input-icon date-picker" [for]="pickPromiseTo"></mat-datepicker-toggle>
+      </div>
+    </div>
+
+    <div class="cdash-filters__field" *ngIf="isAdminView">
+      <label class="cdash-filters__label">{{ 'tr_collector' | translate }}</label>
+      <select class="s-control" [(ngModel)]="selectedCollectorId" (ngModelChange)="applyFilters()">
+        <option value="">{{ 'tr_all_collectors' | translate }}</option>
+        <option [value]="unassignedCollectorValue">{{ 'tr_unassigned_collector' | translate }}</option>
+        <option *ngFor="let c of collectors" [value]="c._id">{{ collectorOptionLabel(c) }}</option>
+      </select>
+    </div>
+
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_status' | translate }}</label>
+      <select class="s-control" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
+        <option value="all">{{ 'tr_collections_all_statuses' | translate }}</option>
+        <option value="due">{{ 'tr_collections_due' | translate }}</option>
+        <option value="overdue">{{ 'tr_collections_overdue' | translate }}</option>
+        <option value="promised">{{ 'tr_collections_promised' | translate }}</option>
+      </select>
+    </div>
+
+    <div class="cdash-filters__actions">
+      <button type="button" class="cdash-filters__apply" (click)="applyFilters()" [disabled]="loading">
+        {{ 'tr_apply' | translate }}
+      </button>
+    </div>
+  </section>
+
+  <div class="cdash__loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i>
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <section class="cdash-kpis cdash-kpis--compact" [attr.aria-label]="'tr_due_installments_title' | translate">
+      <article class="cdash-kpi" *ngIf="statusFilter === 'all' || statusFilter === 'due'">
+        <div class="cdash-kpi__icon cdash-kpi__icon--amber" aria-hidden="true">
+          <i class="fa fa-clock-o"></i>
+        </div>
+        <div class="cdash-kpi__body">
+          <span class="cdash-kpi__label">{{ 'tr_collections_due' | translate }}</span>
+          <span class="cdash-kpi__value">{{ summary.dueCount | number:'1.0-0' }}</span>
+        </div>
+      </article>
+
+      <article class="cdash-kpi" *ngIf="statusFilter === 'all' || statusFilter === 'overdue'">
+        <div class="cdash-kpi__icon cdash-kpi__icon--red" aria-hidden="true">
+          <i class="fa fa-exclamation-triangle"></i>
+        </div>
+        <div class="cdash-kpi__body">
+          <span class="cdash-kpi__label">{{ 'tr_collections_overdue' | translate }}</span>
+          <span class="cdash-kpi__value">{{ summary.overdueCount | number:'1.0-0' }}</span>
+        </div>
+      </article>
+
+      <article class="cdash-kpi" *ngIf="statusFilter === 'all' || statusFilter === 'promised'">
+        <div class="cdash-kpi__icon cdash-kpi__icon--blue" aria-hidden="true">
+          <i class="fa fa-handshake-o"></i>
+        </div>
+        <div class="cdash-kpi__body">
+          <span class="cdash-kpi__label">{{ 'tr_collections_promised' | translate }}</span>
+          <span class="cdash-kpi__value">{{ summary.promisedCount | number:'1.0-0' }}</span>
+        </div>
+      </article>
+
+      <article class="cdash-kpi">
+        <div class="cdash-kpi__icon cdash-kpi__icon--violet" aria-hidden="true">
+          <i class="fa fa-money"></i>
+        </div>
+        <div class="cdash-kpi__body">
+          <span class="cdash-kpi__label">{{ 'tr_collections_amount' | translate }}</span>
+          <span class="cdash-kpi__value">
+            {{ summary.dueAmount | currency:'EGP ':'symbol':'1.0-0' }}
+          </span>
+        </div>
+      </article>
+    </section>
+
+    <section class="cdash-card">
+      <div class="cdash-card__head">
+        <h2 class="cdash-card__title">{{ 'tr_due_installments_list' | translate }}</h2>
+      </div>
+      <div class="cdash-table-wrap" *ngIf="items.length; else noDue">
+        <table class="cdash-table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_client_name' | translate }}</th>
+              <th>{{ 'tr_order_number' | translate }}</th>
+              <th *ngIf="isAdminView">{{ 'tr_collector' | translate }}</th>
+              <th>{{ 'tr_installment_due_date' | translate }}</th>
+              <th *ngIf="showDaysOverdue">{{ 'tr_collections_days_overdue' | translate }}</th>
+              <th>
+                <button
+                  type="button"
+                  class="cdash-sort-btn"
+                  (click)="toggleRemainingSort()"
+                  [attr.aria-label]="'tr_collections_sort_by_share' | translate"
+                  [attr.title]="'tr_collections_sort_by_share' | translate"
+                >
+                  {{ 'tr_remaining' | translate }}
+                  <i
+                    class="fa"
+                    [class.fa-sort]="!remainingSort"
+                    [class.fa-sort-amount-desc]="remainingSort === 'desc'"
+                    [class.fa-sort-amount-asc]="remainingSort === 'asc'"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              </th>
+              <th>{{ 'tr_status' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of items">
+              <td>
+                <button type="button" class="cdash-link-btn" (click)="openClient(item)">
+                  <i class="fa fa-eye" aria-hidden="true"></i>
+                  {{ item.clientName || '—' }}
+                </button>
+              </td>
+              <td>
+                <button type="button" class="cdash-invoice" (click)="openPay(item)">
+                  #{{ item.orderNumber }}
+                </button>
+              </td>
+              <td *ngIf="isAdminView">
+                <span *ngIf="item.collectorName; else noCollector">{{ item.collectorName }}</span>
+                <ng-template #noCollector>
+                  <span class="cdash-unassigned">{{ 'tr_unassigned_collector' | translate }}</span>
+                </ng-template>
+              </td>
+              <td>{{ item.dueDate | date:'dd/MM/yyyy' }}</td>
+              <td *ngIf="showDaysOverdue" class="cdash-days">
+                {{ item.status === 'overdue' ? (item.daysOverdue || 0) : '—' }}
+              </td>
+              <td class="cdash-amt-cell">
+                <span class="cdash-amt-cell__value">
+                  {{ item.remaining | currency:'EGP ':'symbol':'1.0-0' }}
+                </span>
+                <span
+                  class="cdash-share"
+                  [class.cdash-share--major]="shareOfTotal(item.remaining) >= 20"
+                  [attr.title]="'tr_collections_share_of_total_hint' | translate"
+                >
+                  {{ shareOfTotal(item.remaining) | number:'1.0-1' }}%
+                </span>
+              </td>
+              <td class="cdash-status-cell">
+                <span
+                  class="cdash-badge"
+                  [attr.data-status]="item.status === 'due' || item.status === 'promised' ? item.status : null"
+                  [attr.data-overdue]="item.status === 'overdue' ? 'overdue' : null"
+                >
+                  {{ statusLabelKey(item.status) | translate }}
+                </span>
+              </td>
+              <td class="cdash-actions-cell">
+                <span class="options-menu">
+                  <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                  <div class="options-menu-container p-0">
+                    <div class="single-option" (click)="openPay(item)">
+                      {{ 'tr_pay_installment' | translate }}
+                    </div>
+                    <div class="single-option" (click)="setPromise(item)">
+                      {{ 'tr_promise_to_pay' | translate }}
+                    </div>
+                    <div
+                      class="single-option"
+                      *ngIf="isAdminView"
+                      (click)="assignCollector(item)"
+                    >
+                      {{ 'tr_assign_collector' | translate }}
+                    </div>
+                  </div>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <pagination
+          *ngIf="pagination.totalCount > perPage"
+          [paginationData]="pagination"
+          [perPage]="perPage"
+          (paginationUpdate)="paginationUpdate($event)"
+        ></pagination>
+      </div>
+      <ng-template #noDue>
+        <p class="cdash-empty">{{ 'tr_collections_empty' | translate }}</p>
+      </ng-template>
+    </section>
+  </ng-container>
+</div>

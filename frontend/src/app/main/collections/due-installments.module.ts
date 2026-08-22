@@ -3,13 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SharedModule } from '@shared/shared.module';
 import { MatDialogModule } from '@angular/material/dialog';
-import { CollectionsDashboardComponent } from './collections-dashboard/collections-dashboard.component';
+import { DueInstallmentsComponent } from './due-installments/due-installments.component';
 import { OrdersModule } from '../orders/orders.module';
 import { PromiseToPayDialogModule } from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.module';
 import { AssignCollectorDialogModule } from '@shared/components/assign-collector-dialog/assign-collector-dialog.module';
 
 @NgModule({
-  declarations: [CollectionsDashboardComponent],
+  declarations: [DueInstallmentsComponent],
   imports: [
     CommonModule,
     FormsModule,
@@ -19,6 +19,6 @@ import { AssignCollectorDialogModule } from '@shared/components/assign-collector
     PromiseToPayDialogModule,
     AssignCollectorDialogModule,
   ],
-  exports: [CollectionsDashboardComponent],
+  exports: [DueInstallmentsComponent],
 })
-export class CollectionsDashboardModule {}
+export class DueInstallmentsModule {}

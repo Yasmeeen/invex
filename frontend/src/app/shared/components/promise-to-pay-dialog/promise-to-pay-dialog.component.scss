@@ -59,6 +59,71 @@
   }
 }
 
+.ptp-form__history {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: #f8faf9;
+  border: 1px solid #e5ebe7;
+}
+
+.ptp-form__history-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+  color: #374151;
+}
+
+.ptp-form__history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.ptp-form__history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.ptp-form__history-date {
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: #111827;
+}
+
+.ptp-form__history-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ptp-form__history-badge--kept {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ptp-form__history-badge--missed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ptp-form__history-badge--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .ptp-form__actions {
   display: flex;
   justify-content: flex-end;

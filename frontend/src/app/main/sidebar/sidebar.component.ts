@@ -17,6 +17,7 @@ import { Globals } from 'src/app/core/globals';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { RealtimeNotificationsService } from '@shared/services/realtime-notifications.service';
+import { CollectionsService } from '@shared/services/collections.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -25,6 +26,7 @@ import { RealtimeNotificationsService } from '@shared/services/realtime-notifica
 })
 export class SidebarComponent implements OnInit, OnDestroy {
   appSidebar: SidebarItem [];
+  private baseSidebar: SidebarItem[] = [];
   actortypr: any;
   currentUserType:any;
   levelName = '';
@@ -35,7 +37,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   private readonly collapseStorageKey = 'appSidebarCollapsed';
   private readonly pendingTransfersLink = '/products/branch-transfers';
+  private readonly installmentOnlyLinks = new Set([
+    '/collections',
+    '/collections/due',
+    '/reports/installments',
+  ]);
   private subscriptions: Subscription[] = [];
+  private hasSaleInstallments = false;
 
   constructor(
       public globals: Globals,
@@ -43,27 +51,29 @@ export class SidebarComponent implements OnInit, OnDestroy {
       private authenticationService: AuthenticationService,
       private productsService: ProductsSerivce,
       private realtime: RealtimeNotificationsService,
-      private router: Router
+      private router: Router,
+      private collectionsService: CollectionsService
   ) {
     globals.currentUser = this.authenticationService.getUserFromLocalStorage();
     const role = globals.currentUser?.role;
     if (isModerator(role)) {
-      this.appSidebar = ModeratorSidebar;
+      this.baseSidebar = ModeratorSidebar;
     } else if (isWarehouse(role)) {
-      this.appSidebar = Warehouse;
+      this.baseSidebar = Warehouse;
     } else if (globals.currentUser.role == 'Cashier'){
-      this.appSidebar = Cashier;
+      this.baseSidebar = Cashier;
     } else if (globals.currentUser.role === 'Collector') {
-      this.appSidebar = CollectorSidebar;
+      this.baseSidebar = CollectorSidebar;
     }
     else if (globals.currentUser.role === 'Co Admin') {
-      this.appSidebar = CoAdminSidebar;
+      this.baseSidebar = CoAdminSidebar;
     } else if (globals.currentUser.role === 'Branch Manager') {
-      this.appSidebar = BranchManagerSidebar;
+      this.baseSidebar = BranchManagerSidebar;
     }
     else{
-      this.appSidebar = AdminSidebar;
+      this.baseSidebar = AdminSidebar;
     }
+    this.appSidebar = this.filterSidebar(this.baseSidebar);
 
   }
 
@@ -75,6 +85,19 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
 
     this.refreshPendingTransferCount();
+
+    this.subscriptions.push(
+      this.collectionsService.hasInstallments().subscribe({
+        next: (has) => {
+          this.hasSaleInstallments = has;
+          this.appSidebar = this.filterSidebar(this.baseSidebar);
+        },
+        error: () => {
+          this.hasSaleInstallments = false;
+          this.appSidebar = this.filterSidebar(this.baseSidebar);
+        },
+      })
+    );
 
     this.subscriptions.push(
       this.realtime.newNotification$.subscribe((n) => {
@@ -181,6 +204,31 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
   closeSidebar() {
     document.body.classList.remove('sidebar-active');
+  }
+
+  private filterSidebar(items: SidebarItem[]): SidebarItem[] {
+    if (this.hasSaleInstallments) {
+      return items;
+    }
+    return items
+      .map((item) => {
+        if (!item.children?.length) {
+          return item;
+        }
+        return {
+          ...item,
+          children: this.filterSidebar(item.children),
+        };
+      })
+      .filter((item) => {
+        if (this.installmentOnlyLinks.has(String(item.routerLink || ''))) {
+          return false;
+        }
+        if (item.routerLink === 'null' && item.children && !item.children.length) {
+          return false;
+        }
+        return true;
+      });
   }
 
 

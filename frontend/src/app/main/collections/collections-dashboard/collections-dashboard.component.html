@@ -61,7 +61,8 @@
       <label class="cdash-filters__label">{{ 'tr_collector' | translate }}</label>
       <select class="s-control" [(ngModel)]="selectedCollectorId" (ngModelChange)="applyFilters()">
         <option value="">{{ 'tr_all_collectors' | translate }}</option>
-        <option *ngFor="let c of collectors" [value]="c._id">{{ c.name }}</option>
+        <option value="unassigned">{{ 'tr_unassigned_collector' | translate }}</option>
+        <option *ngFor="let c of collectors" [value]="c._id">{{ collectorOptionLabel(c) }}</option>
       </select>
     </div>
 
@@ -135,6 +136,16 @@
         </div>
       </article>
 
+      <article class="cdash-kpi" *ngIf="isAdminView">
+        <div class="cdash-kpi__icon cdash-kpi__icon--amber" aria-hidden="true">
+          <i class="fa fa-user-times"></i>
+        </div>
+        <div class="cdash-kpi__body">
+          <span class="cdash-kpi__label">{{ 'tr_unassigned_invoices' | translate }}</span>
+          <span class="cdash-kpi__value">{{ (summary.unassignedOrdersCount || 0) | number:'1.0-0' }}</span>
+        </div>
+      </article>
+
       <article class="cdash-kpi cdash-kpi--rate">
         <div class="cdash-kpi__rate-ring" [ngStyle]="rateRingStyle()" aria-hidden="true">
           <div class="cdash-kpi__rate-inner">
@@ -151,13 +162,18 @@
     <div class="cdash-mid">
       <section class="cdash-card" *ngIf="isAdminView || collectorRows.length">
         <div class="cdash-card__head">
-          <h2 class="cdash-card__title">{{ 'tr_collections_collectors_perf' | translate }}</h2>
+          <div>
+            <h2 class="cdash-card__title">{{ 'tr_collections_collectors_perf' | translate }}</h2>
+            <p class="cdash-card__sub" *ngIf="isAdminView">{{ 'tr_collections_workload_hint' | translate }}</p>
+          </div>
         </div>
         <div class="cdash-table-wrap" *ngIf="collectorRows.length; else noCollectors">
           <table class="cdash-table">
             <thead>
               <tr>
                 <th>{{ 'tr_collector' | translate }}</th>
+                <th>{{ 'tr_collections_open_invoices' | translate }}</th>
+                <th>{{ 'tr_collections_open_clients' | translate }}</th>
                 <th>{{ 'tr_collections_target' | translate }}</th>
                 <th>{{ 'tr_collections_collected' | translate }}</th>
                 <th>{{ 'tr_collections_overdue_amount' | translate }}</th>
@@ -173,6 +189,8 @@
                     <span class="cdash-person__name">{{ row.collectorName || '—' }}</span>
                   </div>
                 </td>
+                <td>{{ (row.openOrdersCount || 0) | number:'1.0-0' }}</td>
+                <td>{{ (row.openClientsCount || 0) | number:'1.0-0' }}</td>
                 <td>{{ row.target | currency:'EGP ':'symbol':'1.0-0' }}</td>
                 <td>{{ row.collected | currency:'EGP ':'symbol':'1.0-0' }}</td>
                 <td>{{ row.overdue | currency:'EGP ':'symbol':'1.0-0' }}</td>
@@ -236,7 +254,24 @@
                 <th *ngIf="isAdminView">{{ 'tr_collector' | translate }}</th>
                 <th>{{ 'tr_installment_due_date' | translate }}</th>
                 <th>{{ 'tr_collections_days_overdue' | translate }}</th>
-                <th>{{ 'tr_remaining' | translate }}</th>
+                <th>
+                  <button
+                    type="button"
+                    class="cdash-sort-btn"
+                    (click)="toggleOverdueShareSort()"
+                    [attr.aria-label]="'tr_collections_sort_by_share' | translate"
+                    [attr.title]="'tr_collections_sort_by_share' | translate"
+                  >
+                    {{ 'tr_remaining' | translate }}
+                    <i
+                      class="fa"
+                      [class.fa-sort]="!overdueShareSort"
+                      [class.fa-sort-amount-desc]="overdueShareSort === 'desc'"
+                      [class.fa-sort-amount-asc]="overdueShareSort === 'asc'"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                </th>
                 <th>{{ 'tr_status' | translate }}</th>
                 <th></th>
               </tr>
@@ -254,11 +289,27 @@
                     #{{ item.orderNumber }}
                   </button>
                 </td>
-                <td *ngIf="isAdminView">{{ item.collectorName || '—' }}</td>
+                <td *ngIf="isAdminView">
+                  <span *ngIf="item.collectorName; else noDashCollector">{{ item.collectorName }}</span>
+                  <ng-template #noDashCollector>
+                    <span class="cdash-unassigned">{{ 'tr_unassigned_collector' | translate }}</span>
+                  </ng-template>
+                </td>
                 <td>{{ item.dueDate | date:'dd/MM/yyyy' }}</td>
                 <td class="cdash-days">{{ item.daysOverdue }}</td>
-                <td>{{ item.remaining | currency:'EGP ':'symbol':'1.0-0' }}</td>
-                <td>
+                <td class="cdash-amt-cell">
+                  <span class="cdash-amt-cell__value">
+                    {{ item.remaining | currency:'EGP ':'symbol':'1.0-0' }}
+                  </span>
+                  <span
+                    class="cdash-share"
+                    [class.cdash-share--major]="overdueShareOfTotal(item.remaining) >= 20"
+                    [attr.title]="'tr_collections_share_of_total_hint' | translate"
+                  >
+                    {{ overdueShareOfTotal(item.remaining) | number:'1.0-1' }}%
+                  </span>
+                </td>
+                <td class="cdash-status-cell">
                   <span class="cdash-badge" [attr.data-overdue]="item.status">
                     {{ overdueStatusKey(item.status) | translate }}
                   </span>
@@ -272,6 +323,13 @@
                       </div>
                       <div class="single-option" (click)="setPromise(item)">
                         {{ 'tr_promise_to_pay' | translate }}
+                      </div>
+                      <div
+                        class="single-option"
+                        *ngIf="isAdminView"
+                        (click)="assignCollector(item)"
+                      >
+                        {{ 'tr_assign_collector' | translate }}
                       </div>
                     </div>
                   </span>

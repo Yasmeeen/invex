@@ -28,7 +28,7 @@
             [clearable]="true"
             [searchable]="true"
             placeholder="{{ 'tr_cashier_payment_select_placeholder' | translate }}"
-            [(ngModel)]="selectedPayMethods"
+            [ngModel]="selectedPayMethods"
             [ngModelOptions]="{ standalone: true }"
             name="payMethodsMulti"
             (ngModelChange)="onSelectedPayMethodsChange($event)"
@@ -136,9 +136,19 @@
             }}:
             <strong>+{{ installmentMarkupPreview() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
           </div>
-          <div class="size-small mt-1" *ngIf="installmentMarkupPreview() > 0">
+          <div class="size-small mt-1" *ngIf="installmentDueAfterMarkup() > 0.005">
             {{ 'tr_cashier_installment_due_after_markup' | translate }}:
             <strong>{{ installmentDueAfterMarkup() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+          <div
+            class="payment-splits-dialog__installment-amount mt-2"
+            *ngIf="installmentMonthlyAmount() > 0"
+          >
+            {{
+              'tr_cashier_installment_monthly_amount'
+                | translate:{ months: installmentPlanMonths() }
+            }}:
+            <strong>{{ installmentMonthlyAmount() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
           </div>
         </div>
       </ng-container>

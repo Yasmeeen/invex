@@ -202,6 +202,33 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     return round2(this.paymentRemaining() + this.installmentMarkupPreview());
   }
 
+  /**
+   * Monthly installment amount (matches backend buildSaleInstallmentSchedule base).
+   * Last month may absorb a few piastres of rounding.
+   */
+  installmentMonthlyAmount(): number {
+    if (
+      this.mode === 'deposit' ||
+      this.paymentOverAllocated() ||
+      !this.hasInstallmentPayMethodSelected()
+    ) {
+      return 0;
+    }
+    const months = Math.max(1, Math.floor(Number(this.selectedInstallmentPlan()?.months) || 0));
+    if (!this.selectedInstallmentPlan() || months < 1) {
+      return 0;
+    }
+    const totalDue = this.installmentDueAfterMarkup();
+    if (totalDue <= 0.005) {
+      return 0;
+    }
+    return Math.floor((totalDue / months) * 100) / 100;
+  }
+
+  installmentPlanMonths(): number {
+    return Math.max(0, Math.floor(Number(this.selectedInstallmentPlan()?.months) || 0));
+  }
+
   creditDueAfterMarkup(): number {
     return round2(this.paymentRemaining() + this.creditMarkupPreview());
   }
@@ -259,7 +286,20 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     if (!raw.length) {
       this.selectedPayMethods = ['cash'];
       this.reconcilePayAmountsKeys(['cash']);
+      this.ensureDefaultNetAmounts();
+      this.syncFeeSources();
       return;
+    }
+    // Switching from cash-only to another method: drop cash automatically.
+    // To split cash + other, the user must re-select cash explicitly.
+    const prevWasCashOnly =
+      this.selectedPayMethods.length === 1 &&
+      String(this.selectedPayMethods[0] || '')
+        .trim()
+        .toLowerCase() === 'cash';
+    const hasNonCash = raw.some((id) => String(id || '').trim().toLowerCase() !== 'cash');
+    if (prevWasCashOnly && hasNonCash) {
+      raw = raw.filter((id) => String(id || '').trim().toLowerCase() !== 'cash');
     }
     // Credit and installment are mutually exclusive.
     const hasCredit = raw.some((id) => this.isCreditPayMethod(id));
@@ -274,6 +314,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       this.notify.push(this.translate.instant('tr_cashier_credit_or_installment'), 'error');
     }
     this.reconcilePayAmountsKeys(raw);
+    this.ensureDefaultNetAmounts();
     this.syncFeeSources();
   }
 

@@ -173,6 +173,10 @@
     background: var(--cd-amber-soft);
     color: var(--cd-amber);
   }
+  &--blue {
+    background: var(--cd-blue-soft);
+    color: var(--cd-blue);
+  }
 }
 
 .cdash-kpi__body {
@@ -252,6 +256,20 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
+}
+
+.cdash-card__sub {
+  margin: 0.25rem 0 0;
+  width: 100%;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  line-height: 1.35;
+}
+
+.cdash-unassigned {
+  color: #b45309;
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
 .cdash-card__head--chart {
@@ -396,6 +414,8 @@
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &[data-status='excellent'] {
     background: var(--cd-green-soft);
@@ -461,6 +481,62 @@
 .cdash-days {
   color: var(--cd-red);
   font-weight: 700;
+}
+
+.cdash-amt-cell {
+  white-space: nowrap;
+
+  &__value {
+    margin-inline-end: 0.45rem;
+  }
+}
+
+.cdash-status-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.cdash-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+
+  i {
+    opacity: 0.65;
+    font-size: 0.85em;
+  }
+
+  &:hover i {
+    opacity: 1;
+    color: var(--cd-primary, #6c5ce7);
+  }
+}
+
+.cdash-share {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  &--major {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
 }
 
 .cdash-actions-cell {

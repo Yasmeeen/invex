@@ -1,10 +1,18 @@
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
+export interface PromiseToPayHistoryItem {
+  promiseToPayAt?: string | Date | null;
+  recordedAt?: string | Date | null;
+  /** true = paid on promised day, false = missed, null = still pending */
+  paidOnPromisedDay?: boolean | null;
+}
+
 export interface PromiseToPayDialogData {
   promiseToPayAt?: string | Date | null;
   orderNumber?: string | number | null;
   installmentSequence?: number | null;
+  promiseToPayHistory?: PromiseToPayHistoryItem[];
 }
 
 /** ISO local datetime string `YYYY-MM-DDTHH:mm`, or `null` to clear. */
@@ -17,12 +25,14 @@ export type PromiseToPayDialogResult = string | null | false;
 })
 export class PromiseToPayDialogComponent {
   promiseAt = '';
+  history: PromiseToPayHistoryItem[] = [];
 
   constructor(
     private dialogRef: MatDialogRef<PromiseToPayDialogComponent, PromiseToPayDialogResult>,
     @Inject(MAT_DIALOG_DATA) public data: PromiseToPayDialogData
   ) {
     this.promiseAt = this.toLocalInputValue(data?.promiseToPayAt);
+    this.history = Array.isArray(data?.promiseToPayHistory) ? data.promiseToPayHistory : [];
   }
 
   cancel(): void {
@@ -36,6 +46,12 @@ export class PromiseToPayDialogComponent {
   submit(): void {
     const value = String(this.promiseAt || '').trim();
     this.dialogRef.close(value || null);
+  }
+
+  outcomeKey(item: PromiseToPayHistoryItem): 'kept' | 'missed' | 'pending' {
+    if (item?.paidOnPromisedDay === true) return 'kept';
+    if (item?.paidOnPromisedDay === false) return 'missed';
+    return 'pending';
   }
 
   private toLocalInputValue(value?: string | Date | null): string {

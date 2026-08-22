@@ -79,9 +79,9 @@ export const AdminSidebar = [
         icon: 'fa fa-user-circle-o icon',
       },
       {
-        name: 'tr_collections_dashboard_title',
-        routerLink: '/collections',
-        icon: 'fa fa-money icon',
+        name: 'tr_due_installments_title',
+        routerLink: '/collections/due',
+        icon: 'fa fa-calendar-check-o icon',
       },
       {
         name: 'tr_purchases',
@@ -236,9 +236,9 @@ export const Cashier = [
 /** Collector: follow-up installment collections for assigned clients. */
 export const CollectorSidebar = [
   {
-    name: 'tr_collections_dashboard_title',
-    routerLink: '/collections',
-    icon: 'fa fa-money icon',
+    name: 'tr_due_installments_title',
+    routerLink: '/collections/due',
+    icon: 'fa fa-calendar-check-o icon',
   },
   {
     name: 'tr_clients',

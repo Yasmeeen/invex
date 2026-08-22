@@ -55,6 +55,19 @@
     background: #f8faf9;
   }
 
+  &__installment-amount {
+    font-size: 0.95rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    background: #eef6f0;
+    border: 1px solid #d4e8da;
+    color: #1e4d2b;
+
+    strong {
+      font-size: 1.05rem;
+    }
+  }
+
   &__section-title {
     font-size: 1rem;
     margin: 0 0 0.5rem;

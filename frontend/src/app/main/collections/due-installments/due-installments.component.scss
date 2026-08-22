@@ -1,0 +1,31 @@
+.cdash-kpis--compact {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 220px));
+  justify-content: start;
+}
+
+.cdash-badge[data-status='due'] {
+  background: var(--cd-amber-soft, #fef3c7);
+  color: #b45309;
+}
+
+.cdash-badge[data-status='promised'] {
+  background: var(--cd-blue-soft, #dbeafe);
+  color: #1d4ed8;
+}
+
+.cdash-unassigned {
+  color: #b45309;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.cdash-kpi__icon--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+@media (max-width: 720px) {
+  .cdash-kpis--compact {
+    grid-template-columns: 1fr;
+  }
+}

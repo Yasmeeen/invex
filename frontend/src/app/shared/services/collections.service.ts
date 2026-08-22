@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { COLLECTIONS_URL } from '@core/base/urls';
 
 export interface CollectionDueItem {
@@ -21,6 +21,11 @@ export interface CollectionDueItem {
   paidAmount?: number;
   remaining?: number;
   promiseToPayAt?: string;
+  promiseToPayHistory?: Array<{
+    promiseToPayAt?: string;
+    recordedAt?: string;
+    paidOnPromisedDay?: boolean | null;
+  }>;
   note?: string;
   status?: 'due' | 'overdue' | 'promised' | 'severe' | 'paid';
   orderRemaining?: number;
@@ -33,6 +38,10 @@ export interface CollectorUser {
   email?: string;
   role?: string;
   branch?: { _id?: string; name?: string };
+  /** Open installment invoices (when listCollectors?withWorkload=1). */
+  openOrdersCount?: number;
+  /** Distinct clients on those invoices. */
+  openClientsCount?: number;
 }
 
 export interface CollectorPerformance {
@@ -43,6 +52,8 @@ export interface CollectorPerformance {
   overdue: number;
   collectionRate: number;
   status: 'excellent' | 'good' | 'follow_up' | 'low';
+  openOrdersCount?: number;
+  openClientsCount?: number;
 }
 
 export interface CollectionsDashboardResponse {
@@ -52,6 +63,7 @@ export interface CollectionsDashboardResponse {
     overdue: number;
     dueSoon: number;
     collectionRate: number;
+    unassignedOrdersCount?: number;
   };
   collectors: CollectorPerformance[];
   monthly: {
@@ -68,7 +80,34 @@ export interface CollectionsDashboardResponse {
 
 @Injectable({ providedIn: 'root' })
 export class CollectionsService {
+  private readonly hasInstallmentsSubject = new BehaviorSubject<boolean>(false);
+  private hasInstallmentsFetchStarted = false;
+
   constructor(private http: HttpClient) {}
+
+  /** Whether the store has any sale installment invoices. */
+  hasInstallments(): Observable<boolean> {
+    this.ensureHasInstallmentsLoaded();
+    return this.hasInstallmentsSubject.asObservable();
+  }
+
+  /** After the first installment sale, show collections UI without a full reload. */
+  notifyInstallmentSaleCreated(): void {
+    this.hasInstallmentsSubject.next(true);
+  }
+
+  private ensureHasInstallmentsLoaded(): void {
+    if (this.hasInstallmentsFetchStarted) {
+      return;
+    }
+    this.hasInstallmentsFetchStarted = true;
+    this.http
+      .get<{ hasInstallments: boolean }>(`${COLLECTIONS_URL}/has-installments`)
+      .subscribe({
+        next: (r) => this.hasInstallmentsSubject.next(!!r?.hasInstallments),
+        error: () => this.hasInstallmentsSubject.next(false),
+      });
+  }
 
   getDashboard(params: {
     collectorId?: string;
@@ -91,11 +130,16 @@ export class CollectionsService {
 
   listDue(params: {
     collectorId?: string;
+    branchId?: string;
     status?: string;
     from?: string;
     to?: string;
+    promiseFrom?: string;
+    promiseTo?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortDir?: 'asc' | 'desc';
   }): Observable<{
     items: CollectionDueItem[];
     meta: any;
@@ -116,7 +160,29 @@ export class CollectionsService {
     return this.http.get<any>(`${COLLECTIONS_URL}/due`, { params: httpParams });
   }
 
-  listCollectors(): Observable<{ collectors: CollectorUser[] }> {
-    return this.http.get<{ collectors: CollectorUser[] }>(`${COLLECTIONS_URL}/collectors`);
+  listCollectors(opts?: {
+    withWorkload?: boolean;
+  }): Observable<{ collectors: CollectorUser[] }> {
+    let params = new HttpParams();
+    if (opts?.withWorkload) {
+      params = params.set('withWorkload', '1');
+    }
+    return this.http.get<{ collectors: CollectorUser[] }>(`${COLLECTIONS_URL}/collectors`, {
+      params,
+    });
+  }
+
+  assignOrderCollector(
+    orderId: string,
+    collectorId: string | null
+  ): Observable<{
+    orderId: string;
+    orderNumber?: number;
+    collectorId?: string | null;
+    collectorName?: string;
+  }> {
+    return this.http.patch<any>(`${COLLECTIONS_URL}/orders/${orderId}/collector`, {
+      collectorId,
+    });
   }
 }

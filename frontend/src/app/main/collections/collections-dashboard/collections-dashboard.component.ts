@@ -26,6 +26,10 @@ import {
   PromiseToPayDialogComponent,
   PromiseToPayDialogResult,
 } from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.component';
+import {
+  AssignCollectorDialogComponent,
+  AssignCollectorDialogResult,
+} from '@shared/components/assign-collector-dialog/assign-collector-dialog.component';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import * as Highcharts from 'highcharts';
 import { Subscription } from 'rxjs';
@@ -59,6 +63,7 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
     overdue: 0,
     dueSoon: 0,
     collectionRate: 0,
+    unassignedOrdersCount: 0,
   };
   collectorRows: CollectorPerformance[] = [];
   monthly = {
@@ -67,7 +72,10 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
     series: [] as { key: string; label: string; target: number; collected: number }[],
   };
   overdueItems: CollectionDueItem[] = [];
+  private overdueItemsRaw: CollectionDueItem[] = [];
   overduePageItems: CollectionDueItem[] = [];
+  /** '' = API order; 'desc' = highest share first; 'asc' = lowest first */
+  overdueShareSort: '' | 'asc' | 'desc' = '';
   readonly overduePerPage = 10;
   overduePagination: PaginationData = {
     currentPage: 1,
@@ -118,7 +126,7 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
         })
       );
       this.subs.push(
-        this.collections.listCollectors().subscribe({
+        this.collections.listCollectors({ withWorkload: true }).subscribe({
           next: (res) => {
             this.collectors = res?.collectors || [];
           },
@@ -151,10 +159,18 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
         .subscribe({
           next: (res: CollectionsDashboardResponse) => {
             this.loading = false;
-            this.summary = res?.summary || this.summary;
+            this.summary = {
+              totalInstallments: Number(res?.summary?.totalInstallments) || 0,
+              collected: Number(res?.summary?.collected) || 0,
+              overdue: Number(res?.summary?.overdue) || 0,
+              dueSoon: Number(res?.summary?.dueSoon) || 0,
+              collectionRate: Number(res?.summary?.collectionRate) || 0,
+              unassignedOrdersCount: Number(res?.summary?.unassignedOrdersCount) || 0,
+            };
             this.collectorRows = res?.collectors || [];
             this.monthly = res?.monthly || this.monthly;
-            this.overdueItems = res?.overdueItems || [];
+            this.overdueItemsRaw = res?.overdueItems || [];
+            this.overdueItems = this.sortOverdueItems(this.overdueItemsRaw);
             this.promisesToday = res?.promisesToday || { count: 0, items: [] };
             this.setOverduePage(1);
             setTimeout(() => this.renderChart(), 0);
@@ -169,6 +185,74 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
 
   applyFilters(): void {
     this.load();
+  }
+
+  collectorOptionLabel(c: CollectorUser): string {
+    const name = c?.name || '—';
+    const n = Number(c?.openOrdersCount);
+    if (!Number.isFinite(n)) return name;
+    return `${name} (${n})`;
+  }
+
+  private loadCollectors(): void {
+    this.subs.push(
+      this.collections.listCollectors({ withWorkload: true }).subscribe({
+        next: (res) => {
+          this.collectors = res?.collectors || [];
+        },
+      })
+    );
+  }
+
+  assignCollector(item: CollectionDueItem): void {
+    if (!this.isAdminView || !item?.orderId) return;
+
+    const openDialog = (collectors: CollectorUser[]) => {
+      const ref = this.dialog.open(AssignCollectorDialogComponent, {
+        width: '440px',
+        maxWidth: '95vw',
+        panelClass: 'assign-collector-dialog-panel',
+        backdropClass: 'assign-collector-dialog-backdrop',
+        data: {
+          orderNumber: item.orderNumber,
+          clientName: item.clientName,
+          collectorId: item.collectorId || null,
+          collectors,
+        },
+        disableClose: true,
+      });
+      ref.afterClosed().subscribe((result: AssignCollectorDialogResult | undefined) => {
+        if (result === false || result === undefined) return;
+        this.collections.assignOrderCollector(String(item.orderId), result).subscribe({
+          next: () => {
+            this.notify.push(this.translate.instant('tr_assign_collector_ok'), 'success');
+            this.loadCollectors();
+            this.load();
+          },
+          error: (err) => {
+            const msg =
+              err?.error?.error ||
+              err?.error?.message ||
+              this.translate.instant('tr_unexpected_error_message');
+            this.notify.push(msg, 'error');
+          },
+        });
+      });
+    };
+
+    if (this.collectors.length) {
+      openDialog(this.collectors);
+      return;
+    }
+    this.collections.listCollectors({ withWorkload: true }).subscribe({
+      next: (res) => {
+        this.collectors = res?.collectors || [];
+        openDialog(this.collectors);
+      },
+      error: () => {
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
+    });
   }
 
   setOverduePage(page: number): void {
@@ -190,6 +274,28 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
     this.setOverduePage(page);
   }
 
+  toggleOverdueShareSort(): void {
+    if (this.overdueShareSort === '') {
+      this.overdueShareSort = 'desc';
+    } else if (this.overdueShareSort === 'desc') {
+      this.overdueShareSort = 'asc';
+    } else {
+      this.overdueShareSort = '';
+    }
+    this.overdueItems = this.sortOverdueItems(this.overdueItemsRaw);
+    this.setOverduePage(1);
+  }
+
+  private sortOverdueItems(items: CollectionDueItem[]): CollectionDueItem[] {
+    const list = [...(items || [])];
+    if (this.overdueShareSort === 'desc') {
+      list.sort((a, b) => (Number(b.remaining) || 0) - (Number(a.remaining) || 0));
+    } else if (this.overdueShareSort === 'asc') {
+      list.sort((a, b) => (Number(a.remaining) || 0) - (Number(b.remaining) || 0));
+    }
+    return list;
+  }
+
   initials(name?: string): string {
     const parts = String(name || '')
       .trim()
@@ -208,6 +314,22 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
     return status === 'severe'
       ? 'tr_collections_overdue_severe'
       : 'tr_collections_overdue_late';
+  }
+
+  /** Sum of remaining on all overdue rows (used for share %). */
+  get overdueTotalRemaining(): number {
+    return (this.overdueItems || []).reduce(
+      (sum, item) => sum + (Number(item?.remaining) || 0),
+      0
+    );
+  }
+
+  /** Percentage of this overdue installment vs total overdue remaining. */
+  overdueShareOfTotal(remaining?: number): number {
+    const amount = Number(remaining) || 0;
+    const total = this.overdueTotalRemaining;
+    if (total <= 0 || amount <= 0) return 0;
+    return Math.round((amount / total) * 1000) / 10;
   }
 
   rateRingStyle(): Record<string, string> {
@@ -256,6 +378,7 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
         promiseToPayAt: item.promiseToPayAt || null,
         orderNumber: item.orderNumber,
         installmentSequence: item.sequence,
+        promiseToPayHistory: item.promiseToPayHistory || [],
       },
       disableClose: true,
     });

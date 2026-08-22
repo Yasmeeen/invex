@@ -9,6 +9,7 @@ import {
 } from './moneyAccounts.js';
 import {
   catalogToPaymentAppFeePercents,
+  catalogToPurchaseTreasuryMethods,
   mergeMoneyAccountsFromCatalog,
   normalizePaymentMethodsCatalog,
 } from './paymentMethodsCatalog.js';
@@ -36,7 +37,11 @@ function serializeSettings(doc) {
   });
   moneyAccounts = normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(moneyAccounts),
-    moneyAccounts: mergeMoneyAccountsFromCatalog(moneyAccounts, paymentMethodsCatalog),
+    moneyAccounts: mergeMoneyAccountsFromCatalog(
+      moneyAccounts,
+      paymentMethodsCatalog,
+      doc.paymentMethodAccountMap
+    ),
   });
 
   const accountKeys = new Set(moneyAccounts.map((a) => a.key));
@@ -48,8 +53,12 @@ function serializeSettings(doc) {
   );
 
   const paymentAppFeePercents = catalogToPaymentAppFeePercents(paymentMethodsCatalog);
-  // Keep purchase pickers aligned with real cash/treasury accounts (not sale-only catalog rows)
-  const purchaseTreasuryMethods = moneyAccountsToPurchaseTreasuries(moneyAccounts);
+  const purchaseTreasuryMethods = catalogToPurchaseTreasuryMethods(
+    paymentMethodsCatalog,
+    paymentMethodAccountMap,
+    moneyAccounts
+  );
+  const featureAvailable = isEcommerceIntegrationFeatureAvailable();
 
   return {
     storeName: doc.storeName,
@@ -61,22 +70,6 @@ function serializeSettings(doc) {
     moneyAccounts,
     paymentMethodAccountMap,
     paymentAppFeePercents,
-    returnExchangePolicy: doc.returnExchangePolicy || '',
-    showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
-    bookingPolicy: doc.bookingPolicy || '',
-    showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
-  };
-}
-
-function serializeSettings(doc) {
-  const featureAvailable = isEcommerceIntegrationFeatureAvailable();
-  return {
-    storeName: doc.storeName,
-    storePhoneNumber: doc.storePhoneNumber,
-    logoUrl: doc.logoUrl || '',
-    receiptLanguage: doc.receiptLanguage || 'en',
-    purchaseTreasuryMethods: normalizePurchaseTreasuryMethods(doc.purchaseTreasuryMethods),
-    paymentAppFeePercents: normalizePaymentAppFeePercents(doc.paymentAppFeePercents),
     returnExchangePolicy: doc.returnExchangePolicy || '',
     showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
     bookingPolicy: doc.bookingPolicy || '',
@@ -266,7 +259,11 @@ export const updateStoreSettings = async (req, res) => {
         });
       moneyAccountsNormalized = normalizeMoneyAccounts({
         purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(baseMoney),
-        moneyAccounts: mergeMoneyAccountsFromCatalog(baseMoney, catalogNormalized),
+        moneyAccounts: mergeMoneyAccountsFromCatalog(
+          baseMoney,
+          catalogNormalized,
+          existing?.paymentMethodAccountMap
+        ),
       });
       treasuryNormalized = moneyAccountsToPurchaseTreasuries(moneyAccountsNormalized);
     } else if (treasuryNormalized !== undefined || moneyAccountsNormalized !== undefined) {

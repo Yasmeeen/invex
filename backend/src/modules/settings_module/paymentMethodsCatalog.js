@@ -1,9 +1,8 @@
 import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
 import {
-  DEFAULT_PURCHASE_TREASURY_METHODS,
-  normalizePurchaseTreasuryMethods,
+  RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS,
 } from './treasuryMethods.js';
-import { DEFAULT_SETTLEMENT_ACCOUNTS } from './moneyAccounts.js';
+import { DEFAULT_SETTLEMENT_ACCOUNTS, paymentMethodToAccountMap } from './moneyAccounts.js';
 
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 const SHOW_IN = new Set(['sale', 'purchase', 'both']);
@@ -19,9 +18,9 @@ const DEFAULT_SALE_METHODS = [
   { key: 'visa', label: 'فيزا', showIn: 'sale', effectMode: 'instant' },
   { key: 'mastercard', label: 'ماستركارد', showIn: 'sale', effectMode: 'instant' },
   { key: 'meeza', label: 'ميزة', showIn: 'sale', effectMode: 'instant' },
-  { key: 'vodafone_cash', label: 'فودافون كاش', showIn: 'both', effectMode: 'instant' },
+  { key: 'vodafone_cash', label: 'فودافون كاش', showIn: 'sale', effectMode: 'instant' },
   { key: 'instapay', label: 'إنستاباي', showIn: 'sale', effectMode: 'instant' },
-  { key: 'etisalat_cash', label: 'اتصالات كاش', showIn: 'both', effectMode: 'instant' },
+  { key: 'etisalat_cash', label: 'اتصالات كاش', showIn: 'sale', effectMode: 'instant' },
   { key: 'valu', label: 'فاليو', showIn: 'sale', effectMode: 'settlement' },
   { key: 'aman', label: 'أمان', showIn: 'sale', effectMode: 'settlement' },
   { key: 'halan', label: 'حالان', showIn: 'sale', effectMode: 'settlement' },
@@ -69,7 +68,6 @@ function normalizeFeePercent(key, raw) {
 export function normalizePaymentMethodsCatalog({
   paymentMethodsCatalog,
   paymentAppFeePercents,
-  purchaseTreasuryMethods,
 } = {}) {
   const seen = new Set();
   const out = [];
@@ -95,14 +93,19 @@ export function normalizePaymentMethodsCatalog({
 
   const rawCatalog = Array.isArray(paymentMethodsCatalog) ? paymentMethodsCatalog : [];
   if (rawCatalog.length > 0) {
-    for (const row of rawCatalog) push(row);
+    for (const row of rawCatalog) {
+      const key = normalizeKey(row?.key ?? row?.method);
+      const showIn = normalizeShowIn(row?.showIn, 'sale');
+      // Drop retired purchase-treasury rows; keep if the store marked them for sale/both.
+      if (RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS.has(key) && showIn === 'purchase') continue;
+      push(row);
+    }
     if (!seen.has('cash')) {
       push({ key: 'cash', label: 'نقدي', showIn: 'both', effectMode: 'instant', feePercent: 0 });
     }
     if (!seen.has('credit')) {
       push({ key: 'credit', label: 'بيع بالآجل', showIn: 'both', effectMode: 'none', feePercent: 0 });
     }
-    // Keep cash & credit near the top
     out.sort((a, b) => {
       const rank = (k) => (k === 'cash' ? 0 : k === 'credit' ? 1 : 2);
       const d = rank(a.key) - rank(b.key);
@@ -111,27 +114,18 @@ export function normalizePaymentMethodsCatalog({
     return out;
   }
 
-  // --- Migrate from existing settings ---
+  // Empty catalog: cash + credit + configured fee methods. Do not seed purchase treasuries.
   const fees = normalizePaymentAppFeePercents(paymentAppFeePercents);
   const feeMap = new Map(fees.map((f) => [f.method, f]));
-  const treasuries = normalizePurchaseTreasuryMethods(purchaseTreasuryMethods);
-  const treasuryKeys = new Set(treasuries.map((t) => t.key));
   const settlementKeys = new Set(DEFAULT_SETTLEMENT_ACCOUNTS.map((a) => a.key));
 
   for (const def of DEFAULT_SALE_METHODS) {
     const fee = feeMap.get(def.key);
-    const inTreasury = treasuryKeys.has(def.key);
-    let showIn = def.showIn;
-    if (def.key !== 'cash' && def.key !== 'credit') {
-      if (fee && inTreasury) showIn = 'both';
-      else if (fee) showIn = 'sale';
-      else if (inTreasury && def.effectMode === 'instant') showIn = def.showIn === 'both' ? 'both' : 'both';
-    }
     push(
       {
         key: def.key,
         label: fee?.label || def.label,
-        showIn,
+        showIn: def.showIn,
         effectMode: def.effectMode,
         feePercent: fee?.percent ?? 0,
       },
@@ -139,36 +133,15 @@ export function normalizePaymentMethodsCatalog({
     );
   }
 
-  // Custom fee rows not in defaults
   for (const fee of fees) {
     if (seen.has(fee.method)) continue;
-    const inTreasury = treasuryKeys.has(fee.method);
+    if (RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS.has(fee.method)) continue;
     push({
       key: fee.method,
       label: fee.label || fee.method,
-      showIn: inTreasury ? 'both' : 'sale',
+      showIn: 'sale',
       effectMode: settlementKeys.has(fee.method) ? 'settlement' : 'instant',
       feePercent: fee.percent,
-    });
-  }
-
-  // Purchase-only treasuries (banks etc.)
-  for (const t of treasuries) {
-    if (seen.has(t.key)) {
-      // Ensure showIn includes purchase when key exists as treasury
-      const row = out.find((x) => x.key === t.key);
-      if (row && row.effectMode !== 'none' && row.showIn === 'sale') {
-        row.showIn = 'both';
-      }
-      if (row && t.label) row.label = t.label;
-      continue;
-    }
-    push({
-      key: t.key,
-      label: t.label,
-      showIn: 'purchase',
-      effectMode: 'instant',
-      feePercent: 0,
     });
   }
 
@@ -198,50 +171,64 @@ export function catalogToPaymentAppFeePercents(catalog) {
 }
 
 /**
- * Purchase treasury pickers — derived from catalog (purchase-visible, has money effect).
- * Always includes cash.
+ * Purchase pickers: payment-method catalog rows shown in purchase/both with instant effect.
+ * Does not inject money-account rows (old purchase treasuries). Always includes cash.
  */
-export function catalogToPurchaseTreasuryMethods(catalog) {
+export function catalogToPurchaseTreasuryMethods(
+  catalog,
+  paymentMethodAccountMap,
+  moneyAccounts
+) {
   const list = Array.isArray(catalog) ? catalog : [];
-  const rows = list
-    .filter((r) => catalogShowsInPurchase(r) && r.effectMode !== 'none')
-    .map((r) => ({ key: r.key, label: r.label }));
+  const spendable = new Set(
+    (moneyAccounts || [])
+      .filter((a) => a && (a.kind === 'cash' || a.kind === 'treasury'))
+      .map((a) => normalizeKey(a.key))
+      .filter(Boolean)
+  );
+  const map = paymentMethodToAccountMap(paymentMethodAccountMap || []);
+  const rows = [];
+
+  for (const r of list) {
+    if (!r || !catalogShowsInPurchase(r) || r.effectMode !== 'instant') continue;
+    const key = normalizeKey(r.key);
+    if (!key) continue;
+    if (RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS.has(key) && r.showIn !== 'both') continue;
+    if (key === 'cash') {
+      rows.push({ key, label: r.label });
+      continue;
+    }
+    if (spendable.size) {
+      const acc = map.get(key);
+      if (!acc || !spendable.has(acc)) continue;
+    }
+    rows.push({ key, label: r.label });
+  }
+
   if (!rows.some((r) => r.key === 'cash')) {
     rows.unshift({ key: 'cash', label: 'نقدي' });
   }
-  return normalizePurchaseTreasuryMethods(rows.length ? rows : DEFAULT_PURCHASE_TREASURY_METHODS);
+  return rows;
 }
 
 /**
- * Ensure moneyAccounts cover catalog methods that need a balance home.
- * Does not remove existing accounts (preserves balances).
+ * Never invent bank/wallet accounts from payment methods.
+ * Stores add money accounts themselves and link methods to them.
  */
 export function mergeMoneyAccountsFromCatalog(moneyAccounts, catalog) {
   const list = Array.isArray(moneyAccounts) ? [...moneyAccounts] : [];
   const seen = new Set(list.map((a) => normalizeKey(a.key)));
-  for (const row of catalog || []) {
-    if (!row || row.effectMode === 'none') continue;
-    const key = normalizeKey(row.key);
-    if (!key) continue;
-
-    if (row.effectMode === 'settlement') {
-      // Settlement companies are created in money accounts, not from payment methods.
-      continue;
-    }
-
-    if (seen.has(key)) continue;
-    if (catalogShowsInPurchase(row) || key === 'cash') {
-      list.push({
-        key,
-        label: row.label,
-        kind: key === 'cash' ? 'cash' : 'treasury',
-        channel: '',
-        accountNumber: '',
-        phone: '',
-        enabled: true,
-      });
-      seen.add(key);
-    }
+  if (!seen.has('cash')) {
+    const cashRow = (catalog || []).find((r) => normalizeKey(r?.key) === 'cash');
+    list.unshift({
+      key: 'cash',
+      label: cashRow?.label || 'نقدي',
+      kind: 'cash',
+      channel: '',
+      accountNumber: '',
+      phone: '',
+      enabled: true,
+    });
   }
   return list;
 }

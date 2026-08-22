@@ -548,9 +548,28 @@ export async function postPaymentMethodInflows({
   return created;
 }
 
+function spendAccountKeyForSplit(splitKey, moneyAccounts, paymentMethodAccountMap) {
+  const key = String(splitKey || '')
+    .trim()
+    .toLowerCase();
+  if (!key || isDeferredPurchaseTreasury(key)) return null;
+  if (key === 'cash') return 'cash';
+  const spendable = new Set(
+    (moneyAccounts || [])
+      .filter((a) => a && (a.kind === 'cash' || a.kind === 'treasury'))
+      .map((a) => String(a.key || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const map = paymentMethodToAccountMap(paymentMethodAccountMap);
+  const mapped = map.get(key);
+  if (mapped && spendable.has(mapped)) return mapped;
+  if (spendable.has(key)) return key;
+  return null;
+}
+
 /**
  * Post purchase-treasury split outflows (expenses, desk purchase, vendor pay).
- * Skips deferred. Cash and non-cash both go to ledger.
+ * Skips deferred. Cash and non-cash both go to ledger (linked wallet/bank account).
  */
 export async function postTreasurySplitOutflows({
   branchId,
@@ -563,17 +582,16 @@ export async function postTreasurySplitOutflows({
   session,
 } = {}) {
   if (!Array.isArray(splits) || !splits.length) return [];
+  const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const created = [];
   for (const row of splits) {
-    const key = String(row?.key || '')
-      .trim()
-      .toLowerCase();
-    if (!key || isDeferredPurchaseTreasury(key)) continue;
+    const accountKey = spendAccountKeyForSplit(row?.key, moneyAccounts, paymentMethodAccountMap);
+    if (!accountKey) continue;
     const amt = round2(row?.amount);
     if (amt <= 0) continue;
     const entry = await recordTreasuryLedgerEntry({
       branchId,
-      accountKey: key,
+      accountKey,
       direction: 'out',
       amount: amt,
       occurredAt,
@@ -602,17 +620,16 @@ export async function postTreasurySplitInflows({
   session,
 } = {}) {
   if (!Array.isArray(splits) || !splits.length) return [];
+  const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const created = [];
   for (const row of splits) {
-    const key = String(row?.key || '')
-      .trim()
-      .toLowerCase();
-    if (!key || isDeferredPurchaseTreasury(key)) continue;
+    const accountKey = spendAccountKeyForSplit(row?.key, moneyAccounts, paymentMethodAccountMap);
+    if (!accountKey) continue;
     const amt = round2(row?.amount);
     if (amt <= 0) continue;
     const entry = await recordTreasuryLedgerEntry({
       branchId,
-      accountKey: key,
+      accountKey,
       direction: 'in',
       amount: amt,
       occurredAt,

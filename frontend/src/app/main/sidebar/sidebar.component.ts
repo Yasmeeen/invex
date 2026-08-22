@@ -86,6 +86,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
     this.refreshPendingTransferCount();
 
+    this.collectionsService.refreshHasInstallments();
     this.subscriptions.push(
       this.collectionsService.hasInstallments().subscribe({
         next: (has) => {

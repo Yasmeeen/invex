@@ -91,6 +91,20 @@ export class CollectionsService {
     return this.hasInstallmentsSubject.asObservable();
   }
 
+  /** Re-check the API (home/sidebar after backend was down or a merge restart). */
+  refreshHasInstallments(): void {
+    this.hasInstallmentsFetchStarted = true;
+    this.http
+      .get<{ hasInstallments: boolean }>(`${COLLECTIONS_URL}/has-installments`)
+      .subscribe({
+        next: (r) => this.hasInstallmentsSubject.next(!!r?.hasInstallments),
+        error: () => {
+          this.hasInstallmentsSubject.next(false);
+          this.hasInstallmentsFetchStarted = false;
+        },
+      });
+  }
+
   /** After the first installment sale, show collections UI without a full reload. */
   notifyInstallmentSaleCreated(): void {
     this.hasInstallmentsSubject.next(true);
@@ -100,13 +114,7 @@ export class CollectionsService {
     if (this.hasInstallmentsFetchStarted) {
       return;
     }
-    this.hasInstallmentsFetchStarted = true;
-    this.http
-      .get<{ hasInstallments: boolean }>(`${COLLECTIONS_URL}/has-installments`)
-      .subscribe({
-        next: (r) => this.hasInstallmentsSubject.next(!!r?.hasInstallments),
-        error: () => this.hasInstallmentsSubject.next(false),
-      });
+    this.refreshHasInstallments();
   }
 
   getDashboard(params: {

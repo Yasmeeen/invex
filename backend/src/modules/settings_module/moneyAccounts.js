@@ -1,6 +1,7 @@
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import {
   DEFAULT_PURCHASE_TREASURY_METHODS,
+  RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS,
   normalizePurchaseTreasuryMethods,
 } from './treasuryMethods.js';
 
@@ -138,6 +139,7 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
   };
 
   for (const row of treasuries) {
+    if (RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS.has(normalizeKey(row.key))) continue;
     const extra = extrasByKey.get(normalizeKey(row.key)) || {};
     push(row.key, row.label, row.key === 'cash' ? 'cash' : 'treasury', extra);
   }
@@ -199,7 +201,9 @@ export function moneyAccountsToPurchaseTreasuries(moneyAccounts) {
   const treasuries = list
     .filter((a) => a.kind === 'cash' || a.kind === 'treasury')
     .map((a) => ({ key: a.key, label: a.label }));
-  return normalizePurchaseTreasuryMethods(treasuries.length ? treasuries : DEFAULT_PURCHASE_TREASURY_METHODS);
+  return normalizePurchaseTreasuryMethods(
+    treasuries.length ? treasuries : DEFAULT_PURCHASE_TREASURY_METHODS
+  );
 }
 
 /**
@@ -419,7 +423,11 @@ export async function getEffectiveMoneyAccountsFromDb() {
   });
   moneyAccounts = normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(moneyAccounts),
-    moneyAccounts: mergeMoneyAccountsFromCatalog(moneyAccounts, catalog),
+    moneyAccounts: mergeMoneyAccountsFromCatalog(
+      moneyAccounts,
+      catalog,
+      doc?.paymentMethodAccountMap
+    ),
   });
 
   const keys = new Set(moneyAccounts.map((a) => a.key));

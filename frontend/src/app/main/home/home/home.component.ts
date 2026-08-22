@@ -124,6 +124,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     );
     this.syncOpeningPopup(this.openingCelebration.snapshot);
     this.openingCelebration.load();
+    this.collectionsService.refreshHasInstallments();
     this.installmentUsageSub = this.collectionsService.hasInstallments().subscribe({
       next: (has) => {
         this.showCollectionsTab = has;

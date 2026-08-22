@@ -88,30 +88,6 @@
       </div>
     </ng-container>
 
-    <!-- Payments -->
-    <ng-container *ngIf="activeTab === 'payments'">
-      <div class="store-settings-card__section-head">
-        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_payments' | translate }}</h2>
-        <p class="store-settings-card__hint">{{ 'tr_settings_tab_payments_hint' | translate }}</p>
-      </div>
-
-      <div class="store-settings-card__field store-settings-card__field--action">
-        <label class="store-settings-card__label">{{ 'tr_payment_methods_fees_title' | translate }}</label>
-        <p class="store-settings-card__hint">{{ 'tr_payment_methods_fees_settings_short' | translate }}</p>
-        <button type="button" class="s-btn btn-secondary" (click)="openPaymentMethodsFeesDialog()">
-          <i class="fa fa-percent mr-1"></i>{{ 'tr_payment_methods_fees_open' | translate }}
-        </button>
-      </div>
-
-      <div class="store-settings-card__field store-settings-card__field--action">
-        <label class="store-settings-card__label">{{ 'tr_purchase_treasury_settings_title' | translate }}</label>
-        <p class="store-settings-card__hint">{{ 'tr_purchase_treasury_settings_short' | translate }}</p>
-        <button type="button" class="s-btn btn-secondary" (click)="openPurchaseTreasuryDialog()">
-          <i class="fa fa-university mr-1"></i>{{ 'tr_purchase_treasury_open' | translate }}
-        </button>
-      </div>
-    </ng-container>
-
     <!-- Policies -->
     <ng-container *ngIf="activeTab === 'policies'">
       <div class="store-settings-card__section-head">

@@ -7,11 +7,8 @@ import {
 } from '@shared/services/store-settings.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
-import { MatDialog } from '@angular/material/dialog';
-import { PaymentAppFeesDialogComponent } from './payment-app-fees-dialog/payment-app-fees-dialog.component';
-import { PurchaseTreasuryDialogComponent } from './purchase-treasury-dialog/purchase-treasury-dialog.component';
 
-type SettingsTabId = 'general' | 'payments' | 'policies' | 'ecommerce';
+type SettingsTabId = 'general' | 'policies' | 'ecommerce';
 
 interface SettingsTab {
   id: SettingsTabId;
@@ -58,7 +55,6 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
 
   readonly allTabs: SettingsTab[] = [
     { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
-    { id: 'payments', labelKey: 'tr_settings_tab_payments', icon: 'fa-credit-card' },
     { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
     {
       id: 'ecommerce',
@@ -76,8 +72,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
   constructor(
     private storeSettingsService: StoreSettingsService,
     private appNotificationService: AppNotificationService,
-    private translate: TranslateService,
-    private dialog: MatDialog
+    private translate: TranslateService
   ) {}
 
   get visibleTabs(): SettingsTab[] {
@@ -126,24 +121,6 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.settingsSub?.unsubscribe();
-  }
-
-  openPaymentMethodsFeesDialog(): void {
-    this.dialog.open(PaymentAppFeesDialogComponent, {
-      width: '560px',
-      maxWidth: '96vw',
-      panelClass: 'payment-app-fees-dialog-panel',
-      backdropClass: 'payment-app-fees-dialog-backdrop',
-    });
-  }
-
-  openPurchaseTreasuryDialog(): void {
-    this.dialog.open(PurchaseTreasuryDialogComponent, {
-      width: '520px',
-      maxWidth: '96vw',
-      panelClass: 'purchase-treasury-dialog-panel',
-      backdropClass: 'purchase-treasury-dialog-backdrop',
-    });
   }
 
   onLogoSelected(event: Event): void {

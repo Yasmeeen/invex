@@ -52,7 +52,7 @@ async function persistAccounts(doc, accounts) {
     paymentAppFeePercents: doc?.paymentAppFeePercents,
     purchaseTreasuryMethods: doc?.purchaseTreasuryMethods,
   });
-  let next = mergeMoneyAccountsFromCatalog(accounts, catalog);
+  let next = mergeMoneyAccountsFromCatalog(accounts, catalog, doc?.paymentMethodAccountMap);
   next = normalizeMoneyAccounts({
     purchaseTreasuryMethods: moneyAccountsToPurchaseTreasuries(next),
     moneyAccounts: next,

@@ -656,19 +656,30 @@ export async function getOpeningBalance(branchId, accountKey) {
   return round2(doc?.amount ?? 0);
 }
 
-/** Net ledger movements (in − out) for account/branch, optional date upper bound inclusive. */
-export async function sumLedgerNet({ branchId, accountKey, untilDate } = {}) {
+/** Net ledger movements (in − out) for account/branch, optional date bounds inclusive. */
+export async function sumLedgerNet({ branchId, accountKey, untilDate, fromDate } = {}) {
   const match = {
-    branch: new mongoose.Types.ObjectId(String(branchId)),
     accountKey: String(accountKey).trim().toLowerCase(),
   };
-  if (untilDate) {
-    const end = moment
-      .tz(String(untilDate), 'YYYY-MM-DD', BUSINESS_TZ)
-      .endOf('day')
-      .utc()
-      .toDate();
-    match.occurredAt = { $lte: end };
+  if (branchId) {
+    match.branch = new mongoose.Types.ObjectId(String(branchId));
+  }
+  if (fromDate || untilDate) {
+    match.occurredAt = {};
+    if (fromDate) {
+      match.occurredAt.$gte = moment
+        .tz(String(fromDate), 'YYYY-MM-DD', BUSINESS_TZ)
+        .startOf('day')
+        .utc()
+        .toDate();
+    }
+    if (untilDate) {
+      match.occurredAt.$lte = moment
+        .tz(String(untilDate), 'YYYY-MM-DD', BUSINESS_TZ)
+        .endOf('day')
+        .utc()
+        .toDate();
+    }
   }
   const rows = await TreasuryLedgerEntry.aggregate([
     { $match: match },

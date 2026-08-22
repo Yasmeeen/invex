@@ -7,7 +7,6 @@ import { canPickBranchRole } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
-import { StoreSettingsService } from '@shared/services/store-settings.service';
 import {
   MoneyAccountBalance,
   TreasuryAccountsService,
@@ -58,25 +57,22 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
     private notify: AppNotificationService,
     private translate: TranslateService,
     private router: Router,
-    private storeSettings: StoreSettingsService,
     public globals: Globals
   ) {}
 
   ngOnInit(): void {
-    this.storeSettings.load();
     if (canPickBranchRole(this.globals.currentUser?.role)) {
       this.subscriptions.push(
-        this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        this.branchesService.getBranchs({ page: 1, limit: 200 }).subscribe({
           next: (res: any) => {
             this.branches = res?.branches || [];
-            this.load();
           },
           error: () => {
             this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
-            this.load();
           },
         })
       );
+      this.load();
     } else {
       this.filterBranchId = String(this.globals.currentUser?.branch || '');
       this.load();

@@ -32,6 +32,7 @@ import { TransferProductBranchDialogComponent } from '../transfer-product-branch
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { Router } from '@angular/router';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 @Component({
   selector: 'app-products-list',
@@ -70,6 +71,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
   /** all | available | out_of_stock — maps to API `inStock` */
   stockFilter: 'all' | 'available' | 'out_of_stock' = 'all';
+  onlineFilter: 'all' | 'listed' | 'not_listed' = 'all';
 
   readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
     { id: 'all', labelKey: 'tr_location_all' },
@@ -93,6 +95,15 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     { id: 'all', labelKey: 'tr_products_stock_filter_all' },
     { id: 'available', labelKey: 'tr_products_stock_filter_available' },
     { id: 'out_of_stock', labelKey: 'tr_products_stock_filter_out' },
+  ];
+
+  readonly onlineFilterOptions: Array<{
+    id: 'all' | 'listed' | 'not_listed';
+    labelKey: string;
+  }> = [
+    { id: 'all', labelKey: 'tr_product_online_filter_all' },
+    { id: 'listed', labelKey: 'tr_product_online_filter_yes' },
+    { id: 'not_listed', labelKey: 'tr_product_online_filter_no' },
   ];
   totalNumberOfProducts: number;
   viewMode: 'table' | 'cards' = 'cards';
@@ -128,7 +139,8 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     private branchesServce: BranchesServce,
     private vendorsSerivce: VendorsSerivce,
     private globals: Globals,
-    private router: Router
+    private router: Router,
+    private storeSettings: StoreSettingsService
   ) { }
 
   /** Moderator: never create/edit/delete/print products. */
@@ -139,6 +151,15 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   /** Moderator: net price must not be visible in the products list. */
   get showNetPrice(): boolean {
     return !isModerator(this.globals.currentUser?.role);
+  }
+
+  get showOnlineListingUi(): boolean {
+    const s = this.storeSettings.snapshot;
+    return (
+      Boolean(s.ecommerceIntegrationFeatureAvailable) &&
+      Boolean(s.ecommerceIntegrationEnabled) &&
+      s.ecommerceCatalogMode !== 'online_only'
+    );
   }
 
   /** Super Admin / Co Admin / Admin / Branch Manager (own branch only); not warehouse products. */
@@ -254,6 +275,13 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       filterParams['inStock'] = 'true';
     } else if (this.stockFilter === 'out_of_stock') {
       filterParams['inStock'] = 'false';
+    }
+    if (this.showOnlineListingUi) {
+      if (this.onlineFilter === 'listed') {
+        filterParams['listedOnline'] = 'true';
+      } else if (this.onlineFilter === 'not_listed') {
+        filterParams['listedOnline'] = 'false';
+      }
     }
     if (this.locationFilter === 'warehouse') {
       filterParams['warehouseOnly'] = true;

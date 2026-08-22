@@ -16,8 +16,17 @@ import {
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
+import {
+  notifyProductChanged,
+  notifyProductDeleted,
+} from '../integrations_module/catalogSync.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
+
+function parseListedOnEcommerce(body) {
+  const v = body?.listedOnEcommerce;
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
 
 function pickActorUserId(req) {
   const body = req?.body || {};
@@ -353,6 +362,7 @@ async function createOrReviveProductRow({
   imageUrl,
   attributes,
   addedBy,
+  listedOnEcommerce,
   acquiredFromFields = {},
 }) {
   const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
@@ -379,6 +389,7 @@ async function createOrReviveProductRow({
     if (imageUrl != null) existing.imageUrl = imageUrl;
     if (attributes) existing.attributes = attributes;
     if (addedBy) existing.addedBy = addedBy;
+    if (listedOnEcommerce !== undefined) existing.listedOnEcommerce = listedOnEcommerce;
     Object.assign(existing, acquiredFromFields);
     await existing.save();
     return { ok: true, product: existing, revived: true };
@@ -396,6 +407,7 @@ async function createOrReviveProductRow({
     imageUrl,
     attributes,
     addedBy,
+    listedOnEcommerce,
     ...acquiredFromFields,
   });
   return { ok: true, product, revived: false };
@@ -1114,6 +1126,8 @@ function buildProductsListQuery(queryParams = {}) {
     warehouseOnly,
     excludeWarehouse,
     booked,
+    listedOnline,
+    listedOnEcommerce,
     categoryId,
     attrKey,
     attrValue,
@@ -1152,6 +1166,18 @@ function buildProductsListQuery(queryParams = {}) {
       $or: [
         { bookingStatus: { $ne: 'active' } },
         { bookingStatus: { $exists: false } },
+      ],
+    });
+  }
+
+  const listedFlag = listedOnline ?? listedOnEcommerce;
+  if (listedFlag === 'true' || listedFlag === true) {
+    query.listedOnEcommerce = true;
+  } else if (listedFlag === 'false' || listedFlag === false) {
+    andParts.push({
+      $or: [
+        { listedOnEcommerce: { $ne: true } },
+        { listedOnEcommerce: { $exists: false } },
       ],
     });
   }
@@ -1268,6 +1294,7 @@ export const createProduct = async (req, res) => {
   try {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, imageUrl, attributes, addedBy } =
       req.body;
+    const listedOnEcommerce = parseListedOnEcommerce(req.body);
     const imageUrlNorm = normalizeImageUrl(imageUrl);
     const addedByNorm = normalizeAddedBy(addedBy);
     const isWarehouse =
@@ -1472,7 +1499,8 @@ export const createProduct = async (req, res) => {
             imageUrl: uf.imageUrl || imageUrlNorm,
             attributes: uf.attributes,
             addedBy: addedByNorm,
-            acquiredFromFields,
+            listedOnEcommerce,
+            ...acquiredFromFields,
           });
           if (!row.ok) {
             return res.status(409).json({ error: row.error, code: row.code });
@@ -1532,7 +1560,8 @@ export const createProduct = async (req, res) => {
           imageUrl: uf.imageUrl || imageUrlNorm,
           attributes: uf.attributes,
           addedBy: addedByNorm,
-          acquiredFromFields,
+          listedOnEcommerce,
+          ...acquiredFromFields,
         });
         if (!row.ok) {
           return res.status(409).json({ error: row.error, code: row.code });
@@ -1590,7 +1619,8 @@ export const createProduct = async (req, res) => {
         imageUrl: imageUrlNorm,
         attributes: attrs,
         addedBy: addedByNorm,
-        acquiredFromFields,
+        listedOnEcommerce,
+        ...acquiredFromFields,
       });
       if (!row.ok) {
         return res.status(409).json({ error: row.error, code: row.code });
@@ -1612,6 +1642,7 @@ export const createProduct = async (req, res) => {
         },
       });
 
+      notifyProductChanged(createdProduct?._id);
       return res.status(201).json({ message: '✅ Product created', createdProduct });
     }
 
@@ -1636,7 +1667,8 @@ export const createProduct = async (req, res) => {
       imageUrl: imageUrlNorm,
       attributes: attrs,
       addedBy: addedByNorm,
-      acquiredFromFields,
+      listedOnEcommerce,
+      ...acquiredFromFields,
     });
     if (!row.ok) {
       return res.status(409).json({
@@ -1662,6 +1694,7 @@ export const createProduct = async (req, res) => {
       },
     });
 
+    notifyProductChanged(createdProduct?._id);
     res.status(201).json({ message: '✅ Product created', createdProduct });
   } catch (error) {
     console.error('❌ Error creating product:', error.message);
@@ -1682,6 +1715,7 @@ export const updateProduct = async (req, res) => {
     const { name, code, price, netPrice, category, branch, stock, discount, inWarehouse, attributes, addedBy } = req.body;
     const hasImageUrl = Object.prototype.hasOwnProperty.call(req.body, 'imageUrl');
     const hasAddedBy = Object.prototype.hasOwnProperty.call(req.body, 'addedBy');
+    const hasListedOnEcommerce = Object.prototype.hasOwnProperty.call(req.body, 'listedOnEcommerce');
     const imageUrlNorm = hasImageUrl ? normalizeImageUrl(req.body.imageUrl) : undefined;
     const isWarehouse =
       inWarehouse === true || inWarehouse === 'true' || String(inWarehouse).toLowerCase() === 'true';
@@ -1821,6 +1855,9 @@ export const updateProduct = async (req, res) => {
       if (hasAddedBy) {
         updateDoc.addedBy = normalizeAddedBy(addedBy);
       }
+      if (hasListedOnEcommerce) {
+        updateDoc.listedOnEcommerce = parseListedOnEcommerce(req.body);
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -1885,6 +1922,9 @@ export const updateProduct = async (req, res) => {
     if (hasAddedBy) {
       updateDocBranch.addedBy = normalizeAddedBy(addedBy);
     }
+    if (hasListedOnEcommerce) {
+      updateDocBranch.listedOnEcommerce = parseListedOnEcommerce(req.body);
+    }
 
     const updateOpBranch = acquiredFromUnset
       ? { $set: updateDocBranch, $unset: { acquiredFrom: 1 } }
@@ -1908,6 +1948,7 @@ export const updateProduct = async (req, res) => {
       after: { code: product?.code, name: product?.name, stock: product?.stock, price: product?.price, netPrice: product?.netPrice },
     });
 
+    notifyProductChanged(product?._id);
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product:', error.message);
@@ -1975,6 +2016,7 @@ export const deleteProduct = async (req, res) => {
       before: { code: product?.code, name: product?.name, stock: product?.stock, branch: product?.branch, inWarehouse: product?.inWarehouse },
     });
 
+    notifyProductDeleted(product?._id);
     res.json({ message: '✅ Product deleted' });
   } catch (error) {
     console.error('❌ Error deleting product:', error.message);
@@ -2213,6 +2255,7 @@ export const approveBranchTransfer = async (req, res) => {
             imageUrl: imageUrlNorm,
             attributes: attrs,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),
@@ -2790,6 +2833,7 @@ export const transferProductStock = async (req, res) => {
             branch: toBranchId,
             inWarehouse: false,
             addedBy: normalizeAddedBy(sourceProduct.addedBy),
+            listedOnEcommerce: Boolean(sourceProduct.listedOnEcommerce),
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),

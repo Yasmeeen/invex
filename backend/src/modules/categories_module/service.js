@@ -1,5 +1,9 @@
 import Category from '../../DB/models/category.model.js';
 import Product from '../../DB/models/product.model.js';
+import {
+  notifyCategoryChanged,
+  notifyCategoryDeleted,
+} from '../integrations_module/catalogSync.js';
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -170,6 +174,7 @@ export const createCategory = async (req, res) => {
         showProductCodeOnInvoice == null ? true : parseBool(showProductCodeOnInvoice),
     });
 
+    notifyCategoryChanged(newCategory._id);
     res.status(201).json({
       message: '✅ Category created',
       category: toCategoryResponse(newCategory),
@@ -249,6 +254,7 @@ export const updateCategory = async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
+    notifyCategoryChanged(updatedCategory._id);
     res.json({
       message: '✅ Category updated',
       category: toCategoryResponse(updatedCategory),
@@ -271,6 +277,7 @@ export const deleteCategory = async (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
+    notifyCategoryDeleted(deletedCategory._id);
     res.json({ message: '✅ Category deleted' });
   } catch (err) {
     console.error('❌ Error deleting category:', err.message);

@@ -168,6 +168,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private productReservationLoadTokens = new Map<string, number>();
   /** Avoid repeating the same red reservation toast for a SKU in this cart session. */
   private foreignBookingToastShown = new Set<string>();
+  private listedOnlineToastShown = new Set<string>();
   private readonly destroy$ = new Subject<void>();
 
   /** Built from store settings; refreshed on settings$ updates (receipt labels). */
@@ -1838,6 +1839,28 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.ensureProductReservationsLoaded(product, { toast: true });
   }
 
+  private maybePushOnlineListingWarning(product: Product | any, lineQuantity: number): void {
+    if (!product?.listedOnEcommerce) {
+      return;
+    }
+    const id = String(product?._id || product?.productId || '');
+    const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
+    const qty = Math.max(1, Math.floor(Number(lineQuantity) || 1));
+    const lastUnit = qty >= stock;
+    const toastKey = lastUnit ? `${id}:last` : `${id}:listed`;
+    if (this.listedOnlineToastShown.has(toastKey)) {
+      return;
+    }
+    this.listedOnlineToastShown.add(toastKey);
+    const msgKey = lastUnit
+      ? 'tr_cashier_listed_online_last_unit'
+      : 'tr_cashier_listed_online_warn';
+    this.appNotificationService.push(
+      this.translate.instant(msgKey, { name: product?.name || product?.code || '' }),
+      lastUnit ? 'error' : 'warning'
+    );
+  }
+
   openProductDetails(product: Product | any, event?: Event): void {
     event?.stopPropagation();
     if (!product) return;
@@ -1866,9 +1889,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       item.quantity++;
       this.maybePushBookingWarning(item, item.quantity);
+      this.maybePushOnlineListingWarning(item, item.quantity);
       this.refreshExchangePaymentDefaults();
     } else {
       this.maybePushBookingWarning(product, 1);
+      this.maybePushOnlineListingWarning(product, 1);
       this.orderItems.push({
         ...product,
         quantity: 1,

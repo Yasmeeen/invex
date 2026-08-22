@@ -8,6 +8,16 @@ import {
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
+type SettingsTabId = 'general' | 'payments' | 'policies' | 'ecommerce';
+
+interface SettingsTab {
+  id: SettingsTabId;
+  labelKey: string;
+  icon: string;
+  /** When true, tab only shows if ecommerce feature env is unlocked. */
+  requiresEcommerceFeature?: boolean;
+}
+
 @Component({
   selector: 'app-store-settings',
   templateUrl: './store-settings.component.html',
@@ -28,6 +38,12 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     showReturnExchangePolicyOnReceipt: false,
     bookingPolicy: '',
     showBookingPolicyOnReceipt: false,
+    ecommerceIntegrationFeatureAvailable: false,
+    ecommerceIntegrationEnabled: false,
+    ecommerceBaseUrl: '',
+    ecommerceSharedKey: '',
+    ecommerceCatalogMode: 'all',
+    onlineBranchId: null,
   };
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
@@ -37,6 +53,19 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     { value: 'fr', labelKey: 'tr_lang_fr' },
   ];
 
+  readonly allTabs: SettingsTab[] = [
+    { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
+    { id: 'payments', labelKey: 'tr_settings_tab_payments', icon: 'fa-credit-card' },
+    { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
+    {
+      id: 'ecommerce',
+      labelKey: 'tr_settings_tab_ecommerce',
+      icon: 'fa-globe',
+      requiresEcommerceFeature: true,
+    },
+  ];
+
+  activeTab: SettingsTabId = 'general';
   logoPreview = '';
   saving = false;
   private settingsSub?: Subscription;
@@ -47,7 +76,18 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     private translate: TranslateService
   ) {}
 
+  get visibleTabs(): SettingsTab[] {
+    return this.allTabs.filter(
+      (t) => !t.requiresEcommerceFeature || this.form.ecommerceIntegrationFeatureAvailable
+    );
+  }
+
+  setTab(id: SettingsTabId): void {
+    this.activeTab = id;
+  }
+
   ngOnInit(): void {
+    this.storeSettingsService.load();
     this.settingsSub = this.storeSettingsService.settings$.subscribe((v) => {
       this.form = {
         storeName: v.storeName,
@@ -63,8 +103,20 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
         bookingPolicy: v.bookingPolicy || '',
         showBookingPolicyOnReceipt: Boolean(v.showBookingPolicyOnReceipt),
+        ecommerceIntegrationFeatureAvailable: Boolean(v.ecommerceIntegrationFeatureAvailable),
+        ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
+        ecommerceBaseUrl: v.ecommerceBaseUrl || '',
+        ecommerceSharedKey: v.ecommerceSharedKey || '',
+        ecommerceCatalogMode: v.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+        onlineBranchId: v.onlineBranchId || null,
       };
       this.logoPreview = this.form.logoUrl || '';
+      if (
+        this.activeTab === 'ecommerce' &&
+        !this.form.ecommerceIntegrationFeatureAvailable
+      ) {
+        this.activeTab = 'general';
+      }
     });
   }
 
@@ -113,6 +165,11 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
         bookingPolicy: this.form.bookingPolicy?.trim() || '',
         showBookingPolicyOnReceipt: Boolean(this.form.showBookingPolicyOnReceipt),
+        ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
+        ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
+        ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',
+        ecommerceCatalogMode:
+          this.form.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
       })
       .subscribe({
         next: () => {

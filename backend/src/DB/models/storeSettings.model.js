@@ -147,6 +147,25 @@ const storeSettingsSchema = new mongoose.Schema(
     bookingPolicy: { type: String, default: '', trim: true, maxlength: 2000 },
     /** When true and policy text is set, print it on booking receipts. */
     showBookingPolicyOnReceipt: { type: Boolean, default: false },
+
+    /** E-commerce storefront integration (gated by ECOMMERCE_INTEGRATION_FEATURE env). */
+    ecommerceIntegrationEnabled: { type: Boolean, default: false },
+    /** Base URL of the e-commerce API (e.g. https://shop.example.com). */
+    ecommerceBaseUrl: { type: String, default: '', trim: true },
+    /** Shared secret for service-to-service calls (header x-integration-key). */
+    ecommerceSharedKey: { type: String, default: '', trim: true },
+    /** all = every sellable product; online_only = products on Online branch only. */
+    ecommerceCatalogMode: {
+      type: String,
+      enum: ['all', 'online_only'],
+      default: 'all',
+    },
+    /** Branch used when ecommerceCatalogMode is online_only. */
+    onlineBranchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+    },
   },
   { timestamps: true, collection: 'storesettings' }
 );

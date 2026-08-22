@@ -307,6 +307,17 @@ const orderSchema = new mongoose.Schema(
     restoredAt: { type: Date, required: false, index: true },
 
     orderNumber: { type: Number, unique: true, required: true },
+
+    /** pos = cashier; ecommerce = confirmed online store order (invoice source). */
+    source: {
+      type: String,
+      enum: ['pos', 'ecommerce'],
+      default: 'pos',
+      trim: true,
+      index: true,
+    },
+    ecommerceOrderId: { type: String, default: '', trim: true, index: true },
+    ecommerceOrderNumber: { type: String, default: '', trim: true },
   },
   { timestamps: true }
 );

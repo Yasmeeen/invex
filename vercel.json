@@ -1,30 +1,27 @@
 {
-    "services": {
-      "frontend": {
-        "root": "frontend",
-        "framework": "angular"
-      },
-      "backend": {
-        "root": "backend",
-        "framework": "express",
-        "runtime": "node",
-        "entrypoint": "index.js"
+  "services": {
+    "frontend": {
+      "root": "frontend/",
+      "framework": "angular"
+    },
+    "backend": {
+      "root": "backend/",
+      "framework": "express",
+      "entrypoint": "index.js"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api(/.*)?",
+      "destination": {
+        "service": "backend"
       }
     },
-    "rewrites": [
-      {
-        "source": "/api(/.*)?",
-        "destination": {
-          "type": "service",
-          "service": "backend"
-        }
-      },
-      {
-        "source": "/(.*)",
-        "destination": {
-          "type": "service",
-          "service": "frontend"
-        }
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
       }
-    ]
-  }
+    }
+  ]
+}

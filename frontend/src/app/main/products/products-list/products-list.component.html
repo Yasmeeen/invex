@@ -163,7 +163,7 @@
             appendTo="body"
             [(ngModel)]="locationFilter"
             name="locationFilter"
-            (ngModelChange)="getproducts()"
+            (ngModelChange)="onListFiltersChange()"
           >
             <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
             <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
@@ -203,7 +203,7 @@
             appendTo="body"
             [(ngModel)]="bookingFilter"
             name="bookingFilter"
-            (ngModelChange)="getproducts()"
+            (ngModelChange)="onListFiltersChange()"
           >
             <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
             <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
@@ -223,7 +223,7 @@
             appendTo="body"
             [(ngModel)]="onlineFilter"
             name="onlineFilter"
-            (ngModelChange)="getproducts()"
+            (ngModelChange)="onListFiltersChange()"
           >
             <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
             <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
@@ -247,7 +247,7 @@
               name="branchIds"
               [items]="branches"
               [clearable]="true"
-              (ngModelChange)="getproducts()"
+              (ngModelChange)="onListFiltersChange()"
             >
               <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
                 <div class="ng-value" *ngFor="let item of items">

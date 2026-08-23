@@ -541,6 +541,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     delete this.params['attrValue'];
     delete this.params['search'];
     delete this.params['supplier_id'];
+    delete this.params['listedOnline'];
     const filterParams = this.buildProductsFilterParams();
     Object.assign(this.params, filterParams);
 
@@ -594,6 +595,12 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   }
 
   onStockFilterChange(): void {
+    this.params.page = 1;
+    this.getproducts();
+  }
+
+  /** Reset to first page so filters (e.g. branch) do not request an empty later page. */
+  onListFiltersChange(): void {
     this.params.page = 1;
     this.getproducts();
   }

@@ -30,7 +30,7 @@ async function main() {
 
   const categories = await Category.find().select('_id code name').lean();
   if (!categories.length) {
-    console.error('❌ No categories found. Run seed:supermarket:fresh first.');
+    console.error('❌ No categories found. Run seed:demo first.');
     await mongoose.disconnect();
     process.exit(1);
   }
@@ -59,7 +59,9 @@ async function main() {
       continue;
     }
 
-    const pool = catDef.sellByWeight ? catDef.products.slice(0, 2) : catDef.products;
+    const pool = catDef.products.filter(
+      (p) => p.isSource || (!p.sourceKey && Number(p.stock) > 0)
+    );
     for (const p of pool) {
       let code;
       do {

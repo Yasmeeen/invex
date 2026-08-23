@@ -6,6 +6,19 @@ export const IMAGES_BY_CATEGORY = {
     'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=400&fit=crop&auto=format',
     'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=400&fit=crop&auto=format',
   ],
+  BEEF: [
+    'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=400&fit=crop&auto=format',
+    'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=400&fit=crop&auto=format',
+  ],
+  LAMB: [
+    'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=400&fit=crop&auto=format',
+  ],
+  OFFAL: [
+    'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=400&fit=crop&auto=format',
+  ],
+  PACK: [
+    'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=400&fit=crop&auto=format',
+  ],
   POULTRY: [
     'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop&auto=format',
     'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=400&fit=crop&auto=format',

@@ -1,5 +1,5 @@
 /**
- * Seed a large Egyptian supermarket demo (categories, products, clients, vendors, ~300 invoices).
+ * Seed an Egyptian butcher demo (fridge sources, cut SKUs, clients, vendors, invoices).
  *
  * Usage:
  *   node scripts/seedSupermarketDemo.js          # seed if empty
@@ -143,15 +143,16 @@ async function seedStoreSettings() {
     storePhoneNumber: DEMO_STORE.storePhoneNumber,
     receiptLanguage: DEMO_STORE.receiptLanguage,
     weightSalesEnabled: DEMO_STORE.weightSalesEnabled,
+    cutFromSourceEnabled: DEMO_STORE.cutFromSourceEnabled,
     deliveryOrdersEnabled: DEMO_STORE.deliveryOrdersEnabled,
     cashierPurchaseExchangeEnabled: DEMO_STORE.cashierPurchaseExchangeEnabled,
-    returnExchangePolicy: 'الاسترجاع خلال 24 ساعة للمنتجات المعلبة فقط. اللحوم والأسماك والخضار لا تُسترد.',
+    returnExchangePolicy: 'اللحوم والدواجن الطازجة لا تُسترد بعد الخروج. الاسترجاع خلال ساعتين للمنتجات المغلقة فقط.',
     showReturnExchangePolicyOnReceipt: true,
     bookingPolicy: '',
     showBookingPolicyOnReceipt: false,
     paymentMethodsCatalog: [
       { key: 'cash', label: 'كاش', showIn: 'both', effectMode: 'instant', feePercent: 0 },
-      { key: 'visa', label: 'فiza / Mastercard', showIn: 'sale', effectMode: 'instant', feePercent: 0 },
+      { key: 'visa', label: 'فيزا / ماستركارد', showIn: 'sale', effectMode: 'instant', feePercent: 0 },
       { key: 'vodafone_cash', label: 'فودافون كاش', showIn: 'both', effectMode: 'instant', feePercent: 0 },
       { key: 'credit', label: 'بيع بالآجل', showIn: 'sale', effectMode: 'none', feePercent: 0 },
     ],
@@ -200,6 +201,8 @@ async function seedCategoriesAndProducts(branchMap) {
       const branch = branchMap.get(branchKey);
       const branchProducts = productsByBranch.get(branchKey);
 
+      const sourceByKey = new Map();
+      const createdRows = [];
       for (const p of catDef.products) {
         const code = `${catDef.code}-${String(codeCounter).padStart(3, '0')}`;
         codeCounter += 1;
@@ -217,12 +220,24 @@ async function seedCategoriesAndProducts(branchMap) {
           inWarehouse: false,
           imageUrl: pickProductImageUrl(catDef.code, code, imageIdx),
         });
+        createdRows.push({ product, def: p });
+        if (p.isSource && p.sourceKey) {
+          sourceByKey.set(p.sourceKey, product);
+        }
         branchProducts.push({
           product,
           category,
           sellByWeight: !!catDef.sellByWeight,
           weightUnit: catDef.weightUnit || 'kg',
+          isCut: !!(p.sourceKey && !p.isSource),
         });
+      }
+      for (const row of createdRows) {
+        if (row.def.isSource || !row.def.sourceKey) continue;
+        const src = sourceByKey.get(row.def.sourceKey);
+        if (!src) continue;
+        row.product.sourceProductId = src._id;
+        await row.product.save();
       }
     }
   }
@@ -239,7 +254,9 @@ async function seedWarehouseProducts(categoryByCode, imageCounters) {
     const category = categoryByCode.get(catDef.code);
     if (!category) continue;
 
-    const pool = catDef.sellByWeight ? catDef.products.slice(0, 2) : catDef.products;
+    const pool = catDef.products.filter(
+      (p) => p.isSource || (!p.sourceKey && Number(p.stock) > 0)
+    );
     for (const p of pool) {
       const code = `WH-${catDef.code}-${String(whCodeCounter).padStart(3, '0')}`;
       whCodeCounter += 1;
@@ -312,7 +329,7 @@ function buildOrderLine(entry, { weakDay = false } = {}) {
   const isWeight = sellByWeight;
   let quantity;
   if (isWeight) {
-    const maxKg = weakDay ? 1.2 : Math.min(5.5, product.stock * 0.1);
+    const maxKg = weakDay ? 1.2 : 2.8;
     quantity = round2(rand(weakDay ? 0.2 : 0.4, maxKg));
     if (quantity < 0.15) quantity = 0.25;
   } else {
@@ -331,6 +348,7 @@ function buildOrderLine(entry, { weakDay = false } = {}) {
     cost: product.netPrice,
     isApplyDiscount: false,
     showProductCodeOnInvoice: true,
+    ...(product.sourceProductId ? { sourceProductId: product.sourceProductId } : {}),
     lineTotal,
     numberOfProducts: isWeight ? 1 : quantity,
   };
@@ -408,7 +426,9 @@ async function seedOrders({ branchMap, productsByBranch, clients, users }) {
 
     const branch = branchMap.get(branchKey);
     const catalog = productsByBranch.get(branchKey) || [];
-    if (!catalog.length) continue;
+    const sellable = catalog.filter((e) => e.isCut);
+    const pickPool = sellable.length ? sellable : catalog;
+    if (!pickPool.length) continue;
 
     const dayOfMonth = daySequence[i] ?? listMonthDaysThroughToday()[0] ?? 1;
     const weakDay = dayOfMonth === PROFIT_LOSS_DAY;
@@ -422,7 +442,7 @@ async function seedOrders({ branchMap, productsByBranch, clients, users }) {
       let entry;
       let tries = 0;
       do {
-        entry = pick(catalog);
+        entry = pick(pickPool);
         tries += 1;
       } while (used.has(String(entry.product._id)) && tries < 12);
       used.add(String(entry.product._id));
@@ -683,7 +703,7 @@ async function main() {
   console.log(`💸 Seeding daily expenses (large hit on day ${PROFIT_LOSS_DAY})…`);
   const expenseCount = await seedDailyExpenses({ branchMap, users });
 
-  console.log('\n✅ Demo supermarket seeded successfully!\n');
+  console.log('\n✅ Demo butcher shop seeded successfully!\n');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`  Store:      ${DEMO_STORE.storeName}`);
   console.log(`  Branches:   ${branchMap.size}`);
@@ -701,7 +721,7 @@ async function main() {
   for (const u of DEMO_USERS) {
     console.log(`    ${u.email}  /  ${u.password}  (${u.role})`);
   }
-  console.log('\n  Weight sales: ENABLED (لحوم، دواجن، أسماك، خضار، فواكه)');
+  console.log('\n  Weight sales: ENABLED · cut-from-source: ENABLED (قطعيات تسحب من الثلاجة)');
   console.log('');
 
   await mongoose.disconnect();

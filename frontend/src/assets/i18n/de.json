@@ -822,7 +822,7 @@
   "tr_expenses": "Ausgaben",
   "tr_sell_price": "Verkaufspreis",
   "tr_product_show_price_on_barcode": "Verkaufspreis auf Barcode anzeigen",
-  "tr_net_price": "Nettopreis",
+  "tr_net_price": "Einkaufspreis/Kosten",
   "tr_net_price_optional": "(optional — wenn leer: Preis − Rabatt)",
   "tr_net_price_invalid": "Nettopreis muss ≥ 0 sein",
   "tr_new_branch": "Neue Filiale",
@@ -1137,7 +1137,7 @@
   "tr_exchange_amount_collected_line": "Eingenommen",
   "tr_exchange_sale_and_trade_in": "Verkaufssumme (vor Gutschrift)",
   "tr_sale_price": "Verkaufspreis",
-  "tr_purchase_price": "Einkaufspreis (Kosten)",
+  "tr_purchase_price": "Einkaufspreis/Kosten",
   "tr_cashier": {
     "TITLE": "Kasse",
     "SCAN_PRODUCT": "Produkt scannen...",

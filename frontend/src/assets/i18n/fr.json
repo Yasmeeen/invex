@@ -822,7 +822,7 @@
   "tr_expenses": "Dépenses",
   "tr_sell_price": "Prix de vente",
   "tr_product_show_price_on_barcode": "Afficher le prix de vente sur le code-barres",
-  "tr_net_price": "Prix net",
+  "tr_net_price": "Prix d'achat/coût",
   "tr_net_price_optional": "(facultatif — si vide : prix − remise)",
   "tr_net_price_invalid": "Le prix net doit être ≥ 0",
   "tr_new_branch": "Nouvelle succursale",
@@ -1137,7 +1137,7 @@
   "tr_exchange_amount_collected_line": "Encaissé",
   "tr_exchange_sale_and_trade_in": "Total vente (avant crédit reprise)",
   "tr_sale_price": "Prix de vente",
-  "tr_purchase_price": "Prix d'achat (coût)",
+  "tr_purchase_price": "Prix d'achat/coût",
   "tr_cashier": {
     "TITLE": "Caisse",
     "SCAN_PRODUCT": "Scanner le produit...",

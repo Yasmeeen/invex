@@ -354,7 +354,7 @@
               <i class="fa fa-cube"></i>
             </div>
           </div>
-           <div class="stock-badge"  [class.low-stock]="product.stock < 5">{{product.stock}}</div>
+           <div class="stock-badge" [class.low-stock]="displayStock(product) < 5">{{ displayStock(product) }}</div>
           <div
             *ngIf="bookedQty(product) > 0"
             class="cashier-booking-badge"

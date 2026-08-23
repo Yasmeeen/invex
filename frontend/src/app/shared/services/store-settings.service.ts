@@ -84,6 +84,8 @@ export interface StoreSettings {
   showBookingPolicyOnReceipt: boolean;
   /** Master switch for sell-by-weight categories and cashier weight entry. */
   weightSalesEnabled: boolean;
+  /** Deduct fridge/carcass stock when selling a cut SKU (butcher). Default off. */
+  cutFromSourceEnabled: boolean;
   /** Master switch for delivery invoices at cashier. */
   deliveryOrdersEnabled: boolean;
   /** Master switch for desk product purchase + exchange at cashier. */
@@ -119,6 +121,7 @@ const DEFAULTS: StoreSettings = {
   bookingPolicy: '',
   showBookingPolicyOnReceipt: false,
   weightSalesEnabled: false,
+  cutFromSourceEnabled: false,
   deliveryOrdersEnabled: false,
   cashierPurchaseExchangeEnabled: true,
   ecommerceIntegrationFeatureAvailable: false,
@@ -325,6 +328,7 @@ export class StoreSettingsService {
           bookingPolicy: data.bookingPolicy ?? '',
           showBookingPolicyOnReceipt: Boolean(data.showBookingPolicyOnReceipt),
           weightSalesEnabled: Boolean(data.weightSalesEnabled),
+          cutFromSourceEnabled: Boolean(data.cutFromSourceEnabled),
           deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
           cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
           ecommerceIntegrationFeatureAvailable: Boolean(data.ecommerceIntegrationFeatureAvailable),

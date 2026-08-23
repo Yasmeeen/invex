@@ -1903,12 +1903,35 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Units sellable without touching reserved quantity. */
   freeSellableQty(product: Product | any): number {
+    const stock = this.displayStock(product);
     if (this.isWeightProduct(product)) {
-      const stock = Math.max(0, roundWeight(Number(product?.stock ?? 0)));
-      return Math.max(0, stock - this.bookedQty(product));
+      return Math.max(0, roundWeight(stock) - this.bookedQty(product));
     }
-    const stock = Math.max(0, Math.floor(Number(product?.stock ?? 0)));
-    return Math.max(0, stock - this.bookedQty(product));
+    return Math.max(0, Math.floor(stock) - this.bookedQty(product));
+  }
+
+  cutFromSourceEnabled(): boolean {
+    return !!this.storeSettings.snapshot.cutFromSourceEnabled;
+  }
+
+  sourceStockProduct(product: Product | any): { stock?: number; name?: string } | null {
+    if (!this.cutFromSourceEnabled()) return null;
+    const populated = product?.sourceProduct;
+    if (populated && typeof populated === 'object') return populated;
+    const sid = product?.sourceProductId;
+    if (sid && typeof sid === 'object') return sid;
+    return null;
+  }
+
+  displayStock(product: Product | any): number {
+    const src = this.sourceStockProduct(product);
+    if (src && src.stock != null) {
+      return Math.max(0, Number(src.stock) || 0);
+    }
+    if (this.isWeightProduct(product)) {
+      return Math.max(0, roundWeight(Number(product?.stock ?? 0)));
+    }
+    return Math.max(0, Number(product?.stock ?? 0));
   }
 
   weightSalesEnabled(): boolean {
@@ -2014,7 +2037,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         if (w <= 0) {
           return 'tr_weight_required_for_line';
         }
-        const maxStock = Math.max(0, roundWeight(Number(item.stock ?? 0)));
+        const maxStock = this.displayStock(item);
         if (w > maxStock + 0.0001) {
           return 'tr_not_enough_stock';
         }
@@ -2083,7 +2106,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addProduct(product: any) {
-    if (product.stock == 0) return;
+    if (this.freeSellableQty(product) <= 0) return;
 
     if (this.isWeightProduct(product)) {
       this.orderItems.push({

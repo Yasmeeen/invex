@@ -293,6 +293,16 @@ const orderSchema = new mongoose.Schema(
          * When true, product code is printed under the name on the customer receipt.
          */
         showProductCodeOnInvoice: { type: Boolean, required: false },
+        /**
+         * Snapshot: fridge/carcass product deducted for this cut line (cut-from-source sales).
+         * Returns restore this product, not the cut SKU.
+         */
+        sourceProductId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: false,
+          default: undefined,
+        },
         /** Snapshot: category attributes flagged showOnInvoice (label + value). */
         invoiceAttributes: {
           type: [

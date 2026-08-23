@@ -149,6 +149,11 @@ const storeSettingsSchema = new mongoose.Schema(
     showBookingPolicyOnReceipt: { type: Boolean, default: false },
     /** Master switch: sell-by-weight categories and cashier weight entry. Default off. */
     weightSalesEnabled: { type: Boolean, default: false },
+    /**
+     * Master switch: sell a cut SKU (steak) while deducting kg from a source SKU (carcass / fridge piece).
+     * Default off so other stores keep selling from the product's own stock.
+     */
+    cutFromSourceEnabled: { type: Boolean, default: false },
     /** Master switch: delivery invoices at cashier + delivery staff per branch. Default off. */
     deliveryOrdersEnabled: { type: Boolean, default: false },
     /** Master switch: desk product purchase + exchange at cashier. Default on for existing stores. */

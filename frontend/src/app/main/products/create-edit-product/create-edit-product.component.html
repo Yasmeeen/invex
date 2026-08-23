@@ -179,12 +179,49 @@
                         [step]="isWeightCategory ? 0.001 : 1"
                         (ngModelChange)="onStockQuantityChanged(); onDeskTreasuryCostInputsChanged()"
                       />
+                      <p class="text-muted size-small m-0 mt-1" *ngIf="isCutFromSourceSku">
+                        {{ 'tr_cut_source_stock_hint' | translate }}
+                      </p>
                       <span
                         class="text-error size-small validator"
                         *ngIf="stock.invalid && basicInfoForm.submitted"
                       >
                         {{ 'tr_stock_required' | translate }}
                       </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-12" *ngIf="cutFromSourceEnabled">
+                    <div class="form-group">
+                      <label>{{ 'tr_cut_source_product' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          [items]="sourceStockCandidates"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [ngModel]="selectedSourceProductId"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="onSourceProductChange($event)"
+                          (open)="loadSourceStockCandidates()"
+                          appendTo="#create-edit-product-modal-root"
+                          [clearable]="true"
+                          [placeholder]="'tr_cut_source_none' | translate"
+                          notFoundText="{{ 'tr_no_items_found' | translate }}"
+                        >
+                          <ng-template ng-option-tmp let-item="item">
+                            <div class="weight-medium">{{ item.name }}</div>
+                            <div class="size-small text-muted">
+                              {{ item.code }}
+                              <span *ngIf="item.stock != null"> · {{ item.stock }}</span>
+                            </div>
+                          </ng-template>
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <p class="text-muted size-small m-0 mt-1">
+                        {{ 'tr_cut_source_product_hint' | translate }}
+                      </p>
                     </div>
                   </div>
 
@@ -446,6 +483,7 @@
                           name="branch"
                           [items]="branches"
                           [required]="!storeInWarehouse"
+                          (ngModelChange)="loadSourceStockCandidates()"
                         ></ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>

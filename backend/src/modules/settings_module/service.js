@@ -75,6 +75,7 @@ function serializeSettings(doc) {
     bookingPolicy: doc.bookingPolicy || '',
     showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
     weightSalesEnabled: Boolean(doc.weightSalesEnabled),
+    cutFromSourceEnabled: Boolean(doc.cutFromSourceEnabled),
     deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
     cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
     ecommerceIntegrationFeatureAvailable: featureAvailable,
@@ -122,6 +123,7 @@ export const updateStoreSettings = async (req, res) => {
       bookingPolicy,
       showBookingPolicyOnReceipt,
       weightSalesEnabled,
+      cutFromSourceEnabled,
       deliveryOrdersEnabled,
       cashierPurchaseExchangeEnabled,
       ecommerceIntegrationEnabled,
@@ -381,6 +383,9 @@ export const updateStoreSettings = async (req, res) => {
     if (weightSalesEnabled !== undefined && typeof weightSalesEnabled !== 'boolean') {
       return res.status(400).json({ error: 'weightSalesEnabled must be a boolean' });
     }
+    if (cutFromSourceEnabled !== undefined && typeof cutFromSourceEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'cutFromSourceEnabled must be a boolean' });
+    }
     if (deliveryOrdersEnabled !== undefined && typeof deliveryOrdersEnabled !== 'boolean') {
       return res.status(400).json({ error: 'deliveryOrdersEnabled must be a boolean' });
     }
@@ -415,6 +420,9 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (weightSalesEnabled !== undefined) {
       update.weightSalesEnabled = weightSalesEnabled;
+    }
+    if (cutFromSourceEnabled !== undefined) {
+      update.cutFromSourceEnabled = cutFromSourceEnabled;
     }
     if (deliveryOrdersEnabled !== undefined) {
       update.deliveryOrdersEnabled = deliveryOrdersEnabled;

@@ -104,6 +104,14 @@
 
       <div class="store-settings-card__field">
         <label class="store-settings-card__policy-toggle checkbox-row">
+          <input type="checkbox" name="cutFromSourceEnabled" [(ngModel)]="form.cutFromSourceEnabled" />
+          <span>{{ 'tr_cut_from_source_enabled' | translate }}</span>
+        </label>
+        <p class="store-settings-card__hint">{{ 'tr_cut_from_source_enabled_hint' | translate }}</p>
+      </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__policy-toggle checkbox-row">
           <input
             type="checkbox"
             name="deliveryOrdersEnabled"

@@ -26,6 +26,7 @@ import {
   resolveSellByWeight,
   roundWeight,
 } from '../../utils/sale-quantity.util.js';
+import { isCutFromSourceEnabled, sourceProductIdOf } from '../../utils/cut-from-source.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import {
   consumeBookingsForSale,
@@ -241,7 +242,7 @@ async function runOrderPostCreateSideEffects({
   try {
     const movementDocs = orderProducts.map((item) => ({
       movementType: 'sale',
-      productId: item.productId,
+      productId: item.sourceProductId || item.productId,
       productName: item.name,
       branchId: branch || null,
       fromBranchId: branch || null,
@@ -251,7 +252,9 @@ async function runOrderPostCreateSideEffects({
       totalValue: Number(item.price || 0) * Number(item.quantity || 0),
       referenceType: 'order',
       referenceId: newOrder._id,
-      notes: `Order #${newOrder.orderNumber}`,
+      notes: item.sourceProductId
+        ? `Order #${newOrder.orderNumber} · ${item.name}`
+        : `Order #${newOrder.orderNumber}`,
     }));
     if (exchangePurchaseStockMovements?.length) {
       movementDocs.push(...exchangePurchaseStockMovements);
@@ -658,14 +661,35 @@ export const createOrder = async (req, res) => {
       uniqueProductIds.length > 0
         ? q(
             Product.find({ _id: { $in: uniqueProductIds } }).select(
-              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price'
+              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
             )
           )
         : Promise.resolve([]),
       q(Order.findOne().sort({ orderNumber: -1 }).select('orderNumber')).lean(),
     ]);
     const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settingsDoc);
     const productById = new Map(productDocsList.map((p) => [String(p._id), p]));
+
+    if (cutFromSourceEnabled && productDocsList.length) {
+      const extraSourceIds = [
+        ...new Set(
+          productDocsList
+            .map((p) => sourceProductIdOf(p))
+            .filter((id) => id && mongoose.Types.ObjectId.isValid(id) && !productById.has(id))
+        ),
+      ].map((id) => new mongoose.Types.ObjectId(id));
+      if (extraSourceIds.length) {
+        const extraDocs = await q(
+          Product.find({ _id: { $in: extraSourceIds } }).select(
+            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+          )
+        );
+        for (const doc of extraDocs) {
+          productById.set(String(doc._id), doc);
+        }
+      }
+    }
 
     const categoryIds = [
       ...new Set(
@@ -723,26 +747,36 @@ export const createOrder = async (req, res) => {
 
       totalPrice += price * quantity;
 
-      const transferReserved = Number(productDoc.transferReservedQuantity) || 0;
-      const bookedQty = Number(productDoc.bookedQuantity) || 0;
-      const ecomReserved = Number(productDoc.ecommerceReservedQuantity) || 0;
-      const clientReserved = Math.min(
-        bookedQty,
-        clientReservedByProduct.get(String(productDoc._id)) || 0
+      const sourceId = cutFromSourceEnabled ? sourceProductIdOf(productDoc) : null;
+      if (sourceId && !productById.get(sourceId)) {
+        throw new Error(`Source stock not found for ${productDoc.name}`);
+      }
+      const stockDoc = sourceId ? productById.get(sourceId) : productDoc;
+      const stockTransferReserved = Number(stockDoc.transferReservedQuantity) || 0;
+      const stockBookedQty = Number(stockDoc.bookedQuantity) || 0;
+      const stockEcomReserved = Number(stockDoc.ecommerceReservedQuantity) || 0;
+      const stockClientReserved = Math.min(
+        stockBookedQty,
+        clientReservedByProduct.get(String(stockDoc._id)) || 0
       );
-      const othersBooked = Math.max(0, bookedQty - clientReserved);
+      const stockOthersBooked = Math.max(0, stockBookedQty - stockClientReserved);
       const maxSellable = isWeight
-        ? roundWeight(Number(productDoc.stock) - transferReserved - othersBooked - ecomReserved)
-        : Number(productDoc.stock) - transferReserved - othersBooked - ecomReserved;
+        ? roundWeight(
+            Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved
+          )
+        : Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved;
       if (maxSellable < quantity - (isWeight ? 0.0001 : 0)) {
         throw new Error(`Not enough stock for ${productDoc.name}`);
       }
 
-      productDoc.stock = isWeight
-        ? roundWeight(Number(productDoc.stock) - quantity)
-        : Number(productDoc.stock) - quantity;
-      dirtyProductIds.add(String(productDoc._id));
+      stockDoc.stock = isWeight
+        ? roundWeight(Number(stockDoc.stock) - quantity)
+        : Number(stockDoc.stock) - quantity;
+      dirtyProductIds.add(String(stockDoc._id));
       soldProductIds.add(String(productDoc._id));
+      if (sourceId) {
+        soldProductIds.add(sourceId);
+      }
 
       const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
       // Category default is true; missing field on legacy categories → show code
@@ -764,28 +798,33 @@ export const createOrder = async (req, res) => {
         cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
         showProductCodeOnInvoice,
+        ...(sourceId ? { sourceProductId: stockDoc._id } : {}),
         ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
       });
 
-      // Category setting: soft-hide product once stock is exhausted (keep row for returns)
+      const hideDoc = stockDoc;
+      const hideCat = hideDoc.category
+        ? categoryById.get(String(hideDoc.category)) ?? categoryDoc
+        : categoryDoc;
       if (
-        Number(productDoc.stock) <= (isWeight ? 0.0001 : 0) &&
-        categoryDoc?.deleteProductWhenOutOfStock
+        Number(hideDoc.stock) <= (isWeight ? 0.0001 : 0) &&
+        hideCat?.deleteProductWhenOutOfStock
       ) {
         autoDeletedProducts.push({
-          _id: productDoc._id,
-          code: productDoc.code,
-          name: productDoc.name,
-          stock: productDoc.stock,
-          branch: productDoc.branch,
-          inWarehouse: productDoc.inWarehouse,
-          addedBy: productDoc.addedBy,
-          category: productDoc.category,
-          price: productDoc.price,
-          netPrice: productDoc.netPrice,
+          _id: hideDoc._id,
+          code: hideDoc.code,
+          name: hideDoc.name,
+          stock: hideDoc.stock,
+          branch: hideDoc.branch,
+          inWarehouse: hideDoc.inWarehouse,
+          addedBy: hideDoc.addedBy,
+          category: hideDoc.category,
+          price: hideDoc.price,
+          netPrice: hideDoc.netPrice,
         });
-        productDoc.stock = 0;
-        productDoc.removedWhenOutOfStock = true;
+        hideDoc.stock = 0;
+        hideDoc.removedWhenOutOfStock = true;
+        dirtyProductIds.add(String(hideDoc._id));
       }
     }
 

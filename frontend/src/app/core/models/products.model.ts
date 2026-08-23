@@ -41,6 +41,12 @@ export interface Product {
   addedBy?: string;
   /** null = inherit category; true/false overrides sell-by-weight. */
   sellByWeightOverride?: boolean | null;
+  /**
+   * When cut-from-source is on: populated source SKU or id.
+   * Selling this product deducts the source's stock.
+   */
+  sourceProductId?: string | { _id: string; name?: string; code?: string; stock?: number } | null;
+  sourceProduct?: { _id: string; name?: string; code?: string; stock?: number } | null;
   /** Cashier / order line: piece or weight. */
   saleUnit?: 'piece' | 'weight';
   weightUnit?: 'kg' | 'g';

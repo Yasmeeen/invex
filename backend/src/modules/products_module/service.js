@@ -23,6 +23,11 @@ import {
   roundWeight,
 } from '../../utils/sale-quantity.util.js';
 import {
+  attachSourceProducts,
+  isCutFromSourceEnabled,
+  resolveCutSourceFields,
+} from '../../utils/cut-from-source.js';
+import {
   notifyProductChanged,
   notifyProductDeleted,
 } from '../integrations_module/catalogSync.js';
@@ -392,6 +397,7 @@ async function createOrReviveProductRow({
   ecommerceShortDescription,
   ecommerceIsFeatured,
   acquiredFromFields = {},
+  sourceProductId,
 }) {
   const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
   const existing = await Product.findOne(filter);
@@ -424,6 +430,9 @@ async function createOrReviveProductRow({
     }
     if (ecommerceIsFeatured !== undefined) existing.ecommerceIsFeatured = ecommerceIsFeatured;
     Object.assign(existing, acquiredFromFields);
+    if (sourceProductId !== undefined) {
+      existing.sourceProductId = sourceProductId;
+    }
     await existing.save();
     return { ok: true, product: existing, revived: true };
   }
@@ -445,6 +454,7 @@ async function createOrReviveProductRow({
     ecommerceShortDescription,
     ecommerceIsFeatured,
     ...acquiredFromFields,
+    ...(sourceProductId !== undefined ? { sourceProductId } : {}),
   });
   return { ok: true, product, revived: false };
 }
@@ -1155,7 +1165,7 @@ export const generateBarcodeImage = async (req, res) => {
 
 
 /** Shared list filters for GET /products and inventory audit. */
-function buildProductsListQuery(queryParams = {}) {
+function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false } = {}) {
   const {
     search = '',
     branchId,
@@ -1190,7 +1200,16 @@ function buildProductsListQuery(queryParams = {}) {
 
   // Available (stock > 0) vs finished / out of stock (stock 0)
   if (inStock === 'true' || inStock === true) {
-    query.stock = { $gt: 0 };
+    if (cutFromSourceEnabled) {
+      andParts.push({
+        $or: [
+          { stock: { $gt: 0 } },
+          { sourceProductId: { $ne: null } },
+        ],
+      });
+    } else {
+      query.stock = { $gt: 0 };
+    }
   } else if (inStock === 'false' || inStock === false) {
     query.stock = { $lte: 0 };
   }
@@ -1277,18 +1296,26 @@ export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    const query = buildProductsListQuery(req.query);
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const query = buildProductsListQuery(req.query, {
+      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
+    });
 
     const [products, total] = await Promise.all([
       Product.find(query)
         .select('-ecommerceDescription')
         .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
+        .populate('sourceProductId', 'name code stock')
         .skip(skip)
         .limit(Number(limit))
         .lean(),
       Product.countDocuments(query),
     ]);
+
+    if (isCutFromSourceEnabled(settingsDoc)) {
+      await attachSourceProducts(products);
+    }
 
     const totalPages = Math.ceil(total / limit);
 
@@ -1314,7 +1341,8 @@ export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
-      .populate('branch', 'name');
+      .populate('branch', 'name')
+      .populate('sourceProductId', 'name code stock');
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -1415,8 +1443,20 @@ export const createProduct = async (req, res) => {
       });
     }
     const isWeightCategory = resolveSellByWeight({ weightSalesEnabled, category: catRow });
+    const sourceFields = await resolveCutSourceFields(req.body, {
+      branchOid: isWarehouse ? null : branch?._id,
+      isWarehouse,
+      enabled: isCutFromSourceEnabled(settingsDoc),
+    });
+    if (sourceFields.error) {
+      return res.status(400).json({ error: sourceFields.error });
+    }
+    const sourceCreateArg = sourceFields.skip ? {} : { sourceProductId: sourceFields.sourceProductId };
+    const isCutSku = !sourceFields.skip && !!sourceFields.sourceProductId;
     let normalizedStock = stockNum;
-    if (isWeightCategory) {
+    if (isCutSku) {
+      normalizedStock = 0;
+    } else if (isWeightCategory) {
       if (stockNum < 0) {
         return res.status(400).json({ error: 'Invalid stock' });
       }
@@ -1696,6 +1736,7 @@ export const createProduct = async (req, res) => {
         ecommerceShortDescription,
         ecommerceIsFeatured,
         ...acquiredFromFields,
+        ...sourceCreateArg,
       });
       if (!row.ok) {
         return res.status(409).json({ error: row.error, code: row.code });
@@ -1747,6 +1788,7 @@ export const createProduct = async (req, res) => {
       ecommerceShortDescription,
       ecommerceIsFeatured,
       ...acquiredFromFields,
+      ...sourceCreateArg,
     });
     if (!row.ok) {
       return res.status(409).json({
@@ -1858,8 +1900,19 @@ export const updateProduct = async (req, res) => {
       weightSalesEnabled: !!settingsDocUpdate?.weightSalesEnabled,
       category: catRowUpdate,
     });
+    const sourceFieldsUpdate = await resolveCutSourceFields(req.body, {
+      productId: req.params.id,
+      branchOid: isWarehouse ? null : branch?._id,
+      isWarehouse,
+      enabled: isCutFromSourceEnabled(settingsDocUpdate),
+    });
+    if (sourceFieldsUpdate.error) {
+      return res.status(400).json({ error: sourceFieldsUpdate.error });
+    }
     let normalizedStock = stockNum;
-    if (isWeightCategoryUpdate) {
+    if (!sourceFieldsUpdate.skip && sourceFieldsUpdate.sourceProductId) {
+      normalizedStock = 0;
+    } else if (isWeightCategoryUpdate) {
       if (stockNum < 0) {
         return res.status(400).json({ error: 'Invalid stock' });
       }
@@ -1954,6 +2007,9 @@ export const updateProduct = async (req, res) => {
         discount: discountNum,
         attributes: attrs,
       };
+      if (!sourceFieldsUpdate.skip) {
+        updateDoc.sourceProductId = sourceFieldsUpdate.sourceProductId;
+      }
       if (imageUrlNorm !== undefined) {
         updateDoc.imageUrl = imageUrlNorm;
       }
@@ -2031,6 +2087,9 @@ export const updateProduct = async (req, res) => {
       discount: discountNum,
       attributes: attrs,
     };
+    if (!sourceFieldsUpdate.skip) {
+      updateDocBranch.sourceProductId = sourceFieldsUpdate.sourceProductId;
+    }
     if (imageUrlNorm !== undefined) {
       updateDocBranch.imageUrl = imageUrlNorm;
     }
@@ -3057,7 +3116,10 @@ export const transferProductStock = async (req, res) => {
 /** GET /products/inventory-audit — stock totals for current list filters, grouped by location. */
 export const getProductsInventoryAudit = async (req, res) => {
   try {
-    const query = buildProductsListQuery(req.query);
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const query = buildProductsListQuery(req.query, {
+      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
+    });
     const search = String(req.query.search || '').trim();
 
     const stockValueExpr = {

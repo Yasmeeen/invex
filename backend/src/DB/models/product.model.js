@@ -45,6 +45,17 @@ const productSchema = new mongoose.Schema(
     },
     /** null/undefined = inherit category.sellByWeight; true/false = override. */
     sellByWeightOverride: { type: Boolean, required: false, default: undefined },
+    /**
+     * When store cutFromSourceEnabled: selling this SKU deducts stock from the source (carcass / fridge piece).
+     * Cut SKUs typically keep stock 0; inventory lives on the source.
+     */
+    sourceProductId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: false,
+      default: null,
+      index: true,
+    },
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',

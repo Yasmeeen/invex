@@ -209,12 +209,26 @@ export async function restoreProductStockForReturn(order, line, quantity) {
   const qty = normalizeSaleQuantity(Number(quantity) || 0, isWeight);
   if (qty <= 0) return null;
 
-  let product = await Product.findById(line.productId);
-  if (product) {
+  const addQty = (product) => {
     product.stock = isWeight
       ? roundWeight(Math.max(0, (Number(product.stock) || 0) + qty))
       : Math.max(0, (Number(product.stock) || 0) + qty);
     product.removedWhenOutOfStock = false;
+  };
+
+  const sourceId = line?.sourceProductId;
+  if (sourceId) {
+    const source = await Product.findById(sourceId);
+    if (source) {
+      addQty(source);
+      await source.save();
+      return source;
+    }
+  }
+
+  let product = await Product.findById(line.productId);
+  if (product) {
+    addQty(product);
     await product.save();
     return product;
   }

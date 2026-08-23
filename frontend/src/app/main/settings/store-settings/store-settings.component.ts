@@ -8,7 +8,7 @@ import {
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
-type SettingsTabId = 'general' | 'policies' | 'ecommerce';
+type SettingsTabId = 'general' | 'features' | 'policies' | 'ecommerce';
 
 interface SettingsTab {
   id: SettingsTabId;
@@ -38,6 +38,10 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     showReturnExchangePolicyOnReceipt: false,
     bookingPolicy: '',
     showBookingPolicyOnReceipt: false,
+    weightSalesEnabled: false,
+    cutFromSourceEnabled: false,
+    deliveryOrdersEnabled: false,
+    cashierPurchaseExchangeEnabled: true,
     ecommerceIntegrationFeatureAvailable: false,
     ecommerceIntegrationEnabled: false,
     ecommerceBaseUrl: '',
@@ -55,6 +59,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
 
   readonly allTabs: SettingsTab[] = [
     { id: 'general', labelKey: 'tr_settings_tab_general', icon: 'fa-store' },
+    { id: 'features', labelKey: 'tr_settings_tab_features', icon: 'fa-sliders' },
     { id: 'policies', labelKey: 'tr_settings_tab_policies', icon: 'fa-file-text-o' },
     {
       id: 'ecommerce',
@@ -102,6 +107,10 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(v.showReturnExchangePolicyOnReceipt),
         bookingPolicy: v.bookingPolicy || '',
         showBookingPolicyOnReceipt: Boolean(v.showBookingPolicyOnReceipt),
+        weightSalesEnabled: Boolean(v.weightSalesEnabled),
+        cutFromSourceEnabled: Boolean(v.cutFromSourceEnabled),
+        deliveryOrdersEnabled: Boolean(v.deliveryOrdersEnabled),
+        cashierPurchaseExchangeEnabled: v.cashierPurchaseExchangeEnabled !== false,
         ecommerceIntegrationFeatureAvailable: Boolean(v.ecommerceIntegrationFeatureAvailable),
         ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: v.ecommerceBaseUrl || '',
@@ -164,6 +173,10 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
         bookingPolicy: this.form.bookingPolicy?.trim() || '',
         showBookingPolicyOnReceipt: Boolean(this.form.showBookingPolicyOnReceipt),
+        weightSalesEnabled: Boolean(this.form.weightSalesEnabled),
+        cutFromSourceEnabled: Boolean(this.form.cutFromSourceEnabled),
+        deliveryOrdersEnabled: Boolean(this.form.deliveryOrdersEnabled),
+        cashierPurchaseExchangeEnabled: this.form.cashierPurchaseExchangeEnabled !== false,
         ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
         ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',

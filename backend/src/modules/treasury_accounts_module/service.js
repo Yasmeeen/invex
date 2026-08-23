@@ -15,7 +15,6 @@ import {
   computeAccountExpectedBalanceAllBranches,
   computeAccountsExpectedBalances,
   computeAccountsExpectedBalancesAllBranches,
-  lastMovementsByAccount,
   recordTreasuryTransfer,
   recordTreasuryDeposit,
   recordTreasuryTransferAcrossBranches,
@@ -125,26 +124,16 @@ export const listTreasuryAccounts = async (req, res) => {
       ADMIN_ROLES.includes(actor.role) && !resolved.allBranches;
 
     let balances;
-    let lastByKey;
     if (resolved.allBranches) {
-      [balances, lastByKey] = await Promise.all([
-        computeAccountsExpectedBalancesAllBranches(keys, until),
-        lastMovementsByAccount(null, keys),
-      ]);
+      balances = await computeAccountsExpectedBalancesAllBranches(keys, until);
     } else if (adminCompanyWideNonCash) {
-      const [cashBal, companyBal, cashLast, companyLast] = await Promise.all([
+      const [cashBal, companyBal] = await Promise.all([
         computeAccountsExpectedBalances(resolved.branchId, cashKeys, until),
         computeAccountsExpectedBalancesAllBranches(companyKeys, until),
-        lastMovementsByAccount(resolved.branchId, cashKeys),
-        lastMovementsByAccount(null, companyKeys),
       ]);
       balances = new Map([...cashBal, ...companyBal]);
-      lastByKey = new Map([...cashLast, ...companyLast]);
     } else {
-      [balances, lastByKey] = await Promise.all([
-        computeAccountsExpectedBalances(resolved.branchId, keys, until),
-        lastMovementsByAccount(resolved.branchId, keys),
-      ]);
+      balances = await computeAccountsExpectedBalances(resolved.branchId, keys, until);
     }
     const accounts = (moneyAccounts || []).map((acc) => {
       const bal = balances.get(acc.key) || {
@@ -163,7 +152,6 @@ export const listTreasuryAccounts = async (req, res) => {
         phone: acc.phone || '',
         enabled: acc.key === 'cash' ? true : acc.enabled !== false,
         ...bal,
-        lastMovement: lastByKey.get(acc.key) || null,
       };
     });
 

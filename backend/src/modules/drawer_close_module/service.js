@@ -22,6 +22,7 @@ import {
   recordTreasuryLedgerEntry,
   safeTreasuryPost,
   sumCashTransferNet,
+  sumLedgerNet,
 } from '../../utils/treasury-ledger.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
@@ -253,8 +254,13 @@ export async function getCurrentDrawerCash(branchId, untilDate) {
     return round2(Number(period.openingCashBalance ?? 0));
   }
   try {
-    const preview = await computeDrawerPreviewWithPeriod(branchOid, dateStr);
-    return round2(Number(preview.expectedCashInDrawer ?? 0));
+    const { net } = await sumLedgerNet({
+      branchId: branchOid,
+      accountKey: 'cash',
+      fromDate: period.periodStartDate,
+      untilDate: dateStr,
+    });
+    return round2(Number(period.openingCashBalance ?? 0) + net);
   } catch (err) {
     console.warn('getCurrentDrawerCash:', err?.message || err);
     return round2(Number(period.openingCashBalance ?? 0));

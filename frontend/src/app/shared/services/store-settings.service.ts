@@ -82,6 +82,14 @@ export interface StoreSettings {
   bookingPolicy: string;
   /** Print bookingPolicy on booking receipts when true. */
   showBookingPolicyOnReceipt: boolean;
+  /** Master switch for sell-by-weight categories and cashier weight entry. */
+  weightSalesEnabled: boolean;
+  /** Deduct fridge/carcass stock when selling a cut SKU (butcher). Default off. */
+  cutFromSourceEnabled: boolean;
+  /** Master switch for delivery invoices at cashier. */
+  deliveryOrdersEnabled: boolean;
+  /** Master switch for desk product purchase + exchange at cashier. */
+  cashierPurchaseExchangeEnabled: boolean;
   /** Env-gated e-commerce integration. */
   ecommerceIntegrationFeatureAvailable?: boolean;
   ecommerceIntegrationEnabled?: boolean;
@@ -112,6 +120,10 @@ const DEFAULTS: StoreSettings = {
   showReturnExchangePolicyOnReceipt: false,
   bookingPolicy: '',
   showBookingPolicyOnReceipt: false,
+  weightSalesEnabled: false,
+  cutFromSourceEnabled: false,
+  deliveryOrdersEnabled: false,
+  cashierPurchaseExchangeEnabled: true,
   ecommerceIntegrationFeatureAvailable: false,
   ecommerceIntegrationEnabled: false,
   ecommerceBaseUrl: '',
@@ -315,6 +327,10 @@ export class StoreSettingsService {
           showReturnExchangePolicyOnReceipt: Boolean(data.showReturnExchangePolicyOnReceipt),
           bookingPolicy: data.bookingPolicy ?? '',
           showBookingPolicyOnReceipt: Boolean(data.showBookingPolicyOnReceipt),
+          weightSalesEnabled: Boolean(data.weightSalesEnabled),
+          cutFromSourceEnabled: Boolean(data.cutFromSourceEnabled),
+          deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
+          cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
           ecommerceIntegrationFeatureAvailable: Boolean(data.ecommerceIntegrationFeatureAvailable),
           ecommerceIntegrationEnabled: Boolean(data.ecommerceIntegrationEnabled),
           ecommerceBaseUrl: data.ecommerceBaseUrl ?? '',

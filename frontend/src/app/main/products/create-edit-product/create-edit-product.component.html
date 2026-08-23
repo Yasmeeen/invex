@@ -161,7 +161,13 @@
                       class="form-group"
                       [class.has-error]="stock.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate) }}</label>
+                      <label>
+                        {{
+                          isWeightCategory
+                            ? ('tr_stock_weight' | translate)
+                            : (cashDeskPurchase ? ('tr_quantity' | translate) : ('tr_stock' | translate))
+                        }}
+                      </label>
                       <input
                         type="number"
                         class="s-control"
@@ -169,9 +175,13 @@
                         #stock="ngModel"
                         ngModel
                         required
-                        [attr.min]="cashDeskPurchase ? 1 : 0"
+                        [min]="isWeightCategory ? 0 : cashDeskPurchase ? 1 : 0"
+                        [step]="isWeightCategory ? 0.001 : 1"
                         (ngModelChange)="onStockQuantityChanged(); onDeskTreasuryCostInputsChanged()"
                       />
+                      <p class="text-muted size-small m-0 mt-1" *ngIf="isCutFromSourceSku">
+                        {{ 'tr_cut_source_stock_hint' | translate }}
+                      </p>
                       <span
                         class="text-error size-small validator"
                         *ngIf="stock.invalid && basicInfoForm.submitted"
@@ -181,7 +191,41 @@
                     </div>
                   </div>
 
-                  <!-- Create: device data lives on tab 2. Edit: keep full form here. -->
+                  <div class="col-md-12" *ngIf="cutFromSourceEnabled">
+                    <div class="form-group">
+                      <label>{{ 'tr_cut_source_product' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          [items]="sourceStockCandidates"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [ngModel]="selectedSourceProductId"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="onSourceProductChange($event)"
+                          (open)="loadSourceStockCandidates()"
+                          appendTo="#create-edit-product-modal-root"
+                          [clearable]="true"
+                          [placeholder]="'tr_cut_source_none' | translate"
+                          notFoundText="{{ 'tr_no_items_found' | translate }}"
+                        >
+                          <ng-template ng-option-tmp let-item="item">
+                            <div class="weight-medium">{{ item.name }}</div>
+                            <div class="size-small text-muted">
+                              {{ item.code }}
+                              <span *ngIf="item.stock != null"> · {{ item.stock }}</span>
+                            </div>
+                          </ng-template>
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <p class="text-muted size-small m-0 mt-1">
+                        {{ 'tr_cut_source_product_hint' | translate }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Create: product data lives on tab 2. Edit: keep full form here. -->
                   <div class="col-md-12" *ngIf="!isEdit">
                     <div class="form-group multi-unit-tab-hint">
                       <p class="text-muted size-small m-0">
@@ -439,6 +483,7 @@
                           name="branch"
                           [items]="branches"
                           [required]="!storeInWarehouse"
+                          (ngModelChange)="loadSourceStockCandidates()"
                         ></ng-select>
                         <i class="fa fa-caret-down input-icon"></i>
                       </div>
@@ -765,7 +810,7 @@
                       </div>
                     </ng-container>
 
-                    <!-- Shared device data (qty 1 or multi same-data) -->
+                    <!-- Shared product data (qty 1 or multi same-data) -->
                     <div class="row" *ngIf="!isPerUnitVariantMode">
                       <div class="col-md-12 mt-2 mb-2" *ngIf="isMultiUnitMode">
                         <h4 class="m-0">{{ 'tr_product_tab_units_shared_data' | translate }}</h4>

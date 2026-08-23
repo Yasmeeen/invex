@@ -6,6 +6,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "seed:supermarket": "node scripts/seedSupermarketDemo.js",
+    "seed:supermarket:fresh": "node scripts/seedSupermarketDemo.js --fresh",
+    "seed:product-images": "node scripts/seedProductImages.js",
+    "seed:product-images:force": "node scripts/seedProductImages.js --force",
+    "seed:warehouse": "node scripts/seedWarehouseStock.js",
+    "seed:demo": "node scripts/seedSupermarketDemo.js --fresh",
     "seed:collections": "node src/DB/seedCollectionsDemo.js"
   },
   "keywords": [],

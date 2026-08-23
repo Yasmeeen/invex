@@ -1542,7 +1542,7 @@ export async function finalizeExchangeTradeInPurchaseInSession(
 }
 
 /**
- * Append another device/line to an existing exchange trade-in purchase (one invoice).
+ * Append another product/line to an existing exchange trade-in purchase (one invoice).
  * POST /product-purchase-requests/:id/add-line
  */
 export const addProductPurchaseLine = async (req, res) => {

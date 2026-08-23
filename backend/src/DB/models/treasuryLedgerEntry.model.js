@@ -101,6 +101,7 @@ const treasuryLedgerEntrySchema = new mongoose.Schema(
 );
 
 treasuryLedgerEntrySchema.index({ branch: 1, accountKey: 1, occurredAt: -1 });
+treasuryLedgerEntrySchema.index({ accountKey: 1, occurredAt: -1 });
 treasuryLedgerEntrySchema.index({ sourceType: 1, sourceId: 1 });
 treasuryLedgerEntrySchema.index({ branch: 1, businessDate: 1, accountKey: 1 });
 

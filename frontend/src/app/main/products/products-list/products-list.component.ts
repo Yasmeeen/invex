@@ -331,7 +331,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.floor(Number(product.bookedQuantity) || 0));
   }
 
-  /** Client or supplier name when device was acquired from someone (optional field). */
+  /** Client or supplier name when product was acquired from someone (optional field). */
   productSourceName(product: Product): string {
     return String(product.acquiredFrom?.displayName || '').trim();
   }
@@ -812,6 +812,18 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   }
   
   
+
+  brokenProductImageIds = new Set<string>();
+
+  onProductImageError(productId: string): void {
+    if (productId) {
+      this.brokenProductImageIds.add(String(productId));
+    }
+  }
+
+  productImageVisible(product: Product): boolean {
+    return !!product?.imageUrl && !this.brokenProductImageIds.has(String(product._id));
+  }
 
   ngOnDestroy() {
     this.vendorTypeaheadSub?.unsubscribe();

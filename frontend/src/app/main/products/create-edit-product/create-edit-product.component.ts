@@ -32,6 +32,7 @@ import {
   ProductPurchaseRequestsService,
 } from '@shared/services/product-purchase-requests.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { resolveSellByWeight } from '@shared/utils/sale-quantity.util';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
@@ -107,6 +108,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   isUploadingImage = false;
   /** Show this SKU on the e-commerce website (catalog mode = all). Default off. */
   listedOnEcommerce = false;
+  /** Fridge/carcass product this cut deducts from (butcher). */
+  selectedSourceProductId: string | null = null;
+  sourceStockCandidates: Product[] = [];
   /** Storefront description pushed to the e-commerce catalog. */
   ecommerceDescription = '';
   ecommerceShortDescription = '';
@@ -367,7 +371,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   get showUnitsTab(): boolean {
-    /** Create flow: device data (code, prices, image, attrs) always lives on tab 2. */
+    /** Create flow: product data (code, prices, image, attrs) always lives on tab 2. */
     return !this.isEdit;
   }
 
@@ -411,8 +415,29 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return !!(this.selectedCategory?.multiCodePerPiece);
   }
 
+  get isWeightCategory(): boolean {
+    return resolveSellByWeight({
+      weightSalesEnabled: !!this.storeSettings.snapshot.weightSalesEnabled,
+      category: this.selectedCategory,
+    });
+  }
+
+  get cutFromSourceEnabled(): boolean {
+    return !!this.storeSettings.snapshot.cutFromSourceEnabled;
+  }
+
+  get isCutFromSourceSku(): boolean {
+    return this.cutFromSourceEnabled && !!this.selectedSourceProductId;
+  }
+
   getStockQty(): number {
+    if (this.isCutFromSourceSku) {
+      return 0;
+    }
     const v = this.basicInfoForm?.value?.stock;
+    if (this.isWeightCategory) {
+      return Math.max(0, Number(v) || 0);
+    }
     const n = Math.floor(Number(v));
     if (this.cashDeskPurchase) {
       return Math.max(1, Number.isFinite(n) ? n : 1);
@@ -1179,6 +1204,46 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (warehouse && this.basicInfoForm?.form) {
       this.basicInfoForm.form.patchValue({ branch: null });
     }
+    this.loadSourceStockCandidates();
+  }
+
+  onSourceProductChange(id: string | null) {
+    this.selectedSourceProductId = id || null;
+    if (this.selectedSourceProductId && this.basicInfoForm?.form) {
+      this.basicInfoForm.form.patchValue({ stock: 0 });
+    }
+  }
+
+  loadSourceStockCandidates() {
+    if (!this.cutFromSourceEnabled) {
+      this.sourceStockCandidates = [];
+      return;
+    }
+    const params: any = { page: 1, limit: 300 };
+    if (this.storeInWarehouse) {
+      params.warehouseOnly = true;
+    } else {
+      const b = this.basicInfoForm?.value?.branch;
+      const bid = b?._id || b;
+      if (bid) {
+        params.branchId = String(bid);
+      }
+    }
+    this.productsSerivce.getProducts(params).subscribe({
+      next: (res: any) => {
+        const rows = (res?.products || []) as Product[];
+        this.sourceStockCandidates = rows.filter((p) => {
+          if (this.productId && String(p._id) === String(this.productId)) return false;
+          const sid = (p as any).sourceProductId;
+          if (!sid) return true;
+          if (typeof sid === 'object') return false;
+          return false;
+        });
+      },
+      error: () => {
+        this.sourceStockCandidates = [];
+      },
+    });
   }
 
   getCategories() {
@@ -1241,6 +1306,10 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         addedBy: response.addedBy || '',
       });
       this.productImageUrl = response.imageUrl || '';
+      const srcRaw = response.sourceProductId;
+      this.selectedSourceProductId =
+        srcRaw && typeof srcRaw === 'object' ? String(srcRaw._id) : srcRaw ? String(srcRaw) : null;
+      this.loadSourceStockCandidates();
       this.listedOnEcommerce = Boolean(response.listedOnEcommerce);
       this.ecommerceDescription = String(response.ecommerceDescription || '');
       this.ecommerceShortDescription = String(response.ecommerceShortDescription || '');
@@ -2189,6 +2258,9 @@ createProduct() {
     payload.unitCodes = [...createMultiUnits];
   }
   this.attachAcquiredFromToPayload(payload);
+  if (this.cutFromSourceEnabled) {
+    payload.sourceProductId = this.selectedSourceProductId || null;
+  }
   // Let backend compute netPrice when left empty.
   if (payload.netPrice === '' || payload.netPrice == null) {
     delete payload.netPrice;
@@ -2322,6 +2394,9 @@ updateProduct() {
     delete payload.branch;
   }
   this.attachAcquiredFromToPayload(payload);
+  if (this.cutFromSourceEnabled) {
+    payload.sourceProductId = this.selectedSourceProductId || null;
+  }
   payload.userId = this.globals.currentUser?._id;
   payload.listedOnEcommerce = this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false;
   payload.ecommerceDescription = this.showEcommerceTab ? String(this.ecommerceDescription || '').trim() : '';

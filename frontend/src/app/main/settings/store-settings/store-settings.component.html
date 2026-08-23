@@ -88,6 +88,53 @@
       </div>
     </ng-container>
 
+    <!-- Features -->
+    <ng-container *ngIf="activeTab === 'features'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_settings_tab_features' | translate }}</h2>
+      </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input type="checkbox" name="weightSalesEnabled" [(ngModel)]="form.weightSalesEnabled" />
+          <span>{{ 'tr_weight_sales_enabled' | translate }}</span>
+        </label>
+        <p class="store-settings-card__hint">{{ 'tr_weight_sales_enabled_hint' | translate }}</p>
+      </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input type="checkbox" name="cutFromSourceEnabled" [(ngModel)]="form.cutFromSourceEnabled" />
+          <span>{{ 'tr_cut_from_source_enabled' | translate }}</span>
+        </label>
+        <p class="store-settings-card__hint">{{ 'tr_cut_from_source_enabled_hint' | translate }}</p>
+      </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input
+            type="checkbox"
+            name="deliveryOrdersEnabled"
+            [(ngModel)]="form.deliveryOrdersEnabled"
+          />
+          <span>{{ 'tr_delivery_orders_enabled' | translate }}</span>
+        </label>
+        <p class="store-settings-card__hint">{{ 'tr_delivery_orders_enabled_hint' | translate }}</p>
+      </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__policy-toggle checkbox-row">
+          <input
+            type="checkbox"
+            name="cashierPurchaseExchangeEnabled"
+            [(ngModel)]="form.cashierPurchaseExchangeEnabled"
+          />
+          <span>{{ 'tr_cashier_purchase_exchange_enabled' | translate }}</span>
+        </label>
+        <p class="store-settings-card__hint">{{ 'tr_cashier_purchase_exchange_enabled_hint' | translate }}</p>
+      </div>
+    </ng-container>
+
     <!-- Policies -->
     <ng-container *ngIf="activeTab === 'policies'">
       <div class="store-settings-card__section-head">

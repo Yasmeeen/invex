@@ -37,6 +37,11 @@ const orderSchema = new mongoose.Schema(
     clientAddress: { type: String, required: false, trim: true },
 
     sellerName: { type: String, trim: true },
+
+    /** Cashier delivery invoice (optional delivery person). */
+    isDelivery: { type: Boolean, default: false },
+    deliveryPersonName: { type: String, trim: true },
+
     paymentMethod: { type: String, required: false, trim: true ,  default: "cash"},
 
     branch: {
@@ -273,6 +278,10 @@ const orderSchema = new mongoose.Schema(
         name: { type: String, required: true },
         code: { type: String, required: true },
         quantity: { type: Number, required: true },
+        /** piece = integer count; weight = kg/g amount in quantity. */
+        saleUnit: { type: String, enum: ['piece', 'weight'], default: 'piece' },
+        /** Snapshot when saleUnit is weight. */
+        weightUnit: { type: String, enum: ['kg', 'g'], required: false },
         /** Units already returned on this line. */
         returnedQuantity: { type: Number, default: 0, min: 0 },
         price: { type: Number, required: true },
@@ -284,6 +293,16 @@ const orderSchema = new mongoose.Schema(
          * When true, product code is printed under the name on the customer receipt.
          */
         showProductCodeOnInvoice: { type: Boolean, required: false },
+        /**
+         * Snapshot: fridge/carcass product deducted for this cut line (cut-from-source sales).
+         * Returns restore this product, not the cut SKU.
+         */
+        sourceProductId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: false,
+          default: undefined,
+        },
         /** Snapshot: category attributes flagged showOnInvoice (label + value). */
         invoiceAttributes: {
           type: [
@@ -321,6 +340,9 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.index({ clientId: 1, createdAt: -1 });
+orderSchema.index({ paymentMethod: 1, status: 1 });
 
 const Order = mongoose.model("Order", orderSchema);
 export default Order;

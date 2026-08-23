@@ -243,19 +243,51 @@ export const getClients = async (req, res) => {
       }
     }
 
-    const pipeline = [
-      { $match: matchStage },
-
-      {
-        $lookup: {
-          from: "orders",
-          localField: "_id",
-          foreignField: "clientId",
-          as: "orders",
-        },
+    // Slim order fields only — a full $lookup of invoices (products, schedules, …)
+    // made the clients list load every sale document for every client.
+    const ordersLookupStage = {
+      $lookup: {
+        from: "orders",
+        localField: "_id",
+        foreignField: "clientId",
+        pipeline: [
+          {
+            $project: {
+              totalPrice: 1,
+              createdAt: 1,
+              status: 1,
+              partyType: 1,
+              paymentMethod: 1,
+              paymentStatus: 1,
+              amountPaid: 1,
+              installmentPlanId: 1,
+              installmentPlanSnapshot: 1,
+              installmentPrincipal: 1,
+              installmentInterestAmount: 1,
+              "installments.amount": 1,
+            },
+          },
+        ],
+        as: "orders",
       },
+    };
 
-      {
+    const paginateBeforeOrders =
+      !needsLastInvoiceFilter &&
+      sideFilter !== "debit" &&
+      sideFilter !== "credit";
+
+    const pipeline = [{ $match: matchStage }];
+    let totalOverride = null;
+
+    if (paginateBeforeOrders) {
+      pipeline.push({ $sort: { createdAt: -1 } });
+      const countRows = await Client.aggregate([...pipeline, { $count: "n" }]);
+      totalOverride = countRows[0]?.n || 0;
+      pipeline.push({ $skip: skip }, { $limit: limit });
+    }
+
+    pipeline.push(ordersLookupStage, {
         $addFields: {
           numberOfOrders: { $size: "$orders" },
           totalOrdersPrice: { $sum: "$orders.totalPrice" },
@@ -426,8 +458,8 @@ export const getClients = async (req, res) => {
             },
           },
         },
-      },
-    ];
+      }
+    );
 
     if (needsLastInvoiceFilter) {
       const lastInvoiceAnd = [
@@ -477,8 +509,6 @@ export const getClients = async (req, res) => {
         additionalPhoneNumbers: 1,
         address: 1,
         additionalAddresses: 1,
-        nationalIdImageUrl: 1,
-        guarantor: 1,
         collectorId: 1,
         createdAt: 1,
         branches: 1,
@@ -518,8 +548,12 @@ export const getClients = async (req, res) => {
       withBalances = withBalances.filter((c) => c.balanceSide === sideFilter);
     }
 
-    const total = withBalances.length;
-    const pageRows = withBalances.slice(skip, skip + limit);
+    const total =
+      totalOverride != null ? totalOverride : withBalances.length;
+    const pageRows =
+      totalOverride != null
+        ? withBalances
+        : withBalances.slice(skip, skip + limit);
 
     const branchIds = [
       ...new Set(

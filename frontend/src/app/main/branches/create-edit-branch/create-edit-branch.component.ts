@@ -6,6 +6,9 @@ import { TranslateService } from '@ngx-translate/core';
 import { Branch } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
+
+type BranchFormTabId = 'general' | 'salespeople' | 'delivery';
 
 @Component({
   selector: 'app-create-edit-branch',
@@ -17,7 +20,13 @@ export class CreateEditBranchComponent implements OnInit {
   branchId: string;
   isEdit: boolean;
   salespeople: { name: string }[] = [{ name: '' }];
+  deliveryStaff: { name: string }[] = [{ name: '' }];
+  deliveryOrdersEnabled = false;
   openingDate: Date | null = null;
+  activeTab: BranchFormTabId = 'general';
+  readonly generalTab = { id: 'general' as const, labelKey: 'tr_branch_tab_general', icon: 'fa-building' };
+  readonly salespeopleTab = { id: 'salespeople' as const, labelKey: 'tr_branch_tab_salespeople', icon: 'fa-users' };
+  readonly deliveryTab = { id: 'delivery' as const, labelKey: 'tr_branch_tab_delivery', icon: 'fa-truck' };
   @ViewChild('branchForm') branchForm: NgForm;
 
   constructor(
@@ -26,6 +35,7 @@ export class CreateEditBranchComponent implements OnInit {
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
     private openingCelebration: OpeningCelebrationService,
+    private storeSettings: StoreSettingsService,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -36,6 +46,7 @@ export class CreateEditBranchComponent implements OnInit {
 
     this.branchId = this.data.branchId
     this.isEdit = this.data.isEdit
+    this.deliveryOrdersEnabled = Boolean(this.storeSettings.snapshot.deliveryOrdersEnabled);
 
     
     if(this.isEdit){
@@ -58,6 +69,12 @@ export class CreateEditBranchComponent implements OnInit {
             .filter((sp: { active?: boolean; name?: string }) => sp.active !== false)
             .map((sp: { name?: string }) => ({ name: sp.name || '' }))
         : [{ name: '' }];
+      const deliveryList = Array.isArray(response.deliveryStaff) ? response.deliveryStaff : [];
+      this.deliveryStaff = deliveryList.length
+        ? deliveryList
+            .filter((sp: { active?: boolean; name?: string }) => sp.active !== false)
+            .map((sp: { name?: string }) => ({ name: sp.name || '' }))
+        : [{ name: '' }];
     })
   }
 
@@ -71,6 +88,18 @@ export class CreateEditBranchComponent implements OnInit {
       return;
     }
     this.salespeople.splice(index, 1);
+  }
+
+  addDeliveryStaff(): void {
+    this.deliveryStaff.push({ name: '' });
+  }
+
+  removeDeliveryStaff(index: number): void {
+    if (this.deliveryStaff.length <= 1) {
+      this.deliveryStaff[0].name = '';
+      return;
+    }
+    this.deliveryStaff.splice(index, 1);
   }
 
   clearOpeningDate(event?: Event): void {
@@ -94,6 +123,9 @@ export class CreateEditBranchComponent implements OnInit {
       ...formValue,
       openingDate,
       salespeople: this.salespeople
+        .map((sp) => ({ name: String(sp.name || '').trim(), active: true }))
+        .filter((sp) => sp.name.length > 0),
+      deliveryStaff: this.deliveryStaff
         .map((sp) => ({ name: String(sp.name || '').trim(), active: true }))
         .filter((sp) => sp.name.length > 0),
     };
@@ -141,15 +173,17 @@ export class CreateEditBranchComponent implements OnInit {
   }
 
   submitForm(): void {
-
-    if(this.isEdit){
-      this.updateBranch();
+    this.branchForm.onSubmit(null as any);
+    if (!this.branchForm.valid) {
+      this.activeTab = 'general';
+      return;
     }
-    else{
+
+    if (this.isEdit) {
+      this.updateBranch();
+    } else {
       this.createBranch();
     }
-
-  
   }
 
 }

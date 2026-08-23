@@ -2,6 +2,7 @@ import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
 import Client from "../../DB/models/client.model.js";
 import Vendor from '../../DB/models/vendor.model.js';
 import User from '../../DB/models/user.model.js';
@@ -19,6 +20,13 @@ import {
   processOrderReturn,
   salesReturnTreasuryRefundLines,
 } from '../../utils/order-return.js';
+import {
+  normalizeSaleQuantity,
+  normalizeWeightUnit,
+  resolveSellByWeight,
+  roundWeight,
+} from '../../utils/sale-quantity.util.js';
+import { isCutFromSourceEnabled, sourceProductIdOf } from '../../utils/cut-from-source.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import {
   consumeBookingsForSale,
@@ -31,7 +39,6 @@ import {
   safeTreasuryPost,
 } from '../../utils/treasury-ledger.js';
 import { notifyProductChanged } from '../integrations_module/catalogSync.js';
-import { getOrCreateStoreSettings } from '../settings_module/storeSettingsDoc.js';
 import { normalizePaymentMethodsCatalog } from '../settings_module/paymentMethodsCatalog.js';
 import {
   catalogCreditFeePercent,
@@ -103,12 +110,11 @@ async function clientReservedQtyByProductId({
   if (partyType !== 'client' || !productIds.length) return map;
   const oids = productIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
   if (!oids.length) return map;
-  const bookings = await ProductBooking.find({
+  const bookingsQ = ProductBooking.find({
     product: { $in: oids.map((id) => new mongoose.Types.ObjectId(String(id))) },
     status: 'active',
-  })
-    .session(session)
-    .lean();
+  });
+  const bookings = await (session ? bookingsQ.session(session) : bookingsQ).lean();
   for (const b of bookings) {
     if (!bookingBelongsToSaleClient(b, finalClientId, saleClientPhone)) continue;
     const pid = String(b.product);
@@ -142,6 +148,175 @@ function buildInvoiceAttributesSnapshot(productDoc, categoryDoc) {
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
+}
+
+function orderNeedsTransaction({
+  partyType,
+  exchangePurchaseIdsRaw,
+  exchangePurchaseIdRaw,
+  bookingDepositAllocationsRaw,
+}) {
+  if (partyType === 'supplier') return true;
+  if (Array.isArray(bookingDepositAllocationsRaw) && bookingDepositAllocationsRaw.length > 0) {
+    return true;
+  }
+  if (Array.isArray(exchangePurchaseIdsRaw) && exchangePurchaseIdsRaw.length > 0) return true;
+  if (exchangePurchaseIdRaw && mongoose.Types.ObjectId.isValid(String(exchangePurchaseIdRaw))) {
+    return true;
+  }
+  return false;
+}
+
+async function rollbackOrderSession(session) {
+  if (!session) return;
+  try {
+    await session.abortTransaction();
+  } catch (_) {
+    /* already ended */
+  }
+  session.endSession();
+}
+
+async function commitOrderSession(session) {
+  if (!session) return;
+  await session.commitTransaction();
+  session.endSession();
+}
+
+/** Non-blocking audit/treasury/booking reconcile after order commit (cashier speed). */
+async function runOrderPostCreateSideEffects({
+  req,
+  newOrder,
+  soldProductIds,
+  orderProducts,
+  exchangePurchaseStockMovements,
+  branch,
+  userId,
+  autoDeletedProducts,
+  validatedBookingAllocations,
+  bookingDepositCreditApplied,
+}) {
+  if (validatedBookingAllocations?.length && bookingDepositCreditApplied > 0) {
+    try {
+      await consumeBookingsForSale({
+        allocations: validatedBookingAllocations,
+        userId,
+        orderId: newOrder._id,
+      });
+    } catch (bookingConsumeErr) {
+      console.warn(
+        '⚠️ consumeBookingsForSale:',
+        bookingConsumeErr?.message || bookingConsumeErr
+      );
+    }
+  }
+
+  const soldIdsArray = [...soldProductIds]
+    .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+
+  let productIdsNeedingReconcile = [];
+  if (soldIdsArray.length) {
+    try {
+      productIdsNeedingReconcile = await ProductBooking.distinct('product', {
+        product: { $in: soldIdsArray },
+        status: 'active',
+      });
+    } catch (err) {
+      console.warn('⚠️ booking distinct for reconcile:', err?.message || err);
+      productIdsNeedingReconcile = soldIdsArray;
+    }
+  }
+
+  if (productIdsNeedingReconcile.length) {
+    await Promise.allSettled(
+      productIdsNeedingReconcile.map((pid) =>
+        reconcileBookingsToStock(pid, {
+          userId,
+          reason: `Released after sale #${newOrder?.orderNumber ?? newOrder?._id}`,
+        })
+      )
+    );
+  }
+
+  try {
+    const movementDocs = orderProducts.map((item) => ({
+      movementType: 'sale',
+      productId: item.sourceProductId || item.productId,
+      productName: item.name,
+      branchId: branch || null,
+      fromBranchId: branch || null,
+      toBranchId: null,
+      quantity: Number(item.quantity || 0),
+      unitPrice: Number(item.price || 0),
+      totalValue: Number(item.price || 0) * Number(item.quantity || 0),
+      referenceType: 'order',
+      referenceId: newOrder._id,
+      notes: item.sourceProductId
+        ? `Order #${newOrder.orderNumber} · ${item.name}`
+        : `Order #${newOrder.orderNumber}`,
+    }));
+    if (exchangePurchaseStockMovements?.length) {
+      movementDocs.push(...exchangePurchaseStockMovements);
+    }
+    if (movementDocs.length) {
+      await StockMovement.insertMany(movementDocs);
+    }
+  } catch (movementError) {
+    console.error('⚠️ Failed to log sale stock movement:', movementError.message);
+  }
+
+  // Treasury is posted synchronously in createOrder (before HTTP response).
+
+  await auditLog(req, {
+    action: 'create',
+    module: 'orders',
+    entityType: 'Order',
+    entityId: newOrder?._id,
+    entityLabel: newOrder?.orderNumber != null ? `#${newOrder.orderNumber}` : undefined,
+    message: `Order created #${newOrder?.orderNumber ?? ''}`.trim(),
+    metadata: {
+      orderNumber: newOrder?.orderNumber,
+      subtotalPrice: newOrder?.subtotalPrice,
+      invoiceDiscountAmount: newOrder?.invoiceDiscountAmount,
+      totalPrice: newOrder?.totalPrice,
+      numberOfProducts: newOrder?.numberOfProducts,
+      paymentMethod: newOrder?.paymentMethod,
+      branch: newOrder?.branch,
+      status: newOrder?.status,
+    },
+  });
+
+  for (const item of orderProducts) {
+    if (item?.productId) notifyProductChanged(item.productId);
+  }
+
+  for (const removed of autoDeletedProducts) {
+    await auditLog(req, {
+      action: 'delete',
+      module: 'products',
+      entityType: 'Product',
+      entityId: removed._id,
+      message: `Product hidden from stock after sale ${removed.code || ''}`.trim(),
+      before: {
+        code: removed.code,
+        name: removed.name,
+        stock: removed.stock,
+        branch: removed.branch,
+        inWarehouse: removed.inWarehouse,
+        addedBy: removed.addedBy,
+        category: removed.category,
+        price: removed.price,
+        netPrice: removed.netPrice,
+      },
+      metadata: {
+        reason: 'deleteProductWhenOutOfStock',
+        softRemoved: true,
+        orderId: newOrder?._id,
+        orderNumber: newOrder?.orderNumber,
+      },
+    });
+  }
 }
 
 function normalizePaymentFeeAllocations(raw) {
@@ -262,12 +437,13 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(pageLimit),
+        .limit(pageLimit)
+        .lean(),
 
       Order.countDocuments(query),
     ]);
@@ -309,54 +485,70 @@ export const getOrderById = async (req, res) => {
 };
 
 export const createOrder = async (req, res) => {
+  const {
+    clientId,
+    clientName,
+    clientPhoneNumber,
+    sellerName,
+    clientAddress,
+    paymentMethod,
+    branch,
+    products,
+    status,
+    userId,
+    invoiceDiscountAmount: invoiceDiscountRaw,
+    paidAmount: paidAmountRaw,
+    paymentSplits: paymentSplitsRaw,
+    paymentFeeAllocations: paymentFeeAllocationsRaw,
+    exchangeTradeInCreditAmount: exchangeCreditRaw,
+    exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
+    exchangeProductPurchaseRequestIds: exchangePurchaseIdsRaw,
+    exchangeSettlementTreasurySplits: exchangeSettlementSplitsRaw,
+    bookingDepositCreditAmount: bookingDepositCreditRaw,
+    bookingDepositAllocations: bookingDepositAllocationsRaw,
+    partyType: partyTypeRaw,
+    vendorId: vendorIdRaw,
+    isDelivery: isDeliveryRaw,
+    deliveryPersonName: deliveryPersonNameRaw,
+    linkParty: linkPartyRaw,
+    installmentPlanId: installmentPlanIdRaw,
+    installmentStartDate: installmentStartDateRaw,
+  } = req.body;
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const partyType =
+    String(partyTypeRaw || 'client').trim().toLowerCase() === 'supplier'
+      ? 'supplier'
+      : 'client';
+  const shouldLinkClient =
+    partyType === 'client' &&
+    linkPartyRaw !== false &&
+    linkPartyRaw !== 'false' &&
+    String(linkPartyRaw ?? '').toLowerCase() !== 'false';
+
+  if (!clientPhoneNumber) {
+    return res.status(400).json({ error: 'clientPhoneNumber is required' });
+  }
+  if (!products || products.length === 0) {
+    return res.status(400).json({ error: 'Order must contain at least one product' });
+  }
+
+  const needsTransaction = orderNeedsTransaction({
+    partyType,
+    exchangePurchaseIdsRaw,
+    exchangePurchaseIdRaw,
+    bookingDepositAllocationsRaw,
+  });
+
+  let session = null;
+  if (needsTransaction) {
+    session = await mongoose.startSession();
+    session.startTransaction();
+  }
+
+  const q = (query) => (session ? query.session(session) : query);
+  const w = () => (session ? { session } : {});
 
   try {
-    const {
-      clientId, // optional
-      clientName,
-      clientPhoneNumber,
-      sellerName,
-      clientAddress,
-      paymentMethod,
-      branch,
-      products,
-      status,
-      userId,
-      invoiceDiscountAmount: invoiceDiscountRaw,
-      paidAmount: paidAmountRaw,
-      paymentSplits: paymentSplitsRaw,
-      paymentFeeAllocations: paymentFeeAllocationsRaw,
-      exchangeTradeInCreditAmount: exchangeCreditRaw,
-      exchangeProductPurchaseRequestId: exchangePurchaseIdRaw,
-      exchangeProductPurchaseRequestIds: exchangePurchaseIdsRaw,
-      exchangeSettlementTreasurySplits: exchangeSettlementSplitsRaw,
-      bookingDepositCreditAmount: bookingDepositCreditRaw,
-      bookingDepositAllocations: bookingDepositAllocationsRaw,
-      partyType: partyTypeRaw,
-      vendorId: vendorIdRaw,
-      installmentPlanId: installmentPlanIdRaw,
-      installmentStartDate: installmentStartDateRaw,
-    } = req.body;
-
-    const partyType =
-      String(partyTypeRaw || 'client').trim().toLowerCase() === 'supplier'
-        ? 'supplier'
-        : 'client';
-
-    // validation
-    if ( !clientPhoneNumber ) {
-      return res.status(400).json({
-        error: "clientPhoneNumber is required",
-      });
-    }
-
-    if (!products || products.length === 0) {
-      return res.status(400).json({ error: "Order must contain at least one product" });
-    }
-
     // ======================
     // 1️⃣ CLIENT or SUPPLIER linkage
     // ======================
@@ -372,10 +564,9 @@ export const createOrder = async (req, res) => {
 
     if (partyType === 'supplier') {
       if (vendorIdRaw && mongoose.Types.ObjectId.isValid(String(vendorIdRaw))) {
-        const vendorDoc = await Vendor.findById(vendorIdRaw).session(session);
+        const vendorDoc = await q(Vendor.findById(vendorIdRaw));
         if (!vendorDoc) {
-          await session.abortTransaction();
-          session.endSession();
+          await rollbackOrderSession(session);
           return res.status(400).json({ error: 'Supplier not found' });
         }
         finalVendorId = vendorDoc._id;
@@ -390,10 +581,9 @@ export const createOrder = async (req, res) => {
         exchangeLookupIdRaw &&
         mongoose.Types.ObjectId.isValid(String(exchangeLookupIdRaw))
       ) {
-        const exchangePurchase = await ProductPurchaseRequest.findById(exchangeLookupIdRaw)
-          .select('productPayload.acquiredFrom')
-          .session(session)
-          .lean();
+        const exchangePurchase = await q(
+          ProductPurchaseRequest.findById(exchangeLookupIdRaw).select('productPayload.acquiredFrom')
+        ).lean();
         const af = exchangePurchase?.productPayload?.acquiredFrom;
         if (af && String(af.partyType || 'client').toLowerCase() !== 'supplier') {
           if (af.clientId && mongoose.Types.ObjectId.isValid(String(af.clientId))) {
@@ -410,37 +600,41 @@ export const createOrder = async (req, res) => {
         }
       }
 
-      if (!finalClientId) {
-        let client = await Client.findOne({ phoneNumber: saleClientPhone }).session(session);
+      if (shouldLinkClient) {
+        if (!finalClientId) {
+          let client = await q(Client.findOne({ phoneNumber: saleClientPhone }));
 
-        if (!client) {
-          const [newClient] = await Client.create(
-            [
-              {
-                name: saleClientName,
-                phoneNumber: saleClientPhone,
-                address: saleClientAddress,
-                branches: orderBranchOid ? [orderBranchOid] : [],
-              },
-            ],
-            { session }
-          );
-          client = newClient;
+          if (!client) {
+            const [newClient] = await Client.create(
+              [
+                {
+                  name: saleClientName,
+                  phoneNumber: saleClientPhone,
+                  address: saleClientAddress,
+                  branches: orderBranchOid ? [orderBranchOid] : [],
+                },
+              ],
+              w()
+            );
+            client = newClient;
+          } else if (orderBranchOid) {
+            void Client.updateOne(
+              { _id: client._id },
+              { $addToSet: { branches: orderBranchOid } }
+            ).catch((err) =>
+              console.warn('⚠️ client branch link:', err?.message || err)
+            );
+          }
+
+          finalClientId = client._id;
         } else if (orderBranchOid) {
-          await Client.updateOne(
-            { _id: client._id },
-            { $addToSet: { branches: orderBranchOid } },
-            { session }
+          void Client.updateOne(
+            { _id: finalClientId },
+            { $addToSet: { branches: orderBranchOid } }
+          ).catch((err) =>
+            console.warn('⚠️ client branch link:', err?.message || err)
           );
         }
-
-        finalClientId = client._id;
-      } else if (orderBranchOid) {
-        await Client.updateOne(
-          { _id: finalClientId },
-          { $addToSet: { branches: orderBranchOid } },
-          { session }
-        );
       }
     }
 
@@ -450,38 +644,98 @@ export const createOrder = async (req, res) => {
     let totalPrice = 0;
     let numberOfProducts = 0;
     const orderProducts = [];
-    const categoryById = new Map();
     /** Products whose stock changed — reconcile bookings after commit. */
     const soldProductIds = new Set();
     /** Products removed because category.deleteProductWhenOutOfStock (audit after commit). */
     const autoDeletedProducts = [];
 
-    const getCategoryCached = async (categoryId) => {
-      if (!categoryId) return null;
-      const id = String(categoryId);
-      if (categoryById.has(id)) return categoryById.get(id);
-      const doc = await Category.findById(categoryId).session(session).lean();
-      categoryById.set(id, doc);
-      return doc;
-    };
+    const validLineItems = products.filter((item) => item?.selectedProduct?._id);
+    const uniqueProductIds = [
+      ...new Set(validLineItems.map((item) => String(item.selectedProduct._id))),
+    ]
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
 
-    const orderProductIds = (products || [])
-      .map((item) => item?.selectedProduct?._id)
-      .filter(Boolean);
+    const [settingsDoc, productDocsList, lastOrder] = await Promise.all([
+      q(StoreSettings.findOne().sort({ updatedAt: -1 })).lean(),
+      uniqueProductIds.length > 0
+        ? q(
+            Product.find({ _id: { $in: uniqueProductIds } }).select(
+              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+            )
+          )
+        : Promise.resolve([]),
+      q(Order.findOne().sort({ orderNumber: -1 }).select('orderNumber')).lean(),
+    ]);
+    const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settingsDoc);
+    const productById = new Map(productDocsList.map((p) => [String(p._id), p]));
+
+    if (cutFromSourceEnabled && productDocsList.length) {
+      const extraSourceIds = [
+        ...new Set(
+          productDocsList
+            .map((p) => sourceProductIdOf(p))
+            .filter((id) => id && mongoose.Types.ObjectId.isValid(id) && !productById.has(id))
+        ),
+      ].map((id) => new mongoose.Types.ObjectId(id));
+      if (extraSourceIds.length) {
+        const extraDocs = await q(
+          Product.find({ _id: { $in: extraSourceIds } }).select(
+            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+          )
+        );
+        for (const doc of extraDocs) {
+          productById.set(String(doc._id), doc);
+        }
+      }
+    }
+
+    const categoryIds = [
+      ...new Set(
+        productDocsList
+          .map((p) => p.category)
+          .filter((id) => id != null)
+          .map(String)
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      ),
+    ].map((id) => new mongoose.Types.ObjectId(id));
+
+    const categoryDocs =
+      categoryIds.length > 0
+        ? await q(Category.find({ _id: { $in: categoryIds } })).lean()
+        : [];
+    const categoryById = new Map(categoryDocs.map((c) => [String(c._id), c]));
+    const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
+
+    const dirtyProductIds = new Set();
+
     const clientReservedByProduct = await clientReservedQtyByProductId({
       session,
       partyType,
       finalClientId,
       saleClientPhone,
-      productIds: orderProductIds,
+      productIds: uniqueProductIds,
     });
 
-    for (const item of products) {
+    for (const item of validLineItems) {
       const selected = item.selectedProduct;
-      if (!selected || !selected._id) continue;
+      const productDoc = productById.get(String(selected._id));
+      if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
 
-      const quantity = Number(item.quantity) || 1;
-      numberOfProducts += quantity;
+      const categoryDoc = productDoc.category
+        ? categoryById.get(String(productDoc.category)) ?? null
+        : null;
+      const isWeight = resolveSellByWeight({
+        weightSalesEnabled,
+        category: categoryDoc,
+        product: { ...productDoc.toObject(), sellByWeightOverride: selected.sellByWeightOverride ?? productDoc.sellByWeightOverride },
+      });
+      const quantity = normalizeSaleQuantity(Number(item.quantity) || (isWeight ? 0 : 1), isWeight);
+      if (isWeight && quantity <= 0) {
+        throw new Error(`Valid weight is required for ${productDoc.name}`);
+      }
+      numberOfProducts += isWeight ? 1 : quantity;
 
       let price = Number(selected.price) || 0;
       const itemCost = Number(selected.netPrice ?? selected.cost ?? 0);
@@ -493,25 +747,37 @@ export const createOrder = async (req, res) => {
 
       totalPrice += price * quantity;
 
-      const productDoc = await Product.findById(selected._id).session(session);
-      if (!productDoc) throw new Error(`Product not found: ${selected._id}`);
-      const transferReserved = Number(productDoc.transferReservedQuantity) || 0;
-      const bookedQty = Number(productDoc.bookedQuantity) || 0;
-      const ecomReserved = Number(productDoc.ecommerceReservedQuantity) || 0;
-      const clientReserved = Math.min(
-        bookedQty,
-        clientReservedByProduct.get(String(productDoc._id)) || 0
+      const sourceId = cutFromSourceEnabled ? sourceProductIdOf(productDoc) : null;
+      if (sourceId && !productById.get(sourceId)) {
+        throw new Error(`Source stock not found for ${productDoc.name}`);
+      }
+      const stockDoc = sourceId ? productById.get(sourceId) : productDoc;
+      const stockTransferReserved = Number(stockDoc.transferReservedQuantity) || 0;
+      const stockBookedQty = Number(stockDoc.bookedQuantity) || 0;
+      const stockEcomReserved = Number(stockDoc.ecommerceReservedQuantity) || 0;
+      const stockClientReserved = Math.min(
+        stockBookedQty,
+        clientReservedByProduct.get(String(stockDoc._id)) || 0
       );
-      const othersBooked = Math.max(0, bookedQty - clientReserved);
-      const maxSellable =
-        Number(productDoc.stock) - transferReserved - othersBooked - ecomReserved;
-      if (maxSellable < quantity) throw new Error(`Not enough stock for ${productDoc.name}`);
+      const stockOthersBooked = Math.max(0, stockBookedQty - stockClientReserved);
+      const maxSellable = isWeight
+        ? roundWeight(
+            Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved
+          )
+        : Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved;
+      if (maxSellable < quantity - (isWeight ? 0.0001 : 0)) {
+        throw new Error(`Not enough stock for ${productDoc.name}`);
+      }
 
-      productDoc.stock -= quantity;
-      await productDoc.save({ session });
+      stockDoc.stock = isWeight
+        ? roundWeight(Number(stockDoc.stock) - quantity)
+        : Number(stockDoc.stock) - quantity;
+      dirtyProductIds.add(String(stockDoc._id));
       soldProductIds.add(String(productDoc._id));
+      if (sourceId) {
+        soldProductIds.add(sourceId);
+      }
 
-      const categoryDoc = await getCategoryCached(productDoc.category);
       const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
       // Category default is true; missing field on legacy categories → show code
       const showProductCodeOnInvoice =
@@ -519,39 +785,73 @@ export const createOrder = async (req, res) => {
           ? true
           : !!categoryDoc.showProductCodeOnInvoice;
 
+      const weightUnit = isWeight ? normalizeWeightUnit(categoryDoc?.weightUnit) : undefined;
+
       orderProducts.push({
         productId: selected._id,
         name: selected.name,
         code: selected.code,
         quantity,
+        saleUnit: isWeight ? 'weight' : 'piece',
+        ...(isWeight ? { weightUnit } : {}),
         price,
         cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
         showProductCodeOnInvoice,
+        ...(sourceId ? { sourceProductId: stockDoc._id } : {}),
         ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
       });
 
-      // Category setting: soft-hide product once stock is exhausted (keep row for returns)
+      const hideDoc = stockDoc;
+      const hideCat = hideDoc.category
+        ? categoryById.get(String(hideDoc.category)) ?? categoryDoc
+        : categoryDoc;
       if (
-        Number(productDoc.stock) <= 0 &&
-        categoryDoc?.deleteProductWhenOutOfStock
+        Number(hideDoc.stock) <= (isWeight ? 0.0001 : 0) &&
+        hideCat?.deleteProductWhenOutOfStock
       ) {
         autoDeletedProducts.push({
-          _id: productDoc._id,
-          code: productDoc.code,
-          name: productDoc.name,
-          stock: productDoc.stock,
-          branch: productDoc.branch,
-          inWarehouse: productDoc.inWarehouse,
-          addedBy: productDoc.addedBy,
-          category: productDoc.category,
-          price: productDoc.price,
-          netPrice: productDoc.netPrice,
+          _id: hideDoc._id,
+          code: hideDoc.code,
+          name: hideDoc.name,
+          stock: hideDoc.stock,
+          branch: hideDoc.branch,
+          inWarehouse: hideDoc.inWarehouse,
+          addedBy: hideDoc.addedBy,
+          category: hideDoc.category,
+          price: hideDoc.price,
+          netPrice: hideDoc.netPrice,
         });
-        productDoc.stock = 0;
-        productDoc.removedWhenOutOfStock = true;
-        await productDoc.save({ session });
+        hideDoc.stock = 0;
+        hideDoc.removedWhenOutOfStock = true;
+        dirtyProductIds.add(String(hideDoc._id));
       }
+    }
+
+    if (dirtyProductIds.size > 0) {
+      const bulkOps = [];
+      for (const id of dirtyProductIds) {
+        const productDoc = productById.get(id);
+        if (!productDoc) continue;
+        const $set = { stock: productDoc.stock };
+        if (productDoc.removedWhenOutOfStock) {
+          $set.removedWhenOutOfStock = true;
+        }
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: productDoc._id },
+            update: { $set },
+          },
+        });
+      }
+      if (bulkOps.length) {
+        await Product.bulkWrite(bulkOps, w());
+      }
+    }
+
+    if (!orderProducts.length) {
+      await rollbackOrderSession(session);
+      return res.status(400).json({ error: 'Order must contain at least one product' });
     }
 
     let subtotalPrice = Math.round(totalPrice * 100) / 100;
@@ -565,8 +865,7 @@ export const createOrder = async (req, res) => {
     }
     totalPrice = Math.round((subtotalPrice - invoiceDiscountAmount) * 100) / 100;
     if (totalPrice < 0) {
-      await session.abortTransaction();
-      session.endSession();
+      await rollbackOrderSession(session);
       return res.status(400).json({ error: 'Invalid invoice adjustment' });
     }
     const totalRounded = Math.round(totalPrice * 100) / 100;
@@ -599,12 +898,12 @@ export const createOrder = async (req, res) => {
 
     if (bookingAllocationsRawList.length && partyType === 'client') {
       const bookingIds = bookingAllocationsRawList.map((a) => a.bookingId);
-      const activeBookings = await ProductBooking.find({
-        _id: { $in: bookingIds.map((id) => new mongoose.Types.ObjectId(id)) },
-        status: 'active',
-      })
-        .session(session)
-        .lean();
+      const activeBookings = await q(
+        ProductBooking.find({
+          _id: { $in: bookingIds.map((id) => new mongoose.Types.ObjectId(id)) },
+          status: 'active',
+        })
+      ).lean();
 
       const byId = new Map(activeBookings.map((b) => [String(b._id), b]));
       let maxFromBookings = 0;
@@ -674,13 +973,12 @@ export const createOrder = async (req, res) => {
         .filter((id) => mongoose.Types.ObjectId.isValid(id))
         .map((id) => new mongoose.Types.ObjectId(id));
       if (pidOids.length) {
-        const clientBookings = await ProductBooking.find({
-          product: { $in: pidOids },
-          status: 'active',
-        })
-          .session(session)
-          .sort({ createdAt: 1 })
-          .lean();
+        const clientBookings = await q(
+          ProductBooking.find({
+            product: { $in: pidOids },
+            status: 'active',
+          }).sort({ createdAt: 1 })
+        ).lean();
         const allocatedIds = new Set(
           validatedBookingAllocations.map((a) => String(a.bookingId))
         );
@@ -749,8 +1047,7 @@ export const createOrder = async (req, res) => {
       paidAmount = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
 
       if (paidAmount > amountDueForPayment + 0.001) {
-        await session.abortTransaction();
-        session.endSession();
+        await rollbackOrderSession(session);
         return res.status(400).json({ error: 'Payment amounts exceed amount due' });
       }
 
@@ -850,22 +1147,19 @@ export const createOrder = async (req, res) => {
 
     if (wantsInstallment && onAccount > 0.001) {
       if (!installmentPlanIdRaw || !mongoose.Types.ObjectId.isValid(String(installmentPlanIdRaw))) {
-        await session.abortTransaction();
-        session.endSession();
+        await rollbackOrderSession(session);
         return res.status(400).json({ error: 'Installment plan is required' });
       }
-      const plan = await InstallmentPlan.findById(installmentPlanIdRaw).session(session);
+      const plan = await q(InstallmentPlan.findById(installmentPlanIdRaw));
       if (!plan || plan.enabled === false) {
-        await session.abortTransaction();
-        session.endSession();
+        await rollbackOrderSession(session);
         return res.status(400).json({ error: 'Installment plan not found or disabled' });
       }
 
       const startRaw = installmentStartDateRaw || new Date();
       const startDate = new Date(startRaw);
       if (Number.isNaN(startDate.getTime())) {
-        await session.abortTransaction();
-        session.endSession();
+        await rollbackOrderSession(session);
         return res.status(400).json({ error: 'Invalid installment start date' });
       }
 
@@ -903,7 +1197,6 @@ export const createOrder = async (req, res) => {
       };
       resolvedPaymentMethod = 'installment';
     } else if (onAccount > 0.001) {
-      const settingsDoc = await getOrCreateStoreSettings();
       const catalog = normalizePaymentMethodsCatalog({
         paymentMethodsCatalog: settingsDoc?.paymentMethodsCatalog,
         paymentAppFeePercents: settingsDoc?.paymentAppFeePercents,
@@ -930,30 +1223,26 @@ export const createOrder = async (req, res) => {
 
     let resolvedSellerName = String(sellerName || '').trim();
     if (!resolvedSellerName && userId && mongoose.Types.ObjectId.isValid(String(userId))) {
-      const sellerUser = await User.findById(userId).select('name').session(session).lean();
+      const sellerUser = await q(User.findById(userId).select('name')).lean();
       resolvedSellerName = String(sellerUser?.name || '').trim();
     }
 
-    // ======================
-    // 3️⃣ GENERATE ORDER NUMBER
-    // ======================
-    const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean();
-    const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
+    const isDelivery = Boolean(isDeliveryRaw);
+    const deliveryPersonName = isDelivery
+      ? String(deliveryPersonNameRaw || '').trim()
+      : '';
 
     // Inherit client collector onto installment invoices (can be reassigned later per invoice).
     let inheritedCollectorId = null;
     if (installmentFields && finalClientId) {
-      const clientForCollector = await Client.findById(finalClientId)
-        .select("collectorId")
-        .session(session)
-        .lean();
+      const clientForCollector = await q(Client.findById(finalClientId).select('collectorId')).lean();
       if (clientForCollector?.collectorId) {
         inheritedCollectorId = clientForCollector.collectorId;
       }
     }
 
     // ======================
-    // 4️⃣ CREATE ORDER WITH CASHIER
+    // 3️⃣ CREATE ORDER WITH CASHIER
     // ======================
     const [newOrder] = await Order.create(
       [
@@ -967,6 +1256,12 @@ export const createOrder = async (req, res) => {
           clientPhoneNumber: saleClientPhone,
           clientAddress: saleClientAddress,
           sellerName: resolvedSellerName,
+          ...(isDelivery
+            ? {
+                isDelivery: true,
+                ...(deliveryPersonName ? { deliveryPersonName } : {}),
+              }
+            : {}),
           paymentMethod: resolvedPaymentMethod,
           branch,
           products: orderProducts,
@@ -1011,7 +1306,7 @@ export const createOrder = async (req, res) => {
           ...(installmentFields || {}),
           },
       ],
-      { session }
+      w()
     );
 
     // Finalize exchange trade-ins (create products/stock) only when the sale commits.
@@ -1024,8 +1319,7 @@ export const createOrder = async (req, res) => {
           { userId, orderId: newOrder._id }
         );
         if (finalized?.error) {
-          await session.abortTransaction();
-          session.endSession();
+          await rollbackOrderSession(session);
           return res.status(finalized.status || 400).json({
             error: finalized.error || 'Failed to finalize exchange trade-in',
             ...(finalized.code ? { code: finalized.code } : {}),
@@ -1037,36 +1331,7 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    await session.commitTransaction();
-    session.endSession();
-
-    if (validatedBookingAllocations.length) {
-      try {
-        await consumeBookingsForSale({
-          allocations: validatedBookingAllocations,
-          userId,
-          orderId: newOrder._id,
-        });
-      } catch (bookingConsumeErr) {
-        console.warn(
-          '⚠️ consumeBookingsForSale:',
-          bookingConsumeErr?.message || bookingConsumeErr
-        );
-      }
-    }
-
-    // Free orphan reservations when sold qty left stock below booked qty
-    // (e.g. sale without applying booking deposit credit).
-    for (const pid of soldProductIds) {
-      try {
-        await reconcileBookingsToStock(pid, {
-          userId,
-          reason: `Released after sale #${newOrder?.orderNumber ?? newOrder?._id}`,
-        });
-      } catch (reconcileErr) {
-        console.warn('⚠️ reconcileBookingsToStock:', reconcileErr?.message || reconcileErr);
-      }
-    }
+    await commitOrderSession(session);
 
     const storeOwesExchange = round2(
       Math.max(0, exchangeTradeInCreditAmount - totalRounded)
@@ -1098,101 +1363,39 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Stock movement logs (non-transactional audit trail)
-    try {
-      const movementDocs = orderProducts.map((item) => ({
-        movementType: 'sale',
-        productId: item.productId,
-        productName: item.name,
-        branchId: branch || null,
-        fromBranchId: branch || null,
-        toBranchId: null,
-        quantity: Number(item.quantity || 0),
-        unitPrice: Number(item.price || 0),
-        totalValue: Number(item.price || 0) * Number(item.quantity || 0),
-        referenceType: 'order',
-        referenceId: newOrder._id,
-        notes: `Order #${newOrder.orderNumber}`,
-      }));
-      if (exchangePurchaseStockMovements.length) {
-        movementDocs.push(...exchangePurchaseStockMovements);
-      }
-      if (movementDocs.length) {
-        await StockMovement.insertMany(movementDocs);
-      }
-    } catch (movementError) {
-      console.error('⚠️ Failed to log sale stock movement:', movementError.message);
-    }
-
-    await safeTreasuryPost('order_create', async () => {
-      await postOrderPaymentLinesToLedger({
-        branchId: branch,
-        payments: newOrder.payments || [],
-        orderId: newOrder._id,
-        createdBy: userId,
-      });
+  await safeTreasuryPost('order_create', async () => {
+    await postOrderPaymentLinesToLedger({
+      branchId: branch,
+      payments: newOrder.payments || [],
+      orderId: newOrder._id,
+      createdBy: userId,
     });
+  });
 
-    await auditLog(req, {
-      action: 'create',
-      module: 'orders',
-      entityType: 'Order',
-      entityId: newOrder?._id,
-      entityLabel: newOrder?.orderNumber != null ? `#${newOrder.orderNumber}` : undefined,
-      message: `Order created #${newOrder?.orderNumber ?? ''}`.trim(),
-      metadata: {
-        orderNumber: newOrder?.orderNumber,
-        subtotalPrice: newOrder?.subtotalPrice,
-        invoiceDiscountAmount: newOrder?.invoiceDiscountAmount,
-        totalPrice: newOrder?.totalPrice,
-        numberOfProducts: newOrder?.numberOfProducts,
-        paymentMethod: newOrder?.paymentMethod,
-        branch: newOrder?.branch,
-        status: newOrder?.status,
-      },
-    });
-
-    for (const item of orderProducts) {
-      if (item?.productId) notifyProductChanged(item.productId);
-    }
-
-    for (const removed of autoDeletedProducts) {
-      await auditLog(req, {
-        action: 'delete',
-        module: 'products',
-        entityType: 'Product',
-        entityId: removed._id,
-        message: `Product hidden from stock after sale ${removed.code || ''}`.trim(),
-        before: {
-          code: removed.code,
-          name: removed.name,
-          stock: removed.stock,
-          branch: removed.branch,
-          inWarehouse: removed.inWarehouse,
-          addedBy: removed.addedBy,
-          category: removed.category,
-          price: removed.price,
-          netPrice: removed.netPrice,
-        },
-        metadata: {
-          reason: 'deleteProductWhenOutOfStock',
-          softRemoved: true,
-          orderId: newOrder?._id,
-          orderNumber: newOrder?.orderNumber,
-        },
-      });
-    }
-
-    const newOrderPlain =
+  const newOrderPlain =
       typeof newOrder?.toObject === 'function' ? newOrder.toObject() : newOrder;
 
     res.status(201).json({
       message: "✅ Order created successfully",
       newOrder: newOrderPlain,
     });
+
+    void runOrderPostCreateSideEffects({
+      req,
+      newOrder,
+      soldProductIds,
+      orderProducts,
+      exchangePurchaseStockMovements,
+      branch,
+      userId,
+      autoDeletedProducts,
+      validatedBookingAllocations,
+      bookingDepositCreditApplied,
+    }).catch((err) =>
+      console.error('⚠️ post-create order effects:', err?.message || err)
+    );
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
+    await rollbackOrderSession(session);
     console.error("❌ Error creating order:", err);
     res.status(500).json({ error: "Server error", details: err.message });
   }

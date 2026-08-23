@@ -5,6 +5,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { Category } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 import { CategoriesServce } from '@shared/services/categories.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 export interface CategoryAttributeRow {
   key: string;
@@ -28,12 +29,15 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   deleteProductWhenOutOfStock = false;
   /** Default: show product code on customer invoice */
   showProductCodeOnInvoice = true;
+  sellByWeight = false;
+  weightUnit: 'kg' | 'g' = 'kg';
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
     private categoriesServce: CategoriesServce,
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
+    public storeSettings: StoreSettingsService,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -92,6 +96,8 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       (c as any).showProductCodeOnInvoice == null
         ? true
         : !!(c as any).showProductCodeOnInvoice;
+    this.sellByWeight = !!(c as any).sellByWeight;
+    this.weightUnit = (c as any).weightUnit === 'g' ? 'g' : 'kg';
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
       if (typeof x === 'string') {
@@ -168,6 +174,8 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       multiCodePerPiece: !!(this.category as any).multiCodePerPiece,
       deleteProductWhenOutOfStock: !!this.deleteProductWhenOutOfStock,
       showProductCodeOnInvoice: !!this.showProductCodeOnInvoice,
+      sellByWeight: !!this.sellByWeight,
+      weightUnit: this.weightUnit,
     };
 
     if (this.isEdit && this.categoryId) {

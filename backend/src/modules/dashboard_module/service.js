@@ -42,26 +42,52 @@ export const getOrdersStatstics = async (req, res) => {
       ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
     };
 
-    // 📦 Fetch completed and all invoices
     const [completedOrders, totalInvoicesCount] = await Promise.all([
-      Order.find(completedFilters),
+      Order.find(completedFilters)
+        .select('totalPrice products.productId products.quantity products.cost')
+        .lean(),
       Order.countDocuments(allInvoicesFilters),
     ]);
 
-    // 💰 Calculate totals
     let totalSales = 0;
     let totalNetCost = 0;
+    const missingCostQtyByProduct = new Map();
 
     for (const order of completedOrders) {
       totalSales += order.totalPrice || 0;
 
-      for (const productItem of order.products) {
-        const productId = productItem.productId || productItem._id || productItem;
+      for (const productItem of order.products || []) {
         const quantity = productItem.quantity || 1;
+        const lineCost = Number(productItem.cost);
+        if (Number.isFinite(lineCost) && lineCost > 0) {
+          totalNetCost += lineCost * quantity;
+          continue;
+        }
+        const productId = String(
+          productItem.productId || productItem._id || productItem || ''
+        );
+        if (!productId) continue;
+        missingCostQtyByProduct.set(
+          productId,
+          (missingCostQtyByProduct.get(productId) || 0) + quantity
+        );
+      }
+    }
 
-        const realProduct = await Product.findById(productId).select('netPrice');
-        if (realProduct && realProduct.netPrice) {
-          totalNetCost += realProduct.netPrice * quantity;
+    if (missingCostQtyByProduct.size) {
+      const ids = [...missingCostQtyByProduct.keys()].filter((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+      );
+      if (ids.length) {
+        const catalog = await Product.find({ _id: { $in: ids } })
+          .select('netPrice')
+          .lean();
+        const netById = new Map(
+          catalog.map((p) => [String(p._id), Number(p.netPrice) || 0])
+        );
+        for (const [productId, qty] of missingCostQtyByProduct) {
+          const net = netById.get(String(productId));
+          if (net) totalNetCost += net * qty;
         }
       }
     }
@@ -144,30 +170,36 @@ export const getCategoriesStatistics = async (req, res) => {
       ? { branch: new mongoose.Types.ObjectId(branch) }
       : {};
 
-    const categories = await Category.find().select("name").sort({ name: 1 });
-
-    const stats = await Promise.all(
-      categories.map(async (category) => {
-        // Count products and total stock for that category
-        const products = await Product.find({
-          category: category._id,
-          ...branchFilter, // optional branch filter
-          $or: [
-            { removedWhenOutOfStock: { $ne: true } },
-            { removedWhenOutOfStock: { $exists: false } },
-          ],
-        });
-
-        const productsCount = products.length;
-        const totalItems = products.reduce((acc, p) => acc + (p.stock || 0), 0);
-
-        return {
-          categoryName: category.name,
-          productsCount,
-          totalItems,
-        };
-      })
+    const categories = await Category.find().select("name").sort({ name: 1 }).lean();
+    const productMatch = {
+      ...branchFilter,
+      $or: [
+        { removedWhenOutOfStock: { $ne: true } },
+        { removedWhenOutOfStock: { $exists: false } },
+      ],
+    };
+    const grouped = await Product.aggregate([
+      { $match: productMatch },
+      {
+        $group: {
+          _id: "$category",
+          productsCount: { $sum: 1 },
+          totalItems: { $sum: { $ifNull: ["$stock", 0] } },
+        },
+      },
+    ]);
+    const byCategory = new Map(
+      grouped.map((g) => [String(g._id), g])
     );
+
+    const stats = categories.map((category) => {
+      const row = byCategory.get(String(category._id));
+      return {
+        categoryName: category.name,
+        productsCount: row?.productsCount || 0,
+        totalItems: row?.totalItems || 0,
+      };
+    });
 
     res.status(200).json({
       branch: branch || "All Branches",

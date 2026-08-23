@@ -14,6 +14,12 @@ const branchSchema = new mongoose.Schema({
       active: { type: Boolean, default: true },
     },
   ],
+  deliveryStaff: [
+    {
+      name: { type: String, required: true, trim: true },
+      active: { type: Boolean, default: true },
+    },
+  ],
 }, { timestamps: true });
 
 

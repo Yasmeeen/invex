@@ -36,6 +36,24 @@
     margin: 6px 0;
   }
 
+  .invoice-delivery-badge {
+    margin: 4px 0 8px;
+    padding: 5px 4px;
+    border: 2px double #000;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+
+  .invoice-delivery-badge__icon {
+    display: inline-block;
+    margin-inline-end: 4px;
+  }
+
+  .invoice-delivery-badge__label {
+    text-transform: uppercase;
+  }
+
   .invoice-logo {
     display: block;
     margin: 0 auto 2mm;

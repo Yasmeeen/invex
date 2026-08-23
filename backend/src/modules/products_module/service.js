@@ -16,6 +16,17 @@ import {
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
+import {
+  normalizeSaleQuantity,
+  resolveSellByWeight,
+  roundWeight,
+} from '../../utils/sale-quantity.util.js';
+import {
+  attachSourceProducts,
+  isCutFromSourceEnabled,
+  resolveCutSourceFields,
+} from '../../utils/cut-from-source.js';
 import {
   notifyProductChanged,
   notifyProductDeleted,
@@ -386,6 +397,7 @@ async function createOrReviveProductRow({
   ecommerceShortDescription,
   ecommerceIsFeatured,
   acquiredFromFields = {},
+  sourceProductId,
 }) {
   const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
   const existing = await Product.findOne(filter);
@@ -418,6 +430,9 @@ async function createOrReviveProductRow({
     }
     if (ecommerceIsFeatured !== undefined) existing.ecommerceIsFeatured = ecommerceIsFeatured;
     Object.assign(existing, acquiredFromFields);
+    if (sourceProductId !== undefined) {
+      existing.sourceProductId = sourceProductId;
+    }
     await existing.save();
     return { ok: true, product: existing, revived: true };
   }
@@ -439,6 +454,7 @@ async function createOrReviveProductRow({
     ecommerceShortDescription,
     ecommerceIsFeatured,
     ...acquiredFromFields,
+    ...(sourceProductId !== undefined ? { sourceProductId } : {}),
   });
   return { ok: true, product, revived: false };
 }
@@ -463,7 +479,7 @@ const normalizeImageUrl = (raw) => {
   return s.slice(0, 2048);
 };
 
-/** Optional employee name who registered the device (trimmed, max 200 chars). */
+/** Optional employee name who registered the product (trimmed, max 200 chars). */
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
 
 /** If netPrice omitted/empty, use price - (price * discount% / 100) (clamped to >= 0). */
@@ -773,7 +789,7 @@ export const importProductsFromExcelRows = async (req, res) => {
           code,
           price: priceNum,
           netPrice: finalNet,
-          stock: stockNum,
+          stock: cat?.sellByWeight ? roundWeight(stockNum) : Math.max(0, Math.floor(stockNum)),
           discount: discountNum,
           category: String(cat._id),
           branch: branchId,
@@ -1149,7 +1165,7 @@ export const generateBarcodeImage = async (req, res) => {
 
 
 /** Shared list filters for GET /products and inventory audit. */
-function buildProductsListQuery(queryParams = {}) {
+function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false } = {}) {
   const {
     search = '',
     branchId,
@@ -1184,7 +1200,16 @@ function buildProductsListQuery(queryParams = {}) {
 
   // Available (stock > 0) vs finished / out of stock (stock 0)
   if (inStock === 'true' || inStock === true) {
-    query.stock = { $gt: 0 };
+    if (cutFromSourceEnabled) {
+      andParts.push({
+        $or: [
+          { stock: { $gt: 0 } },
+          { sourceProductId: { $ne: null } },
+        ],
+      });
+    } else {
+      query.stock = { $gt: 0 };
+    }
   } else if (inStock === 'false' || inStock === false) {
     query.stock = { $lte: 0 };
   }
@@ -1271,16 +1296,26 @@ export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    const query = buildProductsListQuery(req.query);
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const query = buildProductsListQuery(req.query, {
+      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
+    });
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
+        .select('-ecommerceDescription')
+        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
+        .populate('sourceProductId', 'name code stock')
         .skip(skip)
-        .limit(Number(limit)),
+        .limit(Number(limit))
+        .lean(),
       Product.countDocuments(query),
     ]);
+
+    if (isCutFromSourceEnabled(settingsDoc)) {
+      await attachSourceProducts(products);
+    }
 
     const totalPages = Math.ceil(total / limit);
 
@@ -1305,8 +1340,9 @@ export const getProducts = async (req, res) => {
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice')
-      .populate('branch', 'name');
+      .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
+      .populate('branch', 'name')
+      .populate('sourceProductId', 'name code stock');
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -1397,10 +1433,41 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: msg, code: e?.code });
     }
 
-    const catRow = await Category.findById(categoryId).select('multiCodePerPiece code').lean();
+    const catRow = await Category.findById(categoryId).select('multiCodePerPiece sellByWeight code').lean();
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
     const categoryMultiCode = !!catRow?.multiCodePerPiece;
+    if (catRow?.sellByWeight && categoryMultiCode) {
+      return res.status(400).json({
+        error: 'Category cannot combine sell-by-weight with multi-code-per-piece',
+      });
+    }
+    const isWeightCategory = resolveSellByWeight({ weightSalesEnabled, category: catRow });
+    const sourceFields = await resolveCutSourceFields(req.body, {
+      branchOid: isWarehouse ? null : branch?._id,
+      isWarehouse,
+      enabled: isCutFromSourceEnabled(settingsDoc),
+    });
+    if (sourceFields.error) {
+      return res.status(400).json({ error: sourceFields.error });
+    }
+    const sourceCreateArg = sourceFields.skip ? {} : { sourceProductId: sourceFields.sourceProductId };
+    const isCutSku = !sourceFields.skip && !!sourceFields.sourceProductId;
+    let normalizedStock = stockNum;
+    if (isCutSku) {
+      normalizedStock = 0;
+    } else if (isWeightCategory) {
+      if (stockNum < 0) {
+        return res.status(400).json({ error: 'Invalid stock' });
+      }
+      normalizedStock = roundWeight(stockNum);
+    } else if (Number.isNaN(stockNum) || stockNum < 1) {
+      return res.status(400).json({ error: 'Stock must be at least 1' });
+    } else {
+      normalizedStock = Math.max(1, Math.floor(stockNum));
+    }
     const categoryPrefix = catRow?.code || '';
-    const unitCount = Math.max(0, Math.floor(stockNum));
+    const unitCount = categoryMultiCode ? Math.max(1, Math.floor(stockNum)) : 1;
 
     if (categoryMultiCode && unitCount > 1) {
       let codes = [];
@@ -1658,7 +1725,7 @@ export const createProduct = async (req, res) => {
         name,
         price: priceNum,
         netPrice: netNum,
-        stock: stockNum,
+        stock: normalizedStock,
         discount: discountNum,
         categoryId,
         imageUrl: imageUrlNorm,
@@ -1669,6 +1736,7 @@ export const createProduct = async (req, res) => {
         ecommerceShortDescription,
         ecommerceIsFeatured,
         ...acquiredFromFields,
+        ...sourceCreateArg,
       });
       if (!row.ok) {
         return res.status(409).json({ error: row.error, code: row.code });
@@ -1709,7 +1777,7 @@ export const createProduct = async (req, res) => {
       name,
       price: priceNum,
       netPrice: netNum,
-      stock: stockNum,
+      stock: normalizedStock,
       discount: discountNum,
       categoryId,
       imageUrl: imageUrlNorm,
@@ -1720,6 +1788,7 @@ export const createProduct = async (req, res) => {
       ecommerceShortDescription,
       ecommerceIsFeatured,
       ...acquiredFromFields,
+      ...sourceCreateArg,
     });
     if (!row.ok) {
       return res.status(409).json({
@@ -1825,6 +1894,35 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: attrsReq.error });
     }
 
+    const catRowUpdate = await Category.findById(categoryId).select('sellByWeight multiCodePerPiece').lean();
+    const settingsDocUpdate = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const isWeightCategoryUpdate = resolveSellByWeight({
+      weightSalesEnabled: !!settingsDocUpdate?.weightSalesEnabled,
+      category: catRowUpdate,
+    });
+    const sourceFieldsUpdate = await resolveCutSourceFields(req.body, {
+      productId: req.params.id,
+      branchOid: isWarehouse ? null : branch?._id,
+      isWarehouse,
+      enabled: isCutFromSourceEnabled(settingsDocUpdate),
+    });
+    if (sourceFieldsUpdate.error) {
+      return res.status(400).json({ error: sourceFieldsUpdate.error });
+    }
+    let normalizedStock = stockNum;
+    if (!sourceFieldsUpdate.skip && sourceFieldsUpdate.sourceProductId) {
+      normalizedStock = 0;
+    } else if (isWeightCategoryUpdate) {
+      if (stockNum < 0) {
+        return res.status(400).json({ error: 'Invalid stock' });
+      }
+      normalizedStock = roundWeight(stockNum);
+    } else if (stockNum < 0) {
+      return res.status(400).json({ error: 'Invalid stock' });
+    } else {
+      normalizedStock = Math.max(0, Math.floor(stockNum));
+    }
+
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
       return res.status(400).json({ error: codeCheck.error });
@@ -1905,10 +2003,13 @@ export const updateProduct = async (req, res) => {
         category: categoryId,
         branch: null,
         inWarehouse: true,
-        stock: stockNum,
+        stock: normalizedStock,
         discount: discountNum,
         attributes: attrs,
       };
+      if (!sourceFieldsUpdate.skip) {
+        updateDoc.sourceProductId = sourceFieldsUpdate.sourceProductId;
+      }
       if (imageUrlNorm !== undefined) {
         updateDoc.imageUrl = imageUrlNorm;
       }
@@ -1982,10 +2083,13 @@ export const updateProduct = async (req, res) => {
       category: categoryId,
       branch: branch._id,
       inWarehouse: false,
-      stock: stockNum,
+      stock: normalizedStock,
       discount: discountNum,
       attributes: attrs,
     };
+    if (!sourceFieldsUpdate.skip) {
+      updateDocBranch.sourceProductId = sourceFieldsUpdate.sourceProductId;
+    }
     if (imageUrlNorm !== undefined) {
       updateDocBranch.imageUrl = imageUrlNorm;
     }
@@ -3012,7 +3116,10 @@ export const transferProductStock = async (req, res) => {
 /** GET /products/inventory-audit — stock totals for current list filters, grouped by location. */
 export const getProductsInventoryAudit = async (req, res) => {
   try {
-    const query = buildProductsListQuery(req.query);
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const query = buildProductsListQuery(req.query, {
+      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
+    });
     const search = String(req.query.search || '').trim();
 
     const stockValueExpr = {

@@ -74,6 +74,10 @@ function serializeSettings(doc) {
     showReturnExchangePolicyOnReceipt: Boolean(doc.showReturnExchangePolicyOnReceipt),
     bookingPolicy: doc.bookingPolicy || '',
     showBookingPolicyOnReceipt: Boolean(doc.showBookingPolicyOnReceipt),
+    weightSalesEnabled: Boolean(doc.weightSalesEnabled),
+    cutFromSourceEnabled: Boolean(doc.cutFromSourceEnabled),
+    deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
+    cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
     ecommerceIntegrationFeatureAvailable: featureAvailable,
     ecommerceIntegrationEnabled: featureAvailable && Boolean(doc.ecommerceIntegrationEnabled),
     ecommerceBaseUrl: featureAvailable ? doc.ecommerceBaseUrl || '' : '',
@@ -118,6 +122,10 @@ export const updateStoreSettings = async (req, res) => {
       showReturnExchangePolicyOnReceipt,
       bookingPolicy,
       showBookingPolicyOnReceipt,
+      weightSalesEnabled,
+      cutFromSourceEnabled,
+      deliveryOrdersEnabled,
+      cashierPurchaseExchangeEnabled,
       ecommerceIntegrationEnabled,
       ecommerceBaseUrl,
       ecommerceSharedKey,
@@ -372,6 +380,21 @@ export const updateStoreSettings = async (req, res) => {
     ) {
       return res.status(400).json({ error: 'showBookingPolicyOnReceipt must be a boolean' });
     }
+    if (weightSalesEnabled !== undefined && typeof weightSalesEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'weightSalesEnabled must be a boolean' });
+    }
+    if (cutFromSourceEnabled !== undefined && typeof cutFromSourceEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'cutFromSourceEnabled must be a boolean' });
+    }
+    if (deliveryOrdersEnabled !== undefined && typeof deliveryOrdersEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'deliveryOrdersEnabled must be a boolean' });
+    }
+    if (
+      cashierPurchaseExchangeEnabled !== undefined &&
+      typeof cashierPurchaseExchangeEnabled !== 'boolean'
+    ) {
+      return res.status(400).json({ error: 'cashierPurchaseExchangeEnabled must be a boolean' });
+    }
 
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
@@ -394,6 +417,18 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (showBookingPolicyOnReceipt !== undefined) {
       update.showBookingPolicyOnReceipt = showBookingPolicyOnReceipt;
+    }
+    if (weightSalesEnabled !== undefined) {
+      update.weightSalesEnabled = weightSalesEnabled;
+    }
+    if (cutFromSourceEnabled !== undefined) {
+      update.cutFromSourceEnabled = cutFromSourceEnabled;
+    }
+    if (deliveryOrdersEnabled !== undefined) {
+      update.deliveryOrdersEnabled = deliveryOrdersEnabled;
+    }
+    if (cashierPurchaseExchangeEnabled !== undefined) {
+      update.cashierPurchaseExchangeEnabled = cashierPurchaseExchangeEnabled;
     }
 
     let shouldPushCatalog = false;

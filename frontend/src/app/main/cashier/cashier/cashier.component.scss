@@ -122,12 +122,12 @@
       font-size: 14px;
     }
 
-    /* Qty: compact — give space to Total for amounts like EGP 88,000.00 */
+    /* Qty: compact — weight lines use an inline unit suffix inside the same control */
     th:nth-child(2),
     td:nth-child(2){
-      width: 88px;
-      min-width: 88px;
-      max-width: 96px;
+      width: 6.5rem;
+      min-width: 6.5rem;
+      max-width: 7rem;
       white-space: nowrap;
       padding-left: 0.25rem;
       padding-right: 0.25rem;
@@ -461,14 +461,24 @@
   }
 
   .cashier-client-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
-    gap: 0.35rem 0.65rem;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
 
-    &--row {
-      grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    &__row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.35rem 0.65rem;
+      align-items: start;
+
+      @media (max-width: 900px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
+  }
+
+  .cashier-delivery-field {
+    min-height: 1.85rem;
   }
 
   .cashier-client-form .cashier-client-fields__item,
@@ -487,6 +497,49 @@
         font-weight: 600;
         line-height: 1.2;
         color: rgba(15, 23, 42, 0.75);
+      }
+
+      // Must beat `.cashier-client-fields__item label { display: block }` so
+      // checkbox + text stay on one line with spacing.
+      label.cashier-delivery-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        min-height: 1.85rem;
+        margin: 0;
+        padding: 0.3rem 0.45rem;
+        box-sizing: border-box;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        line-height: 1.2;
+        color: rgba(15, 23, 42, 0.75);
+        cursor: pointer;
+        user-select: none;
+
+        input {
+          margin: 0;
+          cursor: pointer;
+          flex-shrink: 0;
+          align-self: center;
+        }
+
+        span {
+          display: inline-block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          line-height: 1.2;
+        }
+
+        &:has(input:checked) {
+          border-color: #0d6efd;
+          background: #e7f1ff;
+          color: #0a58ca;
+        }
       }
 
       .s-control {
@@ -1077,3 +1130,51 @@
       text-align: right;
     }
   }
+
+.order-line-weight-field {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  vertical-align: middle;
+
+  &__input {
+    width: 3.35rem;
+    min-width: 2.75rem;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.28rem 0.35rem;
+    font-size: 0.875rem;
+    text-align: center;
+    background: transparent;
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &:focus {
+      outline: none;
+    }
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  &__unit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.45rem;
+    background: #f3f4f6;
+    border-inline-start: 1px solid #e5e7eb;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6b7280;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+}

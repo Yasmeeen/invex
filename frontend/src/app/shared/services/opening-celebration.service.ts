@@ -12,6 +12,7 @@ export class OpeningCelebrationService {
 
   constructor(private branchesService: BranchesServce) {}
 
+  
   get snapshot(): Branch | null {
     return this.activeBranchSub.value;
   }

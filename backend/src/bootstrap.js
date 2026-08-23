@@ -49,8 +49,18 @@ const bootstrap = (app, express) => {
     origin: '*'
   }));
 
-  // Connect to MongoDB
-  connectToMongoDB();
+  app.use(async (req, res, next) => {
+    try {
+      await connectToMongoDB();
+      next();
+    } catch (err) {
+      console.error('❌ MongoDB connection error:', err);
+      res.status(500).json({
+        message: 'Database unavailable',
+        details: err.message,
+      });
+    }
+  });
 
   // Routes
   app.use('/api/products', productRoutes);

@@ -4,6 +4,12 @@ import ProductBooking from './models/productBooking.model.js';
 import Notification from './models/notification.model.js';
 import { seedDefaultSuperAdmin } from './seedDefaultAdmin.js';
 
+const globalForMongoose = globalThis;
+
+if (!globalForMongoose.__invexMongo) {
+  globalForMongoose.__invexMongo = { conn: null, promise: null, postConnect: false };
+}
+
 /**
  * MongoDB forbids compound indexes that include two array fields. An old index
  * { recipients, readBy, ... } breaks Notification.create(); drop it if present.
@@ -72,30 +78,58 @@ async function syncBookedQuantitiesFromBookings() {
   );
 }
 
-const connectToMongoDB = async () => {
-  mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB Atlas successfully.'))
-    .catch((err) => console.error('❌ MongoDB connection error:', err));
+async function runPostConnectTasks() {
+  const cache = globalForMongoose.__invexMongo;
+  if (cache.postConnect) return;
+  cache.postConnect = true;
+  try {
+    await fixNotificationIndexes();
+  } catch (e) {
+    console.warn('⚠️ Notification indexes fix:', e.message);
+  }
+  try {
+    await seedDefaultSuperAdmin();
+  } catch (e) {
+    console.warn('⚠️ Default admin seed:', e.message);
+  }
+  if (process.env.VERCEL) {
+    return;
+  }
+  try {
+    await syncBookedQuantitiesFromBookings();
+    console.log('✅ Product booked / confirmed booked quantities synced from ProductBooking');
+  } catch (e) {
+    console.warn('⚠️ Booked quantity sync:', e.message);
+  }
+}
 
-  mongoose.connection.once('open', async () => {
-    try {
-      await fixNotificationIndexes();
-    } catch (e) {
-      console.warn('⚠️ Notification indexes fix:', e.message);
-    }
-    try {
-      await seedDefaultSuperAdmin();
-    } catch (e) {
-      console.warn('⚠️ Default admin seed:', e.message);
-    }
-    try {
-      await syncBookedQuantitiesFromBookings();
-      console.log('✅ Product booked / confirmed booked quantities synced from ProductBooking');
-    } catch (e) {
-      console.warn('⚠️ Booked quantity sync:', e.message);
-    }
-  });
+const connectToMongoDB = async () => {
+  const cache = globalForMongoose.__invexMongo;
+  if (cache.conn) return cache.conn;
+
+  const uri = String(process.env.MONGO_URI || '').trim();
+  if (!uri) {
+    throw new Error('MONGO_URI is not set');
+  }
+
+  if (!cache.promise) {
+    mongoose.set('bufferCommands', false);
+    cache.promise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 15000,
+    }).then((m) => m);
+  }
+
+  try {
+    cache.conn = await cache.promise;
+  } catch (err) {
+    cache.promise = null;
+    cache.conn = null;
+    throw err;
+  }
+
+  console.log('✅ Connected to MongoDB Atlas successfully.');
+  void runPostConnectTasks();
+  return cache.conn;
 };
 
 export default connectToMongoDB;

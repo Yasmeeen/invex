@@ -6,6 +6,20 @@ import { Server as SocketIOServer } from 'socket.io';
 import { setSocketServer } from './src/realtime/socket.js';
 
 dotenv.config();
+
+function normalizeEnv() {
+  if (!process.env.MONGO_URI && process.env['MONGO_URI ']) {
+    process.env.MONGO_URI = process.env['MONGO_URI '];
+  }
+  if (process.env.MONGO_URI) {
+    process.env.MONGO_URI = process.env.MONGO_URI.trim().replace(/^["']|["']$/g, '');
+  }
+  if (process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = process.env.JWT_SECRET.trim().replace(/^["']|["']$/g, '');
+  }
+}
+normalizeEnv();
+
 const app = express();
 
 // Setup app

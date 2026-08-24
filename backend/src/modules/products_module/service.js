@@ -20,6 +20,12 @@ import {
   notifyProductChanged,
   notifyProductDeleted,
 } from '../integrations_module/catalogSync.js';
+import {
+  attachRemotePickupTransfers,
+  bookedQuantityForPickupBranch,
+  movePickupBookingsWithTransfer,
+  transferAvailableQty,
+} from '../../utils/branch-transfer-bookings.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -1283,9 +1289,12 @@ export const getProducts = async (req, res) => {
     ]);
 
     const totalPages = Math.ceil(total / limit);
+    const productsOut = await attachRemotePickupTransfers(
+      products.map((p) => p.toObject({ virtuals: true }))
+    );
 
     res.json({
-      products,
+      products: productsOut,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
@@ -1312,7 +1321,8 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    res.json(product);
+    const [out] = await attachRemotePickupTransfers([product.toObject({ virtuals: true })]);
+    res.json(out);
   } catch (error) {
     console.error('❌ Error fetching product by ID:', error.message);
     res.status(500).json({ error: 'Failed to fetch product' });
@@ -2196,10 +2206,16 @@ export const requestBranchTransfer = async (req, res) => {
     const booked = await sumActiveBookedQuantityProducts(product._id);
     const reserved = Number(product.transferReservedQuantity) || 0;
     const stock = Math.max(0, Number(product.stock) || 0);
-    const available = Math.max(0, stock - booked - reserved);
+    const bookedForDest = await bookedQuantityForPickupBranch(product._id, toBranchId);
+    const available = transferAvailableQty({
+      stock,
+      bookedTotal: booked,
+      transferReserved: reserved,
+      bookedForDestination: bookedForDest,
+    });
     if (qty > available) {
       return res.status(400).json({
-        error: `Only ${available} unit(s) available to transfer (stock minus bookings and pending transfers)`,
+        error: `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`,
       });
     }
 
@@ -2332,11 +2348,21 @@ export const approveBranchTransfer = async (req, res) => {
 
     const booked = await sumActiveBookedQuantityProducts(sourceProduct._id);
     const stock = Math.max(0, Number(sourceProduct.stock) || 0);
-    if (stock - booked < qty) {
+    const bookedForDest = await bookedQuantityForPickupBranch(sourceProduct._id, transfer.toBranch, {
+      session,
+    });
+    const otherReserved = Math.max(0, reserved - qty);
+    const available = transferAvailableQty({
+      stock,
+      bookedTotal: booked,
+      transferReserved: otherReserved,
+      bookedForDestination: bookedForDest,
+    });
+    if (qty > available) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
-        error: 'Not enough free stock to complete transfer (bookings may have increased)',
+        error: 'Not enough stock to complete transfer (bookings may have increased)',
       });
     }
 
@@ -2391,6 +2417,14 @@ export const approveBranchTransfer = async (req, res) => {
       );
       destinationProduct = Array.isArray(created) ? created[0] : created;
     }
+
+    await movePickupBookingsWithTransfer({
+      sourceProductId: sourceProduct._id,
+      destinationProduct,
+      toBranchId,
+      quantity: qty,
+      session,
+    });
 
     transfer.status = 'approved';
     transfer.destinationProduct = destinationProduct._id;
@@ -2915,14 +2949,23 @@ export const transferProductStock = async (req, res) => {
     }
 
     const reserved = Number(sourceProduct.transferReservedQuantity) || 0;
-    const sellable = Number(sourceProduct.stock) - reserved;
-    if (sellable < transferQty) {
+    const booked = await sumActiveBookedQuantityProducts(sourceProduct._id);
+    const bookedForDest = await bookedQuantityForPickupBranch(sourceProduct._id, toBranchId, {
+      session,
+    });
+    const available = transferAvailableQty({
+      stock: Number(sourceProduct.stock) || 0,
+      bookedTotal: booked,
+      transferReserved: reserved,
+      bookedForDestination: bookedForDest,
+    });
+    if (available < transferQty) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         error: fromWh
-          ? 'Not enough stock in warehouse.'
-          : 'Not enough stock in source branch (some quantity may be reserved for pending transfers).',
+          ? `Only ${available} unit(s) available to transfer to this branch from warehouse.`
+          : `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch).`,
       });
     }
 
@@ -2972,6 +3015,14 @@ export const transferProductStock = async (req, res) => {
       );
       destinationProduct = Array.isArray(created) ? created[0] : created;
     }
+
+    await movePickupBookingsWithTransfer({
+      sourceProductId: sourceProduct._id,
+      destinationProduct,
+      toBranchId,
+      quantity: transferQty,
+      session,
+    });
 
     await session.commitTransaction();
     session.endSession();

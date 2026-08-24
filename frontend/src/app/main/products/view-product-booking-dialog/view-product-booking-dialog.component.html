@@ -102,7 +102,12 @@
                 <dd>{{ pickupLabel(b) }}</dd>
                 <ng-container *ngIf="b.pickupType === 'branch_pickup' && pickupBranchLabel(b)">
                   <dt>{{ 'tr_booking_pickup_branch' | translate }}</dt>
-                  <dd>{{ pickupBranchLabel(b) }}</dd>
+                  <dd>
+                    {{ pickupBranchLabel(b) }}
+                    <p class="booking-pickup-transfer-hint m-0 mt-1" *ngIf="pickupNeedsTransfer(b)">
+                      {{ pickupTransferHint(b) }}
+                    </p>
+                  </dd>
                 </ng-container>
                 <ng-container *ngIf="b.pickupType === 'online_shipping' && b.shippingAddress">
                   <dt>{{ 'tr_booking_shipping_address' | translate }}</dt>

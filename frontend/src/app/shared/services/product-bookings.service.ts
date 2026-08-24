@@ -13,6 +13,7 @@ export interface CreateProductBookingPayload {
   registeredAddress: string;
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
+  pickupBranchId?: string;
   depositAmount: number;
   paymentSplits?: Array<{ method: string; amount: number }>;
   paymentFeeAllocations?: Array<{

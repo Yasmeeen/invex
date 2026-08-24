@@ -136,11 +136,61 @@ export class ViewProductBookingDialogComponent implements OnInit {
   }
 
   pickupBranchLabel(b: ProductActiveBooking): string {
+    const pickup = b.pickupBranch;
+    if (pickup && typeof pickup === 'object' && String(pickup.name || '').trim()) {
+      return String(pickup.name).trim();
+    }
     const br = b.branch;
     if (br && typeof br === 'object' && String(br.name || '').trim()) {
       return String(br.name).trim();
     }
     return String(b.shippingAddress || '').trim();
+  }
+
+  pickupNeedsTransfer(b: ProductActiveBooking): boolean {
+    if (b.pickupType !== 'branch_pickup') {
+      return false;
+    }
+    const pickup = this.pickupBranchId(b);
+    const here = this.productLocationId();
+    return !!pickup && pickup !== here;
+  }
+
+  pickupTransferHint(b: ProductActiveBooking): string {
+    const name = this.pickupBranchLabel(b);
+    if (!name) {
+      return '';
+    }
+    return this.translate.instant('tr_booking_needs_transfer_one', {
+      branch: name,
+      n: Math.max(1, Math.floor(Number(b.quantity) || 1)),
+    });
+  }
+
+  private pickupBranchId(b: ProductActiveBooking): string {
+    const pickup = b.pickupBranch;
+    if (pickup && typeof pickup === 'object' && pickup._id) {
+      return String(pickup._id);
+    }
+    if (typeof pickup === 'string' && pickup) {
+      return pickup;
+    }
+    const br = b.branch;
+    if (br && typeof br === 'object' && br._id) {
+      return String(br._id);
+    }
+    if (typeof br === 'string' && br) {
+      return br;
+    }
+    return '';
+  }
+
+  private productLocationId(): string {
+    const br = this.product?.branch;
+    if (br && typeof br === 'object' && (br as { _id?: string })._id) {
+      return String((br as { _id?: string })._id);
+    }
+    return br ? String(br) : '';
   }
 
   depositPaymentLabel(method: string | undefined | null): string {

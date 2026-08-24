@@ -75,6 +75,24 @@ export class ProductDetailsDialogComponent {
     return Math.max(0, stock - this.bookedQty());
   }
 
+  remotePickupHint(): string {
+    const rows = this.product?.remotePickupTransfers || [];
+    if (!rows.length) {
+      return '';
+    }
+    if (rows.length === 1) {
+      return this.translate.instant('tr_booking_needs_transfer_one', {
+        branch: rows[0].branchName || '',
+        n: rows[0].quantity,
+      });
+    }
+    const branches = rows
+      .map((r) => r.branchName)
+      .filter(Boolean)
+      .join('، ');
+    return this.translate.instant('tr_booking_needs_transfer_many', { branches });
+  }
+
   attributeRows(): Array<{ label: string; value: string }> {
     const attrs = this.normalizeAttributes(this.product?.attributes);
     const defs = Array.isArray(this.product?.category?.attributeDefs)

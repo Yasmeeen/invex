@@ -1,0 +1,445 @@
+{
+  "categories": [
+    {
+      "id": "account",
+      "title": "Sign-in, account and roles",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager",
+        "Cashier",
+        "Collector",
+        "Moderator"
+      ],
+      "items": [
+        {
+          "id": "account-signin",
+          "q": "How do I sign in?",
+          "a": "Open the application URL your administrator gave you. Enter the email (or username) and password issued for your account, then submit.\n\nAfter a successful sign-in you land on the area your role is allowed to use (often Orders). The sidebar on the side shows only the screens your role can open.",
+          "tags": ["login", "password", "url"]
+        },
+        {
+          "id": "account-forgot-password",
+          "q": "I forgot my password. How do I reset it?",
+          "a": "There is no self-service email reset in the standard deployment. Ask a Super Admin or Co Admin to open Users, edit your account, and set a new password.\n\nAfter they save, sign in again with the new password. If you just changed your own password from your profile, you may be asked to sign in again.",
+          "tags": ["password", "reset", "users"]
+        },
+        {
+          "id": "account-ui-language",
+          "q": "How do I change the interface language?",
+          "a": "Use the language control in the header (top of the app). Choose Arabic, English, German, or French. The choice is saved on your user.\n\nArabic switches the layout to right-to-left. This FAQ follows Arabic or English; other UI languages still show English FAQ text.",
+          "tags": ["language", "arabic", "english", "rtl"]
+        },
+        {
+          "id": "account-receipt-language",
+          "q": "Why is the printed receipt in a different language than the screen?",
+          "a": "The screens follow your personal UI language. Printed receipts and invoices follow Store settings → receipt language. Those two can be different on purpose (for example staff UI in English, customer receipt in Arabic).",
+          "tags": ["receipt", "invoice", "language", "settings"]
+        },
+        {
+          "id": "account-why-missing-menu",
+          "q": "Why don’t I see a menu item that a colleague sees?",
+          "a": "Menus are role-based:\n\n• Super Admin: everything, including Home dashboard and the Profit report.\n• Co Admin: almost everything except Home and Profit; includes treasury configuration.\n• Branch Manager: day-to-day operations without Administration and without treasury config screens.\n• Warehouse: products, inventory, orders, branches, stock report.\n• Cashier: cashier, orders, serial track, drawer close.\n• Collector: due installments, clients, orders.\n• Moderator: products and price list (mostly view; bookings as allowed).\n\nBranch-scoped roles usually see only their branch’s data. Super Admin, Co Admin, Moderator, and Collector are not tied to a single branch.",
+          "tags": ["role", "permission", "sidebar", "menu"]
+        },
+        {
+          "id": "account-home-dashboard",
+          "q": "Where is the Home dashboard?",
+          "a": "Home (/home) is for Super Admin only. It summarises accounts, sales, and collections. Other roles start from Orders or the first item in their sidebar.",
+          "tags": ["home", "dashboard", "super admin"],
+          "roles": ["Super Admin"]
+        }
+      ]
+    },
+    {
+      "id": "products",
+      "title": "Products, inventory, transfers, serials and categories",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager",
+        "Moderator",
+        "Cashier"
+      ],
+      "items": [
+        {
+          "id": "products-what",
+          "q": "What is the Products screen for?",
+          "a": "Products is the catalog: codes, selling prices, discounts, images, category, branch, stock-related fields, and booking options when enabled.\n\nOpen Products from Inventory & products. Create or edit a product, assign a category (often used as a code prefix) and a branch when required. You can attach images and barcodes/QR for scanning at the cashier.",
+          "tags": ["catalog", "sku", "barcode", "price"]
+        },
+        {
+          "id": "products-moderator",
+          "q": "What can a Moderator do on products?",
+          "a": "Moderator can view the catalog and the price list. They typically cannot create, edit, or delete products. They may create bookings on products when booking is enabled, including across branches.",
+          "tags": ["moderator", "view-only", "booking"],
+          "roles": ["Super Admin", "Co Admin", "Moderator"]
+        },
+        {
+          "id": "products-price-list",
+          "q": "How do I change prices quickly without opening every product?",
+          "a": "Open Price list (under Inventory & products). That screen is for fast price edits without the full product form. Save after each change you intend to keep.\n\nCashiers do not have this screen; they sell at the prices already set.",
+          "tags": ["price list", "discount"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Warehouse",
+            "Operation Manager",
+            "Moderator"
+          ]
+        },
+        {
+          "id": "products-categories",
+          "q": "How should I use Categories?",
+          "a": "Categories group products and often define a short code used as a prefix when generating product codes. Create the category first if you rely on automatic codes, then add products under it.\n\nOpen Categories from Inventory & products.",
+          "tags": ["category", "prefix", "code"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Warehouse",
+            "Operation Manager"
+          ]
+        },
+        {
+          "id": "products-inventory",
+          "q": "How do I check stock and move inventory between warehouse and branches?",
+          "a": "Open Inventory. You can review quantities and create movements between the warehouse and branches as your process requires.\n\nBookings can reserve units: screens often distinguish reserved quantity from sellable quantity. Do not treat reserved units as available to sell until the booking is cancelled or completed according to your process.",
+          "tags": ["stock", "warehouse", "quantity", "reserved"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Warehouse",
+            "Operation Manager"
+          ]
+        },
+        {
+          "id": "products-transfers",
+          "q": "What are pending branch transfers?",
+          "a": "When stock is sent from one location to a branch, the destination can have incoming transfers to accept. Open Pending transfers (badge on the sidebar when there are items waiting).\n\nWarehouse and branch staff should complete incoming transfers so quantities match reality.",
+          "tags": ["transfer", "pending", "branch"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Warehouse",
+            "Operation Manager"
+          ]
+        },
+        {
+          "id": "products-serial",
+          "q": "How do I look up a serial number or barcode after a sale?",
+          "a": "Open Serial track (under Inventory & products, also in the Cashier menu). Search by serial/barcode. You can see history even after the unit was sold, which helps with returns, warranty, and customer follow-up.",
+          "tags": ["serial", "barcode", "imei", "track"]
+        }
+      ]
+    },
+    {
+      "id": "bookings",
+      "title": "Bookings",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager",
+        "Moderator",
+        "Cashier"
+      ],
+      "items": [
+        {
+          "id": "bookings-what",
+          "q": "What is a product booking?",
+          "a": "A booking reserves one or more units for a customer, often with a deposit. Typical details: customer, deposit amount, pickup or shipping, and status.\n\nCreate bookings from an eligible product (Products list). Confirmed bookings can send in-app notifications. Reserved quantity is no longer freely sellable until the booking is fulfilled or cancelled.",
+          "tags": ["reserve", "deposit", "pickup"]
+        },
+        {
+          "id": "bookings-cashier",
+          "q": "How does a booking deposit affect a later sale?",
+          "a": "At the cashier, a booking can credit the deposit toward the sale so the customer does not pay that amount twice. Complete the remaining balance with the usual payment methods.\n\nIf the customer never completes the sale, follow your store policy to cancel the booking and release stock.",
+          "tags": ["deposit", "cashier", "credit"]
+        },
+        {
+          "id": "bookings-notifications",
+          "q": "Will staff be notified about bookings?",
+          "a": "Yes. Booking events (for example confirmation) can appear in the header notification list. Open notifications, review the item, and mark as read when done.",
+          "tags": ["notification", "header"]
+        }
+      ]
+    },
+    {
+      "id": "cashier-orders",
+      "title": "Cashier and invoices",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager",
+        "Cashier",
+        "Collector"
+      ],
+      "items": [
+        {
+          "id": "cashier-how",
+          "q": "How do I complete a sale at the cashier?",
+          "a": "Open Cashier. Add products by scan or search, line by line. Fill customer details when the sale requires a client (installments, pay-later, deposits).\n\nApply discounts if allowed. Choose one or more payment methods (fees may apply). You can use pay-later or installment plans when enabled. Print the receipt when payment is confirmed. Logo and text direction on the printout follow receipt language in Store settings.",
+          "tags": ["pos", "scan", "payment", "print", "discount"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Cashier"
+          ]
+        },
+        {
+          "id": "cashier-desk-purchase",
+          "q": "What is a desk purchase or trade-in?",
+          "a": "Desk purchase lets you take in a customer item (trade-in) as part of the sale workflow. Follow the on-screen fields for the purchased item and any deferred payment. Related cash movements may appear under Daily expenses as cash movements (not operating cost).",
+          "tags": ["trade-in", "desk purchase"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Cashier"
+          ]
+        },
+        {
+          "id": "orders-what",
+          "q": "What is the difference between Cashier and Orders?",
+          "a": "Cashier is the live point-of-sale: build the cart and take payment now. Orders is the invoice history: find past sales, take remaining payment, process returns, reprint receipts, and follow deferred or installment payments.\n\nWarehouse and Collector can open Orders for operational follow-up even if they do not use Cashier.",
+          "tags": ["invoice", "orders", "return", "reprint"]
+        },
+        {
+          "id": "orders-pay-return",
+          "q": "How do I take remaining payment or process a return?",
+          "a": "Open Orders, find the invoice (search by number, customer, or date). Open it and use pay / return / reprint actions as shown.\n\nFor installment or deferred invoices, remaining amounts stay on the order until collected. Collectors often work from Due installments rather than from Cashier.",
+          "tags": ["pay", "return", "deferred", "installment"]
+        }
+      ]
+    },
+    {
+      "id": "drawer-expenses",
+      "title": "Drawer close and daily expenses",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Cashier"
+      ],
+      "items": [
+        {
+          "id": "drawer-close-how",
+          "q": "How do I close the cash drawer at the end of the day?",
+          "a": "Open Drawer closes. Count the cash (and other tender as the screen asks) and enter the counted amount. The system compares it to the expected amount and shows variance.\n\nChoose whether to retain cash in the drawer or deposit to the safe, then save. Use history to review past closes. Undo last close only if your role is allowed and the action is still available.",
+          "tags": ["drawer", "eod", "variance", "safe", "cash"]
+        },
+        {
+          "id": "expenses-operating",
+          "q": "What are daily operating expenses?",
+          "a": "Open Daily expenses. The operating tab is for store running costs (supplies, small bills, and similar). These can feed profit calculations when your reports include operating costs.\n\nAdd a row with type, amount, date, and notes. Branch Managers typically see their branch only.",
+          "tags": ["expense", "operating", "profit"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        },
+        {
+          "id": "expenses-cash-movements",
+          "q": "What is the cash movements tab? Is it the same as expenses?",
+          "a": "No. Cash movements are money leaving or settling the till that are not operating costs (for example client prepaid payout, desk-purchase deferred paid, exchange settlement). They should not be treated as profit-reducing operating expense.\n\nUse the correct tab so reports stay accurate.",
+          "tags": ["cash movement", "payout", "settlement"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        }
+      ]
+    },
+    {
+      "id": "purchasing-parties",
+      "title": "Clients, suppliers and purchasing requests",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Collector"
+      ],
+      "items": [
+        {
+          "id": "clients-what",
+          "q": "How do I manage customers?",
+          "a": "Open Clients. Create or edit a customer record used on sales, bookings, deposits, opening debit, and installment follow-up.\n\nYou can register a deposit or opening debit, record a payment to/from the client as the screens allow, and open history. Collectors use this directory together with Due installments.",
+          "tags": ["customer", "deposit", "opening debit"]
+        },
+        {
+          "id": "suppliers-what",
+          "q": "How do I manage suppliers?",
+          "a": "Open Suppliers. Keep vendor name and contact data for purchasing. You can record deposits, opening debit, supplier installments, payments, and history — similar pattern to clients but for buying stock.",
+          "tags": ["vendor", "supplier", "deposit"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        },
+        {
+          "id": "purchasing-requests",
+          "q": "How do purchasing requests work?",
+          "a": "Open Purchasing requests. Create a request with items, quantities, and the supplier. Track status until goods are received according to your process.\n\nThis is the buy-from-supplier workflow, not a customer sale.",
+          "tags": ["purchase", "request", "vendor"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        }
+      ]
+    },
+    {
+      "id": "collections",
+      "title": "Collections and installments",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Collector"
+      ],
+      "items": [
+        {
+          "id": "collections-due",
+          "q": "How do I collect an installment that is due?",
+          "a": "Open Due installments (also listed as Collections). Filter by date and branch if you can. Open the installment, collect payment, and save. You can record a promise-to-pay when the customer cannot pay today.\n\nCollectors are not tied to one branch and typically work this list as their main screen. Sale-installment menu items appear only when the store has installment sales enabled.",
+          "tags": ["due", "collect", "promise"]
+        },
+        {
+          "id": "collections-plans",
+          "q": "Where do installment plans (tenor and interest) come from?",
+          "a": "Super Admin and Co Admin define plans under Administration → Installment plans (tenor and interest). At the cashier, staff pick a plan when the sale is on installments.\n\nIf a plan is missing, ask an administrator to add it before selling on installments.",
+          "tags": ["plan", "interest", "tenor"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        }
+      ]
+    },
+    {
+      "id": "treasury",
+      "title": "Treasury and payment methods",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Cashier"
+      ],
+      "items": [
+        {
+          "id": "treasury-accounts",
+          "q": "What are money accounts / treasuries?",
+          "a": "They are the cash, safe, and wallet buckets money moves through. Admins configure them under Treasury (accounts). You can deposit, transfer between accounts, and settle as the screens allow.\n\nCo Admin has a Treasury balances list. Super Admin often sees account summaries on Home. Branch Managers do not get treasury configuration menus; they still use payment methods at the cashier.",
+          "tags": ["safe", "wallet", "cash", "transfer"],
+          "roles": ["Super Admin", "Co Admin"]
+        },
+        {
+          "id": "treasury-payment-methods",
+          "q": "How do payment methods and fees work?",
+          "a": "Admins maintain the payment-methods catalog (name, fees, mapping to a money account). At the cashier, choosing a method can add a fee and post to the mapped account.\n\nIf a method is missing or fees look wrong, a Super Admin or Co Admin must fix the catalog — cashiers cannot edit it.",
+          "tags": ["fee", "card", "wallet", "method"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager", "Cashier"]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": "Reports",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager"
+      ],
+      "items": [
+        {
+          "id": "reports-list",
+          "q": "Which reports exist and what are they for?",
+          "a": "• Sales: revenue, orders, payment mix.\n• Profit: cost, trading profit, branch operating costs, net profit — Super Admin only.\n• Products: product performance.\n• Stock: stock movements.\n• Customers: customer analytics.\n• Collections / installments: installment totals.\n• Bookings: booking stats.\n• Desk purchases: trade-in report.\n• Accounts & wallets: treasury report.\n\nWarehouse typically has Stock only. Always set date range and branch filters before you trust the numbers. Export (Excel/PDF) depends on the screen.",
+          "tags": ["sales", "profit", "stock", "excel"]
+        },
+        {
+          "id": "reports-profit-who",
+          "q": "Why can’t I open the Profit report?",
+          "a": "Profit is Super Admin only by design. Co Admin and Branch Manager do not see it in the menu, and Vixa will not answer profit questions for those roles.\n\nIf profit looks wrong for Super Admin, check date range, branch filter, and that branch cost fields (rent, salaries, and similar) are filled on Branches.",
+          "tags": ["profit", "permission", "cost"],
+          "roles": ["Super Admin", "Co Admin", "Branch Manager"]
+        },
+        {
+          "id": "reports-wrong-numbers",
+          "q": "The numbers look wrong. What should I check first?",
+          "a": "1) Date range on the report.\n2) Branch filter (all vs one branch).\n3) For profit: branch operating cost fields on Branches.\n4) Expenses sitting in the cash-movements tab instead of operating (or the reverse).\n5) Unaccepted branch transfers so stock reports lag reality.",
+          "tags": ["filter", "date", "branch", "debug"]
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "Administration (users, branches, settings, plans, audit)",
+      "roles": ["Super Admin", "Co Admin", "Warehouse", "Operation Manager"],
+      "items": [
+        {
+          "id": "admin-users",
+          "q": "How do I add a staff user and assign a role?",
+          "a": "Open Users (Administration). Create a user with name, email, password, and role. Assign a branch when the role is tied to one location (Branch Manager, Cashier, Warehouse, and similar).\n\nSuper Admin and Co Admin are global — the form hints that no single branch is stored. Only Super Admin and Co Admin can open Users.",
+          "tags": ["user", "role", "branch", "password"],
+          "roles": ["Super Admin", "Co Admin"]
+        },
+        {
+          "id": "admin-branches",
+          "q": "What should I fill on a branch?",
+          "a": "Open Branches. Set name, address, and operating cost fields (rent, salaries, invoices, expenses) used in the Profit report.\n\nWarehouse can open Branches for location data; Branch Manager does not get this menu by default.",
+          "tags": ["branch", "rent", "salary"],
+          "roles": ["Super Admin", "Co Admin", "Warehouse", "Operation Manager"]
+        },
+        {
+          "id": "admin-settings",
+          "q": "What is in Store settings?",
+          "a": "Store name, phone, logo, receipt language, and related settlement / payment-method configuration. Logo and receipt language appear on printed receipts from cashier and orders.\n\nOnly Super Admin and Co Admin can edit Store settings.",
+          "tags": ["logo", "receipt", "phone", "store"],
+          "roles": ["Super Admin", "Co Admin"]
+        },
+        {
+          "id": "admin-audit",
+          "q": "How do I see who changed what?",
+          "a": "Open Audit log. It lists who did what and when. Use it when numbers or records look unexpected. Super Admin and Co Admin only.",
+          "tags": ["audit", "history", "log"],
+          "roles": ["Super Admin", "Co Admin"]
+        }
+      ]
+    },
+    {
+      "id": "vixa",
+      "title": "Vixa and notifications",
+      "roles": [
+        "Super Admin",
+        "Co Admin",
+        "Branch Manager",
+        "Warehouse",
+        "Operation Manager",
+        "Cashier",
+        "Collector",
+        "Moderator"
+      ],
+      "items": [
+        {
+          "id": "vixa-what",
+          "q": "What is Vixa and how should I ask questions?",
+          "a": "Vixa is the in-app assistant (floating chat and the Vixa page). Ask in natural language about the store — especially sales, profit, and bookings for a date range. Examples: “sales today”, “bookings today”, “profit this week” (or Arabic equivalents).\n\nVixa uses the same permissions as the menus: if you cannot open Profit, Vixa will not expose profit figures. If external AI or web search is off, you may see a short fallback; internal report numbers can still work.",
+          "tags": ["ai", "chat", "sales", "profit"],
+          "roles": [
+            "Super Admin",
+            "Co Admin",
+            "Branch Manager",
+            "Cashier",
+            "Moderator"
+          ]
+        },
+        {
+          "id": "notifications-where",
+          "q": "Where are notifications and how do I mark them read?",
+          "a": "Use the bell in the header. Open the list, read booking (and similar) alerts, and mark as read. Unread count appears as a badge.\n\nThis is separate from Vixa chat.",
+          "tags": ["bell", "unread", "booking"]
+        }
+      ]
+    }
+  ]
+}

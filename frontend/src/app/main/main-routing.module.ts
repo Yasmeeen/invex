@@ -15,6 +15,22 @@ const routes: Routes = [
     canActivateChild: [AuthenticationGuard],
     children: [
       {
+        path: 'faq',
+        loadChildren: () => import('./faq/faq.module').then((m) => m.FaqModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+            'Cashier',
+            'Collector',
+            'Moderator',
+          ],
+        },
+      },
+      {
         path: 'vixa',
         loadChildren: () => import('./vixa/vixa.module').then((m) => m.VixaModule),
         canActivate: [RoleGuard],

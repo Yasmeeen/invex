@@ -13,8 +13,11 @@
         <p class="size-small m-0 mb-3">
           {{
             'tr_branch_transfer_max_hint'
-              | translate : { max: maxQuantity }
+              | translate : { max: maxForSelectedBranch() }
           }}
+        </p>
+        <p class="size-small m-0 mb-3 pickup-transfer-note" *ngIf="pickupHintForSelected()">
+          {{ pickupHintForSelected() }}
         </p>
         <div class="form-group">
           <label>{{ 'tr_branch_transfer_to_branch' | translate }}</label>
@@ -36,7 +39,7 @@
             class="s-control width-100"
             type="number"
             min="1"
-            [max]="maxQuantity"
+            [max]="maxForSelectedBranch()"
             formControlName="quantity"
           />
         </div>
@@ -45,7 +48,7 @@
         <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
           {{ 'tr_action.cancel' | translate }}
         </button>
-        <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
+        <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving || maxForSelectedBranch() < 1">
           {{ 'tr_branch_transfer_submit' | translate }}
         </button>
       </div>

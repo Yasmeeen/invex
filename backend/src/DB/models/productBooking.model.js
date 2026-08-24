@@ -14,6 +14,13 @@ const productBookingSchema = new mongoose.Schema(
       ref: 'Branch',
       default: null,
     },
+    /** Branch where the customer will collect (branch pickup). */
+    pickupBranch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null,
+      index: true,
+    },
     productInWarehouse: { type: Boolean, default: false },
     client: {
       type: mongoose.Schema.Types.ObjectId,

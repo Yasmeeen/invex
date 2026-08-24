@@ -173,6 +173,11 @@ export const AdminSidebar = [
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
+  {
+    name: 'tr_faq',
+    routerLink: '/faq',
+    icon: 'fa fa-question-circle icon',
+  },
 ];
 
 /** Co Admin: full admin menu except dashboard (/home) and profit report.
@@ -236,6 +241,11 @@ export const Cashier = [
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
+  {
+    name: 'tr_faq',
+    routerLink: '/faq',
+    icon: 'fa fa-question-circle icon',
+  },
 ];
 
 /** Collector: follow-up installment collections for assigned clients. */
@@ -259,6 +269,11 @@ export const CollectorSidebar = [
     name: 'tr_vixa',
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
+  },
+  {
+    name: 'tr_faq',
+    routerLink: '/faq',
+    icon: 'fa fa-question-circle icon',
   },
 ];
 
@@ -319,6 +334,11 @@ export const Warehouse = [
     routerLink: '/vixa',
     icon: 'fa fa-comments icon',
   },
+  {
+    name: 'tr_faq',
+    routerLink: '/faq',
+    icon: 'fa fa-question-circle icon',
+  },
 ];
 
 /** View products only; bookings allowed from products list. */
@@ -332,6 +352,11 @@ export const ModeratorSidebar = [
     name: 'tr_price_list',
     routerLink: '/products/price-list',
     icon: 'fa fa-list icon',
+  },
+  {
+    name: 'tr_faq',
+    routerLink: '/faq',
+    icon: 'fa fa-question-circle icon',
   },
 ];
 

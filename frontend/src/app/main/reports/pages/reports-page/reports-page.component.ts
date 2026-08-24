@@ -116,6 +116,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.lastReportPayload) {
         this.bindReportData(this.lastReportPayload);
+        this.applyCostPriceVisibility();
       }
     });
 
@@ -195,6 +196,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.lastReportPayload = res;
           this.bindReportData(res);
+          this.applyCostPriceVisibility();
         },
         () => {
           this.loading = false;
@@ -248,6 +250,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.lastReportPayload = res || {};
         this.bindReportData(this.lastReportPayload);
+        this.applyCostPriceVisibility();
       },
       () => {
         this.loading = false;
@@ -847,6 +850,41 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       ]);
       return;
     }
+  }
+
+  private applyCostPriceVisibility(): void {
+    const role = this.authenticationService.getUserFromLocalStorage()?.role;
+    if (this.storeSettings.canSeeCostPrice(role)) {
+      return;
+    }
+    const hideCardKeys = new Set([
+      'tr_report_card_cost',
+      'tr_report_card_trading_profit',
+      'tr_report_card_trading_loss',
+      'tr_report_card_installment_profit_collected',
+      'tr_net_profit',
+      'tr_net_loss',
+      'tr_report_card_margin',
+      'tr_report_card_loss_margin',
+      'tr_report_card_inventory_capital',
+      'tr_report_card_branches_inventory_capital',
+      'tr_report_card_warehouse_inventory_capital',
+    ]);
+    this.cards = (this.cards || []).filter((c) => !hideCardKeys.has(c.titleKey));
+    const hideCol = new Set([
+      'cost',
+      'unitCost',
+      'inventoryCapital',
+      'tradingProfit',
+      'installmentProfitShare',
+      'lineTotal',
+    ]);
+    this.tableColumns = (this.tableColumns || []).filter((c) => !hideCol.has(c.key));
+    this.deskPurchasesDetailColumns = (this.deskPurchasesDetailColumns || []).filter(
+      (c) => !hideCol.has(c.key)
+    );
+    this.branchCapitalColumns = (this.branchCapitalColumns || []).filter((c) => !hideCol.has(c.key));
+    this.profitInvoiceColumns = (this.profitInvoiceColumns || []).filter((c) => !hideCol.has(c.key));
   }
 
   private bindBookingsReportData(res: BookingsReportResponse, t: (key: string, params?: object) => string): void {

@@ -2,8 +2,8 @@ import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Product } from '@core/models/products.model';
 import { Globals } from '@core/globals';
-import { isModerator } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 export type ProductDetailsDialogData = {
   product: Product;
@@ -23,6 +23,7 @@ export class ProductDetailsDialogComponent {
     private ref: MatDialogRef<ProductDetailsDialogComponent, ProductDetailsDialogResult>,
     private translate: TranslateService,
     private globals: Globals,
+    private storeSettings: StoreSettingsService,
     @Inject(MAT_DIALOG_DATA) public data: ProductDetailsDialogData
   ) {}
 
@@ -31,7 +32,7 @@ export class ProductDetailsDialogComponent {
   }
 
   get showNetPrice(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   get allowAddToOrder(): boolean {

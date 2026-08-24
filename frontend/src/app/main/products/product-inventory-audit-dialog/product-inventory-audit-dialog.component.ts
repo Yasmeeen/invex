@@ -3,7 +3,6 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
 import { Product } from '@core/models/products.model';
-import { isModerator } from '@core/utils/role-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import {
   ProductsInventoryAuditResponse,
@@ -11,6 +10,7 @@ import {
 } from '@shared/services/products.service';
 import { ReportExportService } from '@shared/services/report-export.service';
 import { formatEgpMoney } from '@shared/utils/money.util';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 export type ProductInventoryAuditDialogData = {
   filterParams: Record<string, string | boolean>;
@@ -33,6 +33,7 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private globals: Globals,
+    private storeSettings: StoreSettingsService,
     private ref: MatDialogRef<ProductInventoryAuditDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: ProductInventoryAuditDialogData
   ) {}
@@ -42,7 +43,7 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
   }
 
   get showNetPrice(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   loadAudit(): void {

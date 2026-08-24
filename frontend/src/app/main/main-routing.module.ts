@@ -39,7 +39,6 @@ const routes: Routes = [
             'Super Admin',
             'Co Admin',
             'Branch Manager',
-            'Cashier',
             'Moderator',
           ],
         },
@@ -61,7 +60,6 @@ const routes: Routes = [
             'Branch Manager',
             ...WAREHOUSE,
             'Moderator',
-            'Cashier',
           ],
         },
       },
@@ -171,7 +169,7 @@ const routes: Routes = [
         loadChildren: () => import('./expenses/expenses.module').then((m) => m.ExpensesModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
         },
       },
       {

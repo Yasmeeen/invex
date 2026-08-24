@@ -148,14 +148,14 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return !isModerator(this.globals.currentUser?.role);
   }
 
-  /** Moderator: serial track is not available. */
+  /** Moderator / cashier: serial track is not available. */
   get canUseSerialTrack(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    const role = this.globals.currentUser?.role;
+    return !isModerator(role) && role !== 'Cashier';
   }
 
-  /** Moderator: net price must not be visible in the products list. */
   get showNetPrice(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   /** Moderator: supplier filter is not available. */
@@ -367,7 +367,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (this.globals.currentUser?.role === 'Cashier') {
-      this.router.navigate(['/products/serial-track']);
+      this.router.navigate(['/cashier']);
       return;
     }
     const saved = localStorage.getItem('products.viewMode');

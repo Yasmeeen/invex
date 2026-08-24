@@ -16,6 +16,7 @@ import {
 import { isEcommerceIntegrationFeatureAvailable } from '../integrations_module/feature.js';
 import { ensureOnlineBranch } from '../integrations_module/onlineBranch.js';
 import { pushFullCatalog } from '../integrations_module/catalogSync.js';
+import { normalizeRolesHiddenFromCostPrice } from '../../utils/cost-price-access.js';
 
 const MAX_LOGO_LENGTH = 600000;
 
@@ -81,6 +82,7 @@ function serializeSettings(doc) {
     ecommerceCatalogMode:
       featureAvailable && doc.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
     onlineBranchId: featureAvailable && doc.onlineBranchId ? String(doc.onlineBranchId) : null,
+    rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(doc.rolesHiddenFromCostPrice),
   };
 }
 
@@ -122,6 +124,7 @@ export const updateStoreSettings = async (req, res) => {
       ecommerceBaseUrl,
       ecommerceSharedKey,
       ecommerceCatalogMode,
+      rolesHiddenFromCostPrice,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
@@ -366,6 +369,9 @@ export const updateStoreSettings = async (req, res) => {
     if (bookingPolicy !== undefined && typeof bookingPolicy !== 'string') {
       return res.status(400).json({ error: 'bookingPolicy must be a string' });
     }
+    if (rolesHiddenFromCostPrice !== undefined && !Array.isArray(rolesHiddenFromCostPrice)) {
+      return res.status(400).json({ error: 'rolesHiddenFromCostPrice must be an array' });
+    }
     if (
       showBookingPolicyOnReceipt !== undefined &&
       typeof showBookingPolicyOnReceipt !== 'boolean'
@@ -394,6 +400,9 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (showBookingPolicyOnReceipt !== undefined) {
       update.showBookingPolicyOnReceipt = showBookingPolicyOnReceipt;
+    }
+    if (rolesHiddenFromCostPrice !== undefined) {
+      update.rolesHiddenFromCostPrice = normalizeRolesHiddenFromCostPrice(rolesHiddenFromCostPrice);
     }
 
     let shouldPushCatalog = false;

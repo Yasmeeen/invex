@@ -166,6 +166,14 @@ const storeSettingsSchema = new mongoose.Schema(
       ref: 'Branch',
       default: null,
     },
+    /**
+     * Roles that must not see product cost / purchase (net) price.
+     * Super Admin is never hidden. Omitted in DB → all other roles are hidden.
+     */
+    rolesHiddenFromCostPrice: {
+      type: [String],
+      default: undefined,
+    },
   },
   { timestamps: true, collection: 'storesettings' }
 );

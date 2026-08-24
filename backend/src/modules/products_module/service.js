@@ -16,6 +16,12 @@ import {
 } from '../../utils/product-source-party.js';
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
+import {
+  canSeeCostPrice,
+  stripCostFieldsFromProduct,
+  stripInventoryCapital,
+} from '../../utils/cost-price-access.js';
 import {
   notifyProductChanged,
   notifyProductDeleted,
@@ -91,6 +97,17 @@ async function applyZeroStockAfterTransfer(sourceProduct) {
 async function loadUserForBranchTransfer(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
   return User.findById(userId).select('name role branch').lean();
+}
+
+async function viewerCannotSeeCostPrice(req) {
+  const userId = req.query?.userId || req.query?.user_id || req.body?.userId;
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return false;
+  const [user, settings] = await Promise.all([
+    User.findById(userId).select('role').lean(),
+    StoreSettings.findOne().sort({ updatedAt: -1 }).select('rolesHiddenFromCostPrice').lean(),
+  ]);
+  if (!user) return false;
+  return !canSeeCostPrice(user.role, settings?.rolesHiddenFromCostPrice);
 }
 
 function assertMayInitiateBranchTransfer(user, product) {
@@ -1292,9 +1309,10 @@ export const getProducts = async (req, res) => {
     const productsOut = await attachRemotePickupTransfers(
       products.map((p) => p.toObject({ virtuals: true }))
     );
+    const hideCost = await viewerCannotSeeCostPrice(req);
 
     res.json({
-      products: productsOut,
+      products: hideCost ? productsOut.map(stripCostFieldsFromProduct) : productsOut,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
@@ -1322,6 +1340,9 @@ export const getProductById = async (req, res) => {
     }
 
     const [out] = await attachRemotePickupTransfers([product.toObject({ virtuals: true })]);
+    if (await viewerCannotSeeCostPrice(req)) {
+      return res.json(stripCostFieldsFromProduct(out));
+    }
     res.json(out);
   } catch (error) {
     console.error('❌ Error fetching product by ID:', error.message);
@@ -3162,7 +3183,7 @@ export const getProductsInventoryAudit = async (req, res) => {
       ),
     }));
 
-    res.json({
+    const payload = {
       search: search || null,
       totals: {
         productsCount: totals.productsCount || 0,
@@ -3178,7 +3199,11 @@ export const getProductsInventoryAudit = async (req, res) => {
         ),
       },
       byLocation,
-    });
+    };
+    if (await viewerCannotSeeCostPrice(req)) {
+      return res.json(stripInventoryCapital(payload));
+    }
+    res.json(payload);
   } catch (error) {
     console.error('getProductsInventoryAudit:', error);
     res.status(500).json({ error: 'Failed to generate products inventory audit' });
@@ -3265,14 +3290,18 @@ export const getProductSerialTrack = async (req, res) => {
     if (!result.ok) {
       return res.status(result.statusCode || 404).json({ error: result.error });
     }
-    return res.json({
+    const body = {
       exists: result.exists,
       status: result.status,
       product: result.product,
       locations: result.locations || [],
       totalStock: result.totalStock ?? result.product?.stock ?? 0,
       events: result.events,
-    });
+    };
+    if (await viewerCannotSeeCostPrice(req) && body.product) {
+      body.product = stripCostFieldsFromProduct(body.product);
+    }
+    return res.json(body);
   } catch (error) {
     console.error('getProductSerialTrack:', error);
     res.status(500).json({ error: 'Failed to track product serial' });

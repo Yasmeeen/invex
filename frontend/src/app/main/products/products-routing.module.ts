@@ -42,7 +42,6 @@ const routes: Routes = [
         'Co Admin',
         'Branch Manager',
         ...WAREHOUSE,
-        'Cashier',
       ],
     },
   },

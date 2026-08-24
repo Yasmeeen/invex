@@ -142,6 +142,11 @@ export const AdminSidebar = [
     icon: 'fa fa-cogs icon',
     children: [
       {
+        name: 'tr_permissions_title',
+        routerLink: '/settings/permissions',
+        icon: 'fa fa-lock icon',
+      },
+      {
         name: 'tr_users',
         routerLink: '/users',
         icon: 'fa fa-users icon',
@@ -188,7 +193,9 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
     if (!item.children?.length) {
       return item;
     }
-    const children = item.children.filter((c) => c.routerLink !== '/reports/profit');
+    const children = item.children.filter(
+      (c) => c.routerLink !== '/reports/profit' && c.routerLink !== '/settings/permissions'
+    );
     if (item.name === 'tr_treasury_menu') {
       return {
         ...item,
@@ -227,19 +234,14 @@ export const Cashier = [
     icon: 'fa fa-credit-card icon',
   },
   {
-    name: 'tr_serial_track',
-    routerLink: '/products/serial-track',
-    icon: 'fa fa-barcode icon',
+    name: 'tr_daily_expenses_menu',
+    routerLink: '/expenses',
+    icon: 'fa fa-money icon',
   },
   {
     name: 'tr_drawer_close_history_menu',
     routerLink: '/drawer-close',
     icon: 'fa fa-inbox icon',
-  },
-  {
-    name: 'tr_vixa',
-    routerLink: '/vixa',
-    icon: 'fa fa-comments icon',
   },
   {
     name: 'tr_faq',

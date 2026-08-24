@@ -95,6 +95,10 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
     return canPickBranchRole(this.globals.currentUser?.role);
   }
 
+  get showRecordedByColumn(): boolean {
+    return this.globals.currentUser?.role !== 'Cashier';
+  }
+
   get isCashMovementsTab(): boolean {
     return this.activeTab === 'cash_movements';
   }

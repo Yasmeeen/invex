@@ -106,7 +106,7 @@
             <th>{{ 'tr_daily_expense_treasury' | translate }}</th>
             <th>{{ 'tr_daily_expense_type' | translate }}</th>
             <th>{{ 'tr_daily_expense_notes' | translate }}</th>
-            <th>{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
+            <th *ngIf="showRecordedByColumn">{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
           </tr>
         </thead>
         <tbody>
@@ -117,7 +117,7 @@
             <td class="expenses-treasury">{{ expenseTreasuryDisplay(row) }}</td>
             <td>{{ expenseTypeLabel(row) }}</td>
             <td class="expenses-notes">{{ row.notes || '—' }}</td>
-            <td>{{ row.recordedBy?.name || row.recordedBy?.email || '—' }}</td>
+            <td *ngIf="showRecordedByColumn">{{ row.recordedBy?.name || row.recordedBy?.email || '—' }}</td>
           </tr>
         </tbody>
       </table>

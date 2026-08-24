@@ -222,6 +222,11 @@ export const Cashier = [
     icon: 'fa fa-credit-card icon',
   },
   {
+    name: 'tr_price_list',
+    routerLink: '/products/price-list',
+    icon: 'fa fa-list icon',
+  },
+  {
     name: 'tr_serial_track',
     routerLink: '/products/serial-track',
     icon: 'fa fa-barcode icon',

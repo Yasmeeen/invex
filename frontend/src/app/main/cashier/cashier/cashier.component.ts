@@ -21,8 +21,13 @@ import {
 } from '@shared/utils/cashier-payment-methods.util';
 import {
   findProductByScannedCode,
+  findUniqueProductByName,
   productMatchesSearchTerm,
 } from '@shared/utils/product-code-match.util';
+import {
+  parseScaleBarcode,
+  scaleBarcodeLookupCodes,
+} from '@shared/utils/scale-barcode.util';
 import { Branch, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
@@ -197,6 +202,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private settingsSub?: Subscription;
   /** Debounce barcode scanner input so product adds without pressing Enter. */
   private barcodeScanTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Weight from a scale label when the PLU is not in Invex yet — applied on the next add. */
+  private pendingScaleWeightKg: number | null = null;
 
   constructor(
     private productsSerivce: ProductsSerivce,
@@ -1863,24 +1870,53 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Resolve a scanned code from loaded pages, or fetch from API if not yet loaded. */
   private resolveProductByScannedCode(code: string): Observable<Product | undefined> {
-    const local = findProductByScannedCode(this.products, code);
-    if (local) {
-      return of(local);
+    const raw = String(code || '').trim();
+    const lookupCodes = this.weightSalesEnabled()
+      ? scaleBarcodeLookupCodes(raw)
+      : [raw].filter(Boolean);
+    const allowName = this.inputLooksLikeName(raw);
+
+    for (const lookup of lookupCodes) {
+      const local = findProductByScannedCode(this.products, lookup);
+      if (local) {
+        return of(local);
+      }
     }
-    // Barcode lookup must not be limited to the first grid page.
+    if (allowName) {
+      const byName = findUniqueProductByName(this.products, raw);
+      if (byName) {
+        return of(byName);
+      }
+    }
+
+    const search = allowName ? raw : lookupCodes[0] || raw;
     const params = this.buildCashierProductListParams({
       page: 1,
       limit: 50,
-      search: String(code || '').trim(),
+      search,
     });
     delete params.inStock;
 
     return this.productsSerivce.getProducts(params).pipe(
-      map((res: any): Product | undefined =>
-        findProductByScannedCode((res?.products || []) as Product[], code)
-      ),
+      map((res: any): Product | undefined => {
+        const list = (res?.products || []) as Product[];
+        for (const lookup of lookupCodes) {
+          const hit = findProductByScannedCode(list, lookup);
+          if (hit) return hit;
+        }
+        if (allowName) {
+          return findUniqueProductByName(list, raw);
+        }
+        return undefined;
+      }),
       catchError(() => of(undefined as Product | undefined))
     );
+  }
+
+  private inputLooksLikeName(raw: string): boolean {
+    const s = String(raw || '').trim();
+    if (!s || parseScaleBarcode(s)) return false;
+    return /[^\d.\s-]/.test(s);
   }
 
   /** Confirmed active reservation count on this SKU (unconfirmed bookings do not reduce free sellable). */
@@ -2105,13 +2141,20 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  addProduct(product: any) {
+  addProduct(product: any, opts?: { quantity?: number }) {
     if (this.freeSellableQty(product) <= 0) return;
 
     if (this.isWeightProduct(product)) {
+      const fromLabel = normalizeWeightQuantity(
+        Number(opts?.quantity) || this.pendingScaleWeightKg || 0
+      );
+      this.pendingScaleWeightKg = null;
+      const maxStock = this.displayStock(product);
+      const quantity =
+        fromLabel > 0 ? Math.min(fromLabel, maxStock > 0 ? maxStock : fromLabel) : 0;
       this.orderItems.push({
         ...product,
-        quantity: 0,
+        quantity,
         productId: product._id,
         saleUnit: 'weight',
         weightUnit: this.resolveWeightUnit(product),
@@ -2121,6 +2164,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.refreshExchangePaymentDefaults();
       return;
     }
+
+    this.pendingScaleWeightKg = null;
 
     const index = this.orderItems.findIndex(i => i.productId === product._id);
     if (index > -1) {
@@ -2158,8 +2203,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /**
    * Auto-add when scanner/type finishes (no Enter needed).
    * Scanners dump chars quickly then pause; debounce waits for that pause.
-   * Works even when the SKU is not in the currently loaded product pages.
-   * Leaves the field intact if no match (user can keep typing / press Enter).
+   * Names are typed slowly — wait for Enter.
    */
   onBarcodeInput(): void {
     if (this.barcodeScanTimer != null) {
@@ -2167,22 +2211,54 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     const code = (this.barcode || '').trim();
     if (!code) return;
+    if (this.inputLooksLikeName(code)) return;
 
     this.barcodeScanTimer = setTimeout(() => {
       this.barcodeScanTimer = null;
       this.resolveProductByScannedCode(code)
         .pipe(takeUntil(this.destroy$))
         .subscribe((product) => {
-          if (!product) {
-            return;
-          }
           if ((this.barcode || '').trim() !== code) {
             return;
           }
-          this.addProduct(product);
-          this.barcode = '';
+          this.finishScanLookup(code, product);
         });
     }, 180);
+  }
+
+  /** Weight from a scale label only; sale price always comes from Invex. */
+  private scaleScanQuantity(scanned: string, product: Product | any): { quantity?: number } | undefined {
+    if (!this.weightSalesEnabled() || !this.isWeightProduct(product)) return undefined;
+    const parsed = parseScaleBarcode(scanned);
+    if (!parsed || parsed.weightKg <= 0) return undefined;
+    return { quantity: parsed.weightKg };
+  }
+
+  private finishScanLookup(scanned: string, product: Product | undefined): void {
+    if (product) {
+      this.addProduct(product, this.scaleScanQuantity(scanned, product));
+      this.barcode = '';
+      return;
+    }
+
+    const parsed = this.weightSalesEnabled() ? parseScaleBarcode(scanned) : null;
+    if (parsed && parsed.weightKg > 0) {
+      this.pendingScaleWeightKg = parsed.weightKg;
+      this.barcode = '';
+      this.appNotificationService.push(
+        this.translate.instant('tr_cashier_scale_pick_by_name'),
+        'warning'
+      );
+      this.focusBarcodeInput();
+      return;
+    }
+
+    if (this.inputLooksLikeName(scanned)) {
+      this.appNotificationService.push(
+        this.translate.instant('tr_cashier_name_not_unique'),
+        'warning'
+      );
+    }
   }
 
   scanProduct(code: string) {
@@ -2195,10 +2271,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.resolveProductByScannedCode(trimmed)
       .pipe(takeUntil(this.destroy$))
       .subscribe((product) => {
-        if (product) {
-          this.addProduct(product);
-        }
-        this.barcode = '';
+        this.finishScanLookup(trimmed, product);
       });
   }
 

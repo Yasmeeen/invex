@@ -34,3 +34,7 @@ export function isBranchlessUserRole(role: string | undefined | null): boolean {
 export function canBookAnyProduct(role: string | undefined | null): boolean {
   return canPickBranchRole(role) || isWarehouse(role) || isModerator(role);
 }
+
+export function isCashier(role: string | undefined | null): boolean {
+  return role === 'Cashier';
+}

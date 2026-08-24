@@ -17,6 +17,12 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    /** Last time selling price changed (scale / cashier sync). Independent of other product edits. */
+    priceUpdatedAt: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
     netPrice: {
       type: Number,
       required: true,

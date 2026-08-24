@@ -155,6 +155,9 @@ export class HeaderComponent implements OnInit {
     if (n?.type === 'product_purchase_pending') {
       return 'fa-shopping-cart';
     }
+    if (n?.type === 'price_updated') {
+      return 'fa-tags';
+    }
     if (
       n?.type === 'branch_transfer_pending' ||
       n?.type === 'branch_transfer_approved' ||
@@ -166,6 +169,13 @@ export class HeaderComponent implements OnInit {
   }
 
   private navigateFromNotification(n: NotificationItem): void {
+    if (n.type === 'price_updated') {
+      void this.router.navigate(['/products/price-list'], {
+        queryParams: { priceChanged: 'today', search: n?.data?.productCode || null },
+      });
+      return;
+    }
+
     if (n.type === 'product_purchase_pending') {
       const purchaseId = normalizeMongoId(n?.data?.purchaseId);
       if (!purchaseId) return;

@@ -94,8 +94,34 @@ export class RealtimeNotificationsService {
       this.globals.unseenNotificationsCount = (this.globals.unseenNotificationsCount || 0) + 1;
       const msg = n.body || this.translate.instant('tr_notifications');
       this.notify.push(msg, 'info');
+      this.playNotificationSound();
       this.newNotification$.next(n);
     });
+  }
+
+  /** Short beep so cashiers notice price (and other) alerts without looking at the screen. */
+  private playNotificationSound(): void {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+      osc.onended = () => {
+        void ctx.close();
+      };
+    } catch {
+      /* ignore autoplay / audio errors */
+    }
   }
 }
 

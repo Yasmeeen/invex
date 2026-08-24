@@ -62,7 +62,18 @@ export function findProductByScannedCode<T extends { code?: string }>(
   return suffixHits[0];
 }
 
-/** True if product name or code matches a search term (prefix optional for codes). */
+/** Unique name match (typed at cashier). Undefined if none or more than one. */
+export function findUniqueProductByName<T extends { name?: string }>(
+  products: T[],
+  input: string
+): T | undefined {
+  const q = String(input || '').trim().toLowerCase();
+  if (!q || !products?.length) return undefined;
+  const hits = products.filter((p) => String(p?.name || '').trim().toLowerCase().includes(q));
+  if (hits.length === 1) return hits[0];
+  const exact = hits.filter((p) => String(p?.name || '').trim().toLowerCase() === q);
+  return exact.length === 1 ? exact[0] : undefined;
+}
 export function productMatchesSearchTerm(
   product: { name?: string; code?: string },
   term: string

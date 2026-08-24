@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Subscription } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -8,9 +9,10 @@ import { ProductsSerivce } from '@shared/services/products.service';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { Globals } from '@core/globals';
-import { isBranchManager, isModerator } from '@core/utils/role-utils';
+import { isBranchManager, isCashier, isModerator } from '@core/utils/role-utils';
 
 type PriceListRow = Product & { draftPrice: number | string };
+type PriceChangedPreset = 'all' | 'today' | '7d' | '30d' | 'custom';
 
 @Component({
   selector: 'app-price-list',
@@ -27,6 +29,10 @@ export class PriceListComponent implements OnInit, OnDestroy {
   selectedBranches: string[] = [];
   branches: Branch[] = [];
   stockFilter: 'all' | 'available' | 'out_of_stock' = 'all';
+  priceChangedPreset: PriceChangedPreset = 'all';
+  customFrom = '';
+  customTo = '';
+  lastPriceUpdatedAt: string | Date | null = null;
   totalNumberOfProducts = 0;
   nameSearchTerm = '';
   searchTimeout: any;
@@ -42,6 +48,14 @@ export class PriceListComponent implements OnInit, OnDestroy {
     { id: 'out_of_stock', labelKey: 'tr_products_stock_filter_out' },
   ];
 
+  readonly priceChangedOptions: Array<{ id: PriceChangedPreset; labelKey: string }> = [
+    { id: 'all', labelKey: 'tr_price_list_price_changed_all' },
+    { id: 'today', labelKey: 'tr_price_list_price_changed_today' },
+    { id: '7d', labelKey: 'tr_price_list_price_changed_7d' },
+    { id: '30d', labelKey: 'tr_price_list_price_changed_30d' },
+    { id: 'custom', labelKey: 'tr_price_list_price_changed_custom' },
+  ];
+
   params: any = {
     page: 1,
     limit: this.paginationPerPage,
@@ -55,11 +69,16 @@ export class PriceListComponent implements OnInit, OnDestroy {
     private translateService: TranslateService,
     private categoriesService: CategoriesServce,
     private branchesServce: BranchesServce,
-    private globals: Globals
+    private globals: Globals,
+    private route: ActivatedRoute
   ) {}
 
+  get isCashierView(): boolean {
+    return isCashier(this.globals.currentUser?.role);
+  }
+
   get canEditPrices(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return !isModerator(this.globals.currentUser?.role) && !this.isCashierView;
   }
 
   canEditProduct(product: Product): boolean {
@@ -83,6 +102,17 @@ export class PriceListComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.priceChangedPreset = this.isCashierView ? 'today' : 'all';
+    const q = this.route.snapshot.queryParamMap;
+    const preset = q.get('priceChanged');
+    if (preset === 'today' || preset === '7d' || preset === '30d' || preset === 'all') {
+      this.priceChangedPreset = preset;
+    }
+    const search = q.get('search');
+    if (search) {
+      this.nameSearchTerm = search;
+      this.params['search'] = search;
+    }
     this.getproducts();
     this.getcategorys();
     this.getBranches();
@@ -116,8 +146,24 @@ export class PriceListComponent implements OnInit, OnDestroy {
     return !!this.savedIds[product._id];
   }
 
+  isRecentlyChanged(product: Product): boolean {
+    if (!product?.priceUpdatedAt) {
+      return false;
+    }
+    const t = new Date(product.priceUpdatedAt).getTime();
+    return Number.isFinite(t) && Date.now() - t < 24 * 60 * 60 * 1000;
+  }
+
+  private startOfToday(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
   buildFilterParams(): Record<string, string | boolean> {
-    const filterParams: Record<string, string | boolean> = {};
+    const filterParams: Record<string, string | boolean> = {
+      sort: 'priceUpdatedAt',
+    };
     if (this.selectedCategories?.length) {
       filterParams['categoryId'] = this.selectedCategories.filter(Boolean).join(',');
     }
@@ -133,6 +179,24 @@ export class PriceListComponent implements OnInit, OnDestroy {
     if (search) {
       filterParams['search'] = search;
     }
+    if (this.priceChangedPreset === 'today') {
+      filterParams['priceUpdatedSince'] = this.startOfToday().toISOString();
+    } else if (this.priceChangedPreset === '7d') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      filterParams['priceUpdatedSince'] = d.toISOString();
+    } else if (this.priceChangedPreset === '30d') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      filterParams['priceUpdatedSince'] = d.toISOString();
+    } else if (this.priceChangedPreset === 'custom') {
+      if (this.customFrom) {
+        filterParams['priceUpdatedFrom'] = new Date(`${this.customFrom}T00:00:00.000`).toISOString();
+      }
+      if (this.customTo) {
+        filterParams['priceUpdatedTo'] = new Date(`${this.customTo}T23:59:59.999`).toISOString();
+      }
+    }
     return filterParams;
   }
 
@@ -142,6 +206,10 @@ export class PriceListComponent implements OnInit, OnDestroy {
     delete this.params['inStock'];
     delete this.params['categoryId'];
     delete this.params['search'];
+    delete this.params['sort'];
+    delete this.params['priceUpdatedSince'];
+    delete this.params['priceUpdatedFrom'];
+    delete this.params['priceUpdatedTo'];
     Object.assign(this.params, this.buildFilterParams());
 
     this.subscriptions.push(
@@ -153,6 +221,7 @@ export class PriceListComponent implements OnInit, OnDestroy {
           }));
           this.paginationData = response.meta;
           this.totalNumberOfProducts = response.meta.totalCount;
+          this.lastPriceUpdatedAt = response.lastPriceUpdatedAt || null;
           this.productsLoading = false;
         },
         (error: any) => {
@@ -233,6 +302,10 @@ export class PriceListComponent implements OnInit, OnDestroy {
           const updated = res?.product || row;
           row.price = updated.price;
           row.draftPrice = updated.price;
+          row.priceUpdatedAt = updated.priceUpdatedAt || new Date().toISOString();
+          if (updated.priceUpdatedAt) {
+            this.lastPriceUpdatedAt = updated.priceUpdatedAt;
+          }
           const nextSaving = { ...this.savingIds };
           delete nextSaving[row._id];
           this.savingIds = nextSaving;

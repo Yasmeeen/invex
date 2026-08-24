@@ -17,6 +17,7 @@ import {
 import { buildProductHistoryEvents } from '../../utils/product-history.js';
 import { trackProductByCode } from '../../utils/product-serial-track.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
+import { parseScaleBarcode } from '../../utils/scale-barcode.js';
 import {
   normalizeSaleQuantity,
   resolveSellByWeight,
@@ -62,6 +63,58 @@ function pickActorUserId(req) {
   const body = req?.body || {};
   const query = req?.query || {};
   return body.userId || body.user_id || query.userId || query.user_id || null;
+}
+
+function roundMoney(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
+function sellingPriceChanged(beforePrice, nextPrice) {
+  return roundMoney(beforePrice) !== roundMoney(nextPrice);
+}
+
+function parseDateParam(raw) {
+  if (raw == null || raw === '') return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function notifyCashiersPriceUpdated({ product, beforePrice, actorUserId }) {
+  try {
+    const branchOid = product?.branch?._id || product?.branch || null;
+    const cashierQuery = { role: 'Cashier' };
+    if (branchOid && !product?.inWarehouse) {
+      cashierQuery.branch = branchOid;
+    }
+    const cashiers = await User.find(cashierQuery).select('_id').lean();
+    const recipientIds = cashiers
+      .map((u) => u._id)
+      .filter((id) => String(id) !== String(actorUserId || ''));
+    if (!recipientIds.length) return;
+
+    const oldP = roundMoney(beforePrice);
+    const newP = roundMoney(product.price);
+    const notification = await Notification.create({
+      type: 'price_updated',
+      title: 'Selling price updated',
+      body: `${product.name} (${product.code || '—'}): ${oldP} → ${newP}`,
+      data: {
+        productId: product._id,
+        productName: product.name,
+        productCode: product.code,
+        oldPrice: oldP,
+        newPrice: newP,
+        branchId: branchOid,
+        inWarehouse: !!product.inWarehouse,
+        priceUpdatedAt: product.priceUpdatedAt || new Date(),
+      },
+      recipients: recipientIds,
+      readBy: [],
+    });
+    emitToUsers(recipientIds, 'notification:new', { notification });
+  } catch (notifyErr) {
+    console.warn('⚠️ price update notification:', notifyErr?.message || notifyErr);
+  }
 }
 
 async function sumActiveBookedQuantityProducts(productOid) {
@@ -1183,6 +1236,9 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     supplierId,
     vendor_id,
     vendorId,
+    priceUpdatedSince,
+    priceUpdatedFrom,
+    priceUpdatedTo,
   } = queryParams;
 
   const query = {};
@@ -1238,12 +1294,20 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
   }
 
   if (search) {
-    andParts.push({
-      $or: [
-        { name: { $regex: search, $options: 'i' } },
-        { code: { $regex: search, $options: 'i' } },
-      ],
-    });
+    const q = escapeRegex(String(search).trim());
+    const or = [
+      { name: { $regex: q, $options: 'i' } },
+      { code: { $regex: q, $options: 'i' } },
+    ];
+    const scale = parseScaleBarcode(search);
+    if (scale) {
+      const pluRe = escapeRegex(scale.pluUnpadded);
+      or.push({ code: { $regex: `(^|-)${pluRe}$`, $options: 'i' } });
+      if (scale.plu !== scale.pluUnpadded) {
+        or.push({ code: { $regex: escapeRegex(scale.plu), $options: 'i' } });
+      }
+    }
+    andParts.push({ $or: or });
   }
 
   if (warehouseOnly === 'true' || warehouseOnly === true) {
@@ -1285,6 +1349,18 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     }
   }
 
+  const since = parseDateParam(priceUpdatedSince);
+  const from = parseDateParam(priceUpdatedFrom);
+  const to = parseDateParam(priceUpdatedTo);
+  if (since || from || to) {
+    const range = {};
+    if (since) range.$gte = since;
+    if (from && (!since || from > since)) range.$gte = from;
+    if (since && from) range.$gte = since > from ? since : from;
+    if (to) range.$lte = to;
+    query.priceUpdatedAt = range;
+  }
+
   if (andParts.length) {
     query.$and = andParts;
   }
@@ -1294,23 +1370,35 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
 
 export const getProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, sort } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
     const query = buildProductsListQuery(req.query, {
       cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
     });
+    const lastPriceQuery = buildProductsListQuery(
+      { ...req.query, priceUpdatedSince: undefined, priceUpdatedFrom: undefined, priceUpdatedTo: undefined },
+      { cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc) }
+    );
+    const sortSpec =
+      String(sort || '') === 'priceUpdatedAt' ? { priceUpdatedAt: -1, _id: -1 } : undefined;
 
-    const [products, total] = await Promise.all([
-      Product.find(query)
+    const findQ = Product.find(query)
         .select('-ecommerceDescription')
         .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
-        .populate('sourceProductId', 'name code stock')
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
+        .populate('sourceProductId', 'name code stock');
+    if (sortSpec) {
+      findQ.sort(sortSpec);
+    }
+
+    const [products, total, lastPriceRow] = await Promise.all([
+      findQ.skip(skip).limit(Number(limit)).lean(),
       Product.countDocuments(query),
+      Product.findOne(lastPriceQuery)
+        .sort({ priceUpdatedAt: -1 })
+        .select('priceUpdatedAt')
+        .lean(),
     ]);
 
     if (isCutFromSourceEnabled(settingsDoc)) {
@@ -1321,6 +1409,7 @@ export const getProducts = async (req, res) => {
 
     res.json({
       products,
+      lastPriceUpdatedAt: lastPriceRow?.priceUpdatedAt || null,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
@@ -2007,6 +2096,9 @@ export const updateProduct = async (req, res) => {
         discount: discountNum,
         attributes: attrs,
       };
+      if (sellingPriceChanged(before.price, priceNum)) {
+        updateDoc.priceUpdatedAt = new Date();
+      }
       if (!sourceFieldsUpdate.skip) {
         updateDoc.sourceProductId = sourceFieldsUpdate.sourceProductId;
       }
@@ -2054,6 +2146,13 @@ export const updateProduct = async (req, res) => {
       });
 
       notifyProductChanged(product?._id);
+      if (sellingPriceChanged(before.price, product.price)) {
+        await notifyCashiersPriceUpdated({
+          product,
+          beforePrice: before.price,
+          actorUserId: pickActorUserId(req),
+        });
+      }
       return res.json({ message: '✅ Product updated', product });
     }
 
@@ -2116,6 +2215,9 @@ export const updateProduct = async (req, res) => {
       ? { $set: updateDocBranch, $unset: { acquiredFrom: 1 } }
       : updateDocBranch;
     const before = await Product.findById(req.params.id).lean();
+    if (before && sellingPriceChanged(before.price, priceNum)) {
+      updateDocBranch.priceUpdatedAt = new Date();
+    }
     const product = await Product.findByIdAndUpdate(req.params.id, updateOpBranch, { new: true });
 
     if (!product) {
@@ -2135,6 +2237,13 @@ export const updateProduct = async (req, res) => {
     });
 
     notifyProductChanged(product?._id);
+    if (before && sellingPriceChanged(before.price, product.price)) {
+      await notifyCashiersPriceUpdated({
+        product,
+        beforePrice: before.price,
+        actorUserId: pickActorUserId(req),
+      });
+    }
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product:', error.message);
@@ -2160,9 +2269,14 @@ export const updateProductPrice = async (req, res) => {
     if (!before) {
       return res.status(404).json({ error: 'Product not found' });
     }
+    const priceDidChange = sellingPriceChanged(before.price, rounded);
+    const setDoc = { price: rounded };
+    if (priceDidChange) {
+      setDoc.priceUpdatedAt = new Date();
+    }
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      { $set: { price: rounded } },
+      { $set: setDoc },
       { new: true, runValidators: true }
     )
       .populate('category', 'name code')
@@ -2179,6 +2293,13 @@ export const updateProductPrice = async (req, res) => {
     });
 
     notifyProductChanged(product?._id);
+    if (priceDidChange) {
+      await notifyCashiersPriceUpdated({
+        product,
+        beforePrice: before.price,
+        actorUserId: pickActorUserId(req),
+      });
+    }
     res.json({ message: '✅ Product updated', product });
   } catch (error) {
     console.error('❌ Error updating product price:', error.message);

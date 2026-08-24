@@ -10,6 +10,19 @@
     </span>
   </h2>
 
+  <div class="price-list-banner plr-4" *ngIf="!productsLoading">
+    <p class="mb-1" *ngIf="lastPriceUpdatedAt">
+      {{ 'tr_price_list_last_updated' | translate }}:
+      <strong>{{ lastPriceUpdatedAt | date : 'short' }}</strong>
+    </p>
+    <p class="mb-1 text-muted" *ngIf="!lastPriceUpdatedAt">
+      {{ 'tr_price_list_last_updated_never' | translate }}
+    </p>
+    <p class="mb-0 size-small text-muted" *ngIf="isCashierView">
+      {{ 'tr_price_list_readonly_hint' | translate }}
+    </p>
+  </div>
+
   <div class="filters-card bg-secondary plr-4 ptb-2 mb-7">
     <div class="row">
       <div class="col-md-3">
@@ -106,6 +119,52 @@
         </div>
       </div>
     </div>
+    <div class="row mt-2">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_price_list_price_changed_filter' | translate }}</label>
+          <ng-select
+            class="s-control s-select width-100"
+            [items]="priceChangedOptions"
+            bindLabel="labelKey"
+            bindValue="id"
+            [clearable]="false"
+            [searchable]="false"
+            appendTo="body"
+            [(ngModel)]="priceChangedPreset"
+            name="priceChangedPreset"
+            (ngModelChange)="onFilterChange()"
+          >
+            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+          </ng-select>
+        </div>
+      </div>
+      <ng-container *ngIf="priceChangedPreset === 'custom'">
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_price_list_from' | translate }}</label>
+            <input
+              class="s-control bg-white"
+              type="date"
+              [(ngModel)]="customFrom"
+              (ngModelChange)="onFilterChange()"
+            />
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_price_list_to' | translate }}</label>
+            <input
+              class="s-control bg-white"
+              type="date"
+              [(ngModel)]="customTo"
+              (ngModelChange)="onFilterChange()"
+            />
+          </div>
+        </div>
+      </ng-container>
+    </div>
   </div>
 
   <div>
@@ -121,10 +180,14 @@
               <th>{{ 'tr_branch' | translate }}</th>
               <th>{{ 'tr_products_stock_filter' | translate }}</th>
               <th>{{ 'tr_sell_price' | translate }}</th>
+              <th>{{ 'tr_price_updated_at' | translate }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let product of productsList; let i = index; trackBy: trackById">
+            <tr
+              *ngFor="let product of productsList; let i = index; trackBy: trackById"
+              [class.price-row--recent]="isRecentlyChanged(product)"
+            >
               <td>{{ i + 1 }}</td>
               <td>{{ product.name }}</td>
               <td>{{ product.code }}</td>
@@ -164,6 +227,10 @@
                     aria-hidden="true"
                   ></i>
                 </div>
+              </td>
+              <td>
+                <span *ngIf="product.priceUpdatedAt">{{ product.priceUpdatedAt | date : 'short' }}</span>
+                <span *ngIf="!product.priceUpdatedAt">—</span>
               </td>
             </tr>
           </tbody>

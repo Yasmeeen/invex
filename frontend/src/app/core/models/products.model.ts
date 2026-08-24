@@ -10,6 +10,8 @@ export interface Product {
   /** Units reserved for pending branch-to-branch transfers */
   transferReservedQuantity?: number;
   price: number;
+  /** Last selling-price change (for cashier scale sync). */
+  priceUpdatedAt?: string | Date;
   netPrice: number;
   discount: number;
   /** Dynamic attributes values keyed by category attribute keys. */

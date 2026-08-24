@@ -262,7 +262,7 @@ export const CollectorSidebar = [
   },
 ];
 
-/** Formerly Operation Manager — orders, inventory, products, branches, categories, reports. */
+/** Formerly Operation Manager — orders, inventory, products, branches, categories, stock report only. */
 export const Warehouse = [
   {
     name: 'tr_sidebar_inventory_products',
@@ -311,23 +311,7 @@ export const Warehouse = [
     routerLink: 'null',
     icon: 'fa fa-bar-chart icon',
     children: [
-      { name: 'tr_reports_sales', routerLink: '/reports/sales', icon: 'fa fa-line-chart icon' },
-      { name: 'tr_reports_profit', routerLink: '/reports/profit', icon: 'fa fa-area-chart icon' },
-      { name: 'tr_reports_products', routerLink: '/reports/products', icon: 'fa fa-cube icon' },
       { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
-      { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
-      { name: 'tr_reports_installments', routerLink: '/reports/installments', icon: 'fa fa-calendar icon' },
-      { name: 'tr_reports_bookings', routerLink: '/reports/bookings', icon: 'fa fa-bookmark icon' },
-      {
-        name: 'tr_report_title_desk_purchases',
-        routerLink: '/reports/desk-purchases',
-        icon: 'fa fa-shopping-basket icon',
-      },
-      {
-        name: 'tr_reports_treasury',
-        routerLink: '/reports/treasury',
-        icon: 'fa fa-university icon',
-      },
     ],
   },
   {

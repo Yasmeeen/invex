@@ -6,6 +6,7 @@ import {
   getProductPurchaseRequest,
   createProductPurchaseRequest,
   addProductPurchaseLine,
+  addQuantityToExistingProduct,
   approveProductPurchaseRequest,
   rejectProductPurchaseRequest,
   recordProductPurchaseDeferredPayment,
@@ -15,6 +16,7 @@ import {
 router.get('/', listProductPurchaseRequests);
 router.get('/:id', getProductPurchaseRequest);
 router.post('/', createProductPurchaseRequest);
+router.post('/add-quantity', addQuantityToExistingProduct);
 router.post('/:id/add-line', addProductPurchaseLine);
 router.patch('/:id/approve', approveProductPurchaseRequest);
 router.patch('/:id/reject', rejectProductPurchaseRequest);

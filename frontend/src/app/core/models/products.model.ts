@@ -12,7 +12,7 @@ export interface Product {
   price: number;
   /** Last selling-price change (for cashier scale sync). */
   priceUpdatedAt?: string | Date;
-  netPrice: number;
+  netPrice?: number | null;
   discount: number;
   /** Dynamic attributes values keyed by category attribute keys. */
   attributes?: Record<string, string>;
@@ -49,6 +49,11 @@ export interface Product {
    */
   sourceProductId?: string | { _id: string; name?: string; code?: string; stock?: number } | null;
   sourceProduct?: { _id: string; name?: string; code?: string; stock?: number } | null;
+  /** good | service | farm */
+  productType?: 'good' | 'service' | 'farm';
+  /** Extra processing cost per unit/kg (butcher manufactured goods). */
+  processingExtraCost?: number;
+  catalogKey?: string;
   /** Cashier / order line: piece or weight. */
   saleUnit?: 'piece' | 'weight';
   weightUnit?: 'kg' | 'g';

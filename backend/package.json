@@ -12,6 +12,8 @@
     "seed:product-images:force": "node scripts/seedProductImages.js --force",
     "seed:warehouse": "node scripts/seedWarehouseStock.js",
     "seed:demo": "node scripts/seedSupermarketDemo.js --fresh",
+    "seed:al-raji": "node scripts/seedAlRajiCatalog.js",
+    "seed:al-raji:flags": "node scripts/seedAlRajiCatalog.js --enable-store-flags",
     "seed:collections": "node src/DB/seedCollectionsDemo.js"
   },
   "keywords": [],

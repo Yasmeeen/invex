@@ -35,6 +35,11 @@ export const AdminSidebar = [
         icon: 'fa fa-exchange icon',
       },
       {
+        name: 'tr_slaughter',
+        routerLink: '/slaughter',
+        icon: 'fa fa-cutlery icon',
+      },
+      {
         name: 'tr_categories',
         routerLink: '/categories',
         icon: 'fa fa-tags icon',
@@ -293,6 +298,11 @@ export const Warehouse = [
         name: 'tr_serial_track',
         routerLink: '/products/serial-track',
         icon: 'fa fa-barcode icon',
+      },
+      {
+        name: 'tr_slaughter',
+        routerLink: '/slaughter',
+        icon: 'fa fa-cutlery icon',
       },
       {
         name: 'tr_categories',

@@ -22,12 +22,35 @@ export async function seedDefaultSuperAdmin() {
 
   let branchDoc = await Branch.findOne().sort({ createdAt: 1 });
   if (!branchDoc) {
+    // Default: مدينة نصر + التجمع الخامس (override first branch via env if needed).
+    const primaryName = String(
+      process.env.SEED_DEFAULT_BRANCH_NAME || 'مدينة نصر'
+    ).trim();
+    const primaryAddress = String(
+      process.env.SEED_DEFAULT_BRANCH_ADDRESS || 'مدينة نصر، القاهرة'
+    ).trim();
     branchDoc = await Branch.create({
-      name: String(process.env.SEED_DEFAULT_BRANCH_NAME || 'Main').trim(),
-      storeAddress: String(
-        process.env.SEED_DEFAULT_BRANCH_ADDRESS || '—'
-      ).trim(),
+      name: primaryName,
+      storeAddress: primaryAddress,
     });
+
+    const skipSecond =
+      String(process.env.SEED_SKIP_SECOND_BRANCH || '').toLowerCase() === 'true';
+    if (!skipSecond) {
+      const secondName = String(
+        process.env.SEED_SECOND_BRANCH_NAME || 'التجمع الخامس'
+      ).trim();
+      const secondAddress = String(
+        process.env.SEED_SECOND_BRANCH_ADDRESS || 'التجمع الخامس، القاهرة'
+      ).trim();
+      const existingSecond = await Branch.findOne({ name: secondName });
+      if (!existingSecond) {
+        await Branch.create({
+          name: secondName,
+          storeAddress: secondAddress,
+        });
+      }
+    }
   }
 
   await User.create({

@@ -73,5 +73,7 @@ export const PAYMENT_METHODS_URL = BASE_URL + '/payment-methods';
 export const INSTALLMENT_PLANS_URL = BASE_URL + '/installment-plans';
 export const COLLECTIONS_URL = BASE_URL + '/collections';
 
+export const SLAUGHTER_URL = BASE_URL + '/slaughter';
+
 // AI assistant (Vixa)
 export const AI_CHAT_URL = BASE_URL + '/ai/chat';

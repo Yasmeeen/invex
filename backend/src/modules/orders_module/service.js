@@ -26,7 +26,9 @@ import {
   resolveSellByWeight,
   roundWeight,
 } from '../../utils/sale-quantity.util.js';
+import { isFarmProduct, isServiceProduct, roundFarmHeads } from '../../utils/product-type.util.js';
 import { isCutFromSourceEnabled, sourceProductIdOf } from '../../utils/cut-from-source.js';
+import { resolveCutSaleUnitCost } from '../../utils/slaughter-cost.util.js';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import {
   consumeBookingsForSale,
@@ -661,7 +663,7 @@ export const createOrder = async (req, res) => {
       uniqueProductIds.length > 0
         ? q(
             Product.find({ _id: { $in: uniqueProductIds } }).select(
-              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType processingExtraCost'
             )
           )
         : Promise.resolve([]),
@@ -682,7 +684,7 @@ export const createOrder = async (req, res) => {
       if (extraSourceIds.length) {
         const extraDocs = await q(
           Product.find({ _id: { $in: extraSourceIds } }).select(
-            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType processingExtraCost'
           )
         );
         for (const doc of extraDocs) {
@@ -731,14 +733,24 @@ export const createOrder = async (req, res) => {
         category: categoryDoc,
         product: { ...productDoc.toObject(), sellByWeightOverride: selected.sellByWeightOverride ?? productDoc.sellByWeightOverride },
       });
-      const quantity = normalizeSaleQuantity(Number(item.quantity) || (isWeight ? 0 : 1), isWeight);
-      if (isWeight && quantity <= 0) {
+      const isFarm = isFarmProduct(productDoc);
+      const isService = isServiceProduct(productDoc);
+      let quantity;
+      if (isFarm) {
+        quantity = roundFarmHeads(Number(item.quantity) || 0);
+        if (quantity < 0.25) {
+          throw new Error(`Valid head quantity is required for ${productDoc.name}`);
+        }
+      } else {
+        quantity = normalizeSaleQuantity(Number(item.quantity) || (isWeight ? 0 : 1), isWeight);
+      }
+      if (isWeight && !isFarm && quantity <= 0) {
         throw new Error(`Valid weight is required for ${productDoc.name}`);
       }
-      numberOfProducts += isWeight ? 1 : quantity;
+      numberOfProducts += isWeight || isFarm ? 1 : quantity;
 
       let price = Number(selected.price) || 0;
-      const itemCost = Number(selected.netPrice ?? selected.cost ?? 0);
+      let itemCost = Number(selected.netPrice ?? selected.cost ?? 0);
       const isApplyDiscount = !!selected.isApplyDiscount;
 
       if (isApplyDiscount && selected.discount > 0) {
@@ -748,6 +760,14 @@ export const createOrder = async (req, res) => {
       totalPrice += price * quantity;
 
       const sourceId = cutFromSourceEnabled ? sourceProductIdOf(productDoc) : null;
+      if (sourceId) {
+        const sourceDoc = productById.get(sourceId);
+        itemCost = resolveCutSaleUnitCost(
+          sourceDoc?.netPrice,
+          productDoc.processingExtraCost
+        );
+      }
+      if (!isService) {
       if (sourceId && !productById.get(sourceId)) {
         throw new Error(`Source stock not found for ${productDoc.name}`);
       }
@@ -760,16 +780,18 @@ export const createOrder = async (req, res) => {
         clientReservedByProduct.get(String(stockDoc._id)) || 0
       );
       const stockOthersBooked = Math.max(0, stockBookedQty - stockClientReserved);
-      const maxSellable = isWeight
+      const maxSellable = isWeight || isFarm
         ? roundWeight(
             Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved
           )
         : Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved;
-      if (maxSellable < quantity - (isWeight ? 0.0001 : 0)) {
+      if (maxSellable < quantity - (isWeight || isFarm ? 0.0001 : 0)) {
         throw new Error(`Not enough stock for ${productDoc.name}`);
       }
 
-      stockDoc.stock = isWeight
+      stockDoc.stock = isFarm
+        ? roundFarmHeads(Number(stockDoc.stock) - quantity)
+        : isWeight
         ? roundWeight(Number(stockDoc.stock) - quantity)
         : Number(stockDoc.stock) - quantity;
       dirtyProductIds.add(String(stockDoc._id));
@@ -807,7 +829,7 @@ export const createOrder = async (req, res) => {
         ? categoryById.get(String(hideDoc.category)) ?? categoryDoc
         : categoryDoc;
       if (
-        Number(hideDoc.stock) <= (isWeight ? 0.0001 : 0) &&
+        Number(hideDoc.stock) <= (isWeight || isFarm ? 0.0001 : 0) &&
         hideCat?.deleteProductWhenOutOfStock
       ) {
         autoDeletedProducts.push({
@@ -825,6 +847,26 @@ export const createOrder = async (req, res) => {
         hideDoc.stock = 0;
         hideDoc.removedWhenOutOfStock = true;
         dirtyProductIds.add(String(hideDoc._id));
+      }
+      } else {
+        soldProductIds.add(String(productDoc._id));
+        const invoiceAttributes = buildInvoiceAttributesSnapshot(productDoc, categoryDoc);
+        const showProductCodeOnInvoice =
+          categoryDoc?.showProductCodeOnInvoice == null
+            ? true
+            : !!categoryDoc.showProductCodeOnInvoice;
+        orderProducts.push({
+          productId: selected._id,
+          name: selected.name,
+          code: selected.code,
+          quantity,
+          saleUnit: 'piece',
+          price,
+          cost: itemCost || Number(productDoc.netPrice || 0),
+          isApplyDiscount,
+          showProductCodeOnInvoice,
+          ...(invoiceAttributes.length ? { invoiceAttributes } : {}),
+        });
       }
     }
 

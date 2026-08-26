@@ -12,6 +12,7 @@ import {
 } from './return-refund-mirror.js';
 import { getEffectivePurchaseTreasuryMethodsFromDb, treasuryMethodMap } from '../modules/settings_module/treasuryMethods.js';
 import { netSettlementFeesOnPaymentSplits } from './treasury-ledger.js';
+import { isServiceProduct } from './product-type.util.js';
 import {
   isWeightSaleUnit,
   normalizeSaleQuantity,
@@ -208,6 +209,13 @@ export async function restoreProductStockForReturn(order, line, quantity) {
   const isWeight = isWeightSaleUnit(line?.saleUnit);
   const qty = normalizeSaleQuantity(Number(quantity) || 0, isWeight);
   if (qty <= 0) return null;
+
+  const lineProduct = line?.productId
+    ? await Product.findById(line.productId).select('productType')
+    : null;
+  if (isServiceProduct(lineProduct) || isServiceProduct(line)) {
+    return lineProduct;
+  }
 
   const addQty = (product) => {
     product.stock = isWeight

@@ -6,6 +6,10 @@ import { TranslateService } from '@ngx-translate/core';
 import { STORE_SETTINGS_URL } from '@core/base/urls';
 export type ReceiptLanguageCode = 'ar' | 'en' | 'de' | 'fr';
 
+export type BusinessActivityType = 'general' | 'butcher' | 'farm';
+
+export const BUSINESS_ACTIVITY_TYPES: BusinessActivityType[] = ['general', 'butcher', 'farm'];
+
 const PAYMENT_FEE_BLOCKED = new Set(['cash', 'credit', 'mixed']);
 const PAYMENT_FEE_KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -90,6 +94,8 @@ export interface StoreSettings {
   deliveryOrdersEnabled: boolean;
   /** Master switch for desk product purchase + exchange at cashier. */
   cashierPurchaseExchangeEnabled: boolean;
+  /** general = retail default; butcher | farm unlock slaughter & butcher SKUs. */
+  businessActivityType: BusinessActivityType;
   /** Env-gated e-commerce integration. */
   ecommerceIntegrationFeatureAvailable?: boolean;
   ecommerceIntegrationEnabled?: boolean;
@@ -124,6 +130,7 @@ const DEFAULTS: StoreSettings = {
   cutFromSourceEnabled: false,
   deliveryOrdersEnabled: false,
   cashierPurchaseExchangeEnabled: true,
+  businessActivityType: 'general',
   ecommerceIntegrationFeatureAvailable: false,
   ecommerceIntegrationEnabled: false,
   ecommerceBaseUrl: '',
@@ -149,6 +156,17 @@ export class StoreSettingsService {
 
   get snapshot(): StoreSettings {
     return this._settings.value;
+  }
+
+  get butcherFeaturesEnabled(): boolean {
+    const t = this.snapshot.businessActivityType || 'general';
+    return t === 'butcher' || t === 'farm';
+  }
+
+  private normalizeBusinessActivityType(v: unknown): BusinessActivityType {
+    const s = String(v || 'general').trim().toLowerCase();
+    if (s === 'butcher' || s === 'farm') return s;
+    return 'general';
   }
 
   private normalizePaymentAppFeePercents(raw: unknown): PaymentAppFeePercent[] {
@@ -331,6 +349,7 @@ export class StoreSettingsService {
           cutFromSourceEnabled: Boolean(data.cutFromSourceEnabled),
           deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
           cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
+          businessActivityType: this.normalizeBusinessActivityType(data.businessActivityType),
           ecommerceIntegrationFeatureAvailable: Boolean(data.ecommerceIntegrationFeatureAvailable),
           ecommerceIntegrationEnabled: Boolean(data.ecommerceIntegrationEnabled),
           ecommerceBaseUrl: data.ecommerceBaseUrl ?? '',

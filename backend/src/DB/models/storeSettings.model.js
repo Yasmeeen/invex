@@ -159,6 +159,17 @@ const storeSettingsSchema = new mongoose.Schema(
     /** Master switch: desk product purchase + exchange at cashier. Default on for existing stores. */
     cashierPurchaseExchangeEnabled: { type: Boolean, default: true },
 
+    /**
+     * Business activity profile. Butcher/farm unlock slaughter, farm/service SKUs, cut-from-source UI.
+     * Default general — existing stores unchanged.
+     */
+    businessActivityType: {
+      type: String,
+      enum: ['general', 'butcher', 'farm'],
+      default: 'general',
+      index: true,
+    },
+
     /** E-commerce storefront integration (gated by ECOMMERCE_INTEGRATION_FEATURE env). */
     ecommerceIntegrationEnabled: { type: Boolean, default: false },
     /** Base URL of the e-commerce API (e.g. https://shop.example.com). */

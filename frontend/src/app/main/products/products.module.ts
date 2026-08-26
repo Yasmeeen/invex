@@ -17,6 +17,7 @@ import { PendingBranchTransfersComponent } from './pending-branch-transfers/pend
 import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { SerialTrackComponent } from './serial-track/serial-track.component';
+import { AddQuantityDialogComponent } from './add-quantity-dialog/add-quantity-dialog.component';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
 
@@ -32,6 +33,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     ProductHistoryDialogComponent,
     ProductInventoryAuditDialogComponent,
     SerialTrackComponent,
+    AddQuantityDialogComponent,
   ],
   imports: [
     CommonModule,

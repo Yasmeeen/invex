@@ -4,6 +4,7 @@ import {
   ReceiptLanguageCode,
   StoreSettings,
   StoreSettingsService,
+  BusinessActivityType,
 } from '@shared/services/store-settings.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
@@ -42,6 +43,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     cutFromSourceEnabled: false,
     deliveryOrdersEnabled: false,
     cashierPurchaseExchangeEnabled: true,
+    businessActivityType: 'general',
     ecommerceIntegrationFeatureAvailable: false,
     ecommerceIntegrationEnabled: false,
     ecommerceBaseUrl: '',
@@ -49,6 +51,12 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     ecommerceCatalogMode: 'all',
     onlineBranchId: null,
   };
+
+  readonly businessActivityOptions: { value: BusinessActivityType; labelKey: string }[] = [
+    { value: 'general', labelKey: 'tr_business_activity_general' },
+    { value: 'butcher', labelKey: 'tr_business_activity_butcher' },
+    { value: 'farm', labelKey: 'tr_business_activity_farm' },
+  ];
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
     { value: 'ar', labelKey: 'tr_lang_ar' },
@@ -86,6 +94,16 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     );
   }
 
+  get butcherFeaturesEnabled(): boolean {
+    return this.form.businessActivityType === 'butcher' || this.form.businessActivityType === 'farm';
+  }
+
+  onBusinessActivityChange(): void {
+    if (!this.butcherFeaturesEnabled) {
+      this.form.cutFromSourceEnabled = false;
+    }
+  }
+
   setTab(id: SettingsTabId): void {
     this.activeTab = id;
   }
@@ -111,6 +129,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         cutFromSourceEnabled: Boolean(v.cutFromSourceEnabled),
         deliveryOrdersEnabled: Boolean(v.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: v.cashierPurchaseExchangeEnabled !== false,
+        businessActivityType: v.businessActivityType || 'general',
         ecommerceIntegrationFeatureAvailable: Boolean(v.ecommerceIntegrationFeatureAvailable),
         ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: v.ecommerceBaseUrl || '',
@@ -174,9 +193,12 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         bookingPolicy: this.form.bookingPolicy?.trim() || '',
         showBookingPolicyOnReceipt: Boolean(this.form.showBookingPolicyOnReceipt),
         weightSalesEnabled: Boolean(this.form.weightSalesEnabled),
-        cutFromSourceEnabled: Boolean(this.form.cutFromSourceEnabled),
+        cutFromSourceEnabled: this.butcherFeaturesEnabled
+          ? Boolean(this.form.cutFromSourceEnabled)
+          : false,
         deliveryOrdersEnabled: Boolean(this.form.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: this.form.cashierPurchaseExchangeEnabled !== false,
+        businessActivityType: this.form.businessActivityType || 'general',
         ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
         ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',

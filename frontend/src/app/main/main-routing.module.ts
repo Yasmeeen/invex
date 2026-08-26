@@ -105,6 +105,19 @@ const routes: Routes = [
         data: { allowedRoles: ['Super Admin'] }
       },
       {
+        path: 'slaughter',
+        loadChildren: () => import('./slaughter/slaughter.module').then(m => m.SlaughterModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+          ],
+        },
+      },
+      {
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],

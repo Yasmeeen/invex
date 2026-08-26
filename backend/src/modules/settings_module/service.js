@@ -1,4 +1,5 @@
 import StoreSettings from '../../DB/models/storeSettings.model.js';
+import { normalizeBusinessActivityType, isButcherOrFarmActivity } from '../../utils/business-activity.util.js';
 import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
 import { normalizePurchaseTreasuryMethods } from './treasuryMethods.js';
 import {
@@ -78,6 +79,7 @@ function serializeSettings(doc) {
     cutFromSourceEnabled: Boolean(doc.cutFromSourceEnabled),
     deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
     cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
+    businessActivityType: normalizeBusinessActivityType(doc.businessActivityType),
     ecommerceIntegrationFeatureAvailable: featureAvailable,
     ecommerceIntegrationEnabled: featureAvailable && Boolean(doc.ecommerceIntegrationEnabled),
     ecommerceBaseUrl: featureAvailable ? doc.ecommerceBaseUrl || '' : '',
@@ -126,6 +128,7 @@ export const updateStoreSettings = async (req, res) => {
       cutFromSourceEnabled,
       deliveryOrdersEnabled,
       cashierPurchaseExchangeEnabled,
+      businessActivityType,
       ecommerceIntegrationEnabled,
       ecommerceBaseUrl,
       ecommerceSharedKey,
@@ -395,6 +398,25 @@ export const updateStoreSettings = async (req, res) => {
     ) {
       return res.status(400).json({ error: 'cashierPurchaseExchangeEnabled must be a boolean' });
     }
+    let activityNormalized;
+    if (businessActivityType !== undefined) {
+      if (typeof businessActivityType !== 'string') {
+        return res.status(400).json({ error: 'businessActivityType must be a string' });
+      }
+      activityNormalized = normalizeBusinessActivityType(businessActivityType);
+    }
+
+    const effectiveActivity = normalizeBusinessActivityType(
+      activityNormalized ?? existing?.businessActivityType
+    );
+    if (
+      cutFromSourceEnabled === true &&
+      !isButcherOrFarmActivity(effectiveActivity)
+    ) {
+      return res.status(400).json({
+        error: 'cutFromSourceEnabled requires business activity butcher or farm',
+      });
+    }
 
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
@@ -422,13 +444,21 @@ export const updateStoreSettings = async (req, res) => {
       update.weightSalesEnabled = weightSalesEnabled;
     }
     if (cutFromSourceEnabled !== undefined) {
-      update.cutFromSourceEnabled = cutFromSourceEnabled;
+      update.cutFromSourceEnabled = isButcherOrFarmActivity(effectiveActivity)
+        ? cutFromSourceEnabled
+        : false;
     }
     if (deliveryOrdersEnabled !== undefined) {
       update.deliveryOrdersEnabled = deliveryOrdersEnabled;
     }
     if (cashierPurchaseExchangeEnabled !== undefined) {
       update.cashierPurchaseExchangeEnabled = cashierPurchaseExchangeEnabled;
+    }
+    if (activityNormalized !== undefined) {
+      update.businessActivityType = activityNormalized;
+      if (!isButcherOrFarmActivity(activityNormalized)) {
+        update.cutFromSourceEnabled = false;
+      }
     }
 
     let shouldPushCatalog = false;

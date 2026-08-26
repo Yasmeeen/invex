@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
 import Product from '../DB/models/product.model.js';
+import { butcherFeaturesEnabled } from './business-activity.util.js';
 
 export function isCutFromSourceEnabled(settings) {
-  return !!settings?.cutFromSourceEnabled;
+  return butcherFeaturesEnabled(settings) && !!settings?.cutFromSourceEnabled;
 }
 
 export function sourceProductIdOf(product) {

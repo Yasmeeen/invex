@@ -62,6 +62,20 @@ export class ProductPurchaseRequestsService {
     return this.http.post(PRODUCT_PURCHASE_REQUESTS_URL, payload);
   }
 
+  /** Butcher/farm: add stock to an existing product (cost + purchase treasuries). */
+  addQuantity(payload: {
+    userId: string;
+    productId: string;
+    quantity: number;
+    totalCost: number;
+    purchaseTreasurySplits?: PurchaseTreasurySplit[];
+    purchaseTreasuryKey?: string;
+    acquiredFrom?: ProductAcquiredFrom | null;
+    branchId?: string;
+  }): Observable<any> {
+    return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/add-quantity`, payload);
+  }
+
   /** Append another product to an existing exchange trade-in purchase (one invoice). */
   addLine(
     purchaseId: string,

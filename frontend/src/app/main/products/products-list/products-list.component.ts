@@ -31,6 +31,7 @@ import { ProductsImportMetadata } from '@shared/services/products.service';
 import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
+import { AddQuantityDialogComponent } from '../add-quantity-dialog/add-quantity-dialog.component';
 import { Router } from '@angular/router';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -158,6 +159,12 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return !isModerator(this.globals.currentUser?.role);
   }
 
+  /** Per-product: hide empty/unset cost on cards (esp. butcher/farm). */
+  productHasNetPrice(product: Product): boolean {
+    if (!this.showNetPrice) return false;
+    return product?.netPrice != null;
+  }
+
   /** Moderator: supplier filter is not available. */
   get showSupplierFilter(): boolean {
     return !isModerator(this.globals.currentUser?.role);
@@ -256,6 +263,26 @@ export class ProductsListComponent implements OnInit, OnDestroy {
 
   showProductActionsMenu(_product: Product): boolean {
     return true;
+  }
+
+  /** Butcher/farm: add stock via purchase treasuries (not for general retail / services). */
+  canAddQuantity(product: Product): boolean {
+    if (!this.storeSettings.butcherFeaturesEnabled) return false;
+    if (!product || !this.canBranchManagerModifyProduct(product)) return false;
+    if (String(product.productType || '').toLowerCase() === 'service') return false;
+    return true;
+  }
+
+  openAddQuantity(product: Product): void {
+    if (!this.canAddQuantity(product)) return;
+    const ref = this.dialog.open(AddQuantityDialogComponent, {
+      width: '720px',
+      maxWidth: '96vw',
+      data: { product },
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.getproducts();
+    });
   }
 
   openProductHistory(product: Product): void {

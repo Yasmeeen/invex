@@ -1,0 +1,103 @@
+<div class="slaughter-dialog">
+  <h2 mat-dialog-title class="slaughter-dialog__title">{{ 'tr_slaughter_submit' | translate }}</h2>
+
+  <div mat-dialog-content class="slaughter-dialog__body">
+    <div class="row">
+      <div class="col-md-6" *ngIf="showBranchFilter">
+        <div class="form-group">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="branchId"
+            (ngModelChange)="onBranchChange()"
+            [clearable]="false"
+            appendTo="body"
+          ></ng-select>
+        </div>
+      </div>
+      <div [class.col-md-6]="showBranchFilter" [class.col-md-12]="!showBranchFilter">
+        <div class="form-group">
+          <label>{{ 'tr_slaughter_animal' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="farmAnimals"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="farmProductId"
+            (ngModelChange)="onFarmChange()"
+            [clearable]="true"
+            appendTo="body"
+          ></ng-select>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_slaughter_share' | translate }}</label>
+          <select class="s-control" [(ngModel)]="share">
+            <option [ngValue]="1">1</option>
+            <option [ngValue]="0.5">1/2</option>
+            <option [ngValue]="0.25">1/4</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_slaughter_live_weight' | translate }}</label>
+          <input class="s-control" type="number" step="0.001" min="0" [(ngModel)]="liveWeightKg" />
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_slaughter_waste' | translate }}</label>
+          <input class="s-control" type="number" step="0.001" min="0" [(ngModel)]="wasteKg" />
+        </div>
+      </div>
+    </div>
+
+    <div class="slaughter-outputs" *ngIf="selectedTemplate">
+      <h3 class="slaughter-outputs__title">
+        {{ selectedTemplateName }} — {{ 'tr_slaughter_outputs' | translate }}
+      </h3>
+      <div class="slaughter-output-row slaughter-output-row--head">
+        <span class="slaughter-output-row__name">{{ 'tr_slaughter_outputs' | translate }}</span>
+        <span class="slaughter-output-row__kind">{{ 'tr_slaughter_kind' | translate }}</span>
+        <span class="slaughter-output-row__qty">{{ 'tr_slaughter_qty_kg' | translate }}</span>
+      </div>
+      <div class="slaughter-output-row" *ngFor="let o of outputRows">
+        <span class="slaughter-output-row__name" [attr.title]="o.label">{{ o.label }}</span>
+        <span
+          class="slaughter-output-row__kind"
+          [class.slaughter-kind--fridge]="o.kind === 'fridge'"
+          [class.slaughter-kind--offal]="o.kind === 'offal' || !o.kind"
+          [class.slaughter-kind--waste]="o.kind === 'waste'"
+        >
+          {{ kindLabel(o.kind) }}
+        </span>
+        <input
+          class="s-control slaughter-output-row__qty"
+          type="number"
+          step="0.001"
+          min="0"
+          [(ngModel)]="o.quantity"
+        />
+      </div>
+    </div>
+
+    <div class="form-group mb-0 mt-3">
+      <label>{{ 'tr_notes' | translate }}</label>
+      <textarea class="s-control width-100" rows="2" [(ngModel)]="notes"></textarea>
+    </div>
+  </div>
+
+  <div mat-dialog-actions align="end" class="slaughter-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
+      {{ 'tr_slaughter_submit' | translate }}
+    </button>
+  </div>
+</div>

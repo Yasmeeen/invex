@@ -16,6 +16,13 @@ function coerceTreasurySplitsArray(raw) {
   return [];
 }
 
+/** Preserve fractional qty (weight/farm); fall back to 1 when missing/invalid. */
+function coercePurchaseLineQty(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return n;
+}
+
 export function getPurchaseLines(purchase) {
   const doc =
     purchase && typeof purchase.toObject === 'function' ? purchase.toObject() : purchase;
@@ -24,7 +31,7 @@ export function getPurchaseLines(purchase) {
     return rawLines
       .map((l) => ({
         productPayload: l?.productPayload || null,
-        quantity: Math.max(1, Math.floor(Number(l?.quantity) || 1)),
+        quantity: coercePurchaseLineQty(l?.quantity),
         createdProductId: l?.createdProductId,
         createdProductIds: Array.isArray(l?.createdProductIds) ? l.createdProductIds : undefined,
       }))
@@ -34,7 +41,7 @@ export function getPurchaseLines(purchase) {
   return [
     {
       productPayload: doc.productPayload,
-      quantity: Math.max(1, Math.floor(Number(doc.quantity) || 1)),
+      quantity: coercePurchaseLineQty(doc.quantity),
       createdProductId: doc.createdProductId,
       createdProductIds: Array.isArray(doc.createdProductIds) ? doc.createdProductIds : undefined,
     },
@@ -44,7 +51,7 @@ export function getPurchaseLines(purchase) {
 /** Line cost: sum of unitDetails.netPrice when multi-unit prices differ; else netPrice × qty. */
 export function purchaseLineNetTotal(line) {
   const pp = line?.productPayload;
-  const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+  const q = coercePurchaseLineQty(line?.quantity);
   const details = Array.isArray(pp?.unitDetails) ? pp.unitDetails : null;
   if (details && details.length === q) {
     return round2(details.reduce((acc, d) => acc + (Number(d?.netPrice) || 0), 0));

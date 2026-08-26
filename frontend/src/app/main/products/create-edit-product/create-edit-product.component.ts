@@ -111,6 +111,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   /** Fridge/carcass product this cut deducts from (butcher). */
   selectedSourceProductId: string | null = null;
   sourceStockCandidates: Product[] = [];
+  productType: 'good' | 'service' | 'farm' = 'good';
+  /** Extra cost on top of fridge source (manufactured goods) — butcher/farm only. */
+  processingExtraCost: number | '' = 0;
   /** Storefront description pushed to the e-commerce catalog. */
   ecommerceDescription = '';
   ecommerceShortDescription = '';
@@ -423,7 +426,22 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   get cutFromSourceEnabled(): boolean {
-    return !!this.storeSettings.snapshot.cutFromSourceEnabled;
+    return this.storeSettings.butcherFeaturesEnabled && !!this.storeSettings.snapshot.cutFromSourceEnabled;
+  }
+
+  get showProductTypeField(): boolean {
+    return this.storeSettings.butcherFeaturesEnabled;
+  }
+
+  /** Butcher/farm: cost may be left empty (null). General: auto-filled from sell − discount. */
+  get netPriceTrulyOptional(): boolean {
+    return this.storeSettings.butcherFeaturesEnabled;
+  }
+
+  get netPriceOptionalHintKey(): string {
+    return this.netPriceTrulyOptional
+      ? 'tr_net_price_optional_butcher'
+      : 'tr_net_price_optional';
   }
 
   get isCutFromSourceSku(): boolean {
@@ -665,7 +683,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     | Array<{
         code: string;
         price: number;
-        netPrice: number;
+        netPrice: number | null;
         discount: number;
         attributes: Record<string, string>;
         imageUrl: string;
@@ -702,7 +720,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         );
         return null;
       }
-      let netPrice: number;
+      let netPrice: number | null;
       if (row.netPrice === '' || row.netPrice == null) {
         if (this.cashDeskPurchase) {
           this.appNotificationService.push(
@@ -711,7 +729,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
           );
           return null;
         }
-        netPrice = Math.round(price * (1 - discountRaw / 100) * 100) / 100;
+        if (this.netPriceTrulyOptional) {
+          netPrice = null;
+        } else {
+          netPrice = Math.round(price * (1 - discountRaw / 100) * 100) / 100;
+        }
       } else {
         netPrice = Number(row.netPrice);
         if (Number.isNaN(netPrice) || netPrice < 0) {
@@ -725,7 +747,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       details.push({
         code: codes[i],
         price: Math.round(price * 100) / 100,
-        netPrice: Math.round(netPrice * 100) / 100,
+        netPrice:
+          netPrice == null ? null : Math.round(netPrice * 100) / 100,
         discount: Math.round(discountRaw * 100) / 100,
         attributes: this.buildAttributesPayloadFromMap(row.attributes),
         imageUrl: String(row.imageUrl || '').trim() || sharedImage,
@@ -1298,13 +1321,18 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         name: response.name,
         code: response.code,
         price: response.price,
-        netPrice: response.netPrice,
+        netPrice: response.netPrice == null ? '' : response.netPrice,
         stock: response.stock,
         discount: response.discount,
         category: response.category,
         branch: response.branch || null,
         addedBy: response.addedBy || '',
       });
+      this.productType = (response as any).productType === 'service' || (response as any).productType === 'farm'
+        ? (response as any).productType
+        : 'good';
+      const pec = Number((response as any).processingExtraCost);
+      this.processingExtraCost = Number.isFinite(pec) && pec >= 0 ? pec : 0;
       this.productImageUrl = response.imageUrl || '';
       const srcRaw = response.sourceProductId;
       this.selectedSourceProductId =
@@ -1954,7 +1982,7 @@ private submitDeskPurchaseRequest(): void {
     | Array<{
         code: string;
         price: number;
-        netPrice: number;
+        netPrice: number | null;
         discount: number;
         attributes: Record<string, string>;
         imageUrl: string;
@@ -1992,9 +2020,16 @@ private submitDeskPurchaseRequest(): void {
 
   if (deskUnitDetails?.length) {
     priceNum = deskUnitDetails[0].price;
-    netNum = deskUnitDetails[0].netPrice;
+    netNum = Number(deskUnitDetails[0].netPrice);
     discountNum = deskUnitDetails[0].discount;
     attributesPayload = deskUnitDetails[0].attributes;
+    if (deskUnitDetails[0].netPrice == null || Number.isNaN(netNum) || netNum < 0) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_desk_purchase_net_required'),
+        'error'
+      );
+      return;
+    }
   } else if (fv.netPrice === '' || fv.netPrice == null || Number.isNaN(netNum) || netNum < 0) {
     this.appNotificationService.push(
       this.translateService.instant('tr_desk_purchase_net_required'),
@@ -2046,7 +2081,10 @@ private submitDeskPurchaseRequest(): void {
     deskProduct.unitCodes = [...deskMultiUnits];
   }
   if (deskUnitDetails?.length) {
-    deskProduct.unitDetails = deskUnitDetails.map((d) => ({ ...d }));
+    deskProduct.unitDetails = deskUnitDetails.map((d) => ({
+      ...d,
+      netPrice: Number(d.netPrice),
+    }));
   }
   const acquiredFrom = this.buildAcquiredFromPayload();
   if (acquiredFrom) {
@@ -2182,7 +2220,7 @@ createProduct() {
     | Array<{
         code: string;
         price: number;
-        netPrice: number;
+        netPrice: number | null;
         discount: number;
         attributes: Record<string, string>;
         imageUrl: string;
@@ -2261,9 +2299,18 @@ createProduct() {
   if (this.cutFromSourceEnabled) {
     payload.sourceProductId = this.selectedSourceProductId || null;
   }
-  // Let backend compute netPrice when left empty.
+  payload.productType = this.showProductTypeField ? this.productType : 'good';
+  if (this.showProductTypeField || this.cutFromSourceEnabled) {
+    const pec = Number(this.processingExtraCost);
+    payload.processingExtraCost = Number.isFinite(pec) && pec >= 0 ? Math.round(pec * 100) / 100 : 0;
+  }
+  // Empty netPrice: general → omit (backend auto-fills); butcher/farm → send null (optional).
   if (payload.netPrice === '' || payload.netPrice == null) {
-    delete payload.netPrice;
+    if (this.netPriceTrulyOptional) {
+      payload.netPrice = null;
+    } else {
+      delete payload.netPrice;
+    }
   }
   // Ensure numeric discount payload (discount is a percentage 0..100).
   if (payload.discount === '' || payload.discount == null) {
@@ -2382,9 +2429,13 @@ updateProduct() {
     imageUrl: this.productImageUrl,
     attributes: this.buildAttributesPayload(),
   };
-  // Let backend compute netPrice when left empty.
+  // Empty netPrice: general → omit (backend auto-fills); butcher/farm → send null (optional).
   if (payload.netPrice === '' || payload.netPrice == null) {
-    delete payload.netPrice;
+    if (this.netPriceTrulyOptional) {
+      payload.netPrice = null;
+    } else {
+      delete payload.netPrice;
+    }
   }
   // Ensure numeric discount payload (discount is a percentage 0..100).
   if (payload.discount === '' || payload.discount == null) {
@@ -2396,6 +2447,11 @@ updateProduct() {
   this.attachAcquiredFromToPayload(payload);
   if (this.cutFromSourceEnabled) {
     payload.sourceProductId = this.selectedSourceProductId || null;
+  }
+  payload.productType = this.showProductTypeField ? this.productType : 'good';
+  if (this.showProductTypeField || this.cutFromSourceEnabled) {
+    const pec = Number(this.processingExtraCost);
+    payload.processingExtraCost = Number.isFinite(pec) && pec >= 0 ? Math.round(pec * 100) / 100 : 0;
   }
   payload.userId = this.globals.currentUser?._id;
   payload.listedOnEcommerce = this.showOnlineListingOption ? Boolean(this.listedOnEcommerce) : false;

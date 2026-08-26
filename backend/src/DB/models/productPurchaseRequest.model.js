@@ -117,7 +117,8 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       },
     },
 
-    quantity: { type: Number, required: true, min: 1, default: 1 },
+    /** Units / kg / heads (fractional allowed for weight & farm top-ups). */
+    quantity: { type: Number, required: true, min: 0, default: 1 },
 
     /**
      * Multi-product purchase invoice lines (exchange / multi trade-in).
@@ -160,7 +161,7 @@ const productPurchaseRequestSchema = new mongoose.Schema(
               address: { type: String, trim: true, default: '' },
             },
           },
-          quantity: { type: Number, required: true, min: 1, default: 1 },
+          quantity: { type: Number, required: true, min: 0, default: 1 },
           createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
           createdProductIds: {
             type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],

@@ -29,15 +29,30 @@ import {
   resolveCutSourceFields,
 } from '../../utils/cut-from-source.js';
 import {
-  notifyProductChanged,
-  notifyProductDeleted,
-} from '../integrations_module/catalogSync.js';
+  normalizeIncomingStock,
+  normalizeProductType,
+} from '../../utils/product-type.util.js';
+import {
+  normalizeBusinessActivityType,
+  butcherFeaturesEnabled,
+  isButcherOrFarmActivity,
+} from '../../utils/business-activity.util.js';
+import { notifyProductChanged } from '../integrations_module/catalogSync.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
 function parseListedOnEcommerce(body) {
   const v = body?.listedOnEcommerce;
   return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+/** Extra processing cost — only when butcher/farm activity; otherwise ignored (0). */
+function resolveProcessingExtraCost(raw, butcherOn) {
+  if (!butcherOn) return 0;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100) / 100;
 }
 
 function normalizeEcommerceDescription(raw) {
@@ -451,6 +466,10 @@ async function createOrReviveProductRow({
   ecommerceIsFeatured,
   acquiredFromFields = {},
   sourceProductId,
+  productType,
+  catalogKey,
+  sellByWeightOverride,
+  processingExtraCost,
 }) {
   const filter = isWarehouse ? { code, branch: null } : { code, branch: branchOid };
   const existing = await Product.findOne(filter);
@@ -486,6 +505,10 @@ async function createOrReviveProductRow({
     if (sourceProductId !== undefined) {
       existing.sourceProductId = sourceProductId;
     }
+    if (productType !== undefined) existing.productType = normalizeProductType(productType);
+    if (catalogKey !== undefined) existing.catalogKey = catalogKey;
+    if (sellByWeightOverride !== undefined) existing.sellByWeightOverride = sellByWeightOverride;
+    if (processingExtraCost !== undefined) existing.processingExtraCost = processingExtraCost;
     await existing.save();
     return { ok: true, product: existing, revived: true };
   }
@@ -494,7 +517,7 @@ async function createOrReviveProductRow({
     code,
     price,
     netPrice,
-    stock: Math.max(0, Math.floor(Number(stock) || 0)),
+    stock: Math.max(0, Number(stock) || 0),
     discount,
     category: categoryId,
     branch: isWarehouse ? null : branchOid,
@@ -506,6 +529,10 @@ async function createOrReviveProductRow({
     ecommerceDescription,
     ecommerceShortDescription,
     ecommerceIsFeatured,
+    productType: normalizeProductType(productType),
+    ...(catalogKey ? { catalogKey } : {}),
+    ...(sellByWeightOverride !== undefined ? { sellByWeightOverride } : {}),
+    ...(processingExtraCost !== undefined ? { processingExtraCost } : {}),
     ...acquiredFromFields,
     ...(sourceProductId !== undefined ? { sourceProductId } : {}),
   });
@@ -535,16 +562,26 @@ const normalizeImageUrl = (raw) => {
 /** Optional employee name who registered the product (trimmed, max 200 chars). */
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
 
-/** If netPrice omitted/empty, use price - (price * discount% / 100) (clamped to >= 0). */
-const resolveNetPrice = (priceNum, discountNum, netPriceRaw) => {
+/**
+ * Resolve purchase/net cost.
+ * - General stores: empty → price − discount% (legacy).
+ * - Butcher/farm: empty → null (optional; hidden on product cards).
+ */
+const resolveNetPrice = (priceNum, discountNum, netPriceRaw, { allowEmpty = false } = {}) => {
   const d = Number(discountNum);
   const discPct = Number.isFinite(d) && d >= 0 ? d : 0;
   if (netPriceRaw === undefined || netPriceRaw === null || String(netPriceRaw).trim() === '') {
+    if (allowEmpty) return null;
     return Math.max(0, priceNum - (priceNum * discPct) / 100);
   }
   const n = Number(netPriceRaw);
   if (Number.isNaN(n)) return NaN;
   return n;
+};
+
+const isValidNetPriceValue = (netNum) => {
+  if (netNum === null) return true;
+  return !Number.isNaN(netNum) && netNum >= 0;
 };
 
 const normalizeAttrKey = (raw) =>
@@ -1228,6 +1265,7 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     listedOnline,
     listedOnEcommerce,
     categoryId,
+    productType,
     attrKey,
     attrValue,
     includeRemoved,
@@ -1321,6 +1359,10 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     query.category = categoryIds[0];
   } else if (categoryIds.length > 1) {
     query.category = { $in: categoryIds };
+  }
+
+  if (productType) {
+    query.productType = normalizeProductType(productType);
   }
 
   const branchIds = toObjectIds(parseOidCsvList(branchId));
@@ -1471,10 +1513,6 @@ export const createProduct = async (req, res) => {
     if (discountNum > 100) {
       return res.status(400).json({ error: 'Invalid discount (must be <= 100%)' });
     }
-    const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
-    if (Number.isNaN(netNum) || netNum < 0) {
-      return res.status(400).json({ error: 'Invalid net price' });
-    }
 
     if (
       !name ||
@@ -1524,6 +1562,12 @@ export const createProduct = async (req, res) => {
 
     const catRow = await Category.findById(categoryId).select('multiCodePerPiece sellByWeight code').lean();
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const netNum = resolveNetPrice(priceNum, discountNum, netPrice, {
+      allowEmpty: butcherFeaturesEnabled(settingsDoc),
+    });
+    if (!isValidNetPriceValue(netNum)) {
+      return res.status(400).json({ error: 'Invalid net price' });
+    }
     const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
     const categoryMultiCode = !!catRow?.multiCodePerPiece;
     if (catRow?.sellByWeight && categoryMultiCode) {
@@ -1531,7 +1575,25 @@ export const createProduct = async (req, res) => {
         error: 'Category cannot combine sell-by-weight with multi-code-per-piece',
       });
     }
-    const isWeightCategory = resolveSellByWeight({ weightSalesEnabled, category: catRow });
+    const productTypeNorm = normalizeProductType(req.body.productType);
+    if (!butcherFeaturesEnabled(settingsDoc) && productTypeNorm !== 'good') {
+      return res.status(400).json({
+        error: 'Farm and service product types require butcher or farm activity in store settings',
+      });
+    }
+    const overrideRaw = req.body.sellByWeightOverride;
+    const sellByWeightOverrideCreate =
+      overrideRaw === true || overrideRaw === 'true'
+        ? true
+        : overrideRaw === false || overrideRaw === 'false'
+          ? false
+          : undefined;
+    const isWeightCategory = resolveSellByWeight({
+      weightSalesEnabled,
+      category: catRow,
+      product:
+        sellByWeightOverrideCreate === undefined ? {} : { sellByWeightOverride: sellByWeightOverrideCreate },
+    });
     const sourceFields = await resolveCutSourceFields(req.body, {
       branchOid: isWarehouse ? null : branch?._id,
       isWarehouse,
@@ -1542,18 +1604,34 @@ export const createProduct = async (req, res) => {
     }
     const sourceCreateArg = sourceFields.skip ? {} : { sourceProductId: sourceFields.sourceProductId };
     const isCutSku = !sourceFields.skip && !!sourceFields.sourceProductId;
-    let normalizedStock = stockNum;
-    if (isCutSku) {
-      normalizedStock = 0;
-    } else if (isWeightCategory) {
-      if (stockNum < 0) {
-        return res.status(400).json({ error: 'Invalid stock' });
-      }
-      normalizedStock = roundWeight(stockNum);
-    } else if (Number.isNaN(stockNum) || stockNum < 1) {
-      return res.status(400).json({ error: 'Stock must be at least 1' });
-    } else {
-      normalizedStock = Math.max(1, Math.floor(stockNum));
+    const stockNorm = normalizeIncomingStock({
+      stockNum,
+      isCutSku,
+      isWeightCategory,
+      productType: productTypeNorm,
+      isCreate: true,
+    });
+    if (!stockNorm.ok) {
+      return res.status(400).json({ error: stockNorm.error });
+    }
+    const normalizedStock = stockNorm.stock;
+    const catalogKeyCreate = String(req.body.catalogKey || '').trim();
+    const typeCreateArg = {
+      productType: productTypeNorm,
+      ...(catalogKeyCreate ? { catalogKey: catalogKeyCreate } : {}),
+      ...(sellByWeightOverrideCreate !== undefined
+        ? { sellByWeightOverride: sellByWeightOverrideCreate }
+        : {}),
+    };
+    const extraCostCreate = resolveProcessingExtraCost(
+      req.body.processingExtraCost,
+      butcherFeaturesEnabled(settingsDoc)
+    );
+    if (extraCostCreate === null) {
+      return res.status(400).json({ error: 'processingExtraCost must be a number >= 0' });
+    }
+    if (butcherFeaturesEnabled(settingsDoc)) {
+      typeCreateArg.processingExtraCost = extraCostCreate;
     }
     const categoryPrefix = catRow?.code || '';
     const unitCount = categoryMultiCode ? Math.max(1, Math.floor(stockNum)) : 1;
@@ -1571,9 +1649,21 @@ export const createProduct = async (req, res) => {
             return res.status(400).json({ error: `unitDetails[${i}] requires a code` });
           }
           const p = Number(row.price);
-          const n = Number(row.netPrice);
-          if (Number.isNaN(p) || p < 0 || Number.isNaN(n) || n < 0) {
-            return res.status(400).json({ error: `Valid price and netPrice required for unit ${i + 1}` });
+          if (Number.isNaN(p) || p < 0) {
+            return res.status(400).json({ error: `Valid price required for unit ${i + 1}` });
+          }
+          const allowEmptyNet = butcherFeaturesEnabled(settingsDoc);
+          let finalUnitNet;
+          if (row.netPrice === undefined || row.netPrice === null || String(row.netPrice).trim() === '') {
+            finalUnitNet = allowEmptyNet
+              ? null
+              : Math.max(0, p - (p * discountNum) / 100);
+          } else {
+            const n = Number(row.netPrice);
+            if (Number.isNaN(n) || n < 0) {
+              return res.status(400).json({ error: `Valid netPrice required for unit ${i + 1}` });
+            }
+            finalUnitNet = n;
           }
           const dRaw =
             row.discount === undefined || row.discount === null || row.discount === ''
@@ -1596,7 +1686,8 @@ export const createProduct = async (req, res) => {
           details.push({
             code: c,
             price: Math.round(p * 100) / 100,
-            netPrice: Math.round(n * 100) / 100,
+            netPrice:
+              finalUnitNet == null ? null : Math.round(finalUnitNet * 100) / 100,
             discount: Math.round(dRaw * 100) / 100,
             attributes: unitAttrs,
             imageUrl: normalizeImageUrl(row.imageUrl) || imageUrlNorm || '',
@@ -1826,6 +1917,7 @@ export const createProduct = async (req, res) => {
         ecommerceIsFeatured,
         ...acquiredFromFields,
         ...sourceCreateArg,
+        ...typeCreateArg,
       });
       if (!row.ok) {
         return res.status(409).json({ error: row.error, code: row.code });
@@ -1878,6 +1970,7 @@ export const createProduct = async (req, res) => {
       ecommerceIsFeatured,
       ...acquiredFromFields,
       ...sourceCreateArg,
+      ...typeCreateArg,
     });
     if (!row.ok) {
       return res.status(409).json({
@@ -1952,10 +2045,6 @@ export const updateProduct = async (req, res) => {
     if (discountNum > 100) {
       return res.status(400).json({ error: 'Invalid discount (must be <= 100%)' });
     }
-    const netNum = resolveNetPrice(priceNum, discountNum, netPrice);
-    if (Number.isNaN(netNum) || netNum < 0) {
-      return res.status(400).json({ error: 'Invalid net price' });
-    }
 
     if (
       !name ||
@@ -1985,9 +2074,39 @@ export const updateProduct = async (req, res) => {
 
     const catRowUpdate = await Category.findById(categoryId).select('sellByWeight multiCodePerPiece').lean();
     const settingsDocUpdate = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    const netNum = resolveNetPrice(priceNum, discountNum, netPrice, {
+      allowEmpty: butcherFeaturesEnabled(settingsDocUpdate),
+    });
+    if (!isValidNetPriceValue(netNum)) {
+      return res.status(400).json({ error: 'Invalid net price' });
+    }
+    const productTypeUpdate = Object.prototype.hasOwnProperty.call(req.body, 'productType')
+      ? normalizeProductType(req.body.productType)
+      : normalizeProductType((await Product.findById(req.params.id).select('productType').lean())?.productType);
+    if (
+      Object.prototype.hasOwnProperty.call(req.body, 'productType') &&
+      !butcherFeaturesEnabled(settingsDocUpdate) &&
+      productTypeUpdate !== 'good'
+    ) {
+      return res.status(400).json({
+        error: 'Farm and service product types require butcher or farm activity in store settings',
+      });
+    }
+    const overrideRawUpdate = req.body.sellByWeightOverride;
+    const sellByWeightOverrideUpdate = Object.prototype.hasOwnProperty.call(req.body, 'sellByWeightOverride')
+      ? overrideRawUpdate === true || overrideRawUpdate === 'true'
+        ? true
+        : overrideRawUpdate === false || overrideRawUpdate === 'false'
+          ? false
+          : null
+      : undefined;
     const isWeightCategoryUpdate = resolveSellByWeight({
       weightSalesEnabled: !!settingsDocUpdate?.weightSalesEnabled,
       category: catRowUpdate,
+      product:
+        sellByWeightOverrideUpdate === undefined
+          ? {}
+          : { sellByWeightOverride: sellByWeightOverrideUpdate },
     });
     const sourceFieldsUpdate = await resolveCutSourceFields(req.body, {
       productId: req.params.id,
@@ -1998,19 +2117,17 @@ export const updateProduct = async (req, res) => {
     if (sourceFieldsUpdate.error) {
       return res.status(400).json({ error: sourceFieldsUpdate.error });
     }
-    let normalizedStock = stockNum;
-    if (!sourceFieldsUpdate.skip && sourceFieldsUpdate.sourceProductId) {
-      normalizedStock = 0;
-    } else if (isWeightCategoryUpdate) {
-      if (stockNum < 0) {
-        return res.status(400).json({ error: 'Invalid stock' });
-      }
-      normalizedStock = roundWeight(stockNum);
-    } else if (stockNum < 0) {
-      return res.status(400).json({ error: 'Invalid stock' });
-    } else {
-      normalizedStock = Math.max(0, Math.floor(stockNum));
+    const stockNormUpdate = normalizeIncomingStock({
+      stockNum,
+      isCutSku: !sourceFieldsUpdate.skip && !!sourceFieldsUpdate.sourceProductId,
+      isWeightCategory: isWeightCategoryUpdate,
+      productType: productTypeUpdate,
+      isCreate: false,
+    });
+    if (!stockNormUpdate.ok) {
+      return res.status(400).json({ error: stockNormUpdate.error });
     }
+    const normalizedStock = stockNormUpdate.stock;
 
     const codeCheck = await validateProductCodeForCategory(categoryId, code);
     if (!codeCheck.ok) {
@@ -2102,6 +2219,31 @@ export const updateProduct = async (req, res) => {
       if (!sourceFieldsUpdate.skip) {
         updateDoc.sourceProductId = sourceFieldsUpdate.sourceProductId;
       }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'productType')) {
+        updateDoc.productType = productTypeUpdate;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, 'catalogKey')) {
+        updateDoc.catalogKey = String(req.body.catalogKey || '').trim();
+      }
+      if (sellByWeightOverrideUpdate !== undefined) {
+        updateDoc.sellByWeightOverride = sellByWeightOverrideUpdate;
+      }
+      if (butcherFeaturesEnabled(settingsDocUpdate)) {
+        const extraUp = resolveProcessingExtraCost(
+          Object.prototype.hasOwnProperty.call(req.body, 'processingExtraCost')
+            ? req.body.processingExtraCost
+            : undefined,
+          true
+        );
+        if (Object.prototype.hasOwnProperty.call(req.body, 'processingExtraCost')) {
+          if (extraUp === null) {
+            return res.status(400).json({ error: 'processingExtraCost must be a number >= 0' });
+          }
+          updateDoc.processingExtraCost = extraUp;
+        }
+      } else if (Object.prototype.hasOwnProperty.call(req.body, 'processingExtraCost')) {
+        updateDoc.processingExtraCost = 0;
+      }
       if (imageUrlNorm !== undefined) {
         updateDoc.imageUrl = imageUrlNorm;
       }
@@ -2188,6 +2330,26 @@ export const updateProduct = async (req, res) => {
     };
     if (!sourceFieldsUpdate.skip) {
       updateDocBranch.sourceProductId = sourceFieldsUpdate.sourceProductId;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'productType')) {
+      updateDocBranch.productType = productTypeUpdate;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'catalogKey')) {
+      updateDocBranch.catalogKey = String(req.body.catalogKey || '').trim();
+    }
+    if (sellByWeightOverrideUpdate !== undefined) {
+      updateDocBranch.sellByWeightOverride = sellByWeightOverrideUpdate;
+    }
+    if (butcherFeaturesEnabled(settingsDocUpdate)) {
+      if (Object.prototype.hasOwnProperty.call(req.body, 'processingExtraCost')) {
+        const extraBranch = resolveProcessingExtraCost(req.body.processingExtraCost, true);
+        if (extraBranch === null) {
+          return res.status(400).json({ error: 'processingExtraCost must be a number >= 0' });
+        }
+        updateDocBranch.processingExtraCost = extraBranch;
+      }
+    } else if (Object.prototype.hasOwnProperty.call(req.body, 'processingExtraCost')) {
+      updateDocBranch.processingExtraCost = 0;
     }
     if (imageUrlNorm !== undefined) {
       updateDocBranch.imageUrl = imageUrlNorm;

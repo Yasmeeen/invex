@@ -25,8 +25,9 @@ const productSchema = new mongoose.Schema(
     },
     netPrice: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
+      default: null,
     },
     stock: {
       type: Number,
@@ -52,6 +53,22 @@ const productSchema = new mongoose.Schema(
     /** null/undefined = inherit category.sellByWeight; true/false = override. */
     sellByWeightOverride: { type: Boolean, required: false, default: undefined },
     /**
+     * good: inventory SKU; service: sold without stock deduction; farm: live animal heads (0.25 steps).
+     */
+    productType: {
+      type: String,
+      enum: ['good', 'service', 'farm'],
+      default: 'good',
+      index: true,
+    },
+    /** Stable catalog key (Al-Raji seed / slaughter templates), unique per branch. */
+    catalogKey: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    /**
      * When store cutFromSourceEnabled: selling this SKU deducts stock from the source (carcass / fridge piece).
      * Cut SKUs typically keep stock 0; inventory lives on the source.
      */
@@ -61,6 +78,16 @@ const productSchema = new mongoose.Schema(
       required: false,
       default: null,
       index: true,
+    },
+    /**
+     * Extra processing cost per unit/kg (spices, labor, casing) on top of source fridge cost.
+     * Used for manufactured cuts when butcher/farm activity + cut-from-source sale.
+     * Ignored for general stores.
+     */
+    processingExtraCost: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     branch: {
       type: mongoose.Schema.Types.ObjectId,

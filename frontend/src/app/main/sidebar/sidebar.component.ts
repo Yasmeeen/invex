@@ -37,6 +37,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   private readonly collapseStorageKey = 'appSidebarCollapsed';
   private readonly pendingTransfersLink = '/products/branch-transfers';
+  private readonly slaughterLink = '/slaughter';
   private readonly installmentOnlyLinks = new Set([
     '/collections',
     '/collections/due',
@@ -74,6 +75,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
       this.baseSidebar = AdminSidebar;
     }
     this.appSidebar = this.filterSidebar(this.baseSidebar);
+
+    this.subscriptions.push(
+      this.storeSettings.settings$.subscribe(() => {
+        this.appSidebar = this.filterSidebar(this.baseSidebar);
+      })
+    );
 
   }
 
@@ -207,28 +214,45 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private filterSidebar(items: SidebarItem[]): SidebarItem[] {
+    const butcherOn = this.storeSettings.butcherFeaturesEnabled;
+    let filtered = items;
     if (this.hasSaleInstallments) {
-      return items;
+      filtered = items;
+    } else {
+      filtered = items
+        .map((item) => {
+          if (!item.children?.length) {
+            return item;
+          }
+          return {
+            ...item,
+            children: this.filterSidebar(item.children),
+          };
+        })
+        .filter((item) => {
+          if (this.installmentOnlyLinks.has(String(item.routerLink || ''))) {
+            return false;
+          }
+          if (item.routerLink === 'null' && item.children && !item.children.length) {
+            return false;
+          }
+          return true;
+        });
     }
-    return items
-      .map((item) => {
-        if (!item.children?.length) {
-          return item;
-        }
-        return {
-          ...item,
-          children: this.filterSidebar(item.children),
-        };
-      })
-      .filter((item) => {
-        if (this.installmentOnlyLinks.has(String(item.routerLink || ''))) {
-          return false;
-        }
-        if (item.routerLink === 'null' && item.children && !item.children.length) {
-          return false;
-        }
-        return true;
-      });
+    if (!butcherOn) {
+      filtered = filtered
+        .map((item) => {
+          if (!item.children?.length) {
+            return item;
+          }
+          return {
+            ...item,
+            children: item.children.filter((c) => c.routerLink !== this.slaughterLink),
+          };
+        })
+        .filter((item) => item.routerLink !== this.slaughterLink);
+    }
+    return filtered;
   }
 
 

@@ -7,9 +7,11 @@
   },
   "files": [
     "src/main.ts",
-    "src/polyfills.ts"
+    "src/polyfills.ts",
+    "src/app/main/slaughter/slaughter.module.ts"
   ],
   "include": [
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "src/app/main/slaughter/**/*.ts"
   ]
 }

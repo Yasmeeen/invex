@@ -95,6 +95,30 @@
       </div>
 
       <div class="store-settings-card__field">
+        <label class="store-settings-card__label" for="businessActivityType">
+          {{ 'tr_business_activity_type' | translate }}
+        </label>
+        <select
+          id="businessActivityType"
+          class="s-control"
+          name="businessActivityType"
+          [(ngModel)]="form.businessActivityType"
+          (ngModelChange)="onBusinessActivityChange()"
+        >
+          <option *ngFor="let opt of businessActivityOptions" [ngValue]="opt.value">
+            {{ opt.labelKey | translate }}
+          </option>
+        </select>
+        <p class="store-settings-card__hint">{{ 'tr_business_activity_type_hint' | translate }}</p>
+      </div>
+
+      <div class="store-settings-card__field" *ngIf="butcherFeaturesEnabled">
+        <p class="store-settings-card__hint store-settings-card__hint--section">
+          {{ 'tr_butcher_features_section_hint' | translate }}
+        </p>
+      </div>
+
+      <div class="store-settings-card__field">
         <label class="store-settings-card__policy-toggle checkbox-row">
           <input type="checkbox" name="weightSalesEnabled" [(ngModel)]="form.weightSalesEnabled" />
           <span>{{ 'tr_weight_sales_enabled' | translate }}</span>
@@ -102,7 +126,7 @@
         <p class="store-settings-card__hint">{{ 'tr_weight_sales_enabled_hint' | translate }}</p>
       </div>
 
-      <div class="store-settings-card__field">
+      <div class="store-settings-card__field" *ngIf="butcherFeaturesEnabled">
         <label class="store-settings-card__policy-toggle checkbox-row">
           <input type="checkbox" name="cutFromSourceEnabled" [(ngModel)]="form.cutFromSourceEnabled" />
           <span>{{ 'tr_cut_from_source_enabled' | translate }}</span>

@@ -57,7 +57,7 @@
             <span class="discount-badge">-{{ product.discount }}%</span>
           </div>
         </div>
-        <div class="col-md-4 col-6 mb-2" *ngIf="showNetPrice">
+        <div class="col-md-4 col-6 mb-2" *ngIf="productHasNetPrice">
           <span class="meta-label">{{ 'tr_net_price' | translate }}</span>
           <strong>{{ product.netPrice | currency:'EGP ':'symbol':'1.2-2' }}</strong>
         </div>

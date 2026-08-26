@@ -155,6 +155,17 @@
                     </div>
                   </div>
 
+                  <div class="col-md-12" *ngIf="showProductTypeField">
+                    <div class="form-group">
+                      <label>{{ 'tr_product_type' | translate }}</label>
+                      <select class="s-control" name="productType" [(ngModel)]="productType">
+                        <option value="good">{{ 'tr_product_type_good' | translate }}</option>
+                        <option value="service">{{ 'tr_product_type_service' | translate }}</option>
+                        <option value="farm">{{ 'tr_product_type_farm' | translate }}</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <!-- Stock / quantity (before codes so multi-code categories know how many unit fields to show) -->
                   <div class="col-md-12">
                     <div
@@ -175,8 +186,8 @@
                         #stock="ngModel"
                         ngModel
                         required
-                        [min]="isWeightCategory ? 0 : cashDeskPurchase ? 1 : 0"
-                        [step]="isWeightCategory ? 0.001 : 1"
+                        [min]="isWeightCategory || productType === 'service' || productType === 'farm' ? 0 : cashDeskPurchase ? 1 : 0"
+                        [step]="productType === 'farm' ? 0.25 : (isWeightCategory ? 0.001 : 1)"
                         (ngModelChange)="onStockQuantityChanged(); onDeskTreasuryCostInputsChanged()"
                       />
                       <p class="text-muted size-small m-0 mt-1" *ngIf="isCutFromSourceSku">
@@ -329,7 +340,7 @@
                       class="form-group"
                       [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
                     >
-                      <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ 'tr_net_price_optional' | translate }}</span></label>
+                      <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ netPriceOptionalHintKey | translate }}</span></label>
                       <input
                         type="number"
                         class="s-control"
@@ -345,6 +356,21 @@
                       >
                         {{ 'tr_net_price_invalid' | translate }}
                       </span>
+                    </div>
+                  </div>
+
+                  <div class="col-md-6" *ngIf="showProductTypeField || cutFromSourceEnabled">
+                    <div class="form-group">
+                      <label>{{ 'tr_processing_extra_cost' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="processingExtraCost"
+                        [(ngModel)]="processingExtraCost"
+                        min="0"
+                        step="0.01"
+                      />
+                      <p class="text-muted size-small mb-0">{{ 'tr_processing_extra_cost_hint' | translate }}</p>
                     </div>
                   </div>
 
@@ -855,7 +881,7 @@
                           class="form-group"
                           [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
                         >
-                          <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ 'tr_net_price_optional' | translate }}</span></label>
+                          <label>{{ 'tr_net_price' | translate }} <span class="text-muted size-small">{{ netPriceOptionalHintKey | translate }}</span></label>
                           <input
                             type="number"
                             class="s-control"

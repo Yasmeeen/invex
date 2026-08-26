@@ -32,6 +32,19 @@ import {
 } from '../../utils/purchase-treasury-splits.js';
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
 import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import { butcherFeaturesEnabled } from '../../utils/business-activity.util.js';
+import {
+  isFarmProduct,
+  isServiceProduct,
+  normalizeProductType,
+  roundFarmHeads,
+} from '../../utils/product-type.util.js';
+import {
+  normalizeWeightQuantity,
+  resolveSellByWeight,
+  roundWeight,
+} from '../../utils/sale-quantity.util.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
 
 function ecommerceCatalogFieldsFromSource(src) {
   return {
@@ -2414,5 +2427,354 @@ export const returnProductPurchaseRequest = async (req, res) => {
             : 500);
     console.error('returnProductPurchaseRequest:', error);
     return res.status(status).json({ error: msg, code: error?.code });
+  }
+};
+
+/**
+ * POST /product-purchase-requests/add-quantity
+ * Butcher/farm only: add stock to an existing product with cost + purchase treasuries + source party.
+ * Auto-approve roles only (stock applied immediately).
+ */
+export const addQuantityToExistingProduct = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const {
+      userId,
+      productId,
+      quantity: qtyRaw,
+      totalCost: totalCostRaw,
+      acquiredFrom,
+      purchaseTreasurySplits: treasurySplitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      branchId: branchIdRaw,
+    } = req.body || {};
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    const settings = await StoreSettings.findOne()
+      .select('businessActivityType weightSalesEnabled')
+      .lean();
+    if (!butcherFeaturesEnabled(settings)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({
+        error:
+          'Add quantity is only available when business activity is butcher or farm.',
+        code: 'BUSINESS_ACTIVITY_REQUIRED',
+      });
+    }
+
+    const actor = await User.findById(userId).select('_id name role branch').session(session);
+    if (!actor) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'User not found' });
+    }
+    if (!isAutoApproverRole(actor.role)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({
+        error: 'Only Branch Manager or higher can add quantity to stock',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    const product = await Product.findById(productId)
+      .populate('category', 'name code sellByWeight')
+      .session(session);
+    if (!product) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    if (isServiceProduct(product)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Cannot add stock to a service product' });
+    }
+
+    const productBranchId = product.branch ? String(product.branch) : null;
+    let branchId = productBranchId;
+    if (!branchId) {
+      const raw = String(branchIdRaw || '').trim();
+      if (raw && mongoose.Types.ObjectId.isValid(raw)) {
+        branchId = raw;
+      } else if (actor.branch) {
+        branchId = String(actor.branch);
+      }
+    }
+    if (!branchId || !mongoose.Types.ObjectId.isValid(branchId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'branchId is required for warehouse products',
+        code: 'BRANCH_REQUIRED',
+      });
+    }
+
+    if (actor.role === 'Branch Manager') {
+      const actorBranch = actor.branch ? String(actor.branch) : '';
+      if (!actorBranch || (productBranchId && productBranchId !== actorBranch)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cannot add quantity for another branch' });
+      }
+      if (!productBranchId && branchId !== actorBranch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cannot add quantity for another branch' });
+      }
+    }
+
+    const branch = await Branch.findById(branchId).select('_id').session(session).lean();
+    if (!branch) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Branch not found' });
+    }
+
+    const isWeight = resolveSellByWeight({
+      weightSalesEnabled: !!settings?.weightSalesEnabled,
+      category: product.category,
+      product,
+    });
+    const isFarm = isFarmProduct(product);
+    const qtyNum = Number(qtyRaw);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'quantity must be a number > 0' });
+    }
+
+    let q;
+    if (isFarm) {
+      q = roundFarmHeads(qtyNum);
+      if (q <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'quantity must be at least 0.25 head' });
+      }
+    } else if (isWeight) {
+      q = normalizeWeightQuantity(qtyNum);
+      if (q <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'quantity must be a valid weight > 0' });
+      }
+    } else {
+      q = Math.max(1, Math.floor(qtyNum));
+    }
+
+    const totalCost = Math.round((Number(totalCostRaw) || 0) * 100) / 100;
+    if (!Number.isFinite(totalCost) || totalCost <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'totalCost must be a number > 0' });
+    }
+
+    const unitNet = Math.round((totalCost / q) * 100) / 100;
+    const categoryId = product.category?._id || product.category;
+    if (!categoryId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Product has no category' });
+    }
+
+    const payload = {
+      name: String(product.name || '').trim(),
+      code: String(product.code || '').trim(),
+      category: new mongoose.Types.ObjectId(String(categoryId)),
+      price: Number(product.price) || 0,
+      netPrice: unitNet,
+      discount: Number(product.discount) || 0,
+      attributes:
+        product.attributes && typeof product.attributes === 'object' && !Array.isArray(product.attributes)
+          ? product.attributes
+          : {},
+      imageUrl: normalizeImageUrl(product.imageUrl),
+      notes: 'Stock top-up (add quantity)',
+    };
+
+    let acquiredFromFields = {};
+    try {
+      const resolved = await resolveProductAcquiredFrom(
+        { acquiredFrom },
+        { categoryId: String(categoryId), branchOid: branchId }
+      );
+      if (resolved?.acquiredFrom) {
+        acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+        payload.acquiredFrom = resolved.acquiredFrom;
+      }
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+    }
+
+    const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+    const tMap = treasuryMethodMap(treasuryMethods);
+    const treasuryNorm = normalizePurchaseTreasuryInput({
+      purchaseTreasurySplits: treasurySplitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      lineTotal: totalCost,
+      treasuryMethods,
+      tMap,
+      exchangeTradeIn: false,
+    });
+    if (treasuryNorm.error) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: treasuryNorm.error });
+    }
+    const {
+      splits: purchaseTreasurySplits,
+      treasuryKey: treasuryKeyNorm,
+      treasuryLabel: purchaseTreasuryLabel,
+      amountPaid: treasuryAmountPaid,
+      hasDeferred: treasuryHasDeferred,
+    } = treasuryNorm;
+
+    if (treasuryHasDeferred && !payload.acquiredFrom) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'Deferred purchase requires a client or supplier in the source tab',
+        code: 'DEFERRED_PARTY_REQUIRED',
+      });
+    }
+    if (
+      treasuryHasDeferred &&
+      payload.acquiredFrom?.partyType === 'supplier' &&
+      !payload.acquiredFrom?.vendorId
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'Deferred supplier purchase requires a registered supplier',
+        code: 'DEFERRED_SUPPLIER_REQUIRED',
+      });
+    }
+
+    const purchaseArr = await ProductPurchaseRequest.create(
+      [
+        {
+          status: 'approved',
+          branch: new mongoose.Types.ObjectId(String(branchId)),
+          createdBy: actor._id,
+          productPayload: payload,
+          quantity: q,
+          lines: [{ productPayload: payload, quantity: q, createdProductId: product._id }],
+          purchaseTreasuryKey: treasuryKeyNorm,
+          purchaseTreasuryLabel,
+          purchaseTreasurySplits,
+          createdProductId: product._id,
+          resolvedBy: actor._id,
+          resolvedAt: new Date(),
+          resolutionNote: 'Stock top-up (auto-approved)',
+          ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
+        },
+      ],
+      { session }
+    );
+    const created = purchaseArr[0];
+    if (purchaseTreasurySplits?.length) {
+      created.set('purchaseTreasurySplits', purchaseTreasurySplits);
+      created.markModified('purchaseTreasurySplits');
+      await created.save({ session });
+    }
+
+    const prevStock = Number(product.stock) || 0;
+    if (isFarm) {
+      product.stock = roundFarmHeads(prevStock + q);
+    } else if (isWeight) {
+      product.stock = roundWeight(prevStock + q);
+    } else {
+      product.stock = Math.max(0, Math.floor(prevStock) + q);
+    }
+    product.removedWhenOutOfStock = false;
+    product.netPrice = unitNet;
+    if (acquiredFromFields?.acquiredFrom) {
+      product.acquiredFrom = acquiredFromFields.acquiredFrom;
+      product.markModified('acquiredFrom');
+    }
+    await product.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    if (purchaseHasDeferredTreasury(created)) {
+      try {
+        await syncDeferredSupplierDeskPurchase(created, {
+          userId: actor._id,
+          actorName: actor?.name,
+        });
+      } catch (e) {
+        console.error('⚠️ deferred add-quantity vendor sync:', e?.message || e);
+      }
+    }
+
+    try {
+      await StockMovement.create({
+        movementType: 'purchase',
+        productId: product._id,
+        productName: product.name,
+        branchId,
+        fromBranchId: null,
+        toBranchId: branchId,
+        quantity: q,
+        unitPrice: unitNet,
+        totalValue: totalCost,
+        referenceType: 'productPurchaseRequest',
+        referenceId: created._id,
+        notes: `Stock top-up (add quantity)`,
+      });
+    } catch (e) {
+      console.warn('⚠️ add-quantity stock movement:', e?.message || e);
+    }
+
+    await auditLog(req, {
+      action: 'create',
+      module: 'product_purchase_requests',
+      entityType: 'ProductPurchaseRequest',
+      entityId: created._id,
+      message: 'Stock quantity added to existing product',
+      metadata: {
+        productId: String(product._id),
+        productCode: product.code,
+        quantity: q,
+        totalCost,
+        unitNet,
+        productType: normalizeProductType(product.productType),
+      },
+    });
+
+    await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
+
+    const purchaseOut = await leanPurchaseForResponse(created._id);
+    const productOut = await Product.findById(product._id)
+      .populate('category', 'name code sellByWeight')
+      .populate('branch', 'name')
+      .lean();
+
+    return res.status(201).json({
+      message: '✅ Quantity added',
+      purchase: purchaseOut || (created.toObject ? created.toObject() : created),
+      product: productOut,
+    });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('addQuantityToExistingProduct:', e);
+    return res.status(500).json({ error: 'Failed to add quantity', details: e?.message });
   }
 };

@@ -34,6 +34,11 @@ export class ProductDetailsDialogComponent {
     return !isModerator(this.globals.currentUser?.role);
   }
 
+  get productHasNetPrice(): boolean {
+    if (!this.showNetPrice) return false;
+    return this.product?.netPrice != null;
+  }
+
   get allowAddToOrder(): boolean {
     return !!this.data.allowAddToOrder;
   }

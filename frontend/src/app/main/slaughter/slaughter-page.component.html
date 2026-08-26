@@ -1,0 +1,61 @@
+<div class="content-shadow bg-white mb-5">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_slaughter' | translate }}</span>
+    <div class="btn-group">
+      <button type="button" class="s-btn btn-primary" (click)="openSlaughterDialog()">
+        {{ 'tr_slaughter_submit' | translate }}
+      </button>
+    </div>
+  </h2>
+  <p class="plr-4 text-muted size-caption mb-3">{{ 'tr_slaughter_hint' | translate }}</p>
+
+  <div class="plr-4 pb-3" *ngIf="showBranchFilter">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="branchId"
+            (ngModelChange)="onBranchChange()"
+            [clearable]="false"
+          ></ng-select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container plr-4 pb-4">
+    <table class="table" *ngIf="!loading && tickets.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_slaughter_animal' | translate }}</th>
+          <th>{{ 'tr_slaughter_share' | translate }}</th>
+          <th>{{ 'tr_slaughter_outputs' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tickets">
+          <td>{{ t.createdAt | date: 'short' }}</td>
+          <td>{{ ticketFarmName(t) }}</td>
+          <td>{{ t.share }}</td>
+          <td class="slaughter-outputs-cell">{{ ticketOutputsLabel(t) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
+      {{ 'tr_slaughter_empty' | translate }}
+    </div>
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="15"
+        (paginationUpdate)="onPagination($event)"
+      ></pagination>
+    </div>
+  </div>
+</div>

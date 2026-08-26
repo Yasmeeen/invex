@@ -398,7 +398,7 @@
               <td>{{ bookedQty(product) }}</td>
               <td>{{ availableToBook(product) }}</td>
               <td>{{ product.price }}</td>
-              <td *ngIf="showNetPrice">{{ product.netPrice }}</td>
+              <td *ngIf="showNetPrice">{{ product.netPrice != null ? product.netPrice : '—' }}</td>
               <td>{{ product.discount }}</td>
               <td class="products-list__attrs">{{ productAttributesSummary(product) }}</td>
               <td>
@@ -408,6 +408,13 @@
                     <div class="border-bottom"></div>
                     <div class="single-option" (click)="openProductHistory(product)">
                       {{ "tr_product_history" | translate }}
+                    </div>
+                    <div
+                      class="single-option"
+                      *ngIf="canAddQuantity(product)"
+                      (click)="openAddQuantity(product)"
+                    >
+                      {{ "tr_product_add_quantity" | translate }}
                     </div>
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
@@ -526,6 +533,13 @@
                 <div class="single-option" (click)="openProductHistory(product)">
                   {{ "tr_product_history" | translate }}
                 </div>
+                <div
+                  class="single-option"
+                  *ngIf="canAddQuantity(product)"
+                  (click)="openAddQuantity(product)"
+                >
+                  {{ "tr_product_add_quantity" | translate }}
+                </div>
                 <ng-container *ngIf="canBookProduct(product)">
                   <div
                     class="single-option"
@@ -588,7 +602,7 @@
 
           <div class="product-card__prices">
             <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
-            <div *ngIf="showNetPrice"><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
+            <div *ngIf="productHasNetPrice(product)"><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
             <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
           </div>
 

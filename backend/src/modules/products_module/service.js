@@ -1306,8 +1306,9 @@ export const getProducts = async (req, res) => {
     ]);
 
     const totalPages = Math.ceil(total / limit);
+    // flattenMaps so attributes Map serializes (otherwise JSON → {})
     const productsOut = await attachRemotePickupTransfers(
-      products.map((p) => p.toObject({ virtuals: true }))
+      products.map((p) => p.toObject({ virtuals: true, flattenMaps: true }))
     );
     const hideCost = await viewerCannotSeeCostPrice(req);
 
@@ -1339,7 +1340,9 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const [out] = await attachRemotePickupTransfers([product.toObject({ virtuals: true })]);
+    const [out] = await attachRemotePickupTransfers([
+      product.toObject({ virtuals: true, flattenMaps: true }),
+    ]);
     if (await viewerCannotSeeCostPrice(req)) {
       return res.json(stripCostFieldsFromProduct(out));
     }

@@ -14,7 +14,7 @@
         <label class="permissions-card__role" *ngFor="let role of costPriceRoles">
           <input
             type="checkbox"
-            [checked]="isHidden(role)"
+            [checked]="isAllowed(role)"
             (change)="toggleRole(role, $any($event.target).checked)"
           />
           <span>{{ roleLabelKey(role) | translate }}</span>

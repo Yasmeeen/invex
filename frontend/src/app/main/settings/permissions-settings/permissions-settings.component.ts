@@ -6,7 +6,6 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import {
   COST_PRICE_RESTRICTABLE_ROLES,
   CostPriceRestrictableRole,
-  DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE,
   normalizeRolesHiddenFromCostPrice,
 } from '@core/utils/role-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -19,7 +18,8 @@ import { StoreSettingsService } from '@shared/services/store-settings.service';
 })
 export class PermissionsSettingsComponent implements OnInit, OnDestroy {
   readonly costPriceRoles = COST_PRICE_RESTRICTABLE_ROLES;
-  hiddenFromCostPrice = new Set<string>(DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE);
+  /** Roles checked in the UI may see cost / purchase price. */
+  allowedToSeeCostPrice = new Set<string>();
   saving = false;
   private sub?: Subscription;
 
@@ -39,8 +39,9 @@ export class PermissionsSettingsComponent implements OnInit, OnDestroy {
     }
     this.storeSettings.load();
     this.sub = this.storeSettings.settings$.subscribe((s) => {
-      this.hiddenFromCostPrice = new Set(
-        normalizeRolesHiddenFromCostPrice(s.rolesHiddenFromCostPrice)
+      const hidden = new Set(normalizeRolesHiddenFromCostPrice(s.rolesHiddenFromCostPrice));
+      this.allowedToSeeCostPrice = new Set(
+        COST_PRICE_RESTRICTABLE_ROLES.filter((r) => !hidden.has(r))
       );
     });
   }
@@ -61,22 +62,22 @@ export class PermissionsSettingsComponent implements OnInit, OnDestroy {
     return map[role];
   }
 
-  isHidden(role: string): boolean {
-    return this.hiddenFromCostPrice.has(role);
+  isAllowed(role: string): boolean {
+    return this.allowedToSeeCostPrice.has(role);
   }
 
   toggleRole(role: string, checked: boolean): void {
     if (checked) {
-      this.hiddenFromCostPrice.add(role);
+      this.allowedToSeeCostPrice.add(role);
     } else {
-      this.hiddenFromCostPrice.delete(role);
+      this.allowedToSeeCostPrice.delete(role);
     }
   }
 
   save(): void {
     this.saving = true;
-    const rolesHiddenFromCostPrice = COST_PRICE_RESTRICTABLE_ROLES.filter((r) =>
-      this.hiddenFromCostPrice.has(r)
+    const rolesHiddenFromCostPrice = COST_PRICE_RESTRICTABLE_ROLES.filter(
+      (r) => !this.allowedToSeeCostPrice.has(r)
     );
     this.storeSettings.update({ rolesHiddenFromCostPrice }).subscribe({
       next: () => {

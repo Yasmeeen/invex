@@ -467,6 +467,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           format: 'money',
         },
         { key: 'tradingProfit', labelKey: 'tr_report_col_profit_recognized', format: 'money' },
+        {
+          key: 'potentialProfit',
+          labelKey: 'tr_report_col_potential_profit',
+          format: 'money',
+        },
         { key: 'paymentStatus', labelKey: 'tr_status' },
       ];
       this.profitInvoiceRows = this.mapProfitInvoiceRows(res.profitByInvoice || [], t);
@@ -1133,6 +1138,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
               labelKey: 'tr_report_col_profit_recognized',
               format: 'money' as const,
             },
+            {
+              key: 'potentialProfit',
+              labelKey: 'tr_report_col_potential_profit',
+              format: 'money' as const,
+            },
             { key: 'paymentStatus', labelKey: 'tr_status' },
           ];
 
@@ -1284,6 +1294,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
                 labelKey: 'tr_report_col_profit_recognized',
                 format: 'money' as const,
               },
+              {
+                key: 'potentialProfit',
+                labelKey: 'tr_report_col_potential_profit',
+                format: 'money' as const,
+              },
               { key: 'paymentStatus', labelKey: 'tr_status' },
             ];
       try {
@@ -1358,6 +1373,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         installmentAmount: isInstallment ? x.installmentAmount ?? 0 : null,
         installmentProfitShare: isInstallment ? x.installmentProfitShare ?? 0 : null,
         tradingProfit: x.tradingProfit,
+        /** Full trading profit if all installments are collected (interest included). */
+        potentialProfit: isInstallment ? x.installmentTotalProfit ?? null : null,
         paymentStatus: isInstallment
           ? t('tr_report_status_installment')
           : t(payStatusKey[x.paymentStatus] || 'tr_paid'),

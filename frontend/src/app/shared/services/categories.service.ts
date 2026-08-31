@@ -27,8 +27,9 @@ getCategory(categoryId: any) {
 createCategory(params: any) {
   return this.http.post(CATEGORY_CREATE_CATEGORY_URL, params);
 }
-updateCategory(category: Partial<Category>, categoryId: string): Observable<Category> {
-  return this.http.put<Category>(`${CATEGORYS_URL}/${categoryId}`, category).pipe(
+updateCategory(category: Partial<Category>, categoryId: string, userId?: string): Observable<Category> {
+  const payload = userId ? { ...category, userId: String(userId) } : category;
+  return this.http.put<Category>(`${CATEGORYS_URL}/${categoryId}`, payload).pipe(
     tap({
       error: (errorResponse: Error) => {
         this.appNotificationService.push('Update Category Failed', 'error');
@@ -37,8 +38,9 @@ updateCategory(category: Partial<Category>, categoryId: string): Observable<Cate
   );
 }
 
-deleteCategory(categoryId: string) {
-  return this.http.delete( CATEGORY_DELETE_CATEGORY_URL + '/' + categoryId).pipe(
+deleteCategory(categoryId: string, userId?: string) {
+  const options = userId ? { params: { userId: String(userId) } } : {};
+  return this.http.delete(CATEGORY_DELETE_CATEGORY_URL + '/' + categoryId, options).pipe(
     tap({
       error: (errorResponse: Error) => {
         this.appNotificationService.push('Delete Category Failed', 'error');

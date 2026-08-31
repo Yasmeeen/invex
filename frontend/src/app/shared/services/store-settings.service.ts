@@ -4,6 +4,11 @@ import { BehaviorSubject, Observable, from, of } from 'rxjs';
 import { catchError, concatMap, map, tap } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { STORE_SETTINGS_URL } from '@core/base/urls';
+import {
+  canSeeCostPrice,
+  DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE,
+  normalizeRolesHiddenFromCostPrice,
+} from '@core/utils/role-utils';
 export type ReceiptLanguageCode = 'ar' | 'en' | 'de' | 'fr';
 
 export type BusinessActivityType = 'general' | 'butcher' | 'farm';
@@ -103,6 +108,8 @@ export interface StoreSettings {
   ecommerceSharedKey?: string;
   ecommerceCatalogMode?: 'all' | 'online_only';
   onlineBranchId?: string | null;
+  /** Roles that must not see product cost / purchase price. Super Admin is never hidden. */
+  rolesHiddenFromCostPrice?: string[];
 }
 
 const DEFAULTS: StoreSettings = {
@@ -137,6 +144,7 @@ const DEFAULTS: StoreSettings = {
   ecommerceSharedKey: '',
   ecommerceCatalogMode: 'all',
   onlineBranchId: null,
+  rolesHiddenFromCostPrice: [...DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE],
 };
 
 @Injectable({ providedIn: 'root' })
@@ -161,6 +169,10 @@ export class StoreSettingsService {
   get butcherFeaturesEnabled(): boolean {
     const t = this.snapshot.businessActivityType || 'general';
     return t === 'butcher' || t === 'farm';
+  }
+
+  canSeeCostPrice(role: string | undefined | null): boolean {
+    return canSeeCostPrice(role, this._settings.value.rolesHiddenFromCostPrice);
   }
 
   private normalizeBusinessActivityType(v: unknown): BusinessActivityType {
@@ -357,6 +369,9 @@ export class StoreSettingsService {
           ecommerceCatalogMode:
             data.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
           onlineBranchId: data.onlineBranchId ?? null,
+          rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(
+            data.rolesHiddenFromCostPrice
+          ),
         });
         this.ensureReceiptTranslationPacks();
       },
@@ -455,6 +470,11 @@ export class StoreSettingsService {
             body.ecommerceCatalogMode === 'online_only'
               ? 'online_only'
               : 'all',
+          rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(
+            data.rolesHiddenFromCostPrice ??
+              body.rolesHiddenFromCostPrice ??
+              this._settings.value.rolesHiddenFromCostPrice
+          ),
         });
         this.ensureReceiptTranslationPacks();
       })

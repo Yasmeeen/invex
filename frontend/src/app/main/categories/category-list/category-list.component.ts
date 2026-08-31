@@ -96,9 +96,10 @@ export class CategoryListComponent implements OnInit {
   }
 
   createOrEditcategory(isEdit: boolean, category?: Category){
+    const userId = this.globals.currentUser?._id;
     let dialogRef = this.dialog.open(CreateEditCategoryComponent, {
       width: '850px',
-      data: {isEdit:isEdit,category:category, categoryId: category?._id},
+      data: {isEdit:isEdit,category:category, categoryId: category?._id, userId},
       disableClose: true,
   });
   dialogRef.afterClosed().subscribe(event => {
@@ -134,7 +135,7 @@ export class CategoryListComponent implements OnInit {
         return;
       }
       
-      this.categoriesService.deleteCategory(categoryId).subscribe(() => {
+      this.categoriesService.deleteCategory(categoryId, String(this.globals.currentUser?._id || '')).subscribe(() => {
         this.params.page = 1;
           this.getcategories()
   

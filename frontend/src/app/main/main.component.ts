@@ -53,10 +53,10 @@ export class MainComponent implements OnInit, OnDestroy {
       this.syncOpeningCelebration(this.openingCelebration.snapshot);
       this.openingCelebration.load();
       this.storeSettingsService.load();
-    // Hide Vixa for warehouse (and legacy Operation Manager).
+    // Hide Vixa for warehouse (and legacy Operation Manager) and cashier.
     try {
       const u: any = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      this.hideVixaForRole = isWarehouse(u?.role);
+      this.hideVixaForRole = isWarehouse(u?.role) || u?.role === 'Cashier';
     } catch {
       this.hideVixaForRole = false;
     }

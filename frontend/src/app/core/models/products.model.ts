@@ -31,6 +31,8 @@ export interface Product {
    * Default false.
    */
   listedOnEcommerce?: boolean;
+  /** Reserved units whose pickup branch is not this product's current branch. */
+  remotePickupTransfers?: Array<{ branchId: string; branchName: string; quantity: number }>;
   /** Description shown on the e-commerce store (edited in Invex). */
   ecommerceDescription?: string;
   ecommerceShortDescription?: string;
@@ -82,6 +84,7 @@ export interface ProductActiveBooking {
   shippingAddress?: string;
   /** Pickup branch snapshot (ecommerce customer choice or product branch). */
   branch?: { _id?: string; name?: string } | string | null;
+  pickupBranch?: { _id?: string; name?: string } | string | null;
   depositAmount: number;
   /** Deposit payment method splits (cash / apps). */
   depositPayments?: Array<{ method: string; amount: number }>;

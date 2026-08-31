@@ -39,10 +39,14 @@ function actorMayUseBranch(actor, branchIdStr) {
   return String(actor.branch) === String(branchIdStr);
 }
 
-/** List expenses: Super Admin / Co Admin (optional branch filter); Branch Manager — own branch only. */
+/** List expenses: Super Admin / Co Admin (optional branch filter); Branch Manager — own branch; Cashier — own rows only. */
 function canListExpenses(actor) {
   if (!actor) return false;
-  return ADMIN_ROLES.includes(actor.role) || actor.role === 'Branch Manager';
+  return (
+    ADMIN_ROLES.includes(actor.role) ||
+    actor.role === 'Branch Manager' ||
+    actor.role === 'Cashier'
+  );
 }
 
 export const createDailyExpense = async (req, res) => {
@@ -175,6 +179,11 @@ export const listDailyExpenses = async (req, res) => {
       }
     } else if (viewer.role === 'Branch Manager' && viewer.branch) {
       query.branch = viewer.branch;
+    } else if (viewer.role === 'Cashier') {
+      query.recordedBy = viewer._id;
+      if (viewer.branch) {
+        query.branch = viewer.branch;
+      }
     } else {
       return res.status(403).json({ error: 'Not allowed to view expenses' });
     }

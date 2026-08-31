@@ -243,11 +243,21 @@ export async function emitBookingCreatedNotification(booking, product, quantity,
         ? branchName
         : 'Branch';
     const fromWeb = booking?.source === 'ecommerce';
+    let pickupNote = '';
+    if (booking?.pickupType === 'branch_pickup' && booking?.pickupBranch) {
+      const pickupId = String(booking.pickupBranch);
+      const stockId = product.branch ? String(product.branch) : '';
+      if (pickupId && pickupId !== stockId) {
+        const pickupName =
+          (await Branch.findById(pickupId).select('name').lean())?.name || 'another branch';
+        pickupNote = ` — transfer to ${pickupName} for customer pickup`;
+      }
+    }
 
     const notification = await Notification.create({
       type: 'booking_created',
       title: fromWeb ? 'New website booking' : 'New booking',
-      body: `${product.name} ×${quantity} (${locationLabel})`,
+      body: `${product.name} ×${quantity} (${locationLabel})${pickupNote}`,
       data: {
         bookingId: booking._id,
         productId: product._id,
@@ -352,7 +362,8 @@ export async function createBookingFromEcommerceOrder({
     [
       {
         product: product._id,
-        branch: branchOid,
+        branch: product.branch || null,
+        pickupBranch: isPickup && pickupBranch?._id ? pickupBranch._id : null,
         productInWarehouse: !!product.inWarehouse,
         client: client._id,
         customerName: name,
@@ -555,6 +566,7 @@ export const createProductBooking = async (req, res) => {
       transferReferencePhone,
       userId,
       branchId: branchIdBody,
+      pickupBranchId: pickupBranchIdBody,
     } = req.body;
 
     if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
@@ -659,6 +671,21 @@ export const createProductBooking = async (req, res) => {
     const branchOid = product.branch || null;
     const unitPrice = Math.round((Number(product.price) || 0) * 100) / 100;
 
+    let pickupBranchOid = null;
+    let pickupShippingLabel = String(shippingAddress || '').trim();
+    if (pickupType === 'branch_pickup') {
+      const pickupRaw = String(pickupBranchIdBody || '').trim();
+      if (!pickupRaw || !mongoose.Types.ObjectId.isValid(pickupRaw)) {
+        return res.status(400).json({ error: 'Pickup branch is required' });
+      }
+      const pickupBr = await Branch.findById(pickupRaw).select('_id name').lean();
+      if (!pickupBr) {
+        return res.status(400).json({ error: 'Pickup branch not found' });
+      }
+      pickupBranchOid = pickupBr._id;
+      pickupShippingLabel = String(pickupBr.name || '').trim() || pickupShippingLabel;
+    }
+
     let client;
     try {
       client = await findOrCreateClient({
@@ -691,7 +718,8 @@ export const createProductBooking = async (req, res) => {
       customerPhone: String(customerPhone).trim(),
       quantity,
       pickupType,
-      shippingAddress: String(shippingAddress || '').trim(),
+      shippingAddress: pickupType === 'online_shipping' ? String(shippingAddress || '').trim() : pickupShippingLabel,
+      pickupBranch: pickupBranchOid,
       depositAmount: dep,
       depositPayments,
       depositPaymentFeeAllocations: feeAllocations,
@@ -740,7 +768,9 @@ export const createProductBooking = async (req, res) => {
 
     const populated = await ProductBooking.findById(booking._id)
       .populate('createdBy', 'name')
-      .populate('client', 'name phoneNumber');
+      .populate('client', 'name phoneNumber')
+      .populate('pickupBranch', 'name')
+      .populate('branch', 'name');
 
     await emitBookingCreatedNotification(booking, product, quantity, userId);
 
@@ -1014,6 +1044,7 @@ export const getBookingByProductId = async (req, res) => {
         .populate('confirmedBy', 'name _id')
         .populate('client', 'name phoneNumber address')
         .populate('branch', 'name')
+        .populate('pickupBranch', 'name')
         .lean(),
       sumActiveBookedQuantity(new mongoose.Types.ObjectId(String(productId))),
     ]);
@@ -1258,6 +1289,7 @@ export const getBookingsReport = async (req, res) => {
       .limit(15)
       .populate('product', 'name code')
       .populate('branch', 'name')
+      .populate('pickupBranch', 'name')
       .lean();
 
     const [bookings, totalCount] = await Promise.all([
@@ -1267,6 +1299,7 @@ export const getBookingsReport = async (req, res) => {
         .limit(limit)
         .populate('product', 'name code inWarehouse')
         .populate('branch', 'name')
+        .populate('pickupBranch', 'name')
         .populate('createdBy', 'name')
         .populate('confirmedBy', 'name')
         .populate('client', 'name phoneNumber')
@@ -1334,6 +1367,8 @@ export const listProductBookings = async (req, res) => {
         .populate('product', 'name code price branch inWarehouse stock bookedQuantity confirmedBookedQuantity')
         .populate('createdBy', 'name')
         .populate('client', 'name phoneNumber')
+        .populate('pickupBranch', 'name')
+        .populate('branch', 'name')
         .lean(),
       ProductBooking.countDocuments(match),
     ]);

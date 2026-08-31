@@ -6,6 +6,7 @@ import { Category } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { Globals } from '@core/globals';
 
 export interface CategoryAttributeRow {
   key: string;
@@ -38,6 +39,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
     public storeSettings: StoreSettingsService,
+    private globals: Globals,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -167,6 +169,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       return;
     }
     const attrPayload = this.buildAttributeDefsPayload();
+    const userId = this.globals.currentUser?._id || this.data?.userId || null;
     const payload = {
       name: this.category.name,
       code: (this.category as any).code,
@@ -176,10 +179,11 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       showProductCodeOnInvoice: !!this.showProductCodeOnInvoice,
       sellByWeight: !!this.sellByWeight,
       weightUnit: this.weightUnit,
+      ...(userId ? { userId: String(userId) } : {}),
     };
 
     if (this.isEdit && this.categoryId) {
-      this.categoriesServce.updateCategory(payload, this.categoryId).subscribe({
+      this.categoriesServce.updateCategory(payload, this.categoryId, userId || undefined).subscribe({
         next: () => {
           this.appNotificationService.push(
             this.translateService.instant('tr_category_updated_ok'),

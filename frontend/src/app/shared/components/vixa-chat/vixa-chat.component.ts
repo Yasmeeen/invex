@@ -52,8 +52,7 @@ export class VixaChatComponent implements OnInit, OnDestroy {
       return [{ labelKey: 'tr_vixa_quick_bookings_today', prompt: 'tr_vixa_prompt_bookings_today' }];
     }
     if (r === 'Cashier') {
-      // Cashier: orders/invoices for their branch (sales intent covers totals + count).
-      return [{ labelKey: 'tr_vixa_quick_sales_today', prompt: 'tr_vixa_prompt_sales_today' }];
+      return [];
     }
     if (r === 'Branch Manager') {
       return [
@@ -190,7 +189,7 @@ export class VixaChatComponent implements OnInit, OnDestroy {
     const r = this.currentRole;
     const canProfit = r === 'Super Admin';
     const canBookings = r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager' || r === 'Moderator';
-    const canSales = r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager' || r === 'Cashier';
+    const canSales = r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager';
     const examples = ar
       ? [
           canSales ? '\"مبيعات النهارده\"' : null,

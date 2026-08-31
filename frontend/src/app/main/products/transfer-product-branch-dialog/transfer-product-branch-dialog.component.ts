@@ -17,7 +17,6 @@ export class TransferProductBranchDialogComponent implements OnInit {
   saving = false;
   product: Product;
   branches: Branch[];
-  readonly maxQuantity: number;
 
   constructor(
     private fb: FormBuilder,
@@ -31,23 +30,50 @@ export class TransferProductBranchDialogComponent implements OnInit {
   ) {
     this.product = data.product;
     this.branches = data.branches || [];
-    this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
+    const preferred = this.preferredDestinationId();
     this.form = this.fb.group({
-      toBranchId: ['', Validators.required],
-      quantity: [
-        1,
-        [Validators.required, Validators.min(1), Validators.max(this.maxQuantity)],
-      ],
+      toBranchId: [preferred, Validators.required],
+      quantity: [1, [Validators.required, Validators.min(1)]],
     });
   }
 
-  ngOnInit(): void {}
+  ngOnInit(): void {
+    this.syncQuantityMax();
+    this.form.get('toBranchId')?.valueChanges.subscribe(() => this.syncQuantityMax());
+  }
+
+  maxForSelectedBranch(): number {
+    const toId = String(this.form?.get('toBranchId')?.value || '');
+    const stock = Math.max(0, Number(this.product.stock) || 0);
+    const booked = Math.max(0, Math.floor(Number(this.product.bookedQuantity) || 0));
+    const reserved = Math.max(0, Math.floor(Number(this.product.transferReservedQuantity) || 0));
+    const free = Math.max(0, stock - booked - reserved);
+    const extra = (this.product.remotePickupTransfers || []).find(
+      (x) => String(x.branchId) === toId
+    );
+    return free + Math.max(0, Number(extra?.quantity) || 0);
+  }
+
+  pickupHintForSelected(): string {
+    const toId = String(this.form?.get('toBranchId')?.value || '');
+    const extra = (this.product.remotePickupTransfers || []).find(
+      (x) => String(x.branchId) === toId
+    );
+    if (!extra || !(extra.quantity > 0)) {
+      return '';
+    }
+    return this.translate.instant('tr_branch_transfer_includes_pickup', {
+      n: extra.quantity,
+      branch: extra.branchName || '',
+    });
+  }
 
   close(): void {
     this.dialogRef.close(false);
   }
 
   submit(): void {
+    this.syncQuantityMax();
     if (this.form.invalid || this.saving) {
       this.form.markAllAsTouched();
       return;
@@ -80,5 +106,27 @@ export class TransferProductBranchDialogComponent implements OnInit {
           this.notify.push(msg, 'error');
         },
       });
+  }
+
+  private preferredDestinationId(): string {
+    const remotes = this.product.remotePickupTransfers || [];
+    if (remotes.length === 1) {
+      const id = String(remotes[0].branchId || '');
+      if (this.branches.some((b) => String(b._id) === id)) {
+        return id;
+      }
+    }
+    return this.branches[0]?._id ? String(this.branches[0]._id) : '';
+  }
+
+  private syncQuantityMax(): void {
+    const max = Math.max(1, this.maxForSelectedBranch());
+    const qty = this.form.get('quantity');
+    qty?.setValidators([Validators.required, Validators.min(1), Validators.max(max)]);
+    const current = Math.floor(Number(qty?.value) || 1);
+    if (current > max) {
+      qty?.setValue(max);
+    }
+    qty?.updateValueAndValidity({ emitEvent: false });
   }
 }

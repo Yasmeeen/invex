@@ -67,6 +67,10 @@
         </div>
       </div>
 
+      <div class="pickup-transfer-banner" *ngIf="remotePickupHint()">
+        {{ remotePickupHint() }}
+      </div>
+
       <div class="product-details-section" *ngIf="attributeRows().length">
         <h4 class="product-details-section__title">{{ 'tr_category_attributes' | translate }}</h4>
         <div class="attr-grid">

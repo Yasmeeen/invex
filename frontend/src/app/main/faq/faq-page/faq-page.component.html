@@ -1,0 +1,65 @@
+<div class="content-shadow bg-white mb-5 faq-page">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_faq' | translate }}</span>
+  </h2>
+
+  <div class="plr-4 pb-4">
+    <p class="faq-page__lead">{{ 'tr_faq_lead' | translate }}</p>
+
+    <label class="faq-page__search">
+      <span class="sr-only">{{ 'tr_faq_search' | translate }}</span>
+      <input
+        class="s-control"
+        type="search"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onSearchChange()"
+        [placeholder]="'tr_faq_search' | translate"
+        autocomplete="off"
+      />
+    </label>
+  </div>
+
+  <app-ghost-line *ngIf="loading"></app-ghost-line>
+
+  <p *ngIf="loadFailed && !loading" class="plr-4 pb-4">{{ 'tr_faq_load_error' | translate }}</p>
+
+  <div class="faq-page__layout plr-4 pb-4" *ngIf="!loading && !loadFailed">
+    <nav class="faq-page__cats" [attr.aria-label]="'tr_faq' | translate">
+      <button
+        type="button"
+        class="faq-page__cat"
+        [class.faq-page__cat--active]="selectedCategoryId === null"
+        (click)="selectCategory(null)"
+      >
+        {{ 'tr_faq_all_topics' | translate }}
+      </button>
+      <button
+        type="button"
+        class="faq-page__cat"
+        *ngFor="let cat of categories"
+        [class.faq-page__cat--active]="selectedCategoryId === cat.id"
+        (click)="selectCategory(cat.id)"
+      >
+        {{ cat.title }}
+      </button>
+    </nav>
+
+    <div class="faq-page__list">
+      <p *ngIf="!results.length" class="faq-page__empty">{{ 'tr_faq_no_results' | translate }}</p>
+
+      <article class="faq-acc" *ngFor="let row of results">
+        <button
+          type="button"
+          class="faq-acc__q"
+          [attr.aria-expanded]="isOpen(row.item.id)"
+          (click)="toggle(row.item.id)"
+        >
+          <span class="faq-acc__meta">{{ row.categoryTitle }}</span>
+          <span class="faq-acc__title">{{ row.item.q }}</span>
+          <i class="fa" [class.fa-angle-down]="!isOpen(row.item.id)" [class.fa-angle-up]="isOpen(row.item.id)"></i>
+        </button>
+        <div class="faq-acc__a" *ngIf="isOpen(row.item.id)">{{ row.item.a }}</div>
+      </article>
+    </div>
+  </div>
+</div>

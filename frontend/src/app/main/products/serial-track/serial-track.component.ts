@@ -12,6 +12,7 @@ import { AppNotificationService } from '@shared/services/app-notification.servic
 import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { Subscription } from 'rxjs';
 
 export type SerialTrackDetailPart = {
@@ -55,7 +56,8 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
     private notify: AppNotificationService,
     private router: Router,
     private route: ActivatedRoute,
-    private globals: Globals
+    private globals: Globals,
+    private storeSettings: StoreSettingsService
   ) {}
 
   ngOnInit(): void {
@@ -81,6 +83,10 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.querySub?.unsubscribe();
+  }
+
+  get showNetPrice(): boolean {
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   goToProducts(): void {

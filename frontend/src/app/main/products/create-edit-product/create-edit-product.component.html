@@ -335,7 +335,7 @@
                     </div>
                   </div>
 
-                  <div class="col-md-6">
+                  <div class="col-md-6" *ngIf="showCostPriceFields">
                     <div
                       class="form-group"
                       [class.has-error]="netPrice.invalid && basicInfoForm.submitted"
@@ -736,7 +736,7 @@
                                   />
                                 </div>
                               </div>
-                              <div class="col-md-6">
+                              <div class="col-md-6" *ngIf="showCostPriceFields">
                                 <div class="form-group">
                                   <label class="size-small">{{ 'tr_net_price' | translate }}</label>
                                   <input
@@ -876,7 +876,7 @@
                           </label>
                         </div>
                       </div>
-                      <div class="col-md-6">
+                      <div class="col-md-6" *ngIf="showCostPriceFields">
                         <div
                           class="form-group"
                           [class.has-error]="netPrice.invalid && basicInfoForm.submitted"

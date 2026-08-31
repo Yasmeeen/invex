@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import moment from 'moment-timezone';
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
-import { canUseBookings, canUseProfit, canUseReports } from './policy.js';
+import { canUseBookings, canUseProfit, canUseReports, canUseVixa } from './policy.js';
 import { createProvider } from './provider.js';
 import { toolBookings, toolProfit, toolSales } from './tools.js';
 import { searchMarketPrices } from './web_search.js';
@@ -271,6 +271,12 @@ export const chat = async (req, res) => {
     const user = await User.findById(String(userId)).lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
     const role = String(user.role || '');
+    const arLang = langIsArabic(uiLang);
+    if (!canUseVixa(role)) {
+      return res.status(403).json({
+        error: arLang ? 'ليس لديك صلاحية لاستخدام Vixa.' : 'You do not have permission to use Vixa.',
+      });
+    }
 
     const { from: rf, to: rt } = inferRange({ message: msg, from, to });
 

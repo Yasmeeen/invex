@@ -23,6 +23,7 @@ import {
   canPickBranchRole,
   isBranchManager,
   isModerator,
+  isWarehouse,
 } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
@@ -149,14 +150,14 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return !isModerator(this.globals.currentUser?.role);
   }
 
-  /** Moderator: serial track is not available. */
+  /** Moderator / cashier / warehouse: serial track is not available. */
   get canUseSerialTrack(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    const role = this.globals.currentUser?.role;
+    return !isModerator(role) && !isWarehouse(role) && role !== 'Cashier';
   }
 
-  /** Moderator: net price must not be visible in the products list. */
   get showNetPrice(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   /** Per-product: hide empty/unset cost on cards (esp. butcher/farm). */
@@ -208,12 +209,35 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.floor(Number(product.transferReservedQuantity) || 0));
   }
 
-  /** Units available to move to another branch (respects bookings + pending transfer reservations). */
+  /** Units available to move to another branch (free stock + bookings destined for a pickup branch). */
   availableUnitsForBranchTransfer(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const booked = this.bookedQty(product);
     const reserved = this.transferReservedQty(product);
-    return Math.max(0, stock - booked - reserved);
+    const free = Math.max(0, stock - booked - reserved);
+    const remote = (product.remotePickupTransfers || []).reduce(
+      (sum, row) => sum + Math.max(0, Number(row.quantity) || 0),
+      0
+    );
+    return free + remote;
+  }
+
+  remotePickupHint(product: Product): string {
+    const rows = product.remotePickupTransfers || [];
+    if (!rows.length) {
+      return '';
+    }
+    if (rows.length === 1) {
+      return this.translateService.instant('tr_booking_needs_transfer_one', {
+        branch: rows[0].branchName || '',
+        n: rows[0].quantity,
+      });
+    }
+    const branches = rows
+      .map((r) => r.branchName)
+      .filter(Boolean)
+      .join('، ');
+    return this.translateService.instant('tr_booking_needs_transfer_many', { branches });
   }
 
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
@@ -237,9 +261,12 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return String(pid) === String(myId);
   }
 
-  /** Admins, Warehouse, Moderator: any product. Branch Manager: own branch only (not warehouse). */
+  /** Admins / Moderator: any product. Branch Manager: own branch only (not warehouse). Warehouse: no booking. */
   canBookProduct(product: Product): boolean {
     const role = this.globals.currentUser?.role as string | undefined;
+    if (isWarehouse(role)) {
+      return false;
+    }
     if (canBookAnyProduct(role)) {
       if (!isBranchManager(role)) {
         return true;
@@ -371,7 +398,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (this.globals.currentUser?.role === 'Cashier') {
-      this.router.navigate(['/products/serial-track']);
+      this.router.navigate(['/cashier']);
       return;
     }
     const saved = localStorage.getItem('products.viewMode');

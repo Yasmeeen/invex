@@ -20,13 +20,14 @@ import {
 } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 import { AuthenticationService } from '@core/services/authentication.service';
-import { Product } from '@core/models/products.model';
+import { Product, Branch } from '@core/models/products.model';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
 import { BookingReprintService } from '@shared/services/booking-reprint.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -54,6 +55,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   /** Full-screen preview URL (lightbox). */
   depositPreviewUrl: string | null = null;
   product: Product;
+  branches: Branch[] = [];
   readonly maxQuantity: number;
   readonly pickupTypeOptions: Array<{ id: string; labelKey: string }> = [
     { id: 'branch_pickup', labelKey: 'tr_booking_branch_pickup' },
@@ -80,7 +82,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     private notify: AppNotificationService,
     private translate: TranslateService,
     private dialog: MatDialog,
-    private bookingReprint: BookingReprintService
+    private bookingReprint: BookingReprintService,
+    private branchesApi: BranchesServce
   ) {
     this.product = data.product;
     this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
@@ -93,23 +96,46 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       customerName: ['', Validators.required],
       registeredAddress: [''],
       pickupType: ['branch_pickup', Validators.required],
+      pickupBranchId: ['', Validators.required],
       shippingAddress: [''],
       transferReferencePhone: [''],
     });
   }
 
   ngOnInit(): void {
+    const productBranchId = this.productBranchId();
+    this.form.patchValue({ pickupBranchId: productBranchId });
+    this.branchesApi.getBranchs({ page: 1, limit: 1000 }).subscribe({
+      next: (response: any) => {
+        this.branches = response?.branches || [];
+        const current = String(this.form.get('pickupBranchId')?.value || '');
+        if (!current && this.branches.length) {
+          this.form.patchValue({
+            pickupBranchId: productBranchId || String(this.branches[0]._id),
+          });
+        }
+      },
+    });
+
     this.form
       .get('pickupType')
       ?.valueChanges.subscribe((v) => {
         const addr = this.form.get('shippingAddress');
+        const pickup = this.form.get('pickupBranchId');
         if (v === 'online_shipping') {
           addr?.setValidators([Validators.required]);
+          pickup?.clearValidators();
+          pickup?.setValue('');
         } else {
           addr?.clearValidators();
           addr?.setValue('');
+          pickup?.setValidators([Validators.required]);
+          if (!pickup?.value) {
+            pickup?.setValue(this.productBranchId());
+          }
         }
         addr?.updateValueAndValidity({ emitEvent: false });
+        pickup?.updateValueAndValidity({ emitEvent: false });
       });
 
     const phoneControl = this.form.get('customerPhone');
@@ -208,6 +234,24 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       event?.preventDefault?.();
       this.closeDepositPreview();
     }
+  }
+
+  productBranchId(): string {
+    const b = this.product?.branch as { _id?: string } | string | null | undefined;
+    if (b && typeof b === 'object') {
+      return b._id ? String(b._id) : '';
+    }
+    return b ? String(b) : '';
+  }
+
+  pickupBranchNameFromForm(formValue: any, booking: any): string {
+    const fromBooking = booking?.pickupBranch;
+    if (fromBooking && typeof fromBooking === 'object' && String(fromBooking.name || '').trim()) {
+      return String(fromBooking.name).trim();
+    }
+    const id = String(formValue?.pickupBranchId || booking?.pickupBranch || '');
+    const found = this.branches.find((x) => String(x._id) === id);
+    return found?.name ? String(found.name) : '';
   }
 
   close(): void {
@@ -429,6 +473,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
         customerPhone: v.customerPhone.trim(),
         registeredAddress: regAddr,
         pickupType: v.pickupType,
+        pickupBranchId: v.pickupType === 'branch_pickup' ? String(v.pickupBranchId || '') : undefined,
         shippingAddress: v.pickupType === 'online_shipping' ? shipAddr : '',
         depositAmount,
         paymentSplits: splits.length ? splits : undefined,
@@ -495,6 +540,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
         : splits,
       pickupType: booking?.pickupType || formValue.pickupType,
       shippingAddress: booking?.shippingAddress || formValue.shippingAddress,
+      pickupBranchName: this.pickupBranchNameFromForm(formValue, booking),
       createdAt: booking?.createdAt || booking?.bookingDate,
       bookingDate: booking?.bookingDate,
     };
@@ -521,6 +567,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       'Customer phone is required': 'tr_client_phone_required',
       'Customer name is required': 'tr_booking_api_customer_name_required',
       'Invalid pickup type': 'tr_booking_api_invalid_pickup_type',
+      'Pickup branch is required': 'tr_booking_pickup_branch_required',
+      'Pickup branch not found': 'tr_booking_pickup_branch_required',
       'Shipping address is required for online shipping': 'tr_booking_api_shipping_required_online',
       'Valid deposit amount is required': 'tr_booking_api_valid_deposit_required',
       'Invalid deposit transfer image URL': 'tr_booking_api_invalid_deposit_image_url',

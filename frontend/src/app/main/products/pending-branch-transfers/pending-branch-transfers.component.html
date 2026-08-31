@@ -81,7 +81,7 @@
         </div>
       </div>
 
-      <div class="col-md-3" *ngIf="showBranchFilter">
+      <div class="col-md-3" *ngIf="showFromBranchFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_from' | translate }}</label>
           <div class="input-with-icon">
@@ -110,7 +110,7 @@
             <ng-select
               class="s-control s-select"
               [(ngModel)]="selectedToBranches"
-              [items]="branches"
+              [items]="toBranchOptions"
               bindLabel="name"
               bindValue="_id"
               [multiple]="true"
@@ -225,7 +225,7 @@
                 transferProductCode(t)
               }}</span>
             </td>
-            <td>{{ t.fromBranch?.name || '—' }}</td>
+            <td>{{ transferFromLabel(t) }}</td>
             <td>{{ t.toBranch?.name || '—' }}</td>
             <td>{{ t.quantity }}</td>
             <td>
@@ -299,7 +299,7 @@
         </li>
         <li>
           {{ 'tr_branch_transfer_from' | translate }}:
-          {{ rejectTransfer.fromBranch?.name || '—' }}
+          {{ transferFromLabel(rejectTransfer) }}
         </li>
         <li>
           {{ 'tr_branch_transfer_to_branch' | translate }}:

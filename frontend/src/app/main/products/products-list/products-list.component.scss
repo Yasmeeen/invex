@@ -330,6 +330,18 @@ img{
   line-height: 1.35;
 }
 
+.products-list__pickup-hint {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  padding: 6px 8px;
+  white-space: normal;
+}
+
 .booking-badge {
   display: inline-flex;
   align-items: center;
@@ -388,11 +400,60 @@ img{
 }
 
 .filters-card {
-  // ::ng-deep .products-filter-ng-select.ng-select.ng-select-multiple .ng-select-container {
-  //   min-height: 2.375rem;
-  // }
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    row-gap: 1rem;
+    align-items: start;
+  }
+
+  .filters-grid__item {
+    min-width: 0;
+  }
+
+  .filters-grid__item label {
+    display: block;
+    margin-bottom: 0.35rem;
+    line-height: 1.25;
+  }
+
+  .filters-grid__split {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .input-with-icon,
+  .s-control {
+    width: 100%;
+  }
 
   ::ng-deep .input-icon {
     pointer-events: none;
+  }
+
+  ::ng-deep .ng-select.s-control {
+    display: flex;
+    align-items: center;
+  }
+
+  ::ng-deep .ng-select .ng-select-container,
+  ::ng-deep .ng-select .ng-value-container {
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 991px) {
+  .filters-card .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .filters-card .filters-grid {
+    grid-template-columns: 1fr;
   }
 }

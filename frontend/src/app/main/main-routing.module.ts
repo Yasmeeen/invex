@@ -15,6 +15,21 @@ const routes: Routes = [
     canActivateChild: [AuthenticationGuard],
     children: [
       {
+        path: 'faq',
+        loadChildren: () => import('./faq/faq.module').then((m) => m.FaqModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            'Cashier',
+            'Collector',
+            'Moderator',
+          ],
+        },
+      },
+      {
         path: 'vixa',
         loadChildren: () => import('./vixa/vixa.module').then((m) => m.VixaModule),
         canActivate: [RoleGuard],
@@ -23,7 +38,6 @@ const routes: Routes = [
             'Super Admin',
             'Co Admin',
             'Branch Manager',
-            'Cashier',
             'Moderator',
           ],
         },
@@ -45,7 +59,6 @@ const routes: Routes = [
             'Branch Manager',
             ...WAREHOUSE,
             'Moderator',
-            'Cashier',
           ],
         },
       },
@@ -53,14 +66,14 @@ const routes: Routes = [
         path: 'branches',
         loadChildren: () => import('./branches/branches.module').then(m => m.BranchesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', ...WAREHOUSE] },
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] },
       },
       {
         path: 'categories',
         loadChildren: () => import('./categories/categories.module').then(m => m.CategoriesModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Admin', 'Branch Manager'],
         },
       },
       {
@@ -74,7 +87,7 @@ const routes: Routes = [
         loadChildren: () => import('./reports/reports.module').then(m => m.ReportsModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
         },
       },
       {
@@ -92,7 +105,6 @@ const routes: Routes = [
             'Super Admin',
             'Co Admin',
             'Branch Manager',
-            ...WAREHOUSE,
             'Cashier',
             'Collector',
           ],
@@ -168,7 +180,7 @@ const routes: Routes = [
         loadChildren: () => import('./expenses/expenses.module').then((m) => m.ExpensesModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
         },
       },
       {

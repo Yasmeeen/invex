@@ -21,7 +21,13 @@ const productBranchTransferSchema = new mongoose.Schema(
     fromBranch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Branch',
-      required: true,
+      default: null,
+    },
+    /** True when stock leaves the central warehouse (fromBranch is null). */
+    fromWarehouse: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
     toBranch: {
       type: mongoose.Schema.Types.ObjectId,

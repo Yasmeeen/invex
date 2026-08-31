@@ -1,0 +1,72 @@
+.permissions-page {
+  padding: 1.25rem 1.5rem 2rem;
+  max-width: 920px;
+}
+
+.permissions-page__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.permissions-page__lead {
+  margin: 0 0 1.25rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.permissions-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem 1.1rem;
+  box-shadow: 0 4px 24px rgba(30, 77, 43, 0.06);
+}
+
+.permissions-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 2rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid #eef2ef;
+}
+
+.permissions-card__perm {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.permissions-card__perm-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.permissions-card__hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.permissions-card__roles {
+  flex: 2 1 320px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.55rem 0.85rem;
+  align-content: start;
+}
+
+.permissions-card__role {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.permissions-card__actions {
+  margin-top: 1rem;
+}

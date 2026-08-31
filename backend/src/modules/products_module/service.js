@@ -35,6 +35,11 @@ import {
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
+function isWarehouseRole(role) {
+  const r = String(role || '').trim();
+  return r === 'Warehouse' || r === 'Operation Manager';
+}
+
 function parseListedOnEcommerce(body) {
   const v = body?.listedOnEcommerce;
   return v === true || v === 'true' || v === 1 || v === '1';
@@ -117,8 +122,12 @@ function assertMayInitiateBranchTransfer(user, product) {
     throw err;
   }
   if (product.inWarehouse) {
-    const err = new Error('WAREHOUSE');
-    err.code = 'WAREHOUSE';
+    // Central warehouse → branch (pending approval at destination).
+    if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim()) || isWarehouseRole(user.role)) {
+      return;
+    }
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
     throw err;
   }
   if (!product.branch) {
@@ -2181,7 +2190,7 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-/** Branch → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
+/** Branch/warehouse → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
 export const requestBranchTransfer = async (req, res) => {
   try {
     const userId = pickActorUserId(req);
@@ -2213,17 +2222,15 @@ export const requestBranchTransfer = async (req, res) => {
     try {
       assertMayInitiateBranchTransfer(user, product);
     } catch (e) {
-      if (e.code === 'WAREHOUSE') {
-        return res.status(400).json({ error: 'Warehouse products cannot use pending branch transfer' });
-      }
       if (e.code === 'NO_BRANCH') {
         return res.status(400).json({ error: 'Product has no branch' });
       }
       return res.status(403).json({ error: 'You cannot request this transfer' });
     }
 
-    const fromBranchId = product.branch;
-    if (String(fromBranchId) === String(toBranchId)) {
+    const fromWarehouse = !!product.inWarehouse;
+    const fromBranchId = fromWarehouse ? null : product.branch;
+    if (!fromWarehouse && String(fromBranchId) === String(toBranchId)) {
       return res.status(400).json({ error: 'Source and destination branch must differ' });
     }
 
@@ -2239,7 +2246,9 @@ export const requestBranchTransfer = async (req, res) => {
     });
     if (qty > available) {
       return res.status(400).json({
-        error: `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`,
+        error: fromWarehouse
+          ? `Only ${available} unit(s) available to transfer to this branch from warehouse`
+          : `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`,
       });
     }
 
@@ -2251,6 +2260,7 @@ export const requestBranchTransfer = async (req, res) => {
       productNameSnapshot: String(product.name || '').trim(),
       productCodeSnapshot: String(product.code || '').trim(),
       fromBranch: fromBranchId,
+      fromWarehouse,
       toBranch: toBranchId,
       quantity: qty,
       status: 'pending',
@@ -2266,7 +2276,7 @@ export const requestBranchTransfer = async (req, res) => {
 
     try {
       const recipientIds = await collectIncomingTransferNotifyUserIds(toBranchId);
-      const fromName = populated?.fromBranch?.name || 'Branch';
+      const fromName = fromWarehouse ? 'Warehouse' : populated?.fromBranch?.name || 'Branch';
       const toName = populated?.toBranch?.name || 'Branch';
       const pname = populated?.product?.name || 'Product';
       const notification = await Notification.create({
@@ -2279,6 +2289,7 @@ export const requestBranchTransfer = async (req, res) => {
           productName: pname,
           quantity: qty,
           fromBranchId,
+          fromWarehouse,
           toBranchId,
           initiatedById: userId,
         },
@@ -2295,8 +2306,10 @@ export const requestBranchTransfer = async (req, res) => {
       module: 'products',
       entityType: 'ProductBranchTransfer',
       entityId: transfer._id,
-      message: `Branch transfer requested (${qty})`,
-      metadata: { productId: product._id, fromBranchId, toBranchId, quantity: qty },
+      message: fromWarehouse
+        ? `Warehouse transfer requested (${qty})`
+        : `Branch transfer requested (${qty})`,
+      metadata: { productId: product._id, fromBranchId, fromWarehouse, toBranchId, quantity: qty },
     });
 
     return res.status(201).json({
@@ -2356,7 +2369,14 @@ export const approveBranchTransfer = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    if (String(sourceProduct.branch) !== String(transfer.fromBranch)) {
+    const fromWarehouse = !!transfer.fromWarehouse;
+    if (fromWarehouse) {
+      if (!sourceProduct.inWarehouse) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Product is no longer in warehouse' });
+      }
+    } else if (String(sourceProduct.branch) !== String(transfer.fromBranch)) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ error: 'Product branch no longer matches transfer source' });
@@ -2471,14 +2491,14 @@ export const approveBranchTransfer = async (req, res) => {
         productId: sourceProduct._id,
         productName: sourceProduct.name,
         branchId: toBranchId,
-        fromBranchId: transfer.fromBranch,
+        fromBranchId: fromWarehouse ? null : transfer.fromBranch,
         toBranchId,
         quantity: qty,
         unitPrice: Number(sourceProduct.price || 0),
         totalValue: Number(sourceProduct.price || 0) * qty,
         referenceType: 'branch_transfer',
         referenceId: transfer._id,
-        notes: 'Branch transfer approved',
+        notes: fromWarehouse ? 'Warehouse transfer approved' : 'Branch transfer approved',
       });
     } catch (movementError) {
       console.error('⚠️ Failed to log branch transfer movement:', movementError.message);
@@ -2510,11 +2530,14 @@ export const approveBranchTransfer = async (req, res) => {
       module: 'products',
       entityType: 'ProductBranchTransfer',
       entityId: transfer._id,
-      message: `Branch transfer approved (${qty})`,
+      message: fromWarehouse
+        ? `Warehouse transfer approved (${qty})`
+        : `Branch transfer approved (${qty})`,
       metadata: {
         productId: sourceProduct._id,
         destinationProductId: destinationProduct._id,
         fromBranchId: transfer.fromBranch,
+        fromWarehouse,
         toBranchId,
       },
     });
@@ -2677,7 +2700,10 @@ export const listBranchTransfers = async (req, res) => {
     }
 
     if (!TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
-      if (user.role === 'Branch Manager' && user.branch) {
+      if (isWarehouseRole(user.role)) {
+        // Warehouse managers monitor outgoing warehouse → branch transfers.
+        andParts.push({ fromWarehouse: true });
+      } else if (user.role === 'Branch Manager' && user.branch) {
         const bid = user.branch;
         andParts.push({ $or: [{ toBranch: bid }, { fromBranch: bid }] });
       } else {
@@ -2709,8 +2735,18 @@ export const listBranchTransfers = async (req, res) => {
       andParts.push({ createdAt });
     }
 
+    const fromWarehouseOnly =
+      req.query.fromWarehouse === 'true' ||
+      req.query.fromWarehouse === true ||
+      String(req.query.fromWarehouse || '').toLowerCase() === '1';
     const fromBranchIds = toObjectIds(parseOidCsvList(req.query.fromBranchId));
-    if (fromBranchIds.length) {
+    if (fromWarehouseOnly && fromBranchIds.length) {
+      andParts.push({
+        $or: [{ fromWarehouse: true }, { fromBranch: { $in: fromBranchIds } }],
+      });
+    } else if (fromWarehouseOnly) {
+      andParts.push({ fromWarehouse: true });
+    } else if (fromBranchIds.length) {
       andParts.push({ fromBranch: { $in: fromBranchIds } });
     }
 
@@ -2903,6 +2939,11 @@ export const getPendingBranchTransferCount = async (req, res) => {
     let count = 0;
     if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
       count = await ProductBranchTransfer.countDocuments({ status: 'pending' });
+    } else if (isWarehouseRole(user.role)) {
+      count = await ProductBranchTransfer.countDocuments({
+        status: 'pending',
+        fromWarehouse: true,
+      });
     } else if (user.role === 'Branch Manager' && user.branch) {
       count = await ProductBranchTransfer.countDocuments({
         status: 'pending',

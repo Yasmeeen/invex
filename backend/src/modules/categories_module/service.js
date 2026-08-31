@@ -1,9 +1,48 @@
+import mongoose from 'mongoose';
 import Category from '../../DB/models/category.model.js';
 import Product from '../../DB/models/product.model.js';
+import User from '../../DB/models/user.model.js';
 import {
   notifyCategoryChanged,
   notifyCategoryDeleted,
 } from '../integrations_module/catalogSync.js';
+
+/** Roles allowed to create / edit / delete categories (matches frontend RoleGuard). */
+const CATEGORY_WRITE_ROLES = ['Super Admin', 'Co Admin', 'Admin', 'Branch Manager'];
+
+function pickActorUserId(req) {
+  const body = req?.body || {};
+  const query = req?.query || {};
+  return body.userId || body.user_id || query.userId || query.user_id || null;
+}
+
+async function loadActor(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
+  return User.findById(userId).select('role branch name').lean();
+}
+
+function canManageCategories(actor) {
+  if (!actor) return false;
+  return CATEGORY_WRITE_ROLES.includes(String(actor.role || '').trim());
+}
+
+async function assertCanManageCategories(req, res) {
+  const userId = pickActorUserId(req);
+  if (!userId) {
+    res.status(400).json({ error: 'userId is required' });
+    return null;
+  }
+  const actor = await loadActor(userId);
+  if (!actor) {
+    res.status(401).json({ error: 'User not found' });
+    return null;
+  }
+  if (!canManageCategories(actor)) {
+    res.status(403).json({ error: 'Not allowed to manage categories' });
+    return null;
+  }
+  return actor;
+}
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -138,6 +177,9 @@ const normalizeImageUrl = (raw) => {
 // Create category
 export const createCategory = async (req, res) => {
   try {
+    const actor = await assertCanManageCategories(req, res);
+    if (!actor) return;
+
     const {
       name,
       code,
@@ -199,6 +241,9 @@ export const createCategory = async (req, res) => {
 // Update category
 export const updateCategory = async (req, res) => {
   try {
+    const actor = await assertCanManageCategories(req, res);
+    if (!actor) return;
+
     const {
       name,
       code,
@@ -283,6 +328,9 @@ export const updateCategory = async (req, res) => {
 // Delete category
 export const deleteCategory = async (req, res) => {
   try {
+    const actor = await assertCanManageCategories(req, res);
+    if (!actor) return;
+
     const deletedCategory = await Category.findByIdAndDelete(req.params.id);
 
     if (!deletedCategory) {

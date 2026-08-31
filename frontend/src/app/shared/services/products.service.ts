@@ -64,6 +64,8 @@ export type BranchTransferItem = {
   resolvedAt?: string;
   productNameSnapshot?: string;
   productCodeSnapshot?: string;
+  /** True when transfer leaves the central warehouse. */
+  fromWarehouse?: boolean;
   product?: {
     name?: string;
     code?: string;
@@ -74,7 +76,7 @@ export type BranchTransferItem = {
       deleteProductWhenOutOfStock?: boolean;
     } | string;
   };
-  fromBranch?: { _id?: string; name?: string };
+  fromBranch?: { _id?: string; name?: string } | null;
   toBranch?: { _id?: string; name?: string };
   initiatedBy?: { name?: string };
   resolvedBy?: { name?: string };
@@ -231,6 +233,7 @@ listBranchTransfers(params: {
   search?: string;
   from?: string;
   to?: string;
+  fromWarehouse?: boolean;
 }) {
   let hp = new HttpParams().set('userId', params.userId);
   if (params.status) {
@@ -259,6 +262,9 @@ listBranchTransfers(params: {
   }
   if (params.to) {
     hp = hp.set('to', params.to);
+  }
+  if (params.fromWarehouse) {
+    hp = hp.set('fromWarehouse', 'true');
   }
   return this.http.get<{
     transfers: BranchTransferItem[];

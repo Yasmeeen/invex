@@ -23,7 +23,6 @@ const routes: Routes = [
             'Super Admin',
             'Co Admin',
             'Branch Manager',
-            ...WAREHOUSE,
             'Cashier',
             'Collector',
             'Moderator',
@@ -67,14 +66,14 @@ const routes: Routes = [
         path: 'branches',
         loadChildren: () => import('./branches/branches.module').then(m => m.BranchesModule),
         canActivate: [RoleGuard],
-        data: { allowedRoles: ['Super Admin', 'Co Admin', ...WAREHOUSE] },
+        data: { allowedRoles: ['Super Admin', 'Co Admin'] },
       },
       {
         path: 'categories',
         loadChildren: () => import('./categories/categories.module').then(m => m.CategoriesModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Admin', 'Branch Manager'],
         },
       },
       {
@@ -88,7 +87,7 @@ const routes: Routes = [
         loadChildren: () => import('./reports/reports.module').then(m => m.ReportsModule),
         canActivate: [RoleGuard],
         data: {
-          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', ...WAREHOUSE],
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager'],
         },
       },
       {
@@ -106,7 +105,6 @@ const routes: Routes = [
             'Super Admin',
             'Co Admin',
             'Branch Manager',
-            ...WAREHOUSE,
             'Cashier',
             'Collector',
           ],

@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { NgForm } from '@angular/forms';
 import { MatDialogRef } from '@angular/material/dialog';
 import { Branch, Product } from '@core/models/products.model';
+import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { ProductsSerivce } from '@shared/services/products.service';
@@ -30,7 +31,8 @@ export class CreateEditProductComponent implements OnInit {
     private productsService: ProductsSerivce,
     private branchesServce: BranchesServce,
     private appNotificationService: AppNotificationService,
-    private translateService: TranslateService
+    private translateService: TranslateService,
+    private authenticationService: AuthenticationService
   ) {}
 
   ngOnInit(): void {
@@ -76,18 +78,29 @@ export class CreateEditProductComponent implements OnInit {
     if (!this.warehouseForm?.valid) {
       return;
     }
+    const user = this.authenticationService.getUserFromLocalStorage();
+    const userId = user?._id != null ? String(user._id) : '';
+    if (!userId) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_unexpected_error_message'),
+        'error'
+      );
+      return;
+    }
     this.isSubmitting = true;
     this.subscriptions.push(
       this.productsService
-        .transferProductStock({
-          ...this.transferPayload,
-          fromWarehouse: true,
+        .requestBranchTransfer({
+          userId,
+          productId: this.transferPayload.productId,
+          toBranchId: this.transferPayload.toBranchId,
+          quantity: this.transferPayload.quantity,
         })
         .subscribe(
         () => {
           this.isSubmitting = false;
           this.appNotificationService.push(
-            this.translateService.instant('tr_transfer_completed'),
+            this.translateService.instant('tr_branch_transfer_requested'),
             'success'
           );
           this.closeModal(true);

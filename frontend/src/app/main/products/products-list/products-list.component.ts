@@ -23,6 +23,7 @@ import {
   canPickBranchRole,
   isBranchManager,
   isModerator,
+  isWarehouse,
 } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
 import { ViewProductBookingDialogComponent } from '../view-product-booking-dialog/view-product-booking-dialog.component';
@@ -148,10 +149,10 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return !isModerator(this.globals.currentUser?.role);
   }
 
-  /** Moderator / cashier: serial track is not available. */
+  /** Moderator / cashier / warehouse: serial track is not available. */
   get canUseSerialTrack(): boolean {
     const role = this.globals.currentUser?.role;
-    return !isModerator(role) && role !== 'Cashier';
+    return !isModerator(role) && !isWarehouse(role) && role !== 'Cashier';
   }
 
   get showNetPrice(): boolean {
@@ -253,9 +254,12 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return String(pid) === String(myId);
   }
 
-  /** Admins, Warehouse, Moderator: any product. Branch Manager: own branch only (not warehouse). */
+  /** Admins / Moderator: any product. Branch Manager: own branch only (not warehouse). Warehouse: no booking. */
   canBookProduct(product: Product): boolean {
     const role = this.globals.currentUser?.role as string | undefined;
+    if (isWarehouse(role)) {
+      return false;
+    }
     if (canBookAnyProduct(role)) {
       if (!isBranchManager(role)) {
         return true;

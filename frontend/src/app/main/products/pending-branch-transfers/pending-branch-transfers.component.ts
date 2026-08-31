@@ -8,7 +8,7 @@ import { Globals } from '@core/globals';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch, Category } from '@core/models/products.model';
 import { formatCairoDateTime, formatCairoYMD } from '@core/utils/date-tz.util';
-import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
+import { canPickBranchRole, isBranchManager, isWarehouse } from '@core/utils/role-utils';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -60,6 +60,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     search?: string;
     from?: string;
     to?: string;
+    fromWarehouse?: boolean;
   };
 
   private subscriptions: Subscription[] = [];
@@ -79,7 +80,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const role = this.globals.currentUser?.role as string | undefined;
-    if (!(canPickBranchRole(role) || isBranchManager(role))) {
+    if (!(canPickBranchRole(role) || isBranchManager(role) || isWarehouse(role))) {
       this.isNotAuthorized = true;
       this.loading = false;
       return;
@@ -106,7 +107,29 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   get showBranchFilter(): boolean {
     const role = this.globals.currentUser?.role;
+    return canPickBranchRole(role) || isBranchManager(role) || isWarehouse(role);
+  }
+
+  /** From-branch filter (warehouse role only sees warehouse→branch transfers). */
+  get showFromBranchFilter(): boolean {
+    const role = this.globals.currentUser?.role;
     return canPickBranchRole(role) || isBranchManager(role);
+  }
+
+  /** Destination branch options (exclude synthetic warehouse row). */
+  get toBranchOptions(): Branch[] {
+    return (this.branches || []).filter((b) => String(b._id) !== '__warehouse__');
+  }
+
+  /** Label for transfer source: warehouse or branch name. */
+  transferFromLabel(t: BranchTransferItem | null | undefined): string {
+    if (!t) {
+      return '—';
+    }
+    if (t.fromWarehouse) {
+      return this.translate.instant('tr_warehouse');
+    }
+    return t.fromBranch?.name || '—';
   }
 
   loadBranches(): void {
@@ -116,7 +139,15 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
         next: (res: any) => {
-          this.branches = res?.branches || [];
+          const list = res?.branches || [];
+          if (this.showFromBranchFilter) {
+            this.branches = [
+              { _id: '__warehouse__', name: this.translate.instant('tr_warehouse') } as Branch,
+              ...list,
+            ];
+          } else {
+            this.branches = list;
+          }
         },
         error: () => {},
       })
@@ -150,7 +181,9 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     this.params.page = 1;
-    const fromBranchCsv = (this.selectedFromBranches || []).filter(Boolean).join(',');
+    const fromSelected = (this.selectedFromBranches || []).filter(Boolean);
+    const warehouseSelected = fromSelected.includes('__warehouse__');
+    const fromBranchCsv = fromSelected.filter((id) => id !== '__warehouse__').join(',');
     const toBranchCsv = (this.selectedToBranches || []).filter(Boolean).join(',');
     const categoryCsv = (this.selectedCategories || []).filter(Boolean).join(',');
     const search = String(this.searchTerm || '').trim();
@@ -159,6 +192,11 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
       this.params.fromBranchId = fromBranchCsv;
     } else {
       delete this.params.fromBranchId;
+    }
+    if (warehouseSelected) {
+      this.params.fromWarehouse = true;
+    } else {
+      delete this.params.fromWarehouse;
     }
     if (toBranchCsv) {
       this.params.toBranchId = toBranchCsv;
@@ -302,7 +340,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     return {
       [this.translate.instant('tr_product_name')]: this.transferProductName(t),
       [this.translate.instant('tr_code')]: this.transferProductCode(t),
-      [this.translate.instant('tr_branch_transfer_from')]: t.fromBranch?.name || '',
+      [this.translate.instant('tr_branch_transfer_from')]: this.transferFromLabel(t),
       [this.translate.instant('tr_branch_transfer_to_branch')]: t.toBranch?.name || '',
       [this.translate.instant('tr_branch_transfer_quantity')]: t.quantity ?? 0,
       [this.translate.instant('tr_branch_transfer_status_col')]: this.translate.instant(
@@ -420,7 +458,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   private transferConfirmDetails(t: BranchTransferItem): string[] {
     const details = [
       `${this.translate.instant('tr_product_name')}: ${this.transferProductName(t) || '—'}`,
-      `${this.translate.instant('tr_branch_transfer_from')}: ${t.fromBranch?.name || '—'}`,
+      `${this.translate.instant('tr_branch_transfer_from')}: ${this.transferFromLabel(t)}`,
       `${this.translate.instant('tr_branch_transfer_to_branch')}: ${t.toBranch?.name || '—'}`,
       `${this.translate.instant('tr_branch_transfer_quantity')}: ${t.quantity ?? 0}`,
     ];

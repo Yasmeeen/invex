@@ -1,13 +1,10 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { RoleGuard } from '@core/guards/role.guard';
-import { LEGACY_OPERATION_MANAGER } from '@core/utils/role-utils';
 import { ProductsListComponent } from './products-list/products-list.component';
 import { PendingBranchTransfersComponent } from './pending-branch-transfers/pending-branch-transfers.component';
 import { SerialTrackComponent } from './serial-track/serial-track.component';
 import { PriceListComponent } from './price-list/price-list.component';
-
-const WAREHOUSE = ['Warehouse', LEGACY_OPERATION_MANAGER] as const;
 
 const routes: Routes = [
   {
@@ -23,7 +20,6 @@ const routes: Routes = [
         'Super Admin',
         'Co Admin',
         'Branch Manager',
-        ...WAREHOUSE,
         'Moderator',
       ],
     },
@@ -31,6 +27,16 @@ const routes: Routes = [
   {
     path: 'branch-transfers',
     component: PendingBranchTransfersComponent,
+    canActivate: [RoleGuard],
+    data: {
+      allowedRoles: [
+        'Super Admin',
+        'Co Admin',
+        'Branch Manager',
+        'Warehouse',
+        'Operation Manager',
+      ],
+    },
   },
   {
     path: 'serial-track',
@@ -41,7 +47,6 @@ const routes: Routes = [
         'Super Admin',
         'Co Admin',
         'Branch Manager',
-        ...WAREHOUSE,
       ],
     },
   },

@@ -279,67 +279,22 @@ export const CollectorSidebar = [
   },
 ];
 
-/** Formerly Operation Manager — orders, inventory, products, branches, categories, stock report only. */
+/** Warehouse manager — products, warehouse inventory, pending transfers. */
 export const Warehouse = [
   {
-    name: 'tr_sidebar_inventory_products',
-    routerLink: 'null',
+    name: 'tr_products',
+    routerLink: '/products',
+    icon: 'fa fa-cube icon',
+  },
+  {
+    name: 'tr_warehouse',
+    routerLink: '/inventory',
     icon: 'fa fa-cubes icon',
-    children: [
-      {
-        name: 'tr_products',
-        routerLink: '/products',
-        icon: 'fa fa-cube icon',
-      },
-      {
-        name: 'tr_price_list',
-        routerLink: '/products/price-list',
-        icon: 'fa fa-list icon',
-      },
-      {
-        name: 'tr_inventory',
-        routerLink: '/inventory',
-        icon: 'fa fa-cubes icon',
-      },
-      {
-        name: 'tr_serial_track',
-        routerLink: '/products/serial-track',
-        icon: 'fa fa-barcode icon',
-      },
-      {
-        name: 'tr_categories',
-        routerLink: '/categories',
-        icon: 'fa fa-tags icon',
-      },
-    ],
   },
   {
-    name: 'tr_orders',
-    routerLink: '/orders',
-    icon: 'fa fa-list-alt icon',
-  },
-  {
-    name: 'tr_branches',
-    routerLink: '/branches',
-    icon: 'fa fa-building icon',
-  },
-  {
-    name: 'tr_reports',
-    routerLink: 'null',
-    icon: 'fa fa-bar-chart icon',
-    children: [
-      { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
-    ],
-  },
-  {
-    name: 'tr_vixa',
-    routerLink: '/vixa',
-    icon: 'fa fa-comments icon',
-  },
-  {
-    name: 'tr_faq',
-    routerLink: '/faq',
-    icon: 'fa fa-question-circle icon',
+    name: 'tr_branch_transfers_pending',
+    routerLink: '/products/branch-transfers',
+    icon: 'fa fa-exchange icon',
   },
 ];
 

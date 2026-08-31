@@ -4,7 +4,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { isWarehouse } from '@core/utils/role-utils';
 
 /**
- * Warehouse may only open the stock report. Other report routes redirect to /reports/stock.
+ * Warehouse may only open stock + products reports. Other report routes redirect to /reports/stock.
  */
 @Injectable({ providedIn: 'root' })
 export class WarehouseStockReportGuard implements CanActivate {
@@ -15,7 +15,7 @@ export class WarehouseStockReportGuard implements CanActivate {
 
   canActivate(route: ActivatedRouteSnapshot): boolean {
     const reportType = route.data['reportType'] as string | undefined;
-    if (reportType === 'stock') {
+    if (reportType === 'stock' || reportType === 'products') {
       return true;
     }
     const user = this.authenticationService.getUserFromLocalStorage();

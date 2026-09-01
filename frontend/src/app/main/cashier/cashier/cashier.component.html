@@ -988,6 +988,13 @@
           {{ receiptCurrencyLabel(st.receiptLanguage) }}
         </td>
       </tr>
+      <tr *ngIf="receiptInstallmentDiscount() > 0">
+        <td>{{ 'tr_cashier_installment_discount_line' | receiptTranslate: st.receiptLanguage }}</td>
+        <td class="money">
+          {{ formatReceiptAmount(-receiptInstallmentDiscount()) }}
+          {{ receiptCurrencyLabel(st.receiptLanguage) }}
+        </td>
+      </tr>
       <tr class="bold">
         <td>{{ 'tr_receipt_installment_down_payment' | receiptTranslate: st.receiptLanguage }}</td>
         <td class="money">

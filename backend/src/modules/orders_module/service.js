@@ -47,6 +47,7 @@ import {
   creditMarkupAmount,
   creditOnAccountAmount,
   distributeAmountOntoLinePrices,
+  roundMoney,
 } from '../../utils/credit-sale-markup.js';
 import InstallmentPlan from '../../DB/models/installmentPlan.model.js';
 import {
@@ -515,6 +516,7 @@ export const createOrder = async (req, res) => {
     linkParty: linkPartyRaw,
     installmentPlanId: installmentPlanIdRaw,
     installmentStartDate: installmentStartDateRaw,
+    installmentMonthlyAmount: installmentMonthlyAmountRaw,
   } = req.body;
 
   const partyType =
@@ -1205,11 +1207,16 @@ export const createOrder = async (req, res) => {
         return res.status(400).json({ error: 'Invalid installment start date' });
       }
 
+      const monthlyOverride = Number(installmentMonthlyAmountRaw);
       const schedule = buildSaleInstallmentSchedule({
         principal: onAccount,
         interestPercent: plan.interestPercent,
         months: plan.months,
         startDate,
+        monthlyAmountOverride:
+          Number.isFinite(monthlyOverride) && monthlyOverride > 0
+            ? monthlyOverride
+            : undefined,
       });
 
       if (schedule.interestAmount > 0) {
@@ -1219,6 +1226,27 @@ export const createOrder = async (req, res) => {
           totalPrice = Math.round((totalPrice + applied) * 100) / 100;
           amountDueForPayment = Math.round((amountDueForPayment + applied) * 100) / 100;
         }
+      }
+
+      let installmentDiscountAmount = 0;
+      let installmentSurchargeAmount = 0;
+      const adjustmentDelta = roundMoney(schedule.adjustmentAmount || 0);
+      if (adjustmentDelta > 0.001) {
+        installmentSurchargeAmount = distributeAmountOntoLinePrices(
+          orderProducts,
+          adjustmentDelta
+        );
+        if (installmentSurchargeAmount > 0) {
+          subtotalPrice = Math.round((subtotalPrice + installmentSurchargeAmount) * 100) / 100;
+          totalPrice = Math.round((totalPrice + installmentSurchargeAmount) * 100) / 100;
+          amountDueForPayment = Math.round((amountDueForPayment + installmentSurchargeAmount) * 100) / 100;
+        }
+      } else if (adjustmentDelta < -0.001) {
+        installmentDiscountAmount = roundMoney(Math.abs(adjustmentDelta));
+        totalPrice = Math.round((totalPrice - installmentDiscountAmount) * 100) / 100;
+        amountDueForPayment = Math.round((amountDueForPayment - installmentDiscountAmount) * 100) / 100;
+        if (totalPrice < 0) totalPrice = 0;
+        if (amountDueForPayment < 0) amountDueForPayment = 0;
       }
 
       const installmentTotalProfit = orderLineTradingProfit(orderProducts);
@@ -1234,6 +1262,8 @@ export const createOrder = async (req, res) => {
         installmentStartDate: startDate,
         installmentPrincipal: schedule.principal,
         installmentInterestAmount: schedule.interestAmount,
+        installmentDiscountAmount,
+        installmentSurchargeAmount,
         installmentTotalProfit,
         installments: schedule.installments,
       };

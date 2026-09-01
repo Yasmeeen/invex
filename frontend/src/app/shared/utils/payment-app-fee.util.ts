@@ -37,6 +37,8 @@ export interface PaymentSplitsResult {
   /** When financing remaining balance via installment plan. */
   installmentPlanId?: string;
   installmentStartDate?: string;
+  /** Cashier override for monthly installment amount. */
+  installmentMonthlyAmount?: number;
 }
 
 export function round2(n: number): number {

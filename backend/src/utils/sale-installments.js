@@ -87,18 +87,10 @@ export function ensureInstallmentProfitShares(order) {
  * Last installment absorbs rounding remainder so sum === totalDue.
  * Call allocateInstallmentProfitShares after line prices include interest.
  */
-export function buildSaleInstallmentSchedule({
-  principal,
-  interestPercent,
-  months,
-  startDate,
-}) {
+function buildInstallmentRows({ months, startDate, totalDue, monthlyBase }) {
   const m = Math.max(1, Math.floor(Number(months) || 1));
-  const p = Math.round((Number(principal) || 0) * 100) / 100;
-  const rate = Math.max(0, Number(interestPercent) || 0) / 100;
-  const interestAmount = Math.round(p * rate * 100) / 100;
-  const totalDue = Math.round((p + interestAmount) * 100) / 100;
-  const base = Math.floor((totalDue / m) * 100) / 100;
+  const dueTotal = round2(totalDue);
+  const base = round2(monthlyBase);
   const start = startDate ? new Date(startDate) : new Date();
   if (Number.isNaN(start.getTime())) {
     throw new Error("Invalid installment start date");
@@ -110,10 +102,8 @@ export function buildSaleInstallmentSchedule({
     const due = new Date(start);
     due.setMonth(due.getMonth() + i);
     const amount =
-      i === m - 1
-        ? Math.round((totalDue - allocated) * 100) / 100
-        : base;
-    allocated = Math.round((allocated + amount) * 100) / 100;
+      i === m - 1 ? round2(dueTotal - allocated) : base;
+    allocated = round2(allocated + amount);
     rows.push({
       sequence: i + 1,
       dueDate: due,
@@ -127,11 +117,58 @@ export function buildSaleInstallmentSchedule({
     });
   }
 
+  return rows;
+}
+
+export function buildSaleInstallmentSchedule({
+  principal,
+  interestPercent,
+  months,
+  startDate,
+  monthlyAmountOverride,
+}) {
+  const m = Math.max(1, Math.floor(Number(months) || 1));
+  const p = round2(principal);
+  const rate = Math.max(0, Number(interestPercent) || 0) / 100;
+  const interestAmount = round2(p * rate);
+  const defaultTotalDue = round2(p + interestAmount);
+  const defaultMonthlyBase = Math.floor((defaultTotalDue / m) * 100) / 100;
+
+  const override = round2(monthlyAmountOverride);
+  const hasOverride =
+    Number.isFinite(override) &&
+    override > 0 &&
+    Math.abs(override - defaultMonthlyBase) > 0.004;
+
+  if (!hasOverride) {
+    return {
+      principal: p,
+      interestAmount,
+      totalDue: defaultTotalDue,
+      adjustmentAmount: 0,
+      installments: buildInstallmentRows({
+        months: m,
+        startDate,
+        totalDue: defaultTotalDue,
+        monthlyBase: defaultMonthlyBase,
+      }),
+    };
+  }
+
+  const customTotalDue = round2(override * m);
+  const adjustmentAmount = round2(customTotalDue - defaultTotalDue);
+
   return {
     principal: p,
     interestAmount,
-    totalDue,
-    installments: rows,
+    totalDue: customTotalDue,
+    adjustmentAmount,
+    installments: buildInstallmentRows({
+      months: m,
+      startDate,
+      totalDue: customTotalDue,
+      monthlyBase: override,
+    }),
   };
 }
 

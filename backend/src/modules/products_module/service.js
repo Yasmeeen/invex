@@ -1443,17 +1443,63 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
   return query;
 }
 
+/** Normalize booking source filter: pos/invex vs ecommerce/website. */
+function normalizeBookingSourceFilter(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (!v || v === 'all') return null;
+  if (v === 'pos' || v === 'invex') return 'pos';
+  if (v === 'ecommerce' || v === 'website') return 'ecommerce';
+  return null;
+}
+
+/** Restrict product list to SKUs with active bookings from a given channel. */
+async function applyBookingSourceFilter(query, bookingSource) {
+  const source = normalizeBookingSourceFilter(bookingSource);
+  if (!source) return;
+
+  const productIds = await ProductBooking.distinct('product', {
+    status: 'active',
+    source,
+  });
+
+  const idFilter = { $in: productIds };
+  if (query._id) {
+    const existing = query._id;
+    if (existing.$in) {
+      const allowed = new Set(existing.$in.map((id) => String(id)));
+      query._id = {
+        $in: productIds.filter((id) => allowed.has(String(id))),
+      };
+    } else {
+      query.$and = [...(query.$and || []), { _id: existing }, { _id: idFilter }];
+      delete query._id;
+    }
+  } else {
+    query._id = idFilter;
+  }
+}
+
+async function resolveProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false } = {}) {
+  const query = buildProductsListQuery(queryParams, { cutFromSourceEnabled });
+  await applyBookingSourceFilter(query, queryParams.bookingSource);
+  return query;
+}
+
 export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10, sort } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
-    const query = buildProductsListQuery(req.query, {
-      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
-    });
-    const lastPriceQuery = buildProductsListQuery(
-      { ...req.query, priceUpdatedSince: undefined, priceUpdatedFrom: undefined, priceUpdatedTo: undefined },
-      { cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc) }
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settingsDoc);
+    const query = await resolveProductsListQuery(req.query, { cutFromSourceEnabled });
+    const lastPriceQuery = await resolveProductsListQuery(
+      {
+        ...req.query,
+        priceUpdatedSince: undefined,
+        priceUpdatedFrom: undefined,
+        priceUpdatedTo: undefined,
+      },
+      { cutFromSourceEnabled }
     );
     const sortSpec =
       String(sort || '') === 'priceUpdatedAt' ? { priceUpdatedAt: -1, _id: -1 } : undefined;
@@ -3514,7 +3560,7 @@ export const transferProductStock = async (req, res) => {
 export const getProductsInventoryAudit = async (req, res) => {
   try {
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
-    const query = buildProductsListQuery(req.query, {
+    const query = await resolveProductsListQuery(req.query, {
       cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
     });
     const search = String(req.query.search || '').trim();

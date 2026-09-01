@@ -2,6 +2,57 @@
   margin-top: 1rem;
 }
 
+.category-image-field {
+  margin-top: 1rem;
+
+  .category-image-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .category-image-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    img {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+      border-radius: 10px;
+      border: 1px solid #e0e0e0;
+      background: #fafafa;
+    }
+  }
+
+  .category-image-placeholder {
+    width: 96px;
+    height: 96px;
+    border-radius: 10px;
+    border: 1px dashed #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9e9e9e;
+    font-size: 2rem;
+    background: #fafafa;
+  }
+
+  .category-image-upload-label {
+    cursor: pointer;
+    display: inline-block;
+    position: relative;
+    user-select: none;
+
+    &.disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+}
+
 .category-attrs-toolbar {
   display: flex;
   align-items: center;

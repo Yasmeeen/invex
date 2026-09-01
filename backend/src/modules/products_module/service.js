@@ -1299,11 +1299,53 @@ function buildProductsListQuery(queryParams = {}) {
   return query;
 }
 
+/** Normalize booking source filter: pos/invex vs ecommerce/website. */
+function normalizeBookingSourceFilter(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (!v || v === 'all') return null;
+  if (v === 'pos' || v === 'invex') return 'pos';
+  if (v === 'ecommerce' || v === 'website') return 'ecommerce';
+  return null;
+}
+
+/** Restrict product list to SKUs with active bookings from a given channel. */
+async function applyBookingSourceFilter(query, bookingSource) {
+  const source = normalizeBookingSourceFilter(bookingSource);
+  if (!source) return;
+
+  const productIds = await ProductBooking.distinct('product', {
+    status: 'active',
+    source,
+  });
+
+  const idFilter = { $in: productIds };
+  if (query._id) {
+    const existing = query._id;
+    if (existing.$in) {
+      const allowed = new Set(existing.$in.map((id) => String(id)));
+      query._id = {
+        $in: productIds.filter((id) => allowed.has(String(id))),
+      };
+    } else {
+      query.$and = [...(query.$and || []), { _id: existing }, { _id: idFilter }];
+      delete query._id;
+    }
+  } else {
+    query._id = idFilter;
+  }
+}
+
+async function resolveProductsListQuery(queryParams = {}) {
+  const query = buildProductsListQuery(queryParams);
+  await applyBookingSourceFilter(query, queryParams.bookingSource);
+  return query;
+}
+
 export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
-    const query = buildProductsListQuery(req.query);
+    const query = await resolveProductsListQuery(req.query);
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -3128,7 +3170,7 @@ export const transferProductStock = async (req, res) => {
 /** GET /products/inventory-audit — stock totals for current list filters, grouped by location. */
 export const getProductsInventoryAudit = async (req, res) => {
   try {
-    const query = buildProductsListQuery(req.query);
+    const query = await resolveProductsListQuery(req.query);
     const search = String(req.query.search || '').trim();
 
     const stockValueExpr = {

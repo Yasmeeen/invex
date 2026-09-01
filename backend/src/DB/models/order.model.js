@@ -157,6 +157,10 @@ const orderSchema = new mongoose.Schema(
     installmentPrincipal: { type: Number, min: 0, default: 0 },
     /** Interest/markup amount included in schedule totals. */
     installmentInterestAmount: { type: Number, min: 0, default: 0 },
+    /** Discount applied to installment total (cashier override below plan amount). */
+    installmentDiscountAmount: { type: Number, min: 0, default: 0 },
+    /** Surcharge added via higher installment amount (distributed onto line prices). */
+    installmentSurchargeAmount: { type: Number, min: 0, default: 0 },
     /**
      * Full trading profit deferred onto installments (Σ price×qty − Σ cost×qty after interest).
      * Recognized over time as installments are collected.

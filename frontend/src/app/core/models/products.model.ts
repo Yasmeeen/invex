@@ -202,6 +202,8 @@ export interface Order {
   installmentStartDate?: string;
   installmentPrincipal?: number;
   installmentInterestAmount?: number;
+  installmentDiscountAmount?: number;
+  installmentSurchargeAmount?: number;
   installments?: Array<{
     _id?: string;
     sequence?: number;

@@ -68,6 +68,11 @@
     }
   }
 
+  &__installment-monthly-input {
+    max-width: 12rem;
+    font-weight: 600;
+  }
+
   &__section-title {
     font-size: 1rem;
     margin: 0 0 0.5rem;

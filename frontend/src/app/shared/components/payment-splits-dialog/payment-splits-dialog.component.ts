@@ -67,6 +67,9 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   installmentPlans: InstallmentPlan[] = [];
   selectedInstallmentPlanId = '';
   installmentStartDate = '';
+  /** Cashier-editable monthly installment; null = use plan default. */
+  installmentMonthlyOverride: number | null = null;
+  private installmentMonthlyManual = false;
 
   readonly invoiceNetTotal: number;
   readonly mode: PaymentSplitsDialogMode;
@@ -111,6 +114,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
           if (!this.selectedInstallmentPlanId && this.installmentPlans.length) {
             this.selectedInstallmentPlanId = String(this.installmentPlans[0]._id || '');
           }
+          this.syncInstallmentMonthlyOverride();
         },
         error: () => {
           this.installmentPlans = [];
@@ -203,10 +207,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Monthly installment amount (matches backend buildSaleInstallmentSchedule base).
+   * Plan-calculated monthly installment (matches backend buildSaleInstallmentSchedule base).
    * Last month may absorb a few piastres of rounding.
    */
-  installmentMonthlyAmount(): number {
+  calculatedInstallmentMonthlyAmount(): number {
     if (
       this.mode === 'deposit' ||
       this.paymentOverAllocated() ||
@@ -223,6 +227,64 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       return 0;
     }
     return Math.floor((totalDue / months) * 100) / 100;
+  }
+
+  /** Effective monthly amount (override or calculated). */
+  installmentMonthlyAmount(): number {
+    const calculated = this.calculatedInstallmentMonthlyAmount();
+    if (calculated <= 0) {
+      return 0;
+    }
+    if (this.installmentMonthlyOverride != null && this.installmentMonthlyOverride > 0) {
+      return round2(this.installmentMonthlyOverride);
+    }
+    return calculated;
+  }
+
+  onInstallmentPlanChange(): void {
+    this.installmentMonthlyManual = false;
+    this.syncInstallmentMonthlyOverride();
+  }
+
+  onInstallmentMonthlyChange(): void {
+    this.installmentMonthlyManual = true;
+    if (this.installmentMonthlyOverride != null && this.installmentMonthlyOverride < 0) {
+      this.installmentMonthlyOverride = 0;
+    }
+  }
+
+  private syncInstallmentMonthlyOverride(): void {
+    if (this.installmentMonthlyManual) {
+      return;
+    }
+    const calculated = this.calculatedInstallmentMonthlyAmount();
+    this.installmentMonthlyOverride = calculated > 0 ? calculated : null;
+  }
+
+  /** Delta between overridden total installments and plan default (negative = discount). */
+  installmentAdjustmentDelta(): number {
+    const months = this.installmentPlanMonths();
+    if (months < 1) {
+      return 0;
+    }
+    const calculated = this.calculatedInstallmentMonthlyAmount();
+    const effective = this.installmentMonthlyAmount();
+    if (calculated <= 0 || effective <= 0) {
+      return 0;
+    }
+    const defaultTotal = round2(calculated * months);
+    const customTotal = round2(effective * months);
+    return round2(customTotal - defaultTotal);
+  }
+
+  installmentDiscountPreview(): number {
+    const delta = this.installmentAdjustmentDelta();
+    return delta < -0.005 ? round2(Math.abs(delta)) : 0;
+  }
+
+  installmentSurchargePreview(): number {
+    const delta = this.installmentAdjustmentDelta();
+    return delta > 0.005 ? round2(delta) : 0;
   }
 
   installmentPlanMonths(): number {
@@ -316,6 +378,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     this.reconcilePayAmountsKeys(raw);
     this.ensureDefaultNetAmounts();
     this.syncFeeSources();
+    this.syncInstallmentMonthlyOverride();
   }
 
   private reconcilePayAmountsKeys(ids: string[]): void {
@@ -355,6 +418,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
 
   onPayAmountChange(): void {
     this.syncFeeSources();
+    this.syncInstallmentMonthlyOverride();
   }
 
   private syncFeeSources(): void {
@@ -644,6 +708,11 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
         this.notify.push(this.translate.instant('tr_installment_needs_remaining'), 'error');
         return;
       }
+      const monthly = this.installmentMonthlyAmount();
+      if (!monthly || monthly <= 0) {
+        this.notify.push(this.translate.instant('tr_installment_monthly_amount_required'), 'error');
+        return;
+      }
     }
 
     const feeSources = this.feeSources.length
@@ -675,6 +744,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     if (hasInstallment) {
       result.installmentPlanId = this.selectedInstallmentPlanId;
       result.installmentStartDate = this.installmentStartDate;
+      const monthly = this.installmentMonthlyAmount();
+      if (monthly > 0) {
+        result.installmentMonthlyAmount = monthly;
+      }
     }
 
     this.dialogRef.close(result);

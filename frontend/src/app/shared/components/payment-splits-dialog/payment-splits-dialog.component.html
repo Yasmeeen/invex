@@ -104,6 +104,7 @@
               [(ngModel)]="selectedInstallmentPlanId"
               [ngModelOptions]="{ standalone: true }"
               name="installmentPlanId"
+              (ngModelChange)="onInstallmentPlanChange()"
             >
               <option value="" disabled>{{ 'tr_installment_plan_select' | translate }}</option>
               <option *ngFor="let plan of installmentPlans" [value]="plan._id">
@@ -144,11 +145,34 @@
             class="payment-splits-dialog__installment-amount mt-2"
             *ngIf="installmentMonthlyAmount() > 0"
           >
-            {{
-              'tr_cashier_installment_monthly_amount'
-                | translate:{ months: installmentPlanMonths() }
-            }}:
-            <strong>{{ installmentMonthlyAmount() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            <label class="size-small d-block mb-1">
+              {{
+                'tr_cashier_installment_monthly_amount'
+                  | translate:{ months: installmentPlanMonths() }
+              }}
+            </label>
+            <input
+              type="number"
+              class="s-control payment-splits-dialog__installment-monthly-input"
+              min="0.01"
+              step="0.01"
+              [(ngModel)]="installmentMonthlyOverride"
+              [ngModelOptions]="{ standalone: true }"
+              name="installmentMonthlyOverride"
+              (ngModelChange)="onInstallmentMonthlyChange()"
+            />
+            <div class="size-small text-muted mt-1" *ngIf="calculatedInstallmentMonthlyAmount() > 0">
+              {{ 'tr_cashier_installment_monthly_plan_default' | translate }}:
+              <strong>{{ calculatedInstallmentMonthlyAmount() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            </div>
+            <div class="size-small mt-1 text-success" *ngIf="installmentDiscountPreview() > 0">
+              {{ 'tr_cashier_installment_discount_line' | translate }}:
+              <strong>−{{ installmentDiscountPreview() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            </div>
+            <div class="size-small mt-1" *ngIf="installmentSurchargePreview() > 0">
+              {{ 'tr_cashier_installment_surcharge_line' | translate }}:
+              <strong>+{{ installmentSurchargePreview() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            </div>
           </div>
         </div>
       </ng-container>

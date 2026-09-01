@@ -68,8 +68,13 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   private vendorTypeaheadSub?: Subscription;
   /** all | warehouse | branches */
   locationFilter: 'all' | 'warehouse' | 'branches' = 'all';
-  /** all | with_bookings | without_bookings — maps to API `booked` */
-  bookingFilter: 'all' | 'with_bookings' | 'without_bookings' = 'all';
+  /** all | with_bookings | without_bookings | with_invex_bookings | with_website_bookings */
+  bookingFilter:
+    | 'all'
+    | 'with_bookings'
+    | 'without_bookings'
+    | 'with_invex_bookings'
+    | 'with_website_bookings' = 'all';
   /** all | available | out_of_stock — maps to API `inStock` */
   stockFilter: 'all' | 'available' | 'out_of_stock' = 'all';
   onlineFilter: 'all' | 'listed' | 'not_listed' = 'all';
@@ -81,11 +86,18 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   ];
 
   readonly bookingFilterOptions: Array<{
-    id: 'all' | 'with_bookings' | 'without_bookings';
+    id:
+      | 'all'
+      | 'with_bookings'
+      | 'without_bookings'
+      | 'with_invex_bookings'
+      | 'with_website_bookings';
     labelKey: string;
   }> = [
     { id: 'all', labelKey: 'tr_products_booking_filter_all' },
     { id: 'with_bookings', labelKey: 'tr_products_booking_filter_with' },
+    { id: 'with_invex_bookings', labelKey: 'tr_products_booking_filter_invex' },
+    { id: 'with_website_bookings', labelKey: 'tr_products_booking_filter_website' },
     { id: 'without_bookings', labelKey: 'tr_products_booking_filter_without' },
   ];
 
@@ -307,6 +319,10 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       filterParams['booked'] = 'true';
     } else if (this.bookingFilter === 'without_bookings') {
       filterParams['booked'] = 'false';
+    } else if (this.bookingFilter === 'with_invex_bookings') {
+      filterParams['bookingSource'] = 'pos';
+    } else if (this.bookingFilter === 'with_website_bookings') {
+      filterParams['bookingSource'] = 'ecommerce';
     }
     if (this.stockFilter === 'available') {
       filterParams['inStock'] = 'true';
@@ -562,6 +578,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     delete this.params['warehouseOnly'];
     delete this.params['excludeWarehouse'];
     delete this.params['booked'];
+    delete this.params['bookingSource'];
     delete this.params['inStock'];
     delete this.params['categoryId'];
     delete this.params['attrKey'];

@@ -17,17 +17,17 @@ export function canUseProfit(role) {
   return r !== ROLES.CO_ADMIN && r !== ROLES.BRANCH_MANAGER;
 }
 
+export function canUseVixa(role) {
+  const r = norm(role);
+  if (r === ROLES.CASHIER || r === ROLES.WAREHOUSE || r === 'Operation Manager') return false;
+  return true;
+}
+
 export function canUseReports(role) {
   // Vixa should match what users can see in UI quick actions.
-  // - Cashier: allowed to ask about orders/invoices (sales summary) for their branch.
-  // - Warehouse: must not see Vixa reports (per product request).
+  // - Cashier / Warehouse: no Vixa.
   const r = norm(role);
-  return (
-    r === ROLES.SUPER_ADMIN ||
-    r === ROLES.CO_ADMIN ||
-    r === ROLES.BRANCH_MANAGER ||
-    r === ROLES.CASHIER
-  );
+  return r === ROLES.SUPER_ADMIN || r === ROLES.CO_ADMIN || r === ROLES.BRANCH_MANAGER;
 }
 
 export function canUseBookings(role) {

@@ -76,8 +76,8 @@
   </h2>
 
   <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
-    <div class="row">
-      <div class="col-md-3">
+    <div class="filters-grid">
+      <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ "tr_name" | translate }}/{{ "tr_code" | translate }}</label>
           <div class="input-with-icon bg-white width-100">
@@ -90,7 +90,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_category' | translate }}</label>
           <div class="input-with-icon bg-white">
@@ -120,38 +120,34 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4 mb-4" *ngIf="selectedCategories?.length === 1 && attributeKeyOptions?.length">
+      <div class="filters-grid__item" *ngIf="selectedCategories?.length === 1 && attributeKeyOptions?.length">
         <div class="form-group mb-0">
           <label>{{ 'tr_category_attributes' | translate }}</label>
-          <div class="row">
-            <div class="col-md-5">
-              <ng-select
-                class="s-control s-select width-100"
-                placeholder="{{ 'tr_select' | translate }}"
-                [items]="attributeKeyOptions"
-                [(ngModel)]="selectedAttributeKey"
-                name="attrKey"
-                [clearable]="true"
-                appendTo="body"
-                (change)="applyAttributeSearch()"
-              >
-              </ng-select>
-            </div>
-            <div class="col-md-7">
-              <input
-                class="s-control width-100"
-                type="text"
-                [(ngModel)]="selectedAttributeValue"
-                name="attrValue"
-                placeholder="{{ 'tr_search' | translate }}"
-                (keyup)="applyAttributeSearchDebounced()"
-              />
-            </div>
+          <div class="filters-grid__split">
+            <ng-select
+              class="s-control s-select width-100"
+              placeholder="{{ 'tr_select' | translate }}"
+              [items]="attributeKeyOptions"
+              [(ngModel)]="selectedAttributeKey"
+              name="attrKey"
+              [clearable]="true"
+              appendTo="body"
+              (change)="applyAttributeSearch()"
+            >
+            </ng-select>
+            <input
+              class="s-control width-100"
+              type="text"
+              [(ngModel)]="selectedAttributeValue"
+              name="attrValue"
+              placeholder="{{ 'tr_search' | translate }}"
+              (keyup)="applyAttributeSearchDebounced()"
+            />
           </div>
         </div>
       </div>
-      <div class="col-md-4">
-        <div class="form-group">
+      <div class="filters-grid__item">
+        <div class="form-group mb-0">
           <label>{{ 'tr_location_filter' | translate }}</label>
           <ng-select
             class="s-control s-select width-100"
@@ -170,7 +166,7 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_products_stock_filter' | translate }}</label>
           <ng-select
@@ -190,7 +186,7 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_products_booking_filter' | translate }}</label>
           <ng-select
@@ -210,7 +206,7 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4" *ngIf="showOnlineListingUi">
+      <div class="filters-grid__item" *ngIf="showOnlineListingUi">
         <div class="form-group mb-0">
           <label>{{ 'tr_product_online_filter' | translate }}</label>
           <ng-select
@@ -230,8 +226,8 @@
           </ng-select>
         </div>
       </div>
-      <div class="col-md-4 mt-4" *ngIf="locationFilter !== 'warehouse'">
-        <div class="form-group">
+      <div class="filters-grid__item" *ngIf="locationFilter !== 'warehouse'">
+        <div class="form-group mb-0">
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon bg-white">
             <ng-select
@@ -260,7 +256,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-4 mt-4" *ngIf="showSupplierFilter">
+      <div class="filters-grid__item" *ngIf="showSupplierFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_search_supplier' | translate }}</label>
           <ng-select
@@ -379,6 +375,9 @@
                       </span>
                     </span>
                     <span class="products-list__name-text">{{ product.name }}</span>
+                    <p class="products-list__pickup-hint m-0" *ngIf="remotePickupHint(product) as hint">
+                      {{ hint }}
+                    </p>
                   </span>
                 </span>
               </td>
@@ -509,6 +508,9 @@
                 </span>
                 {{ product.name }}
               </div>
+              <p class="products-list__pickup-hint m-0 mt-1" *ngIf="remotePickupHint(product) as hint">
+                {{ hint }}
+              </p>
               <div class="product-card__meta">
                 <span class="muted">{{ product.code }}</span>
                 <span class="dot">•</span>

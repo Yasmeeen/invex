@@ -47,6 +47,7 @@
           <thead>
             <tr>
               <th></th>
+              <th>{{ "tr_category_image" | translate }}</th>
               <th>{{ "tr_category_name" | translate }}</th>
               <th>{{ "tr_category_short_code" | translate }}</th>
               <th>{{ "tr_number_of_products" | translate }}</th>
@@ -57,6 +58,15 @@
           <tbody>
             <tr *ngFor="let category of categoriesList; let i = index">
               <td>{{ i + 1 }}</td>
+              <td>
+                <img
+                  *ngIf="category.imageUrl"
+                  class="category-list-thumb"
+                  [src]="category.imageUrl"
+                  [alt]="category.name"
+                />
+                <span class="text-muted" *ngIf="!category.imageUrl">—</span>
+              </td>
               <td>{{ category.name }}</td>
               <td>
                 <span *ngIf="category.code">{{ category.code }}</span>

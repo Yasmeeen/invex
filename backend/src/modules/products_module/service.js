@@ -28,11 +28,27 @@ import {
   resolveCutSourceFields,
 } from '../../utils/cut-from-source.js';
 import {
+  canSeeCostPrice,
+  stripCostFieldsFromProduct,
+  stripInventoryCapital,
+} from '../../utils/cost-price-access.js';
+import {
   notifyProductChanged,
   notifyProductDeleted,
 } from '../integrations_module/catalogSync.js';
+import {
+  attachRemotePickupTransfers,
+  bookedQuantityForPickupBranch,
+  movePickupBookingsWithTransfer,
+  transferAvailableQty,
+} from '../../utils/branch-transfer-bookings.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
+
+function isWarehouseRole(role) {
+  const r = String(role || '').trim();
+  return r === 'Warehouse' || r === 'Operation Manager';
+}
 
 function parseListedOnEcommerce(body) {
   const v = body?.listedOnEcommerce;
@@ -98,6 +114,17 @@ async function loadUserForBranchTransfer(userId) {
   return User.findById(userId).select('name role branch').lean();
 }
 
+async function viewerCannotSeeCostPrice(req) {
+  const userId = req.query?.userId || req.query?.user_id || req.body?.userId;
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return false;
+  const [user, settings] = await Promise.all([
+    User.findById(userId).select('role').lean(),
+    StoreSettings.findOne().sort({ updatedAt: -1 }).select('rolesHiddenFromCostPrice').lean(),
+  ]);
+  if (!user) return false;
+  return !canSeeCostPrice(user.role, settings?.rolesHiddenFromCostPrice);
+}
+
 function assertMayInitiateBranchTransfer(user, product) {
   if (!user) {
     const err = new Error('UNAUTHORIZED');
@@ -105,8 +132,12 @@ function assertMayInitiateBranchTransfer(user, product) {
     throw err;
   }
   if (product.inWarehouse) {
-    const err = new Error('WAREHOUSE');
-    err.code = 'WAREHOUSE';
+    // Central warehouse → branch (pending approval at destination).
+    if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim()) || isWarehouseRole(user.role)) {
+      return;
+    }
+    const err = new Error('FORBIDDEN');
+    err.code = 'FORBIDDEN';
     throw err;
   }
   if (!product.branch) {
@@ -1292,12 +1323,54 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
   return query;
 }
 
+/** Normalize booking source filter: pos/invex vs ecommerce/website. */
+function normalizeBookingSourceFilter(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (!v || v === 'all') return null;
+  if (v === 'pos' || v === 'invex') return 'pos';
+  if (v === 'ecommerce' || v === 'website') return 'ecommerce';
+  return null;
+}
+
+/** Restrict product list to SKUs with active bookings from a given channel. */
+async function applyBookingSourceFilter(query, bookingSource) {
+  const source = normalizeBookingSourceFilter(bookingSource);
+  if (!source) return;
+
+  const productIds = await ProductBooking.distinct('product', {
+    status: 'active',
+    source,
+  });
+
+  const idFilter = { $in: productIds };
+  if (query._id) {
+    const existing = query._id;
+    if (existing.$in) {
+      const allowed = new Set(existing.$in.map((id) => String(id)));
+      query._id = {
+        $in: productIds.filter((id) => allowed.has(String(id))),
+      };
+    } else {
+      query.$and = [...(query.$and || []), { _id: existing }, { _id: idFilter }];
+      delete query._id;
+    }
+  } else {
+    query._id = idFilter;
+  }
+}
+
+async function resolveProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false } = {}) {
+  const query = buildProductsListQuery(queryParams, { cutFromSourceEnabled });
+  await applyBookingSourceFilter(query, queryParams.bookingSource);
+  return query;
+}
+
 export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
-    const query = buildProductsListQuery(req.query, {
+    const query = await resolveProductsListQuery(req.query, {
       cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
     });
 
@@ -1318,9 +1391,14 @@ export const getProducts = async (req, res) => {
     }
 
     const totalPages = Math.ceil(total / limit);
+    // flattenMaps so attributes Map serializes (otherwise JSON → {})
+    const productsOut = await attachRemotePickupTransfers(
+      products.map((p) => p.toObject({ virtuals: true, flattenMaps: true }))
+    );
+    const hideCost = await viewerCannotSeeCostPrice(req);
 
     res.json({
-      products,
+      products: hideCost ? productsOut.map(stripCostFieldsFromProduct) : productsOut,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
@@ -1348,7 +1426,13 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    res.json(product);
+    const [out] = await attachRemotePickupTransfers([
+      product.toObject({ virtuals: true, flattenMaps: true }),
+    ]);
+    if (await viewerCannotSeeCostPrice(req)) {
+      return res.json(stripCostFieldsFromProduct(out));
+    }
+    res.json(out);
   } catch (error) {
     console.error('❌ Error fetching product by ID:', error.message);
     res.status(500).json({ error: 'Failed to fetch product' });
@@ -2251,7 +2335,7 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-/** Branch → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
+/** Branch/warehouse → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
 export const requestBranchTransfer = async (req, res) => {
   try {
     const userId = pickActorUserId(req);
@@ -2283,27 +2367,33 @@ export const requestBranchTransfer = async (req, res) => {
     try {
       assertMayInitiateBranchTransfer(user, product);
     } catch (e) {
-      if (e.code === 'WAREHOUSE') {
-        return res.status(400).json({ error: 'Warehouse products cannot use pending branch transfer' });
-      }
       if (e.code === 'NO_BRANCH') {
         return res.status(400).json({ error: 'Product has no branch' });
       }
       return res.status(403).json({ error: 'You cannot request this transfer' });
     }
 
-    const fromBranchId = product.branch;
-    if (String(fromBranchId) === String(toBranchId)) {
+    const fromWarehouse = !!product.inWarehouse;
+    const fromBranchId = fromWarehouse ? null : product.branch;
+    if (!fromWarehouse && String(fromBranchId) === String(toBranchId)) {
       return res.status(400).json({ error: 'Source and destination branch must differ' });
     }
 
     const booked = await sumActiveBookedQuantityProducts(product._id);
     const reserved = Number(product.transferReservedQuantity) || 0;
     const stock = Math.max(0, Number(product.stock) || 0);
-    const available = Math.max(0, stock - booked - reserved);
+    const bookedForDest = await bookedQuantityForPickupBranch(product._id, toBranchId);
+    const available = transferAvailableQty({
+      stock,
+      bookedTotal: booked,
+      transferReserved: reserved,
+      bookedForDestination: bookedForDest,
+    });
     if (qty > available) {
       return res.status(400).json({
-        error: `Only ${available} unit(s) available to transfer (stock minus bookings and pending transfers)`,
+        error: fromWarehouse
+          ? `Only ${available} unit(s) available to transfer to this branch from warehouse`
+          : `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`,
       });
     }
 
@@ -2315,6 +2405,7 @@ export const requestBranchTransfer = async (req, res) => {
       productNameSnapshot: String(product.name || '').trim(),
       productCodeSnapshot: String(product.code || '').trim(),
       fromBranch: fromBranchId,
+      fromWarehouse,
       toBranch: toBranchId,
       quantity: qty,
       status: 'pending',
@@ -2330,7 +2421,7 @@ export const requestBranchTransfer = async (req, res) => {
 
     try {
       const recipientIds = await collectIncomingTransferNotifyUserIds(toBranchId);
-      const fromName = populated?.fromBranch?.name || 'Branch';
+      const fromName = fromWarehouse ? 'Warehouse' : populated?.fromBranch?.name || 'Branch';
       const toName = populated?.toBranch?.name || 'Branch';
       const pname = populated?.product?.name || 'Product';
       const notification = await Notification.create({
@@ -2343,6 +2434,7 @@ export const requestBranchTransfer = async (req, res) => {
           productName: pname,
           quantity: qty,
           fromBranchId,
+          fromWarehouse,
           toBranchId,
           initiatedById: userId,
         },
@@ -2359,8 +2451,10 @@ export const requestBranchTransfer = async (req, res) => {
       module: 'products',
       entityType: 'ProductBranchTransfer',
       entityId: transfer._id,
-      message: `Branch transfer requested (${qty})`,
-      metadata: { productId: product._id, fromBranchId, toBranchId, quantity: qty },
+      message: fromWarehouse
+        ? `Warehouse transfer requested (${qty})`
+        : `Branch transfer requested (${qty})`,
+      metadata: { productId: product._id, fromBranchId, fromWarehouse, toBranchId, quantity: qty },
     });
 
     return res.status(201).json({
@@ -2420,7 +2514,14 @@ export const approveBranchTransfer = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    if (String(sourceProduct.branch) !== String(transfer.fromBranch)) {
+    const fromWarehouse = !!transfer.fromWarehouse;
+    if (fromWarehouse) {
+      if (!sourceProduct.inWarehouse) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Product is no longer in warehouse' });
+      }
+    } else if (String(sourceProduct.branch) !== String(transfer.fromBranch)) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ error: 'Product branch no longer matches transfer source' });
@@ -2436,11 +2537,21 @@ export const approveBranchTransfer = async (req, res) => {
 
     const booked = await sumActiveBookedQuantityProducts(sourceProduct._id);
     const stock = Math.max(0, Number(sourceProduct.stock) || 0);
-    if (stock - booked < qty) {
+    const bookedForDest = await bookedQuantityForPickupBranch(sourceProduct._id, transfer.toBranch, {
+      session,
+    });
+    const otherReserved = Math.max(0, reserved - qty);
+    const available = transferAvailableQty({
+      stock,
+      bookedTotal: booked,
+      transferReserved: otherReserved,
+      bookedForDestination: bookedForDest,
+    });
+    if (qty > available) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
-        error: 'Not enough free stock to complete transfer (bookings may have increased)',
+        error: 'Not enough stock to complete transfer (bookings may have increased)',
       });
     }
 
@@ -2496,6 +2607,14 @@ export const approveBranchTransfer = async (req, res) => {
       destinationProduct = Array.isArray(created) ? created[0] : created;
     }
 
+    await movePickupBookingsWithTransfer({
+      sourceProductId: sourceProduct._id,
+      destinationProduct,
+      toBranchId,
+      quantity: qty,
+      session,
+    });
+
     transfer.status = 'approved';
     transfer.destinationProduct = destinationProduct._id;
     if (!String(transfer.productNameSnapshot || '').trim()) {
@@ -2517,14 +2636,14 @@ export const approveBranchTransfer = async (req, res) => {
         productId: sourceProduct._id,
         productName: sourceProduct.name,
         branchId: toBranchId,
-        fromBranchId: transfer.fromBranch,
+        fromBranchId: fromWarehouse ? null : transfer.fromBranch,
         toBranchId,
         quantity: qty,
         unitPrice: Number(sourceProduct.price || 0),
         totalValue: Number(sourceProduct.price || 0) * qty,
         referenceType: 'branch_transfer',
         referenceId: transfer._id,
-        notes: 'Branch transfer approved',
+        notes: fromWarehouse ? 'Warehouse transfer approved' : 'Branch transfer approved',
       });
     } catch (movementError) {
       console.error('⚠️ Failed to log branch transfer movement:', movementError.message);
@@ -2556,11 +2675,14 @@ export const approveBranchTransfer = async (req, res) => {
       module: 'products',
       entityType: 'ProductBranchTransfer',
       entityId: transfer._id,
-      message: `Branch transfer approved (${qty})`,
+      message: fromWarehouse
+        ? `Warehouse transfer approved (${qty})`
+        : `Branch transfer approved (${qty})`,
       metadata: {
         productId: sourceProduct._id,
         destinationProductId: destinationProduct._id,
         fromBranchId: transfer.fromBranch,
+        fromWarehouse,
         toBranchId,
       },
     });
@@ -2723,7 +2845,10 @@ export const listBranchTransfers = async (req, res) => {
     }
 
     if (!TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
-      if (user.role === 'Branch Manager' && user.branch) {
+      if (isWarehouseRole(user.role)) {
+        // Warehouse managers monitor outgoing warehouse → branch transfers.
+        andParts.push({ fromWarehouse: true });
+      } else if (user.role === 'Branch Manager' && user.branch) {
         const bid = user.branch;
         andParts.push({ $or: [{ toBranch: bid }, { fromBranch: bid }] });
       } else {
@@ -2755,8 +2880,18 @@ export const listBranchTransfers = async (req, res) => {
       andParts.push({ createdAt });
     }
 
+    const fromWarehouseOnly =
+      req.query.fromWarehouse === 'true' ||
+      req.query.fromWarehouse === true ||
+      String(req.query.fromWarehouse || '').toLowerCase() === '1';
     const fromBranchIds = toObjectIds(parseOidCsvList(req.query.fromBranchId));
-    if (fromBranchIds.length) {
+    if (fromWarehouseOnly && fromBranchIds.length) {
+      andParts.push({
+        $or: [{ fromWarehouse: true }, { fromBranch: { $in: fromBranchIds } }],
+      });
+    } else if (fromWarehouseOnly) {
+      andParts.push({ fromWarehouse: true });
+    } else if (fromBranchIds.length) {
       andParts.push({ fromBranch: { $in: fromBranchIds } });
     }
 
@@ -2949,6 +3084,11 @@ export const getPendingBranchTransferCount = async (req, res) => {
     let count = 0;
     if (TRANSFER_ADMIN_ROLES.includes(String(user.role || '').trim())) {
       count = await ProductBranchTransfer.countDocuments({ status: 'pending' });
+    } else if (isWarehouseRole(user.role)) {
+      count = await ProductBranchTransfer.countDocuments({
+        status: 'pending',
+        fromWarehouse: true,
+      });
     } else if (user.role === 'Branch Manager' && user.branch) {
       count = await ProductBranchTransfer.countDocuments({
         status: 'pending',
@@ -3019,14 +3159,23 @@ export const transferProductStock = async (req, res) => {
     }
 
     const reserved = Number(sourceProduct.transferReservedQuantity) || 0;
-    const sellable = Number(sourceProduct.stock) - reserved;
-    if (sellable < transferQty) {
+    const booked = await sumActiveBookedQuantityProducts(sourceProduct._id);
+    const bookedForDest = await bookedQuantityForPickupBranch(sourceProduct._id, toBranchId, {
+      session,
+    });
+    const available = transferAvailableQty({
+      stock: Number(sourceProduct.stock) || 0,
+      bookedTotal: booked,
+      transferReserved: reserved,
+      bookedForDestination: bookedForDest,
+    });
+    if (available < transferQty) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         error: fromWh
-          ? 'Not enough stock in warehouse.'
-          : 'Not enough stock in source branch (some quantity may be reserved for pending transfers).',
+          ? `Only ${available} unit(s) available to transfer to this branch from warehouse.`
+          : `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch).`,
       });
     }
 
@@ -3077,6 +3226,14 @@ export const transferProductStock = async (req, res) => {
       destinationProduct = Array.isArray(created) ? created[0] : created;
     }
 
+    await movePickupBookingsWithTransfer({
+      sourceProductId: sourceProduct._id,
+      destinationProduct,
+      toBranchId,
+      quantity: transferQty,
+      session,
+    });
+
     await session.commitTransaction();
     session.endSession();
 
@@ -3117,7 +3274,7 @@ export const transferProductStock = async (req, res) => {
 export const getProductsInventoryAudit = async (req, res) => {
   try {
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
-    const query = buildProductsListQuery(req.query, {
+    const query = await resolveProductsListQuery(req.query, {
       cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
     });
     const search = String(req.query.search || '').trim();
@@ -3218,7 +3375,7 @@ export const getProductsInventoryAudit = async (req, res) => {
       ),
     }));
 
-    res.json({
+    const payload = {
       search: search || null,
       totals: {
         productsCount: totals.productsCount || 0,
@@ -3234,7 +3391,11 @@ export const getProductsInventoryAudit = async (req, res) => {
         ),
       },
       byLocation,
-    });
+    };
+    if (await viewerCannotSeeCostPrice(req)) {
+      return res.json(stripInventoryCapital(payload));
+    }
+    res.json(payload);
   } catch (error) {
     console.error('getProductsInventoryAudit:', error);
     res.status(500).json({ error: 'Failed to generate products inventory audit' });
@@ -3321,14 +3482,18 @@ export const getProductSerialTrack = async (req, res) => {
     if (!result.ok) {
       return res.status(result.statusCode || 404).json({ error: result.error });
     }
-    return res.json({
+    const body = {
       exists: result.exists,
       status: result.status,
       product: result.product,
       locations: result.locations || [],
       totalStock: result.totalStock ?? result.product?.stock ?? 0,
       events: result.events,
-    });
+    };
+    if (await viewerCannotSeeCostPrice(req) && body.product) {
+      body.product = stripCostFieldsFromProduct(body.product);
+    }
+    return res.json(body);
   } catch (error) {
     console.error('getProductSerialTrack:', error);
     res.status(500).json({ error: 'Failed to track product serial' });

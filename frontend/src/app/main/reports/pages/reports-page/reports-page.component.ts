@@ -116,6 +116,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.lastReportPayload) {
         this.bindReportData(this.lastReportPayload);
+        this.applyCostPriceVisibility();
       }
     });
 
@@ -195,6 +196,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.loading = false;
           this.lastReportPayload = res;
           this.bindReportData(res);
+          this.applyCostPriceVisibility();
         },
         () => {
           this.loading = false;
@@ -248,6 +250,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.lastReportPayload = res || {};
         this.bindReportData(this.lastReportPayload);
+        this.applyCostPriceVisibility();
       },
       () => {
         this.loading = false;
@@ -464,6 +467,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           format: 'money',
         },
         { key: 'tradingProfit', labelKey: 'tr_report_col_profit_recognized', format: 'money' },
+        {
+          key: 'potentialProfit',
+          labelKey: 'tr_report_col_potential_profit',
+          format: 'money',
+        },
         { key: 'paymentStatus', labelKey: 'tr_status' },
       ];
       this.profitInvoiceRows = this.mapProfitInvoiceRows(res.profitByInvoice || [], t);
@@ -849,6 +857,41 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private applyCostPriceVisibility(): void {
+    const role = this.authenticationService.getUserFromLocalStorage()?.role;
+    if (this.storeSettings.canSeeCostPrice(role)) {
+      return;
+    }
+    const hideCardKeys = new Set([
+      'tr_report_card_cost',
+      'tr_report_card_trading_profit',
+      'tr_report_card_trading_loss',
+      'tr_report_card_installment_profit_collected',
+      'tr_net_profit',
+      'tr_net_loss',
+      'tr_report_card_margin',
+      'tr_report_card_loss_margin',
+      'tr_report_card_inventory_capital',
+      'tr_report_card_branches_inventory_capital',
+      'tr_report_card_warehouse_inventory_capital',
+    ]);
+    this.cards = (this.cards || []).filter((c) => !hideCardKeys.has(c.titleKey));
+    const hideCol = new Set([
+      'cost',
+      'unitCost',
+      'inventoryCapital',
+      'tradingProfit',
+      'installmentProfitShare',
+      'lineTotal',
+    ]);
+    this.tableColumns = (this.tableColumns || []).filter((c) => !hideCol.has(c.key));
+    this.deskPurchasesDetailColumns = (this.deskPurchasesDetailColumns || []).filter(
+      (c) => !hideCol.has(c.key)
+    );
+    this.branchCapitalColumns = (this.branchCapitalColumns || []).filter((c) => !hideCol.has(c.key));
+    this.profitInvoiceColumns = (this.profitInvoiceColumns || []).filter((c) => !hideCol.has(c.key));
+  }
+
   private bindBookingsReportData(res: BookingsReportResponse, t: (key: string, params?: object) => string): void {
     const s = res.summary || ({} as BookingsReportResponse['summary']);
     this.bookingsMeta = res.meta || null;
@@ -1095,6 +1138,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
               labelKey: 'tr_report_col_profit_recognized',
               format: 'money' as const,
             },
+            {
+              key: 'potentialProfit',
+              labelKey: 'tr_report_col_potential_profit',
+              format: 'money' as const,
+            },
             { key: 'paymentStatus', labelKey: 'tr_status' },
           ];
 
@@ -1246,6 +1294,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
                 labelKey: 'tr_report_col_profit_recognized',
                 format: 'money' as const,
               },
+              {
+                key: 'potentialProfit',
+                labelKey: 'tr_report_col_potential_profit',
+                format: 'money' as const,
+              },
               { key: 'paymentStatus', labelKey: 'tr_status' },
             ];
       try {
@@ -1320,6 +1373,8 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         installmentAmount: isInstallment ? x.installmentAmount ?? 0 : null,
         installmentProfitShare: isInstallment ? x.installmentProfitShare ?? 0 : null,
         tradingProfit: x.tradingProfit,
+        /** Full trading profit if all installments are collected (interest included). */
+        potentialProfit: isInstallment ? x.installmentTotalProfit ?? null : null,
         paymentStatus: isInstallment
           ? t('tr_report_status_installment')
           : t(payStatusKey[x.paymentStatus] || 'tr_paid'),

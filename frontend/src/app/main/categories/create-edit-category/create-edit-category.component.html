@@ -77,6 +77,50 @@
                   </div>
                 </div>
 
+                <div class="form-group category-image-field">
+                  <label>{{ "tr_category_image" | translate }}</label>
+                  <p class="text-muted size-small m-0 mb-2" *ngIf="!isCloudinaryConfigured()">
+                    {{ "tr_cloudinary_not_configured" | translate }}
+                  </p>
+                  <p class="text-muted size-small m-0 mb-2">
+                    {{ "tr_category_image_hint" | translate }}
+                  </p>
+                  <div class="category-image-row">
+                    <div class="category-image-preview" *ngIf="categoryImageUrl">
+                      <img [src]="categoryImageUrl" alt="" />
+                      <button
+                        type="button"
+                        class="s-btn btn-secondary size-small category-image-remove"
+                        (click)="clearCategoryImage()"
+                      >
+                        {{ "tr_remove_logo" | translate }}
+                      </button>
+                    </div>
+                    <div class="category-image-placeholder" *ngIf="!categoryImageUrl">
+                      <i class="fa fa-picture-o" aria-hidden="true"></i>
+                    </div>
+                    <div class="category-image-actions">
+                      <input
+                        id="category-image-file-input"
+                        type="file"
+                        accept="image/*"
+                        class="category-image-file-input"
+                        [disabled]="isUploadingImage || !isCloudinaryConfigured()"
+                        (change)="onCategoryImageSelected($event)"
+                        hidden
+                      />
+                      <label
+                        for="category-image-file-input"
+                        class="s-btn btn-secondary category-image-upload-label mb-0"
+                        [class.disabled]="isUploadingImage || !isCloudinaryConfigured()"
+                      >
+                        <span *ngIf="!isUploadingImage">{{ "tr_choose_image" | translate }}</span>
+                        <span *ngIf="isUploadingImage">{{ "tr_image_uploading" | translate }}</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="form-group mb-0 category-multi-code-checkbox">
                   <span class="s-checkbox size-tiny flex align-items-start">
                     <input

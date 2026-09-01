@@ -49,7 +49,7 @@ export class AuthenticationService {
           this.userSubject.next(user.user);
         },
         error: (errorResponse:any) => {
-          this.appNotificationService.push(errorResponse.error, 'error');
+          this.appNotificationService.push(this.extractErrorMessage(errorResponse, 'Login failed'), 'error');
         }
       })
     );
@@ -63,10 +63,21 @@ export class AuthenticationService {
           this.userSubject.next(user);
         },
         error: (errorResponse:any) => {
-          this.appNotificationService.push(errorResponse.error, 'error');
+          this.appNotificationService.push(this.extractErrorMessage(errorResponse, 'Update password failed'), 'error');
         }
       })
     );
+  }
+
+  private extractErrorMessage(errorResponse: any, fallback: string): string {
+    const err = errorResponse?.error;
+    if (typeof err === 'string' && err.trim()) return err;
+    if (typeof err?.message === 'string' && err.message.trim()) return err.message;
+    if (typeof err?.error === 'string' && err.error.trim()) return err.error;
+    if (typeof errorResponse?.message === 'string' && errorResponse.message.trim()) {
+      return errorResponse.message;
+    }
+    return fallback;
   }
 
   register(userRegiser:User): Observable<User>{

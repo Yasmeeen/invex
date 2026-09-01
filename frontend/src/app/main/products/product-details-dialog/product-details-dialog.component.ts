@@ -2,8 +2,8 @@ import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Product } from '@core/models/products.model';
 import { Globals } from '@core/globals';
-import { isModerator } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 
 export type ProductDetailsDialogData = {
   product: Product;
@@ -23,6 +23,7 @@ export class ProductDetailsDialogComponent {
     private ref: MatDialogRef<ProductDetailsDialogComponent, ProductDetailsDialogResult>,
     private translate: TranslateService,
     private globals: Globals,
+    private storeSettings: StoreSettingsService,
     @Inject(MAT_DIALOG_DATA) public data: ProductDetailsDialogData
   ) {}
 
@@ -31,7 +32,7 @@ export class ProductDetailsDialogComponent {
   }
 
   get showNetPrice(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
   get allowAddToOrder(): boolean {
@@ -73,6 +74,24 @@ export class ProductDetailsDialogComponent {
   freeSellableQty(): number {
     const stock = Number(this.product?.stock) || 0;
     return Math.max(0, stock - this.bookedQty());
+  }
+
+  remotePickupHint(): string {
+    const rows = this.product?.remotePickupTransfers || [];
+    if (!rows.length) {
+      return '';
+    }
+    if (rows.length === 1) {
+      return this.translate.instant('tr_booking_needs_transfer_one', {
+        branch: rows[0].branchName || '',
+        n: rows[0].quantity,
+      });
+    }
+    const branches = rows
+      .map((r) => r.branchName)
+      .filter(Boolean)
+      .join('، ');
+    return this.translate.instant('tr_booking_needs_transfer_many', { branches });
   }
 
   attributeRows(): Array<{ label: string; value: string }> {

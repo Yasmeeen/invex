@@ -13,14 +13,16 @@ export class RoleGuard implements CanActivate, CanActivateChild {
     }
 
     canActivate(next: ActivatedRouteSnapshot) {
-        if (next.data.allowedRoles.includes(this.currentRole())) {
+        const roles = next.data.allowedRoles || next.data.allowedRoles || [];
+        if (roles.includes(this.currentRole())) {
             return true;
         }
         return false;
     }
 
     canActivateChild(next: ActivatedRouteSnapshot) {
-        if (next.data.allowedRoles.includes(this.currentRole())) {
+        const roles = next.data.allowedRoles || next.data.allowedRoles || [];
+        if (roles.includes(this.currentRole())) {
             return true;
         }
         return false;

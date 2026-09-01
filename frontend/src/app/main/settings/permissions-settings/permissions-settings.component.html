@@ -1,0 +1,31 @@
+<div class="permissions-page">
+  <header class="permissions-page__head">
+    <h1 class="permissions-page__title">{{ 'tr_permissions_title' | translate }}</h1>
+    <p class="permissions-page__lead">{{ 'tr_permissions_lead' | translate }}</p>
+  </header>
+
+  <div class="permissions-card">
+    <div class="permissions-card__row">
+      <div class="permissions-card__perm">
+        <h2 class="permissions-card__perm-title">{{ 'tr_permission_cost_price' | translate }}</h2>
+        <p class="permissions-card__hint">{{ 'tr_permission_cost_price_hint' | translate }}</p>
+      </div>
+      <div class="permissions-card__roles">
+        <label class="permissions-card__role" *ngFor="let role of costPriceRoles">
+          <input
+            type="checkbox"
+            [checked]="isAllowed(role)"
+            (change)="toggleRole(role, $any($event.target).checked)"
+          />
+          <span>{{ roleLabelKey(role) | translate }}</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="permissions-card__actions">
+      <button type="button" class="s-btn btn-primary" (click)="save()" [disabled]="saving">
+        {{ 'tr_save_settings' | translate }}
+      </button>
+    </div>
+  </div>
+</div>

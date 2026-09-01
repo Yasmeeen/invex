@@ -370,6 +370,10 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return !!this.data?.cashDeskPurchase;
   }
 
+  get showCostPriceFields(): boolean {
+    return this.cashDeskPurchase || this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
+  }
+
   get showUnitsTab(): boolean {
     /** Create flow: product data (code, prices, image, attrs) always lives on tab 2. */
     return !this.isEdit;

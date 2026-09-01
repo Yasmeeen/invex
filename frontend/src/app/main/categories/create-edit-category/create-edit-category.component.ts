@@ -6,6 +6,9 @@ import { Category } from '@core/models/products.model';
 import { NgForm } from '@angular/forms';
 import { CategoriesServce } from '@shared/services/categories.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { Globals } from '@core/globals';
+import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
+import { environment } from 'src/environments/environment';
 
 export interface CategoryAttributeRow {
   key: string;
@@ -31,6 +34,9 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
   showProductCodeOnInvoice = true;
   sellByWeight = false;
   weightUnit: 'kg' | 'g' = 'kg';
+  categoryImageUrl = '';
+  isUploadingImage = false;
+  private readonly maxImageBytes = 5 * 1024 * 1024;
 
   constructor(
     private dialogRef: MatDialogRef<CreateEditCategoryComponent>,
@@ -38,6 +44,8 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     private appNotificationService: AppNotificationService,
     private translateService: TranslateService,
     public storeSettings: StoreSettingsService,
+    private globals: Globals,
+    private cloudinaryUpload: CloudinaryUploadService,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -98,6 +106,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
         : !!(c as any).showProductCodeOnInvoice;
     this.sellByWeight = !!(c as any).sellByWeight;
     this.weightUnit = (c as any).weightUnit === 'g' ? 'g' : 'kg';
+    this.categoryImageUrl = String((c as any).imageUrl || '').trim();
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
       if (typeof x === 'string') {
@@ -157,6 +166,67 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     return out;
   }
 
+  isCloudinaryConfigured(): boolean {
+    return !!environment.cloudinary?.cloudName;
+  }
+
+  onCategoryImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_image_invalid_type'),
+        'error'
+      );
+      input.value = '';
+      return;
+    }
+    if (file.size > this.maxImageBytes) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_image_too_large'),
+        'error'
+      );
+      input.value = '';
+      return;
+    }
+    if (!this.isCloudinaryConfigured()) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_cloudinary_not_configured'),
+        'error'
+      );
+      input.value = '';
+      return;
+    }
+    this.isUploadingImage = true;
+    this.cloudinaryUpload.uploadProductImage(file, 'categories').subscribe({
+      next: (url) => {
+        this.isUploadingImage = false;
+        this.categoryImageUrl = url;
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_image_upload_ok'),
+          'success'
+        );
+        input.value = '';
+      },
+      error: (err) => {
+        this.isUploadingImage = false;
+        const msg =
+          err?.error?.error ||
+          err?.error?.message ||
+          this.translateService.instant('tr_product_image_upload_failed');
+        this.appNotificationService.push(msg, 'error');
+        input.value = '';
+      },
+    });
+  }
+
+  clearCategoryImage(): void {
+    this.categoryImageUrl = '';
+  }
+
   submitForm(): void {
     this.category = this.categoryForm.value;
     if (!this.categoryForm.valid) {
@@ -167,19 +237,22 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       return;
     }
     const attrPayload = this.buildAttributeDefsPayload();
+    const userId = this.globals.currentUser?._id || this.data?.userId || null;
     const payload = {
       name: this.category.name,
       code: (this.category as any).code,
+      imageUrl: String(this.categoryImageUrl || '').trim(),
       attributeDefs: attrPayload,
       multiCodePerPiece: !!(this.category as any).multiCodePerPiece,
       deleteProductWhenOutOfStock: !!this.deleteProductWhenOutOfStock,
       showProductCodeOnInvoice: !!this.showProductCodeOnInvoice,
       sellByWeight: !!this.sellByWeight,
       weightUnit: this.weightUnit,
+      ...(userId ? { userId: String(userId) } : {}),
     };
 
     if (this.isEdit && this.categoryId) {
-      this.categoriesServce.updateCategory(payload, this.categoryId).subscribe({
+      this.categoriesServce.updateCategory(payload, this.categoryId, userId || undefined).subscribe({
         next: () => {
           this.appNotificationService.push(
             this.translateService.instant('tr_category_updated_ok'),

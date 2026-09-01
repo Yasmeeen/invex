@@ -1189,6 +1189,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return orderDisplayPaid(this.createdOrder);
   }
 
+  receiptInstallmentDiscount(): number {
+    const n = Number(this.createdOrder?.installmentDiscountAmount);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+
   printDeskPurchaseReceipt(): void {
     setTimeout(() => {
       this.cdr.detectChanges();
@@ -2687,6 +2692,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (payment.installmentPlanId) {
       orderData.installmentPlanId = payment.installmentPlanId;
       orderData.installmentStartDate = payment.installmentStartDate || undefined;
+      if (payment.installmentMonthlyAmount && payment.installmentMonthlyAmount > 0) {
+        orderData.installmentMonthlyAmount = payment.installmentMonthlyAmount;
+      }
     }
 
     const settlement = this.pendingExchangeSettlement;

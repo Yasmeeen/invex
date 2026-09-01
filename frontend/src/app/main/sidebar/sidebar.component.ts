@@ -124,7 +124,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   get showsPendingTransfersBadge(): boolean {
     const role = this.globals.currentUser?.role as string | undefined;
-    return canPickBranchRole(role) || isBranchManager(role);
+    return canPickBranchRole(role) || isBranchManager(role) || isWarehouse(role);
   }
 
   isPendingTransfersLink(link: SidebarItem): boolean {

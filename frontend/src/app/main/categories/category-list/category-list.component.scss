@@ -4,21 +4,33 @@
             width: 4rem;
         }
         &:nth-child(2){
-            width: 13rem;
+            width: 5rem;
         }
         &:nth-child(3){
-            width: 11rem;
+            width: 13rem;
         }
         &:nth-child(4){
             width: 11rem;
         }
         &:nth-child(5){
+            width: 11rem;
+        }
+        &:nth-child(6){
           width: 10rem;
       }
     
-      &:nth-child(6){
+      &:nth-child(7){
         width: 2rem;
     }
  
      }
   }
+
+.category-list-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  background: #fafafa;
+}

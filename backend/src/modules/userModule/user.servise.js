@@ -4,7 +4,14 @@ import { auditLog } from '../audit_module/audit.service.js';
 
 import bcrypt from 'bcryptjs';
 
-const BRANCHLESS_ROLES = ['Super Admin', 'Co Admin', 'Moderator', 'Collector'];
+const BRANCHLESS_ROLES = [
+  'Super Admin',
+  'Co Admin',
+  'Moderator',
+  'Collector',
+  'Warehouse',
+  'Operation Manager', // legacy name for Warehouse
+];
 
 function isBranchlessRole(role) {
   return BRANCHLESS_ROLES.includes(String(role || '').trim());

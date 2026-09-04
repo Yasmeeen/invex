@@ -76,14 +76,15 @@ export class ProductPurchaseRequestsService {
     return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/add-quantity`, payload);
   }
 
-  /** Purchase quantity with category/product pick and branch or warehouse destination. */
+  /** Purchase quantity with category/product pick and branch, warehouse, or factory destination. */
   purchaseQuantity(payload: {
     userId: string;
     productId: string;
     quantity: number;
     totalCost: number;
-    destinationType: 'branch' | 'warehouse';
+    destinationType: 'branch' | 'warehouse' | 'factory';
     branchId?: string;
+    factoryId?: string;
     treasuryBranchId?: string;
     purchaseTreasurySplits?: PurchaseTreasurySplit[];
     purchaseTreasuryKey?: string;

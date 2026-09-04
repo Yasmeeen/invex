@@ -1,14 +1,25 @@
 import mongoose from 'mongoose';
 import Product from '../../DB/models/product.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import Category from '../../DB/models/category.model.js';
 import User from '../../DB/models/user.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import SlaughterTemplate from '../../DB/models/slaughterTemplate.model.js';
 import SlaughterTicket from '../../DB/models/slaughterTicket.model.js';
-import { AL_RAJI_SLAUGHTER_TEMPLATES } from '../../../scripts/alRajiCatalogData.js';
-import { isFarmProduct, isValidSlaughterShare, roundFarmHeads } from '../../utils/product-type.util.js';
+import {
+  AL_RAJI_CATEGORIES,
+  AL_RAJI_SLAUGHTER_TEMPLATES,
+} from '../../../scripts/alRajiCatalogData.js';
+import { scaleCodeForSku } from '../../../scripts/alRajiScaleCodes.js';
+import {
+  isFarmProduct,
+  isServiceProduct,
+  isValidSlaughterShare,
+  normalizeProductType,
+  roundFarmHeads,
+} from '../../utils/product-type.util.js';
 import { roundWeight } from '../../utils/sale-quantity.util.js';
-import { normalizeBusinessActivityType, butcherFeaturesEnabled } from '../../utils/business-activity.util.js';
+import { butcherFeaturesEnabled } from '../../utils/business-activity.util.js';
 import { auditLog } from '../audit_module/audit.service.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import {
@@ -18,6 +29,7 @@ import {
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 const STAFF_ROLES = [...ADMIN_ROLES, 'Branch Manager', 'Warehouse', 'Operation Manager'];
+const WAREHOUSE_ROLES = [...ADMIN_ROLES, 'Warehouse', 'Operation Manager'];
 
 function loadActor(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
@@ -33,6 +45,14 @@ function actorMayUseBranch(actor, branchIdStr) {
   if (ADMIN_ROLES.includes(actor.role)) return true;
   if (!actor.branch) return false;
   return String(actor.branch) === String(branchIdStr);
+}
+
+function actorMayUseWarehouse(actor) {
+  return actor && WAREHOUSE_ROLES.includes(actor.role);
+}
+
+function parseBool(v) {
+  return v === true || v === 'true' || v === 1 || v === '1';
 }
 
 function httpError(status, message) {
@@ -51,17 +71,21 @@ async function assertSlaughterActivityEnabled() {
   }
 }
 
+function productInWarehouse(product) {
+  return !!(product && product.inWarehouse);
+}
+
 export async function ensureDefaultTemplates() {
   for (const t of AL_RAJI_SLAUGHTER_TEMPLATES) {
     await SlaughterTemplate.findOneAndUpdate(
       { code: t.code },
       {
-        $setOnInsert: {
-          code: t.code,
+        $set: {
           name: t.name,
           farmSkuKey: t.farmSkuKey,
           outputs: t.outputs,
         },
+        $setOnInsert: { code: t.code },
       },
       { upsert: true, new: true }
     );
@@ -113,11 +137,25 @@ export const listTickets = async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const filter = {};
-    if (req.query.branch_id && mongoose.Types.ObjectId.isValid(String(req.query.branch_id))) {
+    const warehouseOnly = parseBool(req.query.inWarehouse) || parseBool(req.query.warehouse_only);
+
+    if (warehouseOnly) {
+      if (!actorMayUseWarehouse(actor)) {
+        return res.status(403).json({ error: 'Cannot view warehouse slaughter tickets' });
+      }
+      filter.inWarehouse = true;
+    } else if (req.query.branch_id && mongoose.Types.ObjectId.isValid(String(req.query.branch_id))) {
       filter.branch = req.query.branch_id;
-    } else if (!ADMIN_ROLES.includes(actor.role) && actor.branch) {
-      filter.branch = actor.branch;
+      filter.inWarehouse = { $ne: true };
+    } else if (!ADMIN_ROLES.includes(actor.role)) {
+      if (actorMayUseWarehouse(actor) && !actor.branch) {
+        filter.inWarehouse = true;
+      } else if (actor.branch) {
+        filter.branch = actor.branch;
+        filter.inWarehouse = { $ne: true };
+      }
     }
+
     const [tickets, total] = await Promise.all([
       SlaughterTicket.find(filter)
         .sort({ createdAt: -1 })
@@ -169,20 +207,284 @@ function resolveWasteKg(body, liveWeightKg, outputsTotalKg) {
   return 0;
 }
 
+function kindFromTemplate(template, skuKey) {
+  if (!template || !skuKey) return null;
+  const row = (template.outputs || []).find((o) => String(o.skuKey) === String(skuKey));
+  return row && ['fridge', 'offal', 'waste'].includes(row.kind) ? row.kind : null;
+}
+
+function locationProductFilter(inWarehouse, branchId) {
+  const noFactory = [{ factory: null }, { factory: { $exists: false } }];
+  if (inWarehouse) {
+    return {
+      inWarehouse: true,
+      branch: null,
+      $or: noFactory,
+    };
+  }
+  return {
+    branch: branchId,
+    inWarehouse: { $ne: true },
+    $or: noFactory,
+  };
+}
+
+function productAtLocation(product, inWarehouse, branchId) {
+  if (!product) return false;
+  if (product.factory) return false;
+  if (inWarehouse) return productInWarehouse(product);
+  return String(product.branch) === String(branchId) && !product.inWarehouse;
+}
+
+/** Clone a goods product into the slaughter location (stock 0). */
+async function cloneProductToLocation(source, { inWarehouse, branchId }, session) {
+  const doc = {
+    name: source.name,
+    code: source.code,
+    price: source.price,
+    netPrice: source.netPrice ?? null,
+    stock: 0,
+    discount: source.discount || 0,
+    category: source.category,
+    productType: normalizeProductType(source.productType),
+    catalogKey: source.catalogKey || '',
+    sellByWeightOverride: source.sellByWeightOverride,
+    processingExtraCost: source.processingExtraCost || 0,
+    branch: inWarehouse ? null : branchId,
+    inWarehouse: !!inWarehouse,
+    factory: null,
+    sourceProductId: null,
+  };
+  const created = await Product.create([doc], session ? { session } : undefined);
+  return Array.isArray(created) ? created[0] : created;
+}
+
+/**
+ * Resolve output product to one that exists at the slaughter location.
+ * If the picked product is on another branch, reuse local catalogKey or clone it.
+ */
+async function resolveOutputProductAtLocation(product, { inWarehouse, branchId }, session) {
+  if (!product) return null;
+  if (isFarmProduct(product) || isServiceProduct(product)) {
+    throw httpError(400, `Output ${product.name} must be a goods product`);
+  }
+  if (productAtLocation(product, inWarehouse, branchId)) {
+    return product;
+  }
+  const skuKey = String(product.catalogKey || '').trim();
+  if (skuKey) {
+    const localQuery = inWarehouse
+      ? { catalogKey: skuKey, inWarehouse: true, branch: null }
+      : { catalogKey: skuKey, branch: branchId, inWarehouse: { $ne: true } };
+    let local = await q(Product.findOne(localQuery), session);
+    if (local && !local.factory) return local;
+  }
+  return cloneProductToLocation(product, { inWarehouse, branchId }, session);
+}
+
+function isEligibleSlaughterOutput(product) {
+  if (!product) return false;
+  if (isFarmProduct(product) || isServiceProduct(product)) return false;
+  const key = String(product.catalogKey || '');
+  if (key.startsWith('farm_') || key.startsWith('svc_')) return false;
+  return true;
+}
+
+function catalogDefsBySkuKey() {
+  const map = new Map();
+  for (const cat of AL_RAJI_CATEGORIES) {
+    if (cat.code === 'FARM' || cat.code === 'SERV') continue;
+    for (const p of cat.products || []) {
+      if (!p?.skuKey) continue;
+      map.set(String(p.skuKey), { def: p, categoryCode: cat.code });
+    }
+  }
+  return map;
+}
+
+function slaughterOutputSkuKeys() {
+  const keys = new Set();
+  for (const t of AL_RAJI_SLAUGHTER_TEMPLATES) {
+    for (const o of t.outputs || []) {
+      if (o?.skuKey) keys.add(String(o.skuKey));
+    }
+  }
+  for (const cat of AL_RAJI_CATEGORIES) {
+    if (cat.code !== 'OFFAL') continue;
+    for (const p of cat.products || []) {
+      if (p?.skuKey) keys.add(String(p.skuKey));
+    }
+  }
+  for (const cat of AL_RAJI_CATEGORIES) {
+    for (const p of cat.products || []) {
+      if (p?.isSource && p.skuKey) keys.add(String(p.skuKey));
+    }
+  }
+  return keys;
+}
+
+/** Create missing fridge/offal SKUs at the slaughter location from catalog defs. */
+async function ensureSlaughterCatalogOutputsAtLocation({ inWarehouse, branchId }) {
+  const needed = slaughterOutputSkuKeys();
+  if (!needed.size) return;
+
+  const localFilter = locationProductFilter(inWarehouse, branchId);
+  const existing = await Product.find({
+    ...localFilter,
+    catalogKey: { $in: [...needed] },
+  })
+    .select('catalogKey')
+    .lean();
+  const have = new Set(existing.map((p) => String(p.catalogKey)));
+  const missing = [...needed].filter((k) => !have.has(k));
+  if (!missing.length) return;
+
+  const defs = catalogDefsBySkuKey();
+  const categoryCache = new Map();
+  for (const skuKey of missing) {
+    const row = defs.get(skuKey);
+    if (!row) continue;
+    let categoryId = categoryCache.get(row.categoryCode);
+    if (!categoryId) {
+      const cat = await Category.findOne({ code: row.categoryCode }).select('_id').lean();
+      if (!cat) continue;
+      categoryId = cat._id;
+      categoryCache.set(row.categoryCode, categoryId);
+    }
+    const scaleCode = scaleCodeForSku(skuKey);
+    const code =
+      scaleCode || `${row.categoryCode}-${String(skuKey).replace(/_/g, '-')}`.slice(0, 40);
+    try {
+      await Product.create({
+        name: row.def.name,
+        code,
+        price: row.def.price,
+        netPrice: row.def.netPrice ?? null,
+        stock: 0,
+        discount: 0,
+        category: categoryId,
+        productType: normalizeProductType(row.def.productType),
+        catalogKey: skuKey,
+        ...(row.def.sellByWeightOverride !== undefined
+          ? { sellByWeightOverride: row.def.sellByWeightOverride }
+          : {}),
+        branch: inWarehouse ? null : branchId,
+        inWarehouse: !!inWarehouse,
+        factory: null,
+        sourceProductId: null,
+      });
+    } catch {
+      // Unique code race / already exists — ignore and continue.
+    }
+  }
+}
+
+/**
+ * Goods products the user may pick as slaughter yields.
+ * Prefers SKUs at the slaughter location; also includes catalog goods from other
+ * locations (deduped by catalogKey) so the list is not stuck on e.g. كندوز ثلاجة only.
+ */
+export const listOutputProducts = async (req, res) => {
+  try {
+    await assertSlaughterActivityEnabled();
+    const actor = await loadActor(req.query.userId);
+    if (!canUse(actor)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
+
+    const inWarehouse = parseBool(req.query.inWarehouse) || parseBool(req.query.warehouse_only);
+    let branchId = null;
+    if (inWarehouse) {
+      if (!actorMayUseWarehouse(actor)) {
+        return res.status(403).json({ error: 'Cannot view warehouse slaughter products' });
+      }
+    } else {
+      branchId = req.query.branchId || req.query.branch_id;
+      if (!branchId || !mongoose.Types.ObjectId.isValid(String(branchId))) {
+        return res.status(400).json({ error: 'Valid branch is required (or set inWarehouse)' });
+      }
+      if (!actorMayUseBranch(actor, String(branchId))) {
+        return res.status(403).json({ error: 'Cannot view slaughter products for this branch' });
+      }
+    }
+
+    await ensureSlaughterCatalogOutputsAtLocation({ inWarehouse, branchId });
+
+    const localFilter = locationProductFilter(inWarehouse, branchId);
+    const [localRows, companyRows] = await Promise.all([
+      Product.find(localFilter)
+        .select('name code catalogKey productType stock category branch inWarehouse')
+        .populate('category', 'code name')
+        .lean(),
+      Product.find({
+        productType: { $nin: ['farm', 'service'] },
+        $or: [{ factory: null }, { factory: { $exists: false } }],
+      })
+        .select('name code catalogKey productType stock category branch inWarehouse')
+        .populate('category', 'code name')
+        .limit(2000)
+        .lean(),
+    ]);
+
+    const byKey = new Map();
+    const noKey = [];
+
+    const consider = (p, preferLocal) => {
+      if (!isEligibleSlaughterOutput(p)) return;
+      const key = String(p.catalogKey || '').trim();
+      if (!key) {
+        if (productAtLocation(p, inWarehouse, branchId)) {
+          noKey.push(p);
+        }
+        return;
+      }
+      const existing = byKey.get(key);
+      const isLocal = productAtLocation(p, inWarehouse, branchId);
+      if (!existing) {
+        byKey.set(key, p);
+        return;
+      }
+      if (preferLocal && isLocal && !productAtLocation(existing, inWarehouse, branchId)) {
+        byKey.set(key, p);
+      }
+    };
+
+    for (const p of localRows) consider(p, true);
+    for (const p of companyRows) consider(p, true);
+
+    const products = [...byKey.values(), ...noKey]
+      .map((p) => ({ ...p, _id: String(p._id) }))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+
+    return res.json({ products });
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.message || 'Failed to list output products' });
+  }
+};
+
 async function persistSlaughterTicket(req, session) {
   await assertSlaughterActivityEnabled();
   const actor = await loadActor(req.body.userId);
   if (!canUse(actor)) throw httpError(403, 'Not allowed');
 
-  const branchId = req.body.branchId || req.body.branch;
-  if (!branchId || !mongoose.Types.ObjectId.isValid(String(branchId))) {
-    throw httpError(400, 'Valid branch is required');
+  const inWarehouse = parseBool(req.body.inWarehouse);
+  let branchId = null;
+
+  if (inWarehouse) {
+    if (!actorMayUseWarehouse(actor)) {
+      throw httpError(403, 'Cannot slaughter in warehouse');
+    }
+  } else {
+    branchId = req.body.branchId || req.body.branch;
+    if (!branchId || !mongoose.Types.ObjectId.isValid(String(branchId))) {
+      throw httpError(400, 'Valid branch is required (or set inWarehouse)');
+    }
+    if (!actorMayUseBranch(actor, String(branchId))) {
+      throw httpError(403, 'Cannot slaughter for this branch');
+    }
+    const branch = await q(Branch.findById(branchId), session);
+    if (!branch) throw httpError(400, 'Branch not found');
   }
-  if (!actorMayUseBranch(actor, String(branchId))) {
-    throw httpError(403, 'Cannot slaughter for this branch');
-  }
-  const branch = await q(Branch.findById(branchId), session);
-  if (!branch) throw httpError(400, 'Branch not found');
 
   const share = Number(req.body.share);
   if (!isValidSlaughterShare(share)) {
@@ -197,7 +499,14 @@ async function persistSlaughterTicket(req, session) {
     Product.findById(farmProductId).populate('category', 'code'),
     session
   );
-  if (!farm || String(farm.branch) !== String(branchId)) {
+  if (!farm) {
+    throw httpError(400, 'Farm animal not found');
+  }
+  if (inWarehouse) {
+    if (!productInWarehouse(farm)) {
+      throw httpError(400, 'Farm animal not found in warehouse');
+    }
+  } else if (String(farm.branch) !== String(branchId) || farm.inWarehouse) {
     throw httpError(400, 'Farm animal not found in this branch');
   }
   if (!isFarmProduct(farm)) {
@@ -219,32 +528,62 @@ async function persistSlaughterTicket(req, session) {
   if (!template && farm.catalogKey) {
     template = await q(SlaughterTemplate.findOne({ farmSkuKey: farm.catalogKey }), session);
   }
-  if (!template) {
-    throw httpError(400, 'Slaughter template not found for this animal');
-  }
 
   const rawOutputs = Array.isArray(req.body.outputs) ? req.body.outputs : [];
   /** @type {{ product: any, qty: number, kind: string, skuKey: string }[]} */
   const pendingOutputs = [];
+  const seenProductIds = new Set();
+
   for (const row of rawOutputs) {
     const qty = roundWeight(Number(row.quantity) || 0);
     if (qty <= 0) continue;
     const skuKey = String(row.skuKey || '').trim();
     let product = null;
     if (row.productId && mongoose.Types.ObjectId.isValid(String(row.productId))) {
-      product = await q(Product.findById(row.productId), session);
+      product = await q(Product.findById(row.productId).populate('category', 'code'), session);
     }
     if (!product && skuKey) {
-      product = await q(Product.findOne({ catalogKey: skuKey, branch: branchId }), session);
+      if (inWarehouse) {
+        product = await q(
+          Product.findOne({ catalogKey: skuKey, inWarehouse: true, branch: null }).populate(
+            'category',
+            'code'
+          ),
+          session
+        );
+      } else {
+        product = await q(
+          Product.findOne({ catalogKey: skuKey, branch: branchId }).populate('category', 'code'),
+          session
+        );
+      }
+      if (!product) {
+        product = await q(
+          Product.findOne({ catalogKey: skuKey }).populate('category', 'code'),
+          session
+        );
+      }
     }
     if (!product) {
       throw httpError(400, `Output product not found (${skuKey || row.productId})`);
     }
-    if (String(product.branch) !== String(branchId)) {
-      throw httpError(400, `Output ${product.name} is not in this branch`);
+    product = await resolveOutputProductAtLocation(product, { inWarehouse, branchId }, session);
+    const pid = String(product._id);
+    if (seenProductIds.has(pid)) {
+      throw httpError(400, `Duplicate output product: ${product.name}`);
     }
-    const kind = ['fridge', 'offal', 'waste'].includes(row.kind) ? row.kind : 'offal';
-    pendingOutputs.push({ product, qty, kind, skuKey: product.catalogKey || skuKey });
+    seenProductIds.add(pid);
+
+    let kind = ['fridge', 'offal', 'waste'].includes(row.kind) ? row.kind : null;
+    if (!kind) {
+      kind = kindFromTemplate(template, product.catalogKey || skuKey) || 'offal';
+    }
+    pendingOutputs.push({
+      product,
+      qty,
+      kind,
+      skuKey: product.catalogKey || skuKey,
+    });
   }
 
   if (!pendingOutputs.length) {
@@ -282,15 +621,17 @@ async function persistSlaughterTicket(req, session) {
   const liveWeightKg = roundWeight(Number(req.body.liveWeightKg) || 0);
   const wasteKg = resolveWasteKg(req.body, liveWeightKg, outputsTotalKg);
 
+  const locationLabel = inWarehouse ? 'warehouse' : 'branch';
   const createOpts = session ? { session, ordered: true } : undefined;
   const ticketDocs = await SlaughterTicket.create(
     [
       {
-        branch: branchId,
+        branch: inWarehouse ? null : branchId,
+        inWarehouse,
         farmProductId: farm._id,
         farmProductName: farm.name,
-        templateId: template._id,
-        templateCode: template.code,
+        templateId: template?._id || null,
+        templateCode: template?.code || '',
         share,
         liveWeightKg,
         wasteKg,
@@ -311,9 +652,9 @@ async function persistSlaughterTicket(req, session) {
         movementType: 'production',
         productId: farm._id,
         productName: farm.name,
-        branchId,
+        branchId: inWarehouse ? null : branchId,
         quantity: share,
-        notes: `Slaughter consume ${share} head (cost ${farmCostTotal})`,
+        notes: `Slaughter consume ${share} head (${locationLabel}, cost ${farmCostTotal})`,
         referenceType: 'SlaughterTicket',
         referenceId: ticket._id,
       },
@@ -321,9 +662,9 @@ async function persistSlaughterTicket(req, session) {
         movementType: 'production',
         productId: line.productId,
         productName: line.name,
-        branchId,
+        branchId: inWarehouse ? null : branchId,
         quantity: line.quantity,
-        notes: `Slaughter yield ${line.kind} @ ${line.unitCost}/kg`,
+        notes: `Slaughter yield ${line.kind} @ ${line.unitCost}/kg (${locationLabel})`,
         referenceType: 'SlaughterTicket',
         referenceId: ticket._id,
       })),
@@ -336,8 +677,8 @@ async function persistSlaughterTicket(req, session) {
     module: 'slaughter',
     entityType: 'SlaughterTicket',
     entityId: ticket._id,
-    message: `Slaughter ${farm.name} share ${share}, cost/kg ${costPerKg}`,
-    after: { share, outputs: outputLines.length, farmCostTotal, costPerKg },
+    message: `Slaughter ${farm.name} share ${share} (${locationLabel}), cost/kg ${costPerKg}`,
+    after: { share, outputs: outputLines.length, farmCostTotal, costPerKg, inWarehouse },
   });
 
   return SlaughterTicket.findById(ticket._id)

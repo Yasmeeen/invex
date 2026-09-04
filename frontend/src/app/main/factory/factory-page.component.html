@@ -1,0 +1,485 @@
+<div class="content-shadow bg-white mb-5 factory-page">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ pageTitleKey | translate }}</span>
+    <div class="btn-group">
+      <button type="button" class="s-btn btn-primary" (click)="openAddFactory()">
+        {{ 'tr_factory_add' | translate }}
+      </button>
+    </div>
+  </h2>
+  <p class="plr-4 text-muted size-caption mb-3">{{ 'tr_factory_hint' | translate }}</p>
+
+  <div class="plr-4 pb-3">
+    <div class="row align-items-end">
+      <div class="col-md-4">
+        <label>{{ 'tr_factory' | translate }}</label>
+        <ng-select
+          class="s-control s-select"
+          [items]="factories"
+          bindLabel="name"
+          bindValue="_id"
+          [(ngModel)]="factoryId"
+          (ngModelChange)="onFactoryChange()"
+          [clearable]="false"
+          [placeholder]="'tr_factory_select' | translate"
+        ></ng-select>
+      </div>
+      <div class="col-md-8 factory-actions" *ngIf="factoryId">
+        <button
+          type="button"
+          class="s-btn btn-primary"
+          *ngIf="activeTab === 'orders' || activeTab === 'stock'"
+          (click)="openManufacture()"
+        >
+          {{ 'tr_factory_new_order' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary"
+          *ngIf="activeTab === 'transfers' || activeTab === 'stock'"
+          (click)="openTransfer('to_factory')"
+        >
+          {{ 'tr_factory_transfer_in' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary"
+          *ngIf="activeTab === 'transfers' || activeTab === 'stock'"
+          (click)="openTransfer('from_factory')"
+        >
+          {{ 'tr_factory_transfer_out' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-secondary"
+          *ngIf="activeTab === 'sales' || activeTab === 'stock'"
+          (click)="openSale()"
+        >
+          {{ 'tr_factory_new_sale' | translate }}
+        </button>
+        <button
+          type="button"
+          class="s-btn btn-primary"
+          *ngIf="activeTab === 'recipes'"
+          (click)="openRecipeForm()"
+        >
+          {{ 'tr_factory_add_recipe' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock -->
+  <div class="table-container plr-4 pb-4" *ngIf="factoryId && activeTab === 'stock'">
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <input
+          class="form-control"
+          [(ngModel)]="stockSearch"
+          (keyup.enter)="loadStock()"
+          [placeholder]="'tr_search' | translate"
+        />
+      </div>
+    </div>
+    <table class="table" *ngIf="!loading && products.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_name' | translate }}</th>
+          <th>{{ 'tr_code' | translate }}</th>
+          <th>{{ 'tr_stock' | translate }}</th>
+          <th>{{ 'tr_net_price' | translate }}</th>
+          <th>{{ 'tr_price' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of products">
+          <td>{{ p.name }}</td>
+          <td>{{ p.code }}</td>
+          <td>{{ p.stock }}</td>
+          <td>{{ p.netPrice != null ? p.netPrice : '—' }}</td>
+          <td>{{ p.price }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-center text-muted ptb-4" *ngIf="!loading && !products.length">
+      {{ 'tr_factory_stock_empty' | translate }}
+    </div>
+  </div>
+
+  <!-- Orders -->
+  <div class="table-container plr-4 pb-4" *ngIf="factoryId && activeTab === 'orders'">
+    <table class="table" *ngIf="!loading && orders.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_factory_output' | translate }}</th>
+          <th>{{ 'tr_quantity' | translate }}</th>
+          <th>{{ 'tr_factory_unit_cost' | translate }}</th>
+          <th>{{ 'tr_factory_total_cost' | translate }}</th>
+          <th>{{ 'tr_factory_ingredients' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let o of orders">
+          <td>{{ o.createdAt | date: 'short' }}</td>
+          <td>{{ o.outputProductName || o.outputProductCode }}</td>
+          <td>{{ o.outputQty }}</td>
+          <td>{{ o.unitCost }}</td>
+          <td>{{ o.totalIngredientCost }}</td>
+          <td class="ingredients-cell">{{ ingredientsLabel(o) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-center text-muted ptb-4" *ngIf="!loading && !orders.length">
+      {{ 'tr_factory_orders_empty' | translate }}
+    </div>
+  </div>
+
+  <!-- Recipes -->
+  <div class="table-container plr-4 pb-4" *ngIf="factoryId && activeTab === 'recipes'">
+    <table class="table" *ngIf="recipes.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_factory_output' | translate }}</th>
+          <th>{{ 'tr_code' | translate }}</th>
+          <th>{{ 'tr_factory_ingredients' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of recipes">
+          <td>{{ r.outputName }}</td>
+          <td>{{ r.outputProductCode }}</td>
+          <td>
+            <span *ngFor="let l of r.lines; let last = last">
+              {{ l.name || l.ingredientProductCode }} ({{ l.defaultQtyPerOutputUnit }}/u)<span *ngIf="!last">, </span>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-center text-muted ptb-4" *ngIf="!recipes.length">
+      {{ 'tr_factory_recipes_empty' | translate }}
+    </div>
+  </div>
+
+  <!-- Transfers -->
+  <div class="table-container plr-4 pb-4" *ngIf="factoryId && activeTab === 'transfers'">
+    <table class="table" *ngIf="!loading && transfers.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_products' | translate }}</th>
+          <th>{{ 'tr_quantity' | translate }}</th>
+          <th>{{ 'tr_from' | translate }}</th>
+          <th>{{ 'tr_to' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of transfers">
+          <td>{{ t.createdAt | date: 'short' }}</td>
+          <td>{{ t.productNameSnapshot || t.productCodeSnapshot }}</td>
+          <td>{{ t.quantity }}</td>
+          <td>
+            {{ t.fromFactory?.name || t.fromBranch?.name || (t.fromWarehouse ? ('tr_warehouse' | translate) : '—') }}
+          </td>
+          <td>{{ t.toFactory?.name || t.toBranch?.name || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-center text-muted ptb-4" *ngIf="!loading && !transfers.length">
+      {{ 'tr_factory_transfers_empty' | translate }}
+    </div>
+  </div>
+
+  <!-- Sales -->
+  <div class="table-container plr-4 pb-4" *ngIf="factoryId && activeTab === 'sales'">
+    <table class="table" *ngIf="!loading && sales.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_client' | translate }}</th>
+          <th>{{ 'tr_total' | translate }}</th>
+          <th>{{ 'tr_notes' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let s of sales">
+          <td>{{ s.createdAt | date: 'short' }}</td>
+          <td>{{ s.partyName }} ({{ s.partyType }})</td>
+          <td>{{ s.totalAmount }}</td>
+          <td>{{ s.notes || '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="text-center text-muted ptb-4" *ngIf="!loading && !sales.length">
+      {{ 'tr_factory_sales_empty' | translate }}
+    </div>
+  </div>
+
+  <!-- Manufacture panel -->
+  <div class="factory-overlay" *ngIf="showManufacture" (click)="showManufacture = false">
+    <div class="factory-panel factory-modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'tr_factory_new_order' | translate }}</h3>
+      <div class="form-group">
+        <label>{{ 'tr_factory_recipe_optional' | translate }}</label>
+        <ng-select
+          [items]="recipes"
+          bindLabel="outputName"
+          bindValue="_id"
+          [(ngModel)]="manufRecipeId"
+          (ngModelChange)="onRecipePick()"
+          [clearable]="true"
+        ></ng-select>
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" [(ngModel)]="manufNewOutput" />
+          {{ 'tr_factory_new_finished' | translate }}
+        </label>
+      </div>
+      <div class="form-group" *ngIf="!manufNewOutput">
+        <label>{{ 'tr_factory_output' | translate }} *</label>
+        <ng-select
+          [items]="products"
+          [bindLabel]="'name'"
+          bindValue="_id"
+          [(ngModel)]="manufOutputProductId"
+          [clearable]="false"
+        >
+          <ng-template ng-option-tmp let-item="item">{{ productLabel(item) }}</ng-template>
+          <ng-template ng-label-tmp let-item="item">{{ item?.name }} ({{ item?.code }})</ng-template>
+        </ng-select>
+      </div>
+      <div *ngIf="manufNewOutput" class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_name' | translate }} *</label>
+          <input class="form-control" [(ngModel)]="manufNewName" />
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_code' | translate }} *</label>
+          <input class="form-control" [(ngModel)]="manufNewCode" />
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_categories' | translate }} *</label>
+          <ng-select
+            [items]="categories"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="manufNewCategoryId"
+            [clearable]="false"
+          ></ng-select>
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_price' | translate }}</label>
+          <input type="number" class="form-control" [(ngModel)]="manufNewPrice" min="0" step="0.01" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_quantity' | translate }} *</label>
+          <input type="number" class="form-control" [(ngModel)]="manufOutputQty" (ngModelChange)="onManufOutputQtyChange()" min="0" step="0.001" />
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_factory_waste' | translate }}</label>
+          <input type="number" class="form-control" [(ngModel)]="manufWasteQty" min="0" step="0.001" />
+        </div>
+      </div>
+      <h4 class="size-small">{{ 'tr_factory_ingredients' | translate }}</h4>
+      <div class="ingredient-row" *ngFor="let row of manufIngredients; let i = index">
+        <ng-select
+          class="flex-grow"
+          [items]="products"
+          bindValue="_id"
+          [(ngModel)]="row.productId"
+          [clearable]="false"
+        >
+          <ng-template ng-option-tmp let-item="item">{{ productLabel(item) }}</ng-template>
+          <ng-template ng-label-tmp let-item="item">{{ item?.name }} ({{ item?.code }})</ng-template>
+        </ng-select>
+        <input type="number" class="form-control qty-input" [(ngModel)]="row.qty" min="0" step="0.001" />
+        <button type="button" class="s-btn btn-secondary btn-sm factory-remove-btn" (click)="removeManufIngredient(i)">×</button>
+      </div>
+      <button type="button" class="s-btn btn-secondary btn-sm" (click)="addManufIngredient()">
+        + {{ 'tr_factory_add_ingredient' | translate }}
+      </button>
+      <div class="cost-preview mt-2 mb-3">
+        <strong>{{ 'tr_factory_total_cost' | translate }}:</strong> {{ manufCostPreview.total }}
+        &nbsp;|&nbsp;
+        <strong>{{ 'tr_factory_unit_cost' | translate }}:</strong> {{ manufCostPreview.unit }}
+      </div>
+      <div class="form-group">
+        <label>{{ 'tr_notes' | translate }}</label>
+        <input class="form-control" [(ngModel)]="manufNotes" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="s-btn btn-secondary" (click)="showManufacture = false">
+          {{ 'tr_cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" [disabled]="manufSaving" (click)="submitManufacture()">
+          {{ 'tr_save' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recipe panel -->
+  <div class="factory-overlay" *ngIf="showRecipeForm" (click)="showRecipeForm = false">
+    <div class="factory-panel factory-modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'tr_factory_add_recipe' | translate }}</h3>
+      <div class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_factory_output' | translate }} *</label>
+          <input class="form-control" [(ngModel)]="recipeOutputName" />
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ 'tr_code' | translate }} *</label>
+          <input class="form-control" [(ngModel)]="recipeOutputCode" />
+        </div>
+      </div>
+      <div class="ingredient-row" *ngFor="let line of recipeLines; let i = index">
+        <input class="form-control" [(ngModel)]="line.ingredientProductCode" [placeholder]="'tr_code' | translate" />
+        <input class="form-control" [(ngModel)]="line.name" [placeholder]="'tr_name' | translate" />
+        <input type="number" class="form-control qty-input" [(ngModel)]="line.defaultQtyPerOutputUnit" min="0" step="0.001" />
+        <button type="button" class="s-btn btn-secondary btn-sm factory-remove-btn" (click)="removeRecipeLine(i)">×</button>
+      </div>
+      <button type="button" class="s-btn btn-secondary btn-sm" (click)="addRecipeLine()">
+        + {{ 'tr_factory_add_ingredient' | translate }}
+      </button>
+      <div class="modal-actions mt-3">
+        <button type="button" class="s-btn btn-secondary" (click)="showRecipeForm = false">
+          {{ 'tr_cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" [disabled]="recipeSaving" (click)="submitRecipe()">
+          {{ 'tr_save' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer panel -->
+  <div class="factory-overlay" *ngIf="showTransfer" (click)="showTransfer = false">
+    <div class="factory-panel factory-modal" (click)="$event.stopPropagation()">
+      <h3>
+        {{ (transferDirection === 'to_factory' ? 'tr_factory_transfer_in' : 'tr_factory_transfer_out') | translate }}
+      </h3>
+      <ng-container *ngIf="transferDirection === 'to_factory'">
+        <div class="form-group">
+          <label>
+            <input type="checkbox" [(ngModel)]="transferFromWarehouse" (ngModelChange)="loadBranchProducts()" />
+            {{ 'tr_warehouse' | translate }}
+          </label>
+        </div>
+        <div class="form-group" *ngIf="!transferFromWarehouse">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="transferFromBranchId"
+            (ngModelChange)="loadBranchProducts()"
+            [clearable]="false"
+          ></ng-select>
+        </div>
+        <div class="form-group">
+          <label>{{ 'tr_products' | translate }}</label>
+          <ng-select
+            [items]="branchProducts"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="transferProductId"
+            [clearable]="false"
+          >
+            <ng-template ng-option-tmp let-item="item">{{ productLabel(item) }}</ng-template>
+            <ng-template ng-label-tmp let-item="item">{{ item?.name }} ({{ item?.code }})</ng-template>
+          </ng-select>
+        </div>
+      </ng-container>
+      <ng-container *ngIf="transferDirection === 'from_factory'">
+        <div class="form-group">
+          <label>{{ 'tr_products' | translate }}</label>
+          <ng-select [items]="products" bindValue="_id" [(ngModel)]="transferProductId" [clearable]="false">
+            <ng-template ng-option-tmp let-item="item">{{ productLabel(item) }}</ng-template>
+            <ng-template ng-label-tmp let-item="item">{{ item?.name }} ({{ item?.code }})</ng-template>
+          </ng-select>
+        </div>
+        <div class="form-group">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="transferToBranchId"
+            [clearable]="false"
+          ></ng-select>
+        </div>
+      </ng-container>
+      <div class="form-group">
+        <label>{{ 'tr_quantity' | translate }}</label>
+        <input type="number" class="form-control" [(ngModel)]="transferQty" min="0" step="0.001" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="s-btn btn-secondary" (click)="showTransfer = false">
+          {{ 'tr_cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" [disabled]="transferSaving" (click)="submitTransfer()">
+          {{ 'tr_save' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sale panel -->
+  <div class="factory-overlay" *ngIf="showSale" (click)="showSale = false">
+    <div class="factory-panel factory-modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'tr_factory_new_sale' | translate }}</h3>
+      <div class="form-group">
+        <label>{{ 'tr_factory_party' | translate }}</label>
+        <div class="storage-choice">
+          <label class="storage-option">
+            <input type="radio" name="saleParty" [checked]="salePartyType === 'client'" (change)="salePartyType = 'client'" />
+            <span>{{ 'tr_client' | translate }}</span>
+          </label>
+          <label class="storage-option">
+            <input type="radio" name="saleParty" [checked]="salePartyType === 'vendor'" (change)="salePartyType = 'vendor'" />
+            <span>{{ 'tr_supplier' | translate }}</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-group" *ngIf="salePartyType === 'client'">
+        <ng-select [items]="clients" bindLabel="name" bindValue="_id" [(ngModel)]="saleClientId" [clearable]="false"></ng-select>
+      </div>
+      <div class="form-group" *ngIf="salePartyType === 'vendor'">
+        <ng-select [items]="vendors" bindLabel="name" bindValue="_id" [(ngModel)]="saleVendorId" [clearable]="false"></ng-select>
+      </div>
+      <div class="ingredient-row" *ngFor="let row of saleLines; let i = index">
+        <ng-select
+          class="flex-grow"
+          [items]="products"
+          bindValue="_id"
+          [(ngModel)]="row.productId"
+          (ngModelChange)="onSaleProductPick(row)"
+          [clearable]="false"
+        >
+          <ng-template ng-option-tmp let-item="item">{{ productLabel(item) }}</ng-template>
+          <ng-template ng-label-tmp let-item="item">{{ item?.name }} ({{ item?.code }})</ng-template>
+        </ng-select>
+        <input type="number" class="form-control qty-input" [(ngModel)]="row.quantity" min="0" step="0.001" />
+        <input type="number" class="form-control qty-input" [(ngModel)]="row.unitPrice" min="0" step="0.01" />
+        <button type="button" class="s-btn btn-secondary btn-sm factory-remove-btn" (click)="removeSaleLine(i)">×</button>
+      </div>
+      <button type="button" class="s-btn btn-secondary btn-sm" (click)="addSaleLine()">+</button>
+      <div class="form-group mt-2">
+        <label>{{ 'tr_notes' | translate }}</label>
+        <input class="form-control" [(ngModel)]="saleNotes" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="s-btn btn-secondary" (click)="showSale = false">
+          {{ 'tr_cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" [disabled]="saleSaving" (click)="submitSale()">
+          {{ 'tr_save' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

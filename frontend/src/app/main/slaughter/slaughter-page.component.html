@@ -9,20 +9,15 @@
   </h2>
   <p class="plr-4 text-muted size-caption mb-3">{{ 'tr_slaughter_hint' | translate }}</p>
 
-  <div class="plr-4 pb-3" *ngIf="showBranchFilter">
+  <div class="plr-4 pb-3" *ngIf="showLocationFilter">
     <div class="row">
-      <div class="col-md-3">
+      <div class="col-md-4">
         <div class="form-group mb-0">
-          <label>{{ 'tr_branch' | translate }}</label>
-          <ng-select
-            class="s-control s-select"
-            [items]="branches"
-            bindLabel="name"
-            bindValue="_id"
-            [(ngModel)]="branchId"
-            (ngModelChange)="onBranchChange()"
-            [clearable]="false"
-          ></ng-select>
+          <label>{{ 'tr_slaughter_location' | translate }}</label>
+          <select class="s-control" [(ngModel)]="locationFilter" (ngModelChange)="onLocationFilterChange()">
+            <option *ngFor="let b of branches" [ngValue]="b._id">{{ b.name }}</option>
+            <option *ngIf="allowWarehouse" ngValue="warehouse">{{ 'tr_warehouse' | translate }}</option>
+          </select>
         </div>
       </div>
     </div>
@@ -33,6 +28,7 @@
       <thead>
         <tr>
           <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_slaughter_location' | translate }}</th>
           <th>{{ 'tr_slaughter_animal' | translate }}</th>
           <th>{{ 'tr_slaughter_share' | translate }}</th>
           <th>{{ 'tr_slaughter_outputs' | translate }}</th>
@@ -41,6 +37,7 @@
       <tbody>
         <tr *ngFor="let t of tickets">
           <td>{{ t.createdAt | date: 'short' }}</td>
+          <td>{{ ticketLocationLabel(t) }}</td>
           <td>{{ ticketFarmName(t) }}</td>
           <td>{{ t.share }}</td>
           <td class="slaughter-outputs-cell">{{ ticketOutputsLabel(t) }}</td>

@@ -31,6 +31,24 @@ const stockMovementSchema = new mongoose.Schema(
       required: false,
       default: null,
     },
+    fromFactoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Factory',
+      required: false,
+      default: null,
+    },
+    toFactoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Factory',
+      required: false,
+      default: null,
+    },
+    factoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Factory',
+      required: false,
+      default: null,
+    },
     quantity: { type: Number, required: true, min: 0 },
     unitPrice: { type: Number, required: false, min: 0, default: 0 },
     totalValue: { type: Number, required: false, min: 0, default: 0 },
@@ -45,6 +63,7 @@ stockMovementSchema.index({ createdAt: -1 });
 stockMovementSchema.index({ movementType: 1, createdAt: -1 });
 stockMovementSchema.index({ productId: 1, createdAt: -1 });
 stockMovementSchema.index({ branchId: 1, createdAt: -1 });
+stockMovementSchema.index({ factoryId: 1, createdAt: -1 });
 
 const StockMovement = mongoose.model('StockMovement', stockMovementSchema);
 export default StockMovement;

@@ -47,6 +47,38 @@ export const AdminSidebar = [
     ],
   },
   {
+    name: 'tr_factory',
+    routerLink: 'null',
+    icon: 'fa fa-industry icon',
+    children: [
+      {
+        name: 'tr_factory_tab_stock',
+        routerLink: '/factory/stock',
+        icon: 'fa fa-cubes icon',
+      },
+      {
+        name: 'tr_factory_tab_orders',
+        routerLink: '/factory/orders',
+        icon: 'fa fa-cogs icon',
+      },
+      {
+        name: 'tr_factory_tab_recipes',
+        routerLink: '/factory/recipes',
+        icon: 'fa fa-book icon',
+      },
+      {
+        name: 'tr_factory_tab_transfers',
+        routerLink: '/factory/transfers',
+        icon: 'fa fa-exchange icon',
+      },
+      {
+        name: 'tr_factory_tab_sales',
+        routerLink: '/factory/sales',
+        icon: 'fa fa-shopping-cart icon',
+      },
+    ],
+  },
+  {
     name: 'tr_sidebar_sales_cashier',
     routerLink: 'null',
     icon: 'fa fa-credit-card icon',
@@ -315,6 +347,38 @@ export const Warehouse = [
     name: 'tr_slaughter',
     routerLink: '/slaughter',
     icon: 'fa fa-cutlery icon',
+  },
+  {
+    name: 'tr_factory',
+    routerLink: 'null',
+    icon: 'fa fa-industry icon',
+    children: [
+      {
+        name: 'tr_factory_tab_stock',
+        routerLink: '/factory/stock',
+        icon: 'fa fa-cubes icon',
+      },
+      {
+        name: 'tr_factory_tab_orders',
+        routerLink: '/factory/orders',
+        icon: 'fa fa-cogs icon',
+      },
+      {
+        name: 'tr_factory_tab_recipes',
+        routerLink: '/factory/recipes',
+        icon: 'fa fa-book icon',
+      },
+      {
+        name: 'tr_factory_tab_transfers',
+        routerLink: '/factory/transfers',
+        icon: 'fa fa-exchange icon',
+      },
+      {
+        name: 'tr_factory_tab_sales',
+        routerLink: '/factory/sales',
+        icon: 'fa fa-shopping-cart icon',
+      },
+    ],
   },
   {
     name: 'tr_trim_history',

@@ -78,6 +78,15 @@
                 />
                 <span>{{ 'tr_warehouse' | translate }}</span>
               </label>
+              <label class="storage-option" *ngIf="canPickWarehouse">
+                <input
+                  type="radio"
+                  name="purchaseQtyDest"
+                  [checked]="destinationType === 'factory'"
+                  (change)="onDestinationTypeChange('factory')"
+                />
+                <span>{{ 'tr_storage_factory' | translate }}</span>
+              </label>
             </div>
           </div>
 
@@ -100,12 +109,37 @@
             </div>
           </div>
 
+          <div class="form-group" *ngIf="destinationType === 'factory'">
+            <label>{{ 'tr_factory' | translate }} *</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                [items]="factories"
+                bindLabel="name"
+                bindValue="_id"
+                [(ngModel)]="factoryId"
+                [ngModelOptions]="{ standalone: true }"
+                [clearable]="false"
+                [searchable]="true"
+                appendTo="#purchase-quantity-modal-root"
+                placeholder="{{ 'tr_factory_select' | translate }}"
+              ></ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+
           <p class="size-small text-muted m-0" *ngIf="destinationType === 'warehouse'">
             {{ 'tr_purchase_quantity_warehouse_hint' | translate }}
           </p>
 
-          <div class="form-group mt-3" *ngIf="destinationType === 'warehouse' && canPickWarehouse && !isBranchManagerUser">
-            <label>{{ 'tr_purchase_quantity_treasury_branch' | translate }}</label>
+          <div
+            class="form-group mt-3"
+            *ngIf="
+              (destinationType === 'warehouse' || destinationType === 'factory') &&
+              canPickWarehouse &&
+              !isBranchManagerUser
+            "
+          >            <label>{{ 'tr_purchase_quantity_treasury_branch' | translate }}</label>
             <div class="input-with-icon bg-white">
               <ng-select
                 class="s-control s-select"

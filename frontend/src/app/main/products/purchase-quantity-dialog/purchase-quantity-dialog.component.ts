@@ -26,6 +26,7 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import { CategoriesServce } from '@shared/services/categories.service';
+import { FactoryService, Factory } from '@shared/services/factory.service';
 import {
   canPickBranchRole,
   isBranchManager,
@@ -59,8 +60,10 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
   sourcePartyType: OrderPartyType = 'supplier';
   saving = false;
 
-  destinationType: 'branch' | 'warehouse' = 'branch';
+  destinationType: 'branch' | 'warehouse' | 'factory' = 'branch';
   branches: Branch[] = [];
+  factories: Factory[] = [];
+  factoryId: string | null = null;
   categories: Category[] = [];
   categoriesLoading = false;
   products: Product[] = [];
@@ -102,7 +105,8 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     private ordersSerivce: OrdersSerivce,
     private productsService: ProductsSerivce,
     private branchesService: BranchesServce,
-    private categoriesService: CategoriesServce
+    private categoriesService: CategoriesServce,
+    private factoryService: FactoryService
   ) {
     this.form = this.fb.group({
       branchId: [null as string | null, Validators.required],
@@ -187,6 +191,7 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       this.initDestinationDefaults();
     }
     this.loadBranches();
+    this.loadFactories();
     this.loadCategories();
     this.syncTreasuryOptions();
     this.subscriptions.push(
@@ -244,16 +249,18 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     });
   }
 
-  onDestinationTypeChange(type: 'branch' | 'warehouse'): void {
+  onDestinationTypeChange(type: 'branch' | 'warehouse' | 'factory'): void {
     if (this.destinationType === type) return;
     this.destinationType = type;
     const branchCtrl = this.form.get('branchId');
-    if (type === 'warehouse') {
+    if (type === 'warehouse' || type === 'factory') {
       if (this.isBranchManagerUser) {
         return;
       }
       branchCtrl?.setValidators(this.canPickWarehouse ? [Validators.required] : []);
-      branchCtrl?.setValue(null);
+      if (type === 'warehouse') {
+        branchCtrl?.setValue(null);
+      }
     } else {
       branchCtrl?.setValidators([Validators.required]);
       if (this.isBranchManagerUser && this.globals.currentUser?.branch?._id) {
@@ -261,6 +268,22 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       }
     }
     branchCtrl?.updateValueAndValidity();
+  }
+
+  private loadFactories(): void {
+    const uid = String(this.globals.currentUser?._id || '').trim();
+    if (!uid || !this.canPickWarehouse) return;
+    this.factoryService.listFactories(uid, true).subscribe({
+      next: (res) => {
+        this.factories = res.factories || [];
+        if (!this.factoryId && this.factories.length) {
+          this.factoryId = this.factories[0]._id;
+        }
+      },
+      error: () => {
+        this.factories = [];
+      },
+    });
   }
 
   onCategoryChange(categoryId: string | null): void {
@@ -456,8 +479,13 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       this.notify.push(this.translate.instant('tr_purchase_quantity_branch_required'), 'error');
       return;
     }
+    if (this.destinationType === 'factory' && !this.factoryId) {
+      this.activeTab = 'destination';
+      this.notify.push(this.translate.instant('tr_factory_select'), 'error');
+      return;
+    }
     if (
-      this.destinationType === 'warehouse' &&
+      (this.destinationType === 'warehouse' || this.destinationType === 'factory') &&
       this.canPickWarehouse &&
       !this.isBranchManagerUser &&
       !this.form.get('branchId')?.value &&
@@ -508,7 +536,7 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       ? String(this.form.get('branchId')?.value)
       : undefined;
     const treasuryBranchId =
-      this.destinationType === 'warehouse'
+      this.destinationType === 'warehouse' || this.destinationType === 'factory'
         ? branchId || String(this.globals.currentUser?.branch?._id || '')
         : branchId;
 
@@ -521,6 +549,9 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
         totalCost,
         destinationType: this.destinationType,
         ...(branchId ? { branchId } : {}),
+        ...(this.destinationType === 'factory' && this.factoryId
+          ? { factoryId: String(this.factoryId) }
+          : {}),
         ...(treasuryBranchId ? { treasuryBranchId } : {}),
         purchaseTreasurySplits: splits,
         ...(acquiredFrom ? { acquiredFrom } : {}),

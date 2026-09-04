@@ -288,17 +288,10 @@ export const AL_RAJI_SLAUGHTER_TEMPLATES = [
     code: 'BUFFALO',
     name: 'عجل جاموسي',
     farmSkuKey: 'farm_buffalo_calf',
+    /** Same fridge/offal base as beef; buffalo-specific trotter included. */
     outputs: [
-      { skuKey: 'kandouz_fridge', kind: 'fridge', label: 'كندوز ثلاجة' },
+      ...beefOffal,
       { skuKey: 'offal_trotter_buffalo', kind: 'offal', label: 'كوارع جاموسي' },
-      { skuKey: 'offal_liver_kandouz', kind: 'offal', label: 'كبدة كندوز صافي' },
-      { skuKey: 'offal_heart', kind: 'offal', label: 'قلب كندوز' },
-      { skuKey: 'offal_kidney', kind: 'offal', label: 'كلاوي كندوز' },
-      { skuKey: 'offal_tripe', kind: 'offal', label: 'كرشة' },
-      { skuKey: 'offal_lung', kind: 'offal', label: 'فشة' },
-      { skuKey: 'offal_spleen', kind: 'offal', label: 'طحال' },
-      { skuKey: 'offal_head_meat', kind: 'offal', label: 'لحم راس' },
-      { skuKey: 'offal_bone_kandouz', kind: 'offal', label: 'عظم كندوز' },
     ],
   },
   {

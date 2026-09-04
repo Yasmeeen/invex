@@ -205,6 +205,12 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       ref: 'Branch',
       required: false,
     },
+    /** Purchase-quantity destination: factory (independent of branch/warehouse). */
+    stockTopUpDestinationFactoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Factory',
+      required: false,
+    },
 
     /** Store pays party the difference (trade-in credit > sale); affects drawer when cash. */
     exchangeSettlementSplits: { type: [purchaseTreasurySplitSchema], default: undefined },

@@ -15,7 +15,10 @@ const outputLineSchema = new mongoose.Schema(
 
 const slaughterTicketSchema = new mongoose.Schema(
   {
-    branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
+    /** Set when slaughter happens at a branch; null when inWarehouse. */
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null, index: true },
+    /** True when slaughter consumes farm stock and yields products in the central warehouse. */
+    inWarehouse: { type: Boolean, default: false, index: true },
     farmProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     farmProductName: { type: String, default: '', trim: true },
     templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'SlaughterTemplate', default: null },
@@ -36,6 +39,7 @@ const slaughterTicketSchema = new mongoose.Schema(
 
 slaughterTicketSchema.index({ createdAt: -1 });
 slaughterTicketSchema.index({ branch: 1, createdAt: -1 });
+slaughterTicketSchema.index({ inWarehouse: 1, createdAt: -1 });
 
 const SlaughterTicket = mongoose.model('SlaughterTicket', slaughterTicketSchema);
 export default SlaughterTicket;

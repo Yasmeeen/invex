@@ -5,6 +5,7 @@ import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import Factory from '../../DB/models/factory.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import Notification from '../../DB/models/notification.model.js';
 import { emitToUsers } from '../../realtime/socket.js';
@@ -344,7 +345,7 @@ function isAutoApproverRole(role) {
 function canPurchaseQuantityRole(role, destinationType) {
   if (isAutoApproverRole(role)) return true;
   const r = String(role || '').trim();
-  if (r === 'Warehouse' && destinationType === 'warehouse') return true;
+  if (r === 'Warehouse' && (destinationType === 'warehouse' || destinationType === 'factory')) return true;
   if (r === 'Cashier' && destinationType === 'branch') return true;
   return false;
 }
@@ -352,7 +353,7 @@ function canPurchaseQuantityRole(role, destinationType) {
 function canAutoApprovePurchaseQuantity(role, destinationType) {
   if (isAutoApproverRole(role)) return true;
   const r = String(role || '').trim();
-  return r === 'Warehouse' && destinationType === 'warehouse';
+  return r === 'Warehouse' && (destinationType === 'warehouse' || destinationType === 'factory');
 }
 
 async function applyStockTopUpToProduct(product, q, { unitNet, acquiredFromFields, isFarm, isWeight, session }) {
@@ -1802,9 +1803,14 @@ export const approveProductPurchaseRequest = async (req, res) => {
       }
 
       const isWarehouseDest = !!purchase.stockTopUpInWarehouse;
-      const destinationBranchId = isWarehouseDest
-        ? null
-        : String(purchase.stockTopUpDestinationBranchId || purchase.branch);
+      const destinationFactoryId = purchase.stockTopUpDestinationFactoryId
+        ? String(purchase.stockTopUpDestinationFactoryId)
+        : null;
+      const isFactoryDest = !!destinationFactoryId;
+      const destinationBranchId =
+        isWarehouseDest || isFactoryDest
+          ? null
+          : String(purchase.stockTopUpDestinationBranchId || purchase.branch);
 
       const settings = await StoreSettings.findOne()
         .select('businessActivityType weightSalesEnabled')
@@ -1854,6 +1860,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
       const resolvedDest = await resolveOrCreateProductAtDestination(session, template, {
         isWarehouse: isWarehouseDest,
         branchOid: destinationBranchId,
+        factoryOid: destinationFactoryId,
       });
       if (resolvedDest.error || !resolvedDest.product) {
         await session.abortTransaction();
@@ -1909,13 +1916,19 @@ export const approveProductPurchaseRequest = async (req, res) => {
           productName: product.name,
           branchId: purchase.branch,
           fromBranchId: null,
-          toBranchId: isWarehouseDest ? null : destinationBranchId,
+          toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
+          factoryId: isFactoryDest ? destinationFactoryId : null,
+          toFactoryId: isFactoryDest ? destinationFactoryId : null,
           quantity: q,
           unitPrice: unitNet,
           totalValue: totalCost,
           referenceType: 'productPurchaseRequest',
           referenceId: purchase._id,
-          notes: isWarehouseDest ? 'Stock purchase (warehouse, approved)' : 'Stock purchase (branch, approved)',
+          notes: isFactoryDest
+            ? 'Stock purchase (factory, approved)'
+            : isWarehouseDest
+              ? 'Stock purchase (warehouse, approved)'
+              : 'Stock purchase (branch, approved)',
         });
       } catch (e) {
         console.warn('⚠️ stock top-up approve stock movement:', e?.message || e);
@@ -2970,16 +2983,26 @@ export const addQuantityToExistingProduct = async (req, res) => {
   }
 };
 
-async function resolveOrCreateProductAtDestination(session, template, { isWarehouse, branchOid }) {
+async function resolveOrCreateProductAtDestination(session, template, { isWarehouse, branchOid, factoryOid }) {
   const code = String(template.code || '').trim();
   const categoryId = template.category?._id || template.category;
   if (!code || !categoryId) {
     return { error: 'Template product is missing code or category' };
   }
 
-  const filter = isWarehouse
-    ? { code, branch: null, inWarehouse: true }
-    : { code, branch: new mongoose.Types.ObjectId(String(branchOid)) };
+  let filter;
+  if (factoryOid) {
+    filter = {
+      code,
+      factory: new mongoose.Types.ObjectId(String(factoryOid)),
+      inWarehouse: { $ne: true },
+      $or: [{ branch: null }, { branch: { $exists: false } }],
+    };
+  } else if (isWarehouse) {
+    filter = { code, branch: null, inWarehouse: true };
+  } else {
+    filter = { code, branch: new mongoose.Types.ObjectId(String(branchOid)) };
+  }
 
   let target = await Product.findOne(filter).populate('category', 'name code sellByWeight').session(session);
   if (target) {
@@ -2996,8 +3019,9 @@ async function resolveOrCreateProductAtDestination(session, template, { isWareho
         discount: Number(template.discount) || 0,
         stock: 0,
         category: new mongoose.Types.ObjectId(String(categoryId)),
-        branch: isWarehouse ? null : new mongoose.Types.ObjectId(String(branchOid)),
-        inWarehouse: !!isWarehouse,
+        branch: factoryOid || isWarehouse ? null : new mongoose.Types.ObjectId(String(branchOid)),
+        inWarehouse: !!isWarehouse && !factoryOid,
+        factory: factoryOid ? new mongoose.Types.ObjectId(String(factoryOid)) : null,
         imageUrl: normalizeImageUrl(template.imageUrl),
         attributes:
           template.attributes && typeof template.attributes === 'object' && !Array.isArray(template.attributes)
@@ -3036,11 +3060,13 @@ export const purchaseQuantity = async (req, res) => {
       purchaseTreasuryKey: treasuryKeyRaw,
       destinationType: destinationTypeRaw,
       branchId: branchIdRaw,
+      factoryId: factoryIdRaw,
       treasuryBranchId: treasuryBranchIdRaw,
     } = req.body || {};
 
+    const destRaw = String(destinationTypeRaw || 'branch').trim().toLowerCase();
     const destinationType =
-      String(destinationTypeRaw || 'branch').trim().toLowerCase() === 'warehouse' ? 'warehouse' : 'branch';
+      destRaw === 'warehouse' ? 'warehouse' : destRaw === 'factory' ? 'factory' : 'branch';
 
     if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
       await session.abortTransaction();
@@ -3069,8 +3095,30 @@ export const purchaseQuantity = async (req, res) => {
     }
 
     const isWarehouseDest = destinationType === 'warehouse';
+    const isFactoryDest = destinationType === 'factory';
     let destinationBranchId = null;
-    if (!isWarehouseDest) {
+    let destinationFactoryId = null;
+
+    if (isFactoryDest) {
+      const raw = String(factoryIdRaw || '').trim();
+      if (!raw || !mongoose.Types.ObjectId.isValid(raw)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'factoryId is required for factory destination' });
+      }
+      destinationFactoryId = raw;
+      const factory = await Factory.findById(destinationFactoryId).select('_id isActive').session(session).lean();
+      if (!factory) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Factory not found' });
+      }
+      if (factory.isActive === false) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Factory is inactive' });
+      }
+    } else if (!isWarehouseDest) {
       const raw = String(branchIdRaw || '').trim();
       if (!raw || !mongoose.Types.ObjectId.isValid(raw)) {
         await session.abortTransaction();
@@ -3087,10 +3135,14 @@ export const purchaseQuantity = async (req, res) => {
         session.endSession();
         return res.status(403).json({ error: 'Branch Manager has no assigned branch' });
       }
-      if (isWarehouseDest) {
+      if (isWarehouseDest || isFactoryDest) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(403).json({ error: 'Branch Manager cannot purchase into warehouse' });
+        return res.status(403).json({
+          error: isFactoryDest
+            ? 'Branch Manager cannot purchase into factory'
+            : 'Branch Manager cannot purchase into warehouse',
+        });
       }
       if (destinationBranchId !== actorBranch) {
         await session.abortTransaction();
@@ -3106,10 +3158,14 @@ export const purchaseQuantity = async (req, res) => {
         session.endSession();
         return res.status(403).json({ error: 'Cashier has no assigned branch' });
       }
-      if (isWarehouseDest) {
+      if (isWarehouseDest || isFactoryDest) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(403).json({ error: 'Cashier cannot purchase into warehouse' });
+        return res.status(403).json({
+          error: isFactoryDest
+            ? 'Cashier cannot purchase into factory'
+            : 'Cashier cannot purchase into warehouse',
+        });
       }
       if (destinationBranchId !== actorBranch) {
         await session.abortTransaction();
@@ -3132,7 +3188,7 @@ export const purchaseQuantity = async (req, res) => {
       return res.status(400).json({ error: 'Cannot add stock to a service product' });
     }
 
-    if (!isWarehouseDest) {
+    if (!isWarehouseDest && !isFactoryDest) {
       const branch = await Branch.findById(destinationBranchId).select('_id').session(session).lean();
       if (!branch) {
         await session.abortTransaction();
@@ -3142,7 +3198,7 @@ export const purchaseQuantity = async (req, res) => {
     }
 
     let treasuryBranchId = destinationBranchId;
-    if (isWarehouseDest) {
+    if (isWarehouseDest || isFactoryDest) {
       const raw = String(treasuryBranchIdRaw || branchIdRaw || '').trim();
       if (raw && mongoose.Types.ObjectId.isValid(raw)) {
         treasuryBranchId = raw;
@@ -3154,7 +3210,9 @@ export const purchaseQuantity = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
-        error: 'treasuryBranchId is required for warehouse purchases',
+        error: isFactoryDest
+          ? 'treasuryBranchId is required for factory purchases'
+          : 'treasuryBranchId is required for warehouse purchases',
         code: 'BRANCH_REQUIRED',
       });
     }
@@ -3229,7 +3287,11 @@ export const purchaseQuantity = async (req, res) => {
           ? template.attributes
           : {},
       imageUrl: normalizeImageUrl(template.imageUrl),
-      notes: isWarehouseDest ? 'Stock purchase (warehouse)' : 'Stock purchase (branch)',
+      notes: isFactoryDest
+        ? 'Stock purchase (factory)'
+        : isWarehouseDest
+          ? 'Stock purchase (warehouse)'
+          : 'Stock purchase (branch)',
     };
 
     let acquiredFromFields = {};
@@ -3309,16 +3371,20 @@ export const purchaseQuantity = async (req, res) => {
           isStockTopUp: true,
           stockTopUpTemplateProductId: template._id,
           stockTopUpInWarehouse: isWarehouseDest,
-          ...(isWarehouseDest
-            ? {}
-            : { stockTopUpDestinationBranchId: new mongoose.Types.ObjectId(String(destinationBranchId)) }),
+          ...(isFactoryDest
+            ? { stockTopUpDestinationFactoryId: new mongoose.Types.ObjectId(String(destinationFactoryId)) }
+            : isWarehouseDest
+              ? {}
+              : { stockTopUpDestinationBranchId: new mongoose.Types.ObjectId(String(destinationBranchId)) }),
           ...(autoApprove
             ? {
                 resolvedBy: actor._id,
                 resolvedAt: new Date(),
-                resolutionNote: isWarehouseDest
-                  ? 'Stock purchase to warehouse (auto-approved)'
-                  : 'Stock purchase to branch (auto-approved)',
+                resolutionNote: isFactoryDest
+                  ? 'Stock purchase to factory (auto-approved)'
+                  : isWarehouseDest
+                    ? 'Stock purchase to warehouse (auto-approved)'
+                    : 'Stock purchase to branch (auto-approved)',
               }
             : {}),
           ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
@@ -3394,6 +3460,7 @@ export const purchaseQuantity = async (req, res) => {
     const resolved = await resolveOrCreateProductAtDestination(session, template, {
       isWarehouse: isWarehouseDest,
       branchOid: destinationBranchId,
+      factoryOid: destinationFactoryId,
     });
     if (resolved.error || !resolved.product) {
       await session.abortTransaction();
@@ -3436,13 +3503,19 @@ export const purchaseQuantity = async (req, res) => {
         productName: product.name,
         branchId: treasuryBranchId,
         fromBranchId: null,
-        toBranchId: isWarehouseDest ? null : destinationBranchId,
+        toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
+        factoryId: isFactoryDest ? destinationFactoryId : null,
+        toFactoryId: isFactoryDest ? destinationFactoryId : null,
         quantity: q,
         unitPrice: unitNet,
         totalValue: totalCost,
         referenceType: 'productPurchaseRequest',
         referenceId: created._id,
-        notes: isWarehouseDest ? 'Stock purchase (warehouse)' : 'Stock purchase (branch)',
+        notes: isFactoryDest
+          ? 'Stock purchase (factory)'
+          : isWarehouseDest
+            ? 'Stock purchase (warehouse)'
+            : 'Stock purchase (branch)',
       });
     } catch (e) {
       console.warn('⚠️ purchase-quantity stock movement:', e?.message || e);
@@ -3462,6 +3535,7 @@ export const purchaseQuantity = async (req, res) => {
         unitNet,
         destinationType,
         destinationBranchId,
+        destinationFactoryId,
         productCreatedAtDestination: !!resolved.created,
       },
     });

@@ -12,7 +12,7 @@ import {
 } from '@shared/services/slaughter.service';
 import { Router } from '@angular/router';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
-import { canPickBranchRole } from '@core/utils/role-utils';
+import { canPickBranchRole, isWarehouse } from '@core/utils/role-utils';
 import { Subscription } from 'rxjs';
 import { SlaughterDialogComponent } from './slaughter-dialog/slaughter-dialog.component';
 
@@ -28,6 +28,8 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
   loading = true;
   paginationData: PaginationData;
   branchId = '';
+  /** Filter: '' = all (admin), 'warehouse' = warehouse only, or a branch id */
+  locationFilter = '';
 
   private subs: Subscription[] = [];
 
@@ -46,10 +48,16 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
       void this.router.navigate(['/home']);
       return;
     }
+    const role = this.globals.currentUser?.role;
     const userBranch = this.globals.currentUser?.branch;
-    if (userBranch?._id && !canPickBranchRole(this.globals.currentUser?.role)) {
+
+    if (isWarehouse(role) && !canPickBranchRole(role)) {
+      this.locationFilter = 'warehouse';
+    } else if (userBranch?._id && !canPickBranchRole(role)) {
       this.branchId = String(userBranch._id);
+      this.locationFilter = this.branchId;
     }
+
     this.subs.push(
       this.slaughter.listTemplates().subscribe({
         next: (r) => {
@@ -57,13 +65,14 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
         },
       })
     );
-    if (canPickBranchRole(this.globals.currentUser?.role)) {
+    if (canPickBranchRole(role)) {
       this.subs.push(
         this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
           next: (res: any) => {
             this.branches = res?.branches || res?.data || [];
-            if (!this.branchId && this.branches.length) {
-              this.branchId = String(this.branches[0]._id);
+            if (!this.locationFilter && this.branches.length) {
+              this.locationFilter = String(this.branches[0]._id);
+              this.branchId = this.locationFilter;
             }
           },
         })
@@ -76,30 +85,55 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
     this.subs.forEach((s) => s.unsubscribe());
   }
 
-  get showBranchFilter(): boolean {
+  get showLocationFilter(): boolean {
     return canPickBranchRole(this.globals.currentUser?.role);
   }
 
-  onBranchChange(): void {
+  get allowWarehouse(): boolean {
+    const role = this.globals.currentUser?.role;
+    return canPickBranchRole(role) || isWarehouse(role);
+  }
+
+  onLocationFilterChange(): void {
+    if (this.locationFilter === 'warehouse') {
+      this.branchId = '';
+    } else {
+      this.branchId = this.locationFilter;
+    }
     this.loadTickets();
   }
 
   openSlaughterDialog(): void {
-    const ref = this.dialog.open(SlaughterDialogComponent, {
-      width: '680px',
-      maxWidth: '96vw',
-      autoFocus: false,
-      data: {
-        branchId: this.branchId,
-        branches: this.branches,
-        showBranchFilter: this.showBranchFilter,
-        templates: this.templates,
+    const locationType =
+      this.locationFilter === 'warehouse' || (!this.branchId && this.allowWarehouse)
+        ? 'warehouse'
+        : 'branch';
+    const open = (templates: SlaughterTemplate[]) => {
+      const ref = this.dialog.open(SlaughterDialogComponent, {
+        width: '720px',
+        maxWidth: '96vw',
+        autoFocus: false,
+        data: {
+          branchId: this.branchId,
+          branches: this.branches,
+          showBranchFilter: this.showLocationFilter,
+          allowWarehouse: this.allowWarehouse,
+          locationType,
+          templates,
+        },
+      });
+      ref.afterClosed().subscribe((saved) => {
+        if (saved) {
+          this.loadTickets();
+        }
+      });
+    };
+    this.slaughter.listTemplates().subscribe({
+      next: (r) => {
+        this.templates = r.templates || [];
+        open(this.templates);
       },
-    });
-    ref.afterClosed().subscribe((saved) => {
-      if (saved) {
-        this.loadTickets();
-      }
+      error: () => open(this.templates),
     });
   }
 
@@ -120,30 +154,39 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
 
   loadTickets(page = 1): void {
     this.loading = true;
-    this.slaughter
-      .listTickets({
-        page,
-        limit: 15,
-        branch_id: this.branchId || undefined,
-        userId: this.globals.currentUser?._id,
-      })
-      .subscribe({
-        next: (res) => {
-          this.tickets = res.tickets || [];
-          const p = res.pagination || {};
-          this.paginationData = {
-            currentPage: p.page || 1,
-            nextPage: p.page < p.pages ? p.page + 1 : 0,
-            prevPage: p.page > 1 ? p.page - 1 : 0,
-            totalCount: p.total || 0,
-            totalPages: p.pages || 1,
-          };
-          this.loading = false;
-        },
-        error: () => {
-          this.loading = false;
-        },
-      });
+    const params: {
+      page: number;
+      limit: number;
+      branch_id?: string;
+      inWarehouse?: boolean;
+      userId?: string;
+    } = {
+      page,
+      limit: 15,
+      userId: this.globals.currentUser?._id,
+    };
+    if (this.locationFilter === 'warehouse') {
+      params.inWarehouse = true;
+    } else if (this.branchId) {
+      params.branch_id = this.branchId;
+    }
+    this.slaughter.listTickets(params).subscribe({
+      next: (res) => {
+        this.tickets = res.tickets || [];
+        const p = res.pagination || {};
+        this.paginationData = {
+          currentPage: p.page || 1,
+          nextPage: p.page < p.pages ? p.page + 1 : 0,
+          prevPage: p.page > 1 ? p.page - 1 : 0,
+          totalCount: p.total || 0,
+          totalPages: p.pages || 1,
+        };
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      },
+    });
   }
 
   ticketFarmName(t: SlaughterTicket): string {
@@ -151,6 +194,13 @@ export class SlaughterPageComponent implements OnInit, OnDestroy {
       return t.farmProductName;
     }
     return t.farmProductId && t.farmProductId.name ? t.farmProductId.name : '';
+  }
+
+  ticketLocationLabel(t: SlaughterTicket): string {
+    if (t.inWarehouse) {
+      return this.translate.instant('tr_warehouse');
+    }
+    return t.branch?.name || this.translate.instant('tr_storage_branch');
   }
 
   ticketOutputsLabel(t: SlaughterTicket): string {

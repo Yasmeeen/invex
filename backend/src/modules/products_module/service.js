@@ -1294,6 +1294,7 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     branchId,
     warehouseOnly,
     excludeWarehouse,
+    factoryOnly,
     booked,
     listedOnline,
     listedOnEcommerce,
@@ -1383,8 +1384,13 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
 
   if (warehouseOnly === 'true' || warehouseOnly === true) {
     query.inWarehouse = true;
+    andParts.push({ $or: [{ factory: null }, { factory: { $exists: false } }] });
   } else if (excludeWarehouse === 'true' || excludeWarehouse === true) {
     query.inWarehouse = { $ne: true };
+    andParts.push({ $or: [{ factory: null }, { factory: { $exists: false } }] });
+  } else if (!(factoryOnly === 'true' || factoryOnly === true)) {
+    // Default product lists exclude factory stock (use /api/factory/.../stock instead).
+    andParts.push({ $or: [{ factory: null }, { factory: { $exists: false } }] });
   }
 
   const categoryIds = toObjectIds(parseOidCsvList(categoryId));

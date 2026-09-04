@@ -1,8 +1,17 @@
-<div class="slaughter-dialog">
+<div class="slaughter-dialog" id="slaughter-dialog-root">
   <h2 mat-dialog-title class="slaughter-dialog__title">{{ 'tr_slaughter_submit' | translate }}</h2>
 
   <div mat-dialog-content class="slaughter-dialog__body">
     <div class="row">
+      <div class="col-md-6" *ngIf="allowWarehouse">
+        <div class="form-group">
+          <label>{{ 'tr_slaughter_location' | translate }}</label>
+          <select class="s-control" [(ngModel)]="locationType" (ngModelChange)="onLocationTypeChange()">
+            <option value="branch">{{ 'tr_storage_branch' | translate }}</option>
+            <option value="warehouse">{{ 'tr_warehouse' | translate }}</option>
+          </select>
+        </div>
+      </div>
       <div class="col-md-6" *ngIf="showBranchFilter">
         <div class="form-group">
           <label>{{ 'tr_branch' | translate }}</label>
@@ -14,11 +23,14 @@
             [(ngModel)]="branchId"
             (ngModelChange)="onBranchChange()"
             [clearable]="false"
-            appendTo="body"
+            appendTo="#slaughter-dialog-root"
           ></ng-select>
         </div>
       </div>
-      <div [class.col-md-6]="showBranchFilter" [class.col-md-12]="!showBranchFilter">
+      <div
+        [class.col-md-6]="allowWarehouse || showBranchFilter"
+        [class.col-md-12]="!allowWarehouse && !showBranchFilter"
+      >
         <div class="form-group">
           <label>{{ 'tr_slaughter_animal' | translate }}</label>
           <ng-select
@@ -29,7 +41,8 @@
             [(ngModel)]="farmProductId"
             (ngModelChange)="onFarmChange()"
             [clearable]="true"
-            appendTo="body"
+            [placeholder]="loadingFarm ? ('tr_loading' | translate) : ''"
+            appendTo="#slaughter-dialog-root"
           ></ng-select>
         </div>
       </div>
@@ -57,32 +70,107 @@
       </div>
     </div>
 
-    <div class="slaughter-outputs" *ngIf="selectedTemplate">
-      <h3 class="slaughter-outputs__title">
-        {{ selectedTemplateName }} — {{ 'tr_slaughter_outputs' | translate }}
-      </h3>
-      <div class="slaughter-output-row slaughter-output-row--head">
-        <span class="slaughter-output-row__name">{{ 'tr_slaughter_outputs' | translate }}</span>
-        <span class="slaughter-output-row__kind">{{ 'tr_slaughter_kind' | translate }}</span>
-        <span class="slaughter-output-row__qty">{{ 'tr_slaughter_qty_kg' | translate }}</span>
+    <div class="slaughter-outputs">
+      <div class="slaughter-outputs__head">
+        <h3 class="slaughter-outputs__title">
+          <ng-container *ngIf="selectedTemplateName">{{ selectedTemplateName }} — </ng-container>
+          {{ 'tr_slaughter_outputs' | translate }}
+        </h3>
+        <div class="slaughter-outputs__actions">
+          <button
+            type="button"
+            class="s-btn btn-secondary btn-sm"
+            *ngIf="selectedTemplate"
+            (click)="applyTemplatePrefill()"
+            [disabled]="loadingOutputs || !outputProducts.length"
+          >
+            {{ 'tr_slaughter_apply_template' | translate }}
+          </button>
+          <button type="button" class="s-btn btn-secondary btn-sm" (click)="addOutputRow()">
+            <i class="fa fa-plus" aria-hidden="true"></i>
+            {{ 'tr_slaughter_add_output' | translate }}
+          </button>
+        </div>
       </div>
-      <div class="slaughter-output-row" *ngFor="let o of outputRows">
-        <span class="slaughter-output-row__name" [attr.title]="o.label">{{ o.label }}</span>
-        <span
-          class="slaughter-output-row__kind"
-          [class.slaughter-kind--fridge]="o.kind === 'fridge'"
-          [class.slaughter-kind--offal]="o.kind === 'offal' || !o.kind"
-          [class.slaughter-kind--waste]="o.kind === 'waste'"
-        >
-          {{ kindLabel(o.kind) }}
-        </span>
+      <p class="text-muted size-caption mb-2">
+        {{ 'tr_slaughter_pick_outputs_hint' | translate }}
+      </p>
+      <div class="form-group slaughter-outputs__category" *ngIf="outputProducts.length">
+        <label>{{ 'tr_category' | translate }}</label>
+        <ng-select
+          class="s-control s-select"
+          [items]="outputCategories"
+          bindLabel="name"
+          bindValue="_id"
+          [multiple]="true"
+          [(ngModel)]="outputCategoryIds"
+          (ngModelChange)="onOutputCategoryChange()"
+          [closeOnSelect]="false"
+          [clearable]="true"
+          [searchable]="true"
+          [placeholder]="'tr_slaughter_all_categories' | translate"
+          appendTo="#slaughter-dialog-root"
+        ></ng-select>
+      </div>
+      <p class="text-muted size-caption mb-2" *ngIf="loadingOutputs">
+        {{ 'tr_loading' | translate }}
+      </p>
+      <p class="text-muted size-caption mb-2" *ngIf="!loadingOutputs && !outputProducts.length">
+        {{ 'tr_slaughter_no_output_products' | translate }}
+      </p>
+      <p
+        class="text-muted size-caption mb-2"
+        *ngIf="!loadingOutputs && outputProducts.length && outputCategoryIds?.length && !visibleOutputProducts.length"
+      >
+        {{ 'tr_slaughter_no_products_in_category' | translate }}
+      </p>
+      <p class="text-muted size-caption mb-2" *ngIf="inWarehouse && !loadingOutputs">
+        {{ 'tr_slaughter_warehouse_hint' | translate }}
+      </p>
+
+      <div class="slaughter-output-row slaughter-output-row--head" *ngIf="outputProducts.length">
+        <span>{{ 'tr_slaughter_output_product' | translate }}</span>
+        <span>{{ 'tr_slaughter_kind' | translate }}</span>
+        <span>{{ 'tr_slaughter_qty_kg' | translate }}</span>
+        <span></span>
+      </div>
+
+      <div
+        class="slaughter-output-row"
+        *ngFor="let row of outputRows; let i = index; trackBy: trackOutputRow"
+      >
+        <ng-select
+          class="s-control s-select"
+          [items]="visibleOutputProducts"
+          bindLabel="name"
+          bindValue="_id"
+          [(ngModel)]="row.productId"
+          (ngModelChange)="onOutputProductChange(row)"
+          [clearable]="true"
+          [searchable]="true"
+          [placeholder]="'tr_slaughter_pick_product' | translate"
+          appendTo="#slaughter-dialog-root"
+        ></ng-select>
+        <select class="s-control" [(ngModel)]="row.kind">
+          <option value="fridge">{{ 'tr_slaughter_kind_fridge' | translate }}</option>
+          <option value="offal">{{ 'tr_slaughter_kind_offal' | translate }}</option>
+          <option value="waste">{{ 'tr_slaughter_kind_waste' | translate }}</option>
+        </select>
         <input
-          class="s-control slaughter-output-row__qty"
+          class="s-control"
           type="number"
           step="0.001"
           min="0"
-          [(ngModel)]="o.quantity"
+          [(ngModel)]="row.quantity"
         />
+        <button
+          type="button"
+          class="s-btn btn-secondary slaughter-output-row__remove"
+          (click)="removeOutputRow(i)"
+          [attr.title]="'tr_action.delete' | translate"
+        >
+          <i class="fa fa-trash" aria-hidden="true"></i>
+        </button>
       </div>
     </div>
 

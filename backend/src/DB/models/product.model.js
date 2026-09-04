@@ -95,10 +95,21 @@ const productSchema = new mongoose.Schema(
       required: false,
       default: null,
     },
-    /** Central warehouse stock (no branch). Mutually exclusive with branch placement. */
+    /** Central warehouse stock (no branch). Mutually exclusive with branch / factory. */
     inWarehouse: {
       type: Boolean,
       default: false,
+    },
+    /**
+     * Factory stock location (independent of branches/warehouse).
+     * Mutually exclusive with branch and inWarehouse.
+     */
+    factory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Factory',
+      required: false,
+      default: null,
+      index: true,
     },
     /** Public HTTPS URL (e.g. Cloudinary secure_url) */
     imageUrl: {
@@ -207,8 +218,28 @@ const productSchema = new mongoose.Schema(
   }
 );
 
-// ✅ Compound unique index: code + branch combination must be unique
-productSchema.index({ code: 1, branch: 1 }, { unique: true });
+// Location uniqueness: one row per code at each place type.
+productSchema.index(
+  { code: 1, branch: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { branch: { $type: 'objectId' } },
+  }
+);
+productSchema.index(
+  { code: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { inWarehouse: true },
+  }
+);
+productSchema.index(
+  { code: 1, factory: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { factory: { $type: 'objectId' } },
+  }
+);
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;

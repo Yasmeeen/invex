@@ -143,6 +143,20 @@ const routes: Routes = [
         },
       },
       {
+        path: 'factory',
+        loadChildren: () => import('./factory/factory.module').then((m) => m.FactoryModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Admin',
+            ...WAREHOUSE,
+            'Branch Manager',
+          ],
+        },
+      },
+      {
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],

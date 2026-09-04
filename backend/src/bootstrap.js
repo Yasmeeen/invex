@@ -26,6 +26,7 @@ import paymentMethodsRoutes from './modules/payment_methods_module/router.js';
 import installmentPlansRoutes from './modules/installment_plans_module/router.js';
 import collectionsRoutes from './modules/collections_module/router.js';
 import slaughterRoutes from './modules/slaughter_module/router.js';
+import trimRoutes from './modules/trim_module/router.js';
 import integrationsRoutes from './modules/integrations_module/router.js';
 
 const bootstrap = (app, express) => {
@@ -89,6 +90,7 @@ const bootstrap = (app, express) => {
   app.use('/api/installment-plans', installmentPlansRoutes);
   app.use('/api/collections', collectionsRoutes);
   app.use('/api/slaughter', slaughterRoutes);
+  app.use('/api/trim', trimRoutes);
   app.use('/api/integrations', integrationsRoutes);
 
   return app;

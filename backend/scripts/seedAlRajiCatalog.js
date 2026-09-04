@@ -21,6 +21,7 @@ import {
   AL_RAJI_SLAUGHTER_TEMPLATES,
   AL_RAJI_STORE_FLAGS,
 } from './alRajiCatalogData.js';
+import { scaleCodeForSku } from './alRajiScaleCodes.js';
 import { normalizeProductType } from '../src/utils/product-type.util.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,8 +62,10 @@ async function seedBranch(branch, categoryByCode) {
     for (const p of catDef.products) {
       const skuKey = p.skuKey;
       let product = await Product.findOne({ catalogKey: skuKey, branch: branch._id });
+      const scaleCode = scaleCodeForSku(skuKey);
+      const code =
+        scaleCode || `${catDef.code}-${String(skuKey).replace(/_/g, '-')}`.slice(0, 40);
       if (!product) {
-        const code = `${catDef.code}-${String(skuKey).replace(/_/g, '-')}`.slice(0, 40);
         const isCut = !!(p.sourceKey && !p.isSource);
         const productType = normalizeProductType(p.productType);
         product = await Product.create({
@@ -82,6 +85,9 @@ async function seedBranch(branch, categoryByCode) {
             : {}),
         });
         created += 1;
+      } else if (scaleCode && product.code !== scaleCode) {
+        product.code = scaleCode;
+        await product.save();
       }
       createdRows.push({ product, def: p });
       if (p.isSource || (!p.sourceKey && skuKey)) {

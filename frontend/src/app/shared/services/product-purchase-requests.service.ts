@@ -76,6 +76,22 @@ export class ProductPurchaseRequestsService {
     return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/add-quantity`, payload);
   }
 
+  /** Purchase quantity with category/product pick and branch or warehouse destination. */
+  purchaseQuantity(payload: {
+    userId: string;
+    productId: string;
+    quantity: number;
+    totalCost: number;
+    destinationType: 'branch' | 'warehouse';
+    branchId?: string;
+    treasuryBranchId?: string;
+    purchaseTreasurySplits?: PurchaseTreasurySplit[];
+    purchaseTreasuryKey?: string;
+    acquiredFrom?: ProductAcquiredFrom | null;
+  }): Observable<any> {
+    return this.http.post(`${PRODUCT_PURCHASE_REQUESTS_URL}/purchase-quantity`, payload);
+  }
+
   /** Append another product to an existing exchange trade-in purchase (one invoice). */
   addLine(
     purchaseId: string,

@@ -191,6 +191,21 @@ const productPurchaseRequestSchema = new mongoose.Schema(
 
     /** Cashier exchange: intake without upfront treasury; settlement recorded at checkout. */
     isExchangeTradeIn: { type: Boolean, default: false, index: true },
+
+    /** Purchase-quantity flow: add stock to an existing SKU at branch or warehouse. */
+    isStockTopUp: { type: Boolean, default: false, index: true },
+    stockTopUpTemplateProductId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: false,
+    },
+    stockTopUpInWarehouse: { type: Boolean, default: false },
+    stockTopUpDestinationBranchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: false,
+    },
+
     /** Store pays party the difference (trade-in credit > sale); affects drawer when cash. */
     exchangeSettlementSplits: { type: [purchaseTreasurySplitSchema], default: undefined },
     linkedExchangeOrderId: {

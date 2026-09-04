@@ -18,6 +18,8 @@ import { ProductHistoryDialogComponent } from './product-history-dialog/product-
 import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { SerialTrackComponent } from './serial-track/serial-track.component';
 import { AddQuantityDialogComponent } from './add-quantity-dialog/add-quantity-dialog.component';
+import { TrimDialogComponent } from './trim-dialog/trim-dialog.component';
+import { PurchaseQuantityDialogModule } from './purchase-quantity-dialog/purchase-quantity-dialog.module';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
 
@@ -34,6 +36,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     ProductInventoryAuditDialogComponent,
     SerialTrackComponent,
     AddQuantityDialogComponent,
+    TrimDialogComponent,
   ],
   imports: [
     CommonModule,
@@ -41,6 +44,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     SharedModule,
     CreateEditProductModule,
     PaymentSplitsDialogModule,
+    PurchaseQuantityDialogModule,
     MatDialogModule,
     TranslateModule.forChild(),
   ],

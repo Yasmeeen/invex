@@ -31,13 +31,13 @@
       </div>
       <div class="products-toolbar__actions">
         <button
-          *ngIf="canAddProduct"
+          *ngIf="canPurchaseQuantity"
           type="button"
           class="s-btn btn-secondary"
-          (click)="openImportDialog()"
+          (click)="openPurchaseQuantity()"
         >
-          <i class="fa fa-upload" aria-hidden="true"></i>
-          {{ 'tr_upload_excel_sheet' | translate }}
+          <i class="fa fa-cart-plus text-primary" aria-hidden="true"></i>
+          {{ 'tr_purchase_quantity' | translate }}
         </button>
         <button
           *ngIf="canAddProduct"
@@ -47,29 +47,40 @@
         >
           {{ "tr_add_product" | translate }}
         </button>
+        <span class="options-menu products-toolbar__more">
+          <button type="button" class="s-btn btn-secondary size-body">
+            {{ 'tr_actions' | translate }}
+            <i class="fa fa-caret-down" aria-hidden="true"></i>
+          </button>
+          <div class="options-menu-container p-0">
+            <div
+              class="single-option"
+              *ngIf="canAddProduct"
+              (click)="openImportDialog()"
+            >
+              <i class="fa fa-upload text-primary" aria-hidden="true"></i>
+              {{ 'tr_upload_excel_sheet' | translate }}
+            </div>
+            <div class="single-option" (click)="openProductsInventoryAudit()">
+              <i class="fa fa-clipboard text-primary" aria-hidden="true"></i>
+              {{ 'tr_products_inventory_audit' | translate }}
+            </div>
+            <div
+              class="single-option"
+              *ngIf="canUseSerialTrack"
+              (click)="openSerialTrack()"
+            >
+              <i class="fa fa-barcode text-primary" aria-hidden="true"></i>
+              {{ 'tr_serial_track' | translate }}
+            </div>
+          </div>
+        </span>
         <button
           type="button"
           class="s-btn btn-secondary size-body products-toolbar__icon-btn"
           (click)="isFilterOpen = !isFilterOpen"
         >
           <i class="fa fa-filter text-primary" aria-hidden="false"></i>
-        </button>
-        <button
-          type="button"
-          class="s-btn btn-secondary size-body"
-          (click)="openProductsInventoryAudit()"
-        >
-          <i class="fa fa-clipboard text-primary" aria-hidden="true"></i>
-          {{ 'tr_products_inventory_audit' | translate }}
-        </button>
-        <button
-          *ngIf="canUseSerialTrack"
-          type="button"
-          class="s-btn btn-secondary size-body"
-          (click)="openSerialTrack()"
-        >
-          <i class="fa fa-barcode text-primary" aria-hidden="true"></i>
-          {{ 'tr_serial_track' | translate }}
         </button>
       </div>
     </div>
@@ -415,6 +426,13 @@
                     >
                       {{ "tr_product_add_quantity" | translate }}
                     </div>
+                    <div
+                      class="single-option"
+                      *ngIf="canTrim(product)"
+                      (click)="openTrim(product)"
+                    >
+                      {{ "tr_trim" | translate }}
+                    </div>
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
                         class="single-option"
@@ -542,6 +560,13 @@
                 >
                   {{ "tr_product_add_quantity" | translate }}
                 </div>
+                <div
+                  class="single-option"
+                  *ngIf="canTrim(product)"
+                  (click)="openTrim(product)"
+                >
+                  {{ "tr_trim" | translate }}
+                </div>
                 <ng-container *ngIf="canBookProduct(product)">
                   <div
                     class="single-option"
@@ -610,6 +635,17 @@
 
           <div class="product-card__attrs" *ngIf="productAttributesPairs(product).length">
             <span class="chip" *ngFor="let a of productAttributesPairs(product)">{{ a.key }}: {{ a.value }}</span>
+          </div>
+
+          <div class="product-card__actions" *ngIf="canTrim(product)">
+            <button
+              type="button"
+              class="s-btn btn-secondary product-card__trim-btn"
+              (click)="openTrim(product)"
+            >
+              <i class="fa fa-scissors" aria-hidden="true"></i>
+              {{ 'tr_trim' | translate }}
+            </button>
           </div>
         </div>
       </div>

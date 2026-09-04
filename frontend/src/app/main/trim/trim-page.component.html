@@ -1,0 +1,62 @@
+<div class="content-shadow bg-white mb-5">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_trim_history' | translate }}</span>
+  </h2>
+  <p class="plr-4 text-muted size-caption mb-3">{{ 'tr_trim_history_hint' | translate }}</p>
+
+  <div class="plr-4 pb-3" *ngIf="showBranchFilter">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [(ngModel)]="branchId"
+            (ngModelChange)="onBranchChange()"
+            [clearable]="false"
+          ></ng-select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container plr-4 pb-4">
+    <table class="table" *ngIf="!loading && tickets.length">
+      <thead>
+        <tr>
+          <th>{{ 'tr_date' | translate }}</th>
+          <th>{{ 'tr_branch' | translate }}</th>
+          <th>{{ 'tr_trim_source' | translate }}</th>
+          <th>{{ 'tr_trim_input_qty' | translate }}</th>
+          <th>{{ 'tr_trim_waste' | translate }}</th>
+          <th>{{ 'tr_trim_yielded_qty' | translate }}</th>
+          <th>{{ 'tr_trim_outputs' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tickets">
+          <td>{{ t.createdAt | date: 'short' }}</td>
+          <td>{{ t.branch?.name || '—' }}</td>
+          <td>{{ sourceName(t) }}</td>
+          <td>{{ t.inputQty }}</td>
+          <td>{{ t.wasteQty != null ? t.wasteQty : 0 }}</td>
+          <td>{{ t.outputQty != null ? t.outputQty : 0 }}</td>
+          <td class="trim-outputs-cell">{{ outputsLabel(t) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
+      {{ 'tr_trim_empty' | translate }}
+    </div>
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="15"
+        (paginationUpdate)="onPagination($event)"
+      ></pagination>
+    </div>
+  </div>
+</div>

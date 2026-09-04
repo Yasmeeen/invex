@@ -38,6 +38,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   private readonly collapseStorageKey = 'appSidebarCollapsed';
   private readonly pendingTransfersLink = '/products/branch-transfers';
   private readonly slaughterLink = '/slaughter';
+  private readonly trimLink = '/trim';
   private readonly installmentOnlyLinks = new Set([
     '/collections',
     '/collections/due',
@@ -247,10 +248,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
           }
           return {
             ...item,
-            children: item.children.filter((c) => c.routerLink !== this.slaughterLink),
+            children: item.children.filter(
+              (c) => c.routerLink !== this.slaughterLink && c.routerLink !== this.trimLink
+            ),
           };
         })
-        .filter((item) => item.routerLink !== this.slaughterLink);
+        .filter(
+          (item) => item.routerLink !== this.slaughterLink && item.routerLink !== this.trimLink
+        );
     }
     return filtered;
   }

@@ -1,0 +1,19 @@
+@import '../add-quantity-dialog/add-quantity-dialog.component.scss';
+
+.storage-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.storage-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.purchase-qty-show-in {
+  white-space: nowrap;
+}

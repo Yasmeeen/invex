@@ -33,6 +33,8 @@ import { TransferProductBranchDialogComponent } from '../transfer-product-branch
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { AddQuantityDialogComponent } from '../add-quantity-dialog/add-quantity-dialog.component';
+import { TrimDialogComponent } from '../trim-dialog/trim-dialog.component';
+import { PurchaseQuantityDialogComponent } from '../purchase-quantity-dialog/purchase-quantity-dialog.component';
 import { Router } from '@angular/router';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -312,11 +314,59 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  /** Trim (تشفيه): consume source stock into same-category outputs + waste. */
+  canTrim(product: Product): boolean {
+    if (!this.storeSettings.butcherFeaturesEnabled) return false;
+    if (!product || !this.canBranchManagerModifyProduct(product)) return false;
+    if (product.inWarehouse) return false;
+    if (!product.branch) return false;
+    if (!product.category) return false;
+    const t = String(product.productType || 'good').toLowerCase();
+    if (t === 'service' || t === 'farm') return false;
+    return Number(product.stock || 0) > 0;
+  }
+
+  /** Purchase quantity from toolbar: category + product + branch/warehouse destination. */
+  get canPurchaseQuantity(): boolean {
+    if (isModerator(this.globals.currentUser?.role)) return false;
+    const role = this.globals.currentUser?.role;
+    return (
+      canPickBranchRole(role) ||
+      isBranchManager(role) ||
+      isWarehouse(role)
+    );
+  }
+
+  openPurchaseQuantity(): void {
+    if (!this.canPurchaseQuantity) return;
+    const ref = this.dialog.open(PurchaseQuantityDialogComponent, {
+      width: '780px',
+      maxWidth: '96vw',
+    });
+    ref.afterClosed().subscribe((res) => {
+      if (res === true || (res && typeof res === 'object' && res.ok)) this.getproducts();
+    });
+  }
+
   openAddQuantity(product: Product): void {
     if (!this.canAddQuantity(product)) return;
     const ref = this.dialog.open(AddQuantityDialogComponent, {
       width: '720px',
       maxWidth: '96vw',
+      data: { product },
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.getproducts();
+    });
+  }
+
+  openTrim(product: Product): void {
+    if (!this.canTrim(product)) return;
+    const ref = this.dialog.open(TrimDialogComponent, {
+      width: '720px',
+      maxWidth: '96vw',
+      autoFocus: false,
+      panelClass: 'trim-dialog-panel',
       data: { product },
     });
     ref.afterClosed().subscribe((ok) => {

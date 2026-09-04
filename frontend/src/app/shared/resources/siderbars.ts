@@ -62,6 +62,11 @@ export const AdminSidebar = [
         icon: 'fa fa-list-alt icon',
       },
       {
+        name: 'tr_trim_history',
+        routerLink: '/trim',
+        icon: 'fa fa-scissors icon',
+      },
+      {
         name: 'tr_daily_expenses_menu',
         routerLink: '/expenses',
         icon: 'fa fa-money icon',
@@ -310,6 +315,11 @@ export const Warehouse = [
     name: 'tr_slaughter',
     routerLink: '/slaughter',
     icon: 'fa fa-cutlery icon',
+  },
+  {
+    name: 'tr_trim_history',
+    routerLink: '/trim',
+    icon: 'fa fa-scissors icon',
   },
   {
     name: 'tr_branch_transfers_pending',

@@ -338,7 +338,40 @@ function lineTotalFromNetAndDetails(netNum, q, unitDetails) {
 
 function isAutoApproverRole(role) {
   const r = String(role || '').trim();
-  return r === 'Super Admin' || r === 'Co Admin' || r === 'Branch Manager';
+  return r === 'Super Admin' || r === 'Co Admin' || r === 'Admin' || r === 'Branch Manager';
+}
+
+function canPurchaseQuantityRole(role, destinationType) {
+  if (isAutoApproverRole(role)) return true;
+  const r = String(role || '').trim();
+  if (r === 'Warehouse' && destinationType === 'warehouse') return true;
+  if (r === 'Cashier' && destinationType === 'branch') return true;
+  return false;
+}
+
+function canAutoApprovePurchaseQuantity(role, destinationType) {
+  if (isAutoApproverRole(role)) return true;
+  const r = String(role || '').trim();
+  return r === 'Warehouse' && destinationType === 'warehouse';
+}
+
+async function applyStockTopUpToProduct(product, q, { unitNet, acquiredFromFields, isFarm, isWeight, session }) {
+  const prevStock = Number(product.stock) || 0;
+  if (isFarm) {
+    product.stock = roundFarmHeads(prevStock + q);
+  } else if (isWeight) {
+    product.stock = roundWeight(prevStock + q);
+  } else {
+    product.stock = Math.max(0, Math.floor(prevStock) + q);
+  }
+  product.removedWhenOutOfStock = false;
+  product.netPrice = unitNet;
+  if (acquiredFromFields?.acquiredFrom) {
+    product.acquiredFrom = acquiredFromFields.acquiredFrom;
+    product.markModified('acquiredFrom');
+  }
+  await product.save({ session });
+  return product;
 }
 
 async function collectApproverUserIds(branchId) {
@@ -1757,6 +1790,164 @@ export const approveProductPurchaseRequest = async (req, res) => {
       return res.status(403).json({ error: 'You cannot approve this purchase' });
     }
 
+    if (purchase.isStockTopUp) {
+      const pp = purchase.productPayload || {};
+      const template = await Product.findById(purchase.stockTopUpTemplateProductId)
+        .populate('category', 'name code sellByWeight')
+        .session(session);
+      if (!template) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Template product not found for stock top-up' });
+      }
+
+      const isWarehouseDest = !!purchase.stockTopUpInWarehouse;
+      const destinationBranchId = isWarehouseDest
+        ? null
+        : String(purchase.stockTopUpDestinationBranchId || purchase.branch);
+
+      const settings = await StoreSettings.findOne()
+        .select('businessActivityType weightSalesEnabled')
+        .session(session)
+        .lean();
+      const isWeight = resolveSellByWeight({
+        weightSalesEnabled: !!settings?.weightSalesEnabled,
+        category: template.category,
+        product: template,
+      });
+      const isFarm = isFarmProduct(template);
+
+      let q;
+      const qtyNum = Number(purchase.quantity);
+      if (isFarm) {
+        q = roundFarmHeads(qtyNum);
+      } else if (isWeight) {
+        q = normalizeWeightQuantity(qtyNum);
+      } else {
+        q = Math.max(1, Math.floor(qtyNum));
+      }
+      if (!Number.isFinite(q) || q <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Invalid quantity on purchase request' });
+      }
+
+      const unitNet = Math.round(Number(pp.netPrice) * 100) / 100;
+      const totalCost = Math.round(unitNet * q * 100) / 100;
+      const categoryIdStr = String(pp.category);
+
+      let acquiredFromFields = {};
+      try {
+        const resolved = await resolveProductAcquiredFrom(
+          { acquiredFrom: pp.acquiredFrom },
+          { categoryId: categoryIdStr, branchOid: purchase.branch }
+        );
+        if (resolved?.acquiredFrom) {
+          acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+        }
+      } catch (e) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+      }
+
+      const resolvedDest = await resolveOrCreateProductAtDestination(session, template, {
+        isWarehouse: isWarehouseDest,
+        branchOid: destinationBranchId,
+      });
+      if (resolvedDest.error || !resolvedDest.product) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: resolvedDest.error || 'Could not resolve product at destination' });
+      }
+      const product = resolvedDest.product;
+
+      await applyStockTopUpToProduct(product, q, {
+        unitNet,
+        acquiredFromFields,
+        isFarm,
+        isWeight,
+        session,
+      });
+
+      purchase.status = 'approved';
+      purchase.resolvedBy = actor._id;
+      purchase.resolvedAt = new Date();
+      purchase.resolutionNote = String(resolutionNote || '').trim().slice(0, 500);
+      purchase.createdProductId = product._id;
+      purchase.lines = [{ productPayload: pp, quantity: q, createdProductId: product._id }];
+      purchase.markModified('lines');
+      await purchase.save({ session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      await postDeskPurchaseTreasuryLedger(purchase, {
+        userId: actor._id,
+        branchId: purchase.branch,
+      });
+
+      if (purchaseHasDeferredTreasury(purchase)) {
+        try {
+          if (acquiredFromFields.acquiredFrom) {
+            purchase.productPayload = purchase.productPayload || {};
+            purchase.productPayload.acquiredFrom = acquiredFromFields.acquiredFrom;
+          }
+          await syncDeferredSupplierDeskPurchase(purchase, {
+            userId: actor._id,
+            actorName: actor?.name,
+          });
+        } catch (e) {
+          console.error('⚠️ deferred stock top-up approve vendor sync:', e?.message || e);
+        }
+      }
+
+      try {
+        await StockMovement.create({
+          movementType: 'purchase',
+          productId: product._id,
+          productName: product.name,
+          branchId: purchase.branch,
+          fromBranchId: null,
+          toBranchId: isWarehouseDest ? null : destinationBranchId,
+          quantity: q,
+          unitPrice: unitNet,
+          totalValue: totalCost,
+          referenceType: 'productPurchaseRequest',
+          referenceId: purchase._id,
+          notes: isWarehouseDest ? 'Stock purchase (warehouse, approved)' : 'Stock purchase (branch, approved)',
+        });
+      } catch (e) {
+        console.warn('⚠️ stock top-up approve stock movement:', e?.message || e);
+      }
+
+      await auditLog(req, {
+        action: 'approve',
+        module: 'product_purchase_requests',
+        entityType: 'ProductPurchaseRequest',
+        entityId: purchase._id,
+        message: 'Stock quantity purchase approved',
+        metadata: {
+          productId: String(product._id),
+          productCode: product.code,
+          quantity: q,
+          totalCost,
+        },
+      });
+
+      const purchaseOut = await leanPurchaseForResponse(purchase._id);
+      const productOut = await Product.findById(product._id)
+        .populate('category', 'name code sellByWeight')
+        .populate('branch', 'name')
+        .lean();
+
+      return res.status(200).json({
+        message: '✅ Stock purchase approved',
+        purchase: purchaseOut || (purchase.toObject ? purchase.toObject() : purchase),
+        product: productOut,
+      });
+    }
+
     const q = Math.max(1, Math.floor(Number(purchase.quantity) || 1));
     const pp = purchase.productPayload || {};
     const code = String(pp.code || '').trim();
@@ -2776,5 +2967,524 @@ export const addQuantityToExistingProduct = async (req, res) => {
     session.endSession();
     console.error('addQuantityToExistingProduct:', e);
     return res.status(500).json({ error: 'Failed to add quantity', details: e?.message });
+  }
+};
+
+async function resolveOrCreateProductAtDestination(session, template, { isWarehouse, branchOid }) {
+  const code = String(template.code || '').trim();
+  const categoryId = template.category?._id || template.category;
+  if (!code || !categoryId) {
+    return { error: 'Template product is missing code or category' };
+  }
+
+  const filter = isWarehouse
+    ? { code, branch: null, inWarehouse: true }
+    : { code, branch: new mongoose.Types.ObjectId(String(branchOid)) };
+
+  let target = await Product.findOne(filter).populate('category', 'name code sellByWeight').session(session);
+  if (target) {
+    return { product: target };
+  }
+
+  const [created] = await Product.create(
+    [
+      {
+        name: String(template.name || '').trim(),
+        code,
+        price: Number(template.price) || 0,
+        netPrice: template.netPrice != null ? Number(template.netPrice) : undefined,
+        discount: Number(template.discount) || 0,
+        stock: 0,
+        category: new mongoose.Types.ObjectId(String(categoryId)),
+        branch: isWarehouse ? null : new mongoose.Types.ObjectId(String(branchOid)),
+        inWarehouse: !!isWarehouse,
+        imageUrl: normalizeImageUrl(template.imageUrl),
+        attributes:
+          template.attributes && typeof template.attributes === 'object' && !Array.isArray(template.attributes)
+            ? template.attributes
+            : {},
+        productType: normalizeProductType(template.productType),
+        sellByWeightOverride: template.sellByWeightOverride,
+        processingExtraCost: template.processingExtraCost,
+        catalogKey: template.catalogKey,
+        ...ecommerceCatalogFieldsFromSource(template),
+      },
+    ],
+    { session }
+  );
+  const populated = await Product.findById(created._id)
+    .populate('category', 'name code sellByWeight')
+    .session(session);
+  return { product: populated, created: true };
+}
+
+/**
+ * POST /product-purchase-requests/purchase-quantity
+ * Pick category/product, choose branch or warehouse destination, add stock with cost + treasuries.
+ */
+export const purchaseQuantity = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const {
+      userId,
+      productId,
+      quantity: qtyRaw,
+      totalCost: totalCostRaw,
+      acquiredFrom,
+      purchaseTreasurySplits: treasurySplitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      destinationType: destinationTypeRaw,
+      branchId: branchIdRaw,
+      treasuryBranchId: treasuryBranchIdRaw,
+    } = req.body || {};
+
+    const destinationType =
+      String(destinationTypeRaw || 'branch').trim().toLowerCase() === 'warehouse' ? 'warehouse' : 'branch';
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    const actor = await User.findById(userId).select('_id name role branch').session(session);
+    if (!actor) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'User not found' });
+    }
+    if (!canPurchaseQuantityRole(actor.role, destinationType)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({
+        error: 'Only Branch Manager or higher can purchase quantity',
+        code: 'FORBIDDEN',
+      });
+    }
+
+    const isWarehouseDest = destinationType === 'warehouse';
+    let destinationBranchId = null;
+    if (!isWarehouseDest) {
+      const raw = String(branchIdRaw || '').trim();
+      if (!raw || !mongoose.Types.ObjectId.isValid(raw)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'branchId is required for branch destination' });
+      }
+      destinationBranchId = raw;
+    }
+
+    if (actor.role === 'Branch Manager') {
+      const actorBranch = actor.branch ? String(actor.branch) : '';
+      if (!actorBranch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Branch Manager has no assigned branch' });
+      }
+      if (isWarehouseDest) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Branch Manager cannot purchase into warehouse' });
+      }
+      if (destinationBranchId !== actorBranch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cannot purchase quantity for another branch' });
+      }
+    }
+
+    if (actor.role === 'Cashier') {
+      const actorBranch = actor.branch ? String(actor.branch) : '';
+      if (!actorBranch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cashier has no assigned branch' });
+      }
+      if (isWarehouseDest) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cashier cannot purchase into warehouse' });
+      }
+      if (destinationBranchId !== actorBranch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ error: 'Cannot purchase quantity for another branch' });
+      }
+    }
+
+    const template = await Product.findById(productId)
+      .populate('category', 'name code sellByWeight')
+      .session(session);
+    if (!template) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    if (isServiceProduct(template)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Cannot add stock to a service product' });
+    }
+
+    if (!isWarehouseDest) {
+      const branch = await Branch.findById(destinationBranchId).select('_id').session(session).lean();
+      if (!branch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'Branch not found' });
+      }
+    }
+
+    let treasuryBranchId = destinationBranchId;
+    if (isWarehouseDest) {
+      const raw = String(treasuryBranchIdRaw || branchIdRaw || '').trim();
+      if (raw && mongoose.Types.ObjectId.isValid(raw)) {
+        treasuryBranchId = raw;
+      } else if (actor.branch) {
+        treasuryBranchId = String(actor.branch);
+      }
+    }
+    if (!treasuryBranchId || !mongoose.Types.ObjectId.isValid(treasuryBranchId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'treasuryBranchId is required for warehouse purchases',
+        code: 'BRANCH_REQUIRED',
+      });
+    }
+
+    const treasuryBranch = await Branch.findById(treasuryBranchId).select('_id name').session(session).lean();
+    if (!treasuryBranch) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Treasury branch not found' });
+    }
+
+    const settings = await StoreSettings.findOne()
+      .select('businessActivityType weightSalesEnabled')
+      .lean();
+
+    const isWeight = resolveSellByWeight({
+      weightSalesEnabled: !!settings?.weightSalesEnabled,
+      category: template.category,
+      product: template,
+    });
+    const isFarm = isFarmProduct(template);
+    const qtyNum = Number(qtyRaw);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'quantity must be a number > 0' });
+    }
+
+    let q;
+    if (isFarm) {
+      q = roundFarmHeads(qtyNum);
+      if (q <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'quantity must be at least 0.25 head' });
+      }
+    } else if (isWeight) {
+      q = normalizeWeightQuantity(qtyNum);
+      if (q <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: 'quantity must be a valid weight > 0' });
+      }
+    } else {
+      q = Math.max(1, Math.floor(qtyNum));
+    }
+
+    const totalCost = Math.round((Number(totalCostRaw) || 0) * 100) / 100;
+    if (!Number.isFinite(totalCost) || totalCost <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'totalCost must be a number > 0' });
+    }
+
+    const unitNet = Math.round((totalCost / q) * 100) / 100;
+    const categoryId = template.category?._id || template.category;
+    if (!categoryId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: 'Product has no category' });
+    }
+
+    const payload = {
+      name: String(template.name || '').trim(),
+      code: String(template.code || '').trim(),
+      category: new mongoose.Types.ObjectId(String(categoryId)),
+      price: Number(template.price) || 0,
+      netPrice: unitNet,
+      discount: Number(template.discount) || 0,
+      attributes:
+        template.attributes && typeof template.attributes === 'object' && !Array.isArray(template.attributes)
+          ? template.attributes
+          : {},
+      imageUrl: normalizeImageUrl(template.imageUrl),
+      notes: isWarehouseDest ? 'Stock purchase (warehouse)' : 'Stock purchase (branch)',
+    };
+
+    let acquiredFromFields = {};
+    try {
+      const resolvedParty = await resolveProductAcquiredFrom(
+        { acquiredFrom },
+        { categoryId: String(categoryId), branchOid: treasuryBranchId }
+      );
+      if (resolvedParty?.acquiredFrom) {
+        acquiredFromFields = { acquiredFrom: resolvedParty.acquiredFrom };
+        payload.acquiredFrom = resolvedParty.acquiredFrom;
+      }
+    } catch (e) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+    }
+
+    const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
+    const tMap = treasuryMethodMap(treasuryMethods);
+    const treasuryNorm = normalizePurchaseTreasuryInput({
+      purchaseTreasurySplits: treasurySplitsRaw,
+      purchaseTreasuryKey: treasuryKeyRaw,
+      lineTotal: totalCost,
+      treasuryMethods,
+      tMap,
+      exchangeTradeIn: false,
+    });
+    if (treasuryNorm.error) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: treasuryNorm.error });
+    }
+    const {
+      splits: purchaseTreasurySplits,
+      treasuryKey: treasuryKeyNorm,
+      treasuryLabel: purchaseTreasuryLabel,
+      amountPaid: treasuryAmountPaid,
+      hasDeferred: treasuryHasDeferred,
+    } = treasuryNorm;
+
+    if (treasuryHasDeferred && !payload.acquiredFrom) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'Deferred purchase requires a client or supplier in the source tab',
+        code: 'DEFERRED_PARTY_REQUIRED',
+      });
+    }
+    if (
+      treasuryHasDeferred &&
+      payload.acquiredFrom?.partyType === 'supplier' &&
+      !payload.acquiredFrom?.vendorId
+    ) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        error: 'Deferred supplier purchase requires a registered supplier',
+        code: 'DEFERRED_SUPPLIER_REQUIRED',
+      });
+    }
+
+    const autoApprove = canAutoApprovePurchaseQuantity(actor.role, destinationType);
+
+    const purchaseArr = await ProductPurchaseRequest.create(
+      [
+        {
+          status: autoApprove ? 'approved' : 'pending',
+          branch: new mongoose.Types.ObjectId(String(treasuryBranchId)),
+          createdBy: actor._id,
+          productPayload: payload,
+          quantity: q,
+          lines: [{ productPayload: payload, quantity: q }],
+          purchaseTreasuryKey: treasuryKeyNorm,
+          purchaseTreasuryLabel,
+          purchaseTreasurySplits,
+          isStockTopUp: true,
+          stockTopUpTemplateProductId: template._id,
+          stockTopUpInWarehouse: isWarehouseDest,
+          ...(isWarehouseDest
+            ? {}
+            : { stockTopUpDestinationBranchId: new mongoose.Types.ObjectId(String(destinationBranchId)) }),
+          ...(autoApprove
+            ? {
+                resolvedBy: actor._id,
+                resolvedAt: new Date(),
+                resolutionNote: isWarehouseDest
+                  ? 'Stock purchase to warehouse (auto-approved)'
+                  : 'Stock purchase to branch (auto-approved)',
+              }
+            : {}),
+          ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
+        },
+      ],
+      { session }
+    );
+    const created = purchaseArr[0];
+    if (purchaseTreasurySplits?.length) {
+      created.set('purchaseTreasurySplits', purchaseTreasurySplits);
+      created.markModified('purchaseTreasurySplits');
+      await created.save({ session });
+    }
+
+    if (!autoApprove) {
+      await session.commitTransaction();
+      session.endSession();
+
+      try {
+        const recipientIds = await collectApproverUserIds(treasuryBranchId);
+        const notification = await Notification.create({
+          type: 'product_purchase_pending',
+          title: 'Stock purchase pending approval',
+          body: `${payload.name} (${payload.code}) — ${q} unit(s) · Branch: ${treasuryBranch?.name || 'Branch'}`,
+          data: {
+            purchaseId: created._id,
+            branchId: treasuryBranchId,
+            branchName: treasuryBranch?.name || null,
+            createdById: actor._id,
+            createdByName: actor?.name || null,
+            product: {
+              name: payload.name,
+              code: payload.code,
+              categoryId: String(categoryId),
+              price: payload.price,
+              netPrice: payload.netPrice,
+            },
+            quantity: q,
+            isStockTopUp: true,
+          },
+          recipients: recipientIds,
+          readBy: [],
+        });
+        emitToUsers(recipientIds, 'notification:new', { notification });
+      } catch (e) {
+        console.warn('⚠️ stock purchase notification:', e?.message || e);
+      }
+
+      await auditLog(req, {
+        action: 'create',
+        module: 'product_purchase_requests',
+        entityType: 'ProductPurchaseRequest',
+        entityId: created._id,
+        message: 'Stock quantity purchase created (pending approval)',
+        metadata: {
+          templateProductId: String(template._id),
+          productCode: payload.code,
+          quantity: q,
+          totalCost,
+          destinationType,
+          destinationBranchId,
+        },
+      });
+
+      const purchaseOut = await leanPurchaseForResponse(created._id);
+      return res.status(201).json({
+        message: '✅ Purchase created (pending approval)',
+        purchase: purchaseOut || (created.toObject ? created.toObject() : created),
+        pending: true,
+      });
+    }
+
+    const resolved = await resolveOrCreateProductAtDestination(session, template, {
+      isWarehouse: isWarehouseDest,
+      branchOid: destinationBranchId,
+    });
+    if (resolved.error || !resolved.product) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ error: resolved.error || 'Could not resolve product at destination' });
+    }
+    const product = resolved.product;
+
+    created.createdProductId = product._id;
+    created.lines = [{ productPayload: payload, quantity: q, createdProductId: product._id }];
+    created.markModified('lines');
+    await created.save({ session });
+
+    await applyStockTopUpToProduct(product, q, {
+      unitNet,
+      acquiredFromFields,
+      isFarm,
+      isWeight,
+      session,
+    });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    if (purchaseHasDeferredTreasury(created)) {
+      try {
+        await syncDeferredSupplierDeskPurchase(created, {
+          userId: actor._id,
+          actorName: actor?.name,
+        });
+      } catch (e) {
+        console.error('⚠️ deferred purchase-quantity vendor sync:', e?.message || e);
+      }
+    }
+
+    try {
+      await StockMovement.create({
+        movementType: 'purchase',
+        productId: product._id,
+        productName: product.name,
+        branchId: treasuryBranchId,
+        fromBranchId: null,
+        toBranchId: isWarehouseDest ? null : destinationBranchId,
+        quantity: q,
+        unitPrice: unitNet,
+        totalValue: totalCost,
+        referenceType: 'productPurchaseRequest',
+        referenceId: created._id,
+        notes: isWarehouseDest ? 'Stock purchase (warehouse)' : 'Stock purchase (branch)',
+      });
+    } catch (e) {
+      console.warn('⚠️ purchase-quantity stock movement:', e?.message || e);
+    }
+
+    await auditLog(req, {
+      action: 'create',
+      module: 'product_purchase_requests',
+      entityType: 'ProductPurchaseRequest',
+      entityId: created._id,
+      message: 'Stock quantity purchased',
+      metadata: {
+        productId: String(product._id),
+        productCode: product.code,
+        quantity: q,
+        totalCost,
+        unitNet,
+        destinationType,
+        destinationBranchId,
+        productCreatedAtDestination: !!resolved.created,
+      },
+    });
+
+    await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId: treasuryBranchId });
+
+    const purchaseOut = await leanPurchaseForResponse(created._id);
+    const productOut = await Product.findById(product._id)
+      .populate('category', 'name code sellByWeight')
+      .populate('branch', 'name')
+      .lean();
+
+    return res.status(201).json({
+      message: '✅ Quantity purchased',
+      purchase: purchaseOut || (created.toObject ? created.toObject() : created),
+      product: productOut,
+      destinationType,
+      productCreatedAtDestination: !!resolved.created,
+    });
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('purchaseQuantity:', e);
+    return res.status(500).json({ error: 'Failed to purchase quantity', details: e?.message });
   }
 };

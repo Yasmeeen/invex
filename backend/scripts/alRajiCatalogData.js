@@ -41,6 +41,14 @@ export const AL_RAJI_CATEGORIES = [
       { skuKey: 'kandouz_fat', name: 'دهن كندوز', sourceKey: 'kandouz_fridge', price: 80, netPrice: 50 },
       { skuKey: 'kandouz_mince_fatty', name: 'مفروم دسم', sourceKey: 'kandouz_fridge', price: 320, netPrice: 260 },
       { skuKey: 'kandouz_mince_lean', name: 'مفروم صافي', sourceKey: 'kandouz_fridge', price: 340, netPrice: 270 },
+      {
+        skuKey: 'kandouz_masoura',
+        name: 'ماسورة كندوز',
+        sellByWeightOverride: false,
+        price: 50,
+        netPrice: 30,
+        stock: 0,
+      },
     ],
   },
   {

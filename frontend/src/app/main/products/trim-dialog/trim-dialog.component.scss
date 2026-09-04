@@ -1,0 +1,164 @@
+:host {
+  display: block;
+}
+
+.trim-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: min(90vh, 780px);
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  /* Keep ng-select panel inside dialog (appendTo body drops clicks under CDK overlay). */
+  overflow: visible;
+  position: relative;
+
+  /* Global `.s-select` forces `position: static` on the container — breaks dropdown placement. */
+  ::ng-deep ng-select.ng-select {
+    position: relative;
+    z-index: 5;
+  }
+
+  ::ng-deep ng-select.ng-select .ng-select-container {
+    position: relative !important;
+  }
+
+  ::ng-deep ng-select.ng-select .ng-dropdown-panel {
+    z-index: 10050 !important;
+  }
+}
+
+.trim-dialog__title {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 0 10px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.trim-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 280px;
+  width: min(640px, 92vw);
+  max-height: min(68vh, 560px);
+  padding-top: 12px;
+  padding-bottom: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.trim-dialog__source {
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.trim-dialog__source-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.trim-dialog__source-meta {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.trim-suggest-btn {
+  margin-inline-start: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary, #2563eb);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.trim-suggest-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  text-decoration: none;
+}
+
+.trim-outputs {
+  margin-top: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.trim-outputs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.trim-outputs__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.trim-output-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(5.5rem, 0.7fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.55rem;
+}
+
+.trim-output-row--head {
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.trim-output-row__remove {
+  padding: 0.35rem 0.55rem;
+  min-width: 0;
+}
+
+.trim-dialog__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+@media (max-width: 575px) {
+  .trim-output-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'product remove'
+      'qty qty';
+  }
+
+  .trim-output-row ng-select,
+  .trim-output-row > :first-child {
+    grid-area: product;
+  }
+
+  .trim-output-row input[type='number'] {
+    grid-area: qty;
+  }
+
+  .trim-output-row__remove {
+    grid-area: remove;
+  }
+
+  .trim-output-row--head {
+    display: none;
+  }
+}

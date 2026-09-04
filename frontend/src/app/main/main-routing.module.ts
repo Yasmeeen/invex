@@ -130,6 +130,19 @@ const routes: Routes = [
         },
       },
       {
+        path: 'trim',
+        loadChildren: () => import('./trim/trim.module').then(m => m.TrimModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            ...WAREHOUSE,
+          ],
+        },
+      },
+      {
         path: 'inventory',
         loadChildren:() => import('./Inventory/inventory.module').then(m => m.InventoryModule),
         canActivate: [RoleGuard],

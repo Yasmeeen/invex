@@ -1,0 +1,411 @@
+<div class="complex-modal">
+  <div class="modal-wrapper">
+    <div class="close-modal-icon" (click)="close()"></div>
+    <div id="purchase-quantity-modal-root" class="modal-content">
+      <div class="modal-header border-bottom">
+        <h3 class="steel weight-medium size-default m-0">
+          {{ 'tr_purchase_quantity_title' | translate }}
+        </h3>
+        <p class="size-small text-muted m-0 mt-1">
+          {{ 'tr_purchase_quantity_hint' | translate }}
+        </p>
+      </div>
+
+      <div class="modal-body weight-medium steel plr-4 ptb-3" [formGroup]="form">
+        <ul class="product-form-tabs mb-3">
+          <li *ngIf="!isCashierMode">
+            <button
+              type="button"
+              class="product-form-tabs__btn"
+              [class.product-form-tabs__btn--active]="activeTab === 'destination'"
+              (click)="setTab('destination')"
+            >
+              {{ 'tr_purchase_quantity_tab_destination' | translate }}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="product-form-tabs__btn"
+              [class.product-form-tabs__btn--active]="activeTab === 'product'"
+              (click)="setTab('product')"
+            >
+              {{ 'tr_purchase_quantity_tab_product' | translate }}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="product-form-tabs__btn"
+              [class.product-form-tabs__btn--active]="activeTab === 'source'"
+              (click)="setTab('source')"
+            >
+              {{ 'tr_product_add_quantity_tab_source' | translate }}
+              <span class="text-muted size-small">({{ 'tr_optional' | translate }})</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="product-form-tabs__btn"
+              [class.product-form-tabs__btn--active]="activeTab === 'payment'"
+              (click)="setTab('payment')"
+            >
+              {{ 'tr_product_add_quantity_tab_payment' | translate }}
+            </button>
+          </li>
+        </ul>
+
+        <div [hidden]="activeTab !== 'destination'">
+          <div class="form-group">
+            <label>{{ 'tr_product_storage' | translate }} *</label>
+            <div class="storage-choice">
+              <label class="storage-option" *ngIf="!isBranchManagerUser">
+                <input
+                  type="radio"
+                  name="purchaseQtyDest"
+                  [checked]="destinationType === 'branch'"
+                  (change)="onDestinationTypeChange('branch')"
+                />
+                <span>{{ 'tr_storage_branch' | translate }}</span>
+              </label>
+              <label class="storage-option" *ngIf="canPickWarehouse">
+                <input
+                  type="radio"
+                  name="purchaseQtyDest"
+                  [checked]="destinationType === 'warehouse'"
+                  (change)="onDestinationTypeChange('warehouse')"
+                />
+                <span>{{ 'tr_warehouse' | translate }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" *ngIf="destinationType === 'branch'">
+            <label>{{ 'tr_branch' | translate }} *</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                [items]="branches"
+                bindLabel="name"
+                bindValue="_id"
+                formControlName="branchId"
+                [clearable]="false"
+                [searchable]="true"
+                [disabled]="isBranchManagerUser"
+                appendTo="#purchase-quantity-modal-root"
+                placeholder="{{ 'tr_select' | translate }}"
+              ></ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+
+          <p class="size-small text-muted m-0" *ngIf="destinationType === 'warehouse'">
+            {{ 'tr_purchase_quantity_warehouse_hint' | translate }}
+          </p>
+
+          <div class="form-group mt-3" *ngIf="destinationType === 'warehouse' && canPickWarehouse && !isBranchManagerUser">
+            <label>{{ 'tr_purchase_quantity_treasury_branch' | translate }}</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                [items]="branches"
+                bindLabel="name"
+                bindValue="_id"
+                formControlName="branchId"
+                [clearable]="false"
+                [searchable]="true"
+                appendTo="#purchase-quantity-modal-root"
+                placeholder="{{ 'tr_select' | translate }}"
+              ></ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+            <p class="size-small text-muted m-0 mt-1">
+              {{ 'tr_purchase_quantity_treasury_branch_hint' | translate }}
+            </p>
+          </div>
+        </div>
+
+        <div [formGroup]="form" [hidden]="activeTab !== 'product'">
+          <p class="size-small text-muted mb-3" *ngIf="isCashierMode && forcedBranchLabel">
+            {{ 'tr_branch' | translate }}:
+            <strong>{{ forcedBranchLabel }}</strong>
+          </p>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>{{ 'tr_category' | translate }} *</label>
+                <div class="input-with-icon bg-white">
+                  <ng-select
+                    class="s-control s-select"
+                    [items]="categories"
+                    bindLabel="name"
+                    bindValue="_id"
+                    [loading]="categoriesLoading"
+                    [ngModel]="selectedCategoryId"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onCategoryChange($event)"
+                    appendTo="#purchase-quantity-modal-root"
+                    placeholder="{{ 'tr_select' | translate }}"
+                    [clearable]="true"
+                    [searchable]="true"
+                  ></ng-select>
+                  <i class="fa fa-caret-down input-icon"></i>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>{{ 'tr_product_name' | translate }} *</label>
+                <div class="input-with-icon bg-white">
+                  <ng-select
+                    class="s-control s-select"
+                    [items]="products"
+                    bindLabel="name"
+                    bindValue="_id"
+                    [loading]="productsLoading"
+                    [disabled]="!selectedCategoryId"
+                    [ngModel]="selectedProductId"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="onProductChange($event)"
+                    appendTo="#purchase-quantity-modal-root"
+                    placeholder="{{ 'tr_select' | translate }}"
+                    [clearable]="true"
+                    [searchable]="true"
+                    notFoundText="{{ 'tr_no_items_found' | translate }}"
+                  >
+                    <ng-template ng-option-tmp let-item="item">
+                      <div class="weight-medium">{{ item.name }}</div>
+                      <div class="size-small text-muted">{{ item.code }}</div>
+                    </ng-template>
+                    <ng-template ng-label-tmp let-item="item">
+                      {{ item.name }} — {{ item.code }}
+                    </ng-template>
+                  </ng-select>
+                  <i class="fa fa-caret-down input-icon"></i>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>{{ 'tr_quantity' | translate }} *</label>
+                <input
+                  type="number"
+                  class="s-control width-100"
+                  formControlName="quantity"
+                  [min]="minQuantity"
+                  [step]="quantityStep"
+                />
+                <p class="size-small text-muted m-0 mt-1" *ngIf="isWeight">
+                  {{ 'tr_weight' | translate }}
+                </p>
+                <p class="size-small text-muted m-0 mt-1" *ngIf="isFarm">
+                  {{ 'tr_product_type_farm' | translate }}
+                </p>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
+                <input
+                  type="number"
+                  class="s-control width-100"
+                  formControlName="totalCost"
+                  min="0.01"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+          <p class="size-small text-muted m-0" *ngIf="selectedProduct">
+            {{ 'tr_purchase_quantity_product_selected' | translate }}:
+            <strong>{{ selectedProduct?.name }}</strong> ({{ selectedProduct?.code }})
+          </p>
+        </div>
+
+        <div [hidden]="activeTab !== 'source'">
+          <div class="party-type-toggle mb-3">
+            <label class="mr-3">
+              <input
+                type="radio"
+                name="purchaseQtySourcePartyType"
+                [checked]="sourcePartyType === 'client'"
+                (change)="onSourcePartyTypeChange('client')"
+              />
+              {{ 'tr_party_client' | translate }}
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="purchaseQtySourcePartyType"
+                [checked]="sourcePartyType === 'supplier'"
+                (change)="onSourcePartyTypeChange('supplier')"
+              />
+              {{ 'tr_party_supplier' | translate }}
+            </label>
+          </div>
+
+          <div [formGroup]="sourcePartyForm">
+            <h4 class="m-0 mb-3">{{ sourcePartyInfoTitleKey() | translate }}</h4>
+            <div class="row">
+              <div class="col-md-12 mb-3" *ngIf="sourcePartyType === 'supplier'">
+                <div class="form-group">
+                  <label>{{ 'tr_search_supplier' | translate }}</label>
+                  <div class="input-with-icon bg-white">
+                    <ng-select
+                      class="s-control s-select"
+                      [items]="vendorSearchItems"
+                      [typeahead]="vendorTypeahead$"
+                      [loading]="vendorsLoading"
+                      bindLabel="label"
+                      bindValue="_id"
+                      [ngModel]="selectedSourceVendor?._id || null"
+                      [ngModelOptions]="{ standalone: true }"
+                      (ngModelChange)="onSourceVendorIdChange($event)"
+                      (open)="onVendorSelectOpen()"
+                      (clear)="onSourceVendorPicked(null)"
+                      appendTo="#purchase-quantity-modal-root"
+                      [placeholder]="'tr_search_supplier_placeholder' | translate"
+                      [clearable]="true"
+                      [searchable]="true"
+                      notFoundText="{{ 'tr_no_items_found' | translate }}"
+                    >
+                      <ng-template ng-option-tmp let-item="item">
+                        <div class="weight-medium">{{ item.nameOfcompany }}</div>
+                        <div class="size-small text-muted">
+                          {{ item.name }}
+                          <span *ngIf="item.phone"> · {{ item.phone }}</span>
+                        </div>
+                      </ng-template>
+                      <ng-template ng-label-tmp let-item="item">
+                        {{ item.nameOfcompany }}
+                        <span *ngIf="item.name"> — {{ item.name }}</span>
+                      </ng-template>
+                    </ng-select>
+                    <i class="fa fa-caret-down input-icon"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label>{{ 'tr_client_phone' | translate }}</label>
+                  <input type="text" class="s-control" formControlName="phone" />
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label>{{ sourcePartyNameLabelKey() | translate }}</label>
+                  <input type="text" class="s-control" formControlName="name" />
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label>{{ 'tr_address' | translate }}</label>
+                  <input type="text" class="s-control" formControlName="address" />
+                </div>
+              </div>
+            </div>
+            <p class="size-small text-muted" *ngIf="isDeferredSelected">
+              {{
+                (sourcePartyType === 'supplier'
+                  ? 'tr_desk_purchase_deferred_supplier_hint'
+                  : 'tr_desk_purchase_deferred_client_hint'
+                ) | translate
+              }}
+            </p>
+          </div>
+        </div>
+
+        <div class="desk-treasury-splits" [hidden]="activeTab !== 'payment'">
+          <div class="form-group">
+            <label>{{ 'tr_purchase_treasury_method_multi' | translate }}</label>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select"
+                [items]="purchaseTreasuryMethodOptions"
+                bindLabel="label"
+                bindValue="key"
+                [multiple]="true"
+                [closeOnSelect]="false"
+                [clearable]="true"
+                [searchable]="true"
+                placeholder="{{ 'tr_purchase_treasury_select_placeholder' | translate }}"
+                [(ngModel)]="selectedDeskTreasuryKeys"
+                [ngModelOptions]="{ standalone: true }"
+                name="purchaseQtyTreasuryMulti"
+                appendTo="#purchase-quantity-modal-root"
+                (ngModelChange)="onSelectedDeskTreasuryChange($event)"
+              >
+                <ng-template ng-option-tmp let-item="item">
+                  <span>{{ item.label }}</span>
+                  <span class="purchase-qty-show-in size-small text-muted">
+                    — {{ showInLabelKey(item.showIn) | translate }}
+                  </span>
+                </ng-template>
+                <ng-template ng-multi-label-tmp let-items="items" let-clear="clear">
+                  <div class="ng-value" *ngFor="let item of items | slice:0:2">
+                    <span class="ng-value-label">{{ $any(item).label }}</span>
+                    <span class="ng-value-icon right" (click)="clear(item)" aria-hidden="true">×</span>
+                  </div>
+                  <div class="ng-value" *ngIf="items.length > 2">
+                    <span class="ng-value-label">+ {{ items.length - 2 }}</span>
+                  </div>
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+            <p class="text-muted size-small m-0 mt-1">
+              {{ 'tr_purchase_treasury_method_hint' | translate }}
+            </p>
+          </div>
+
+          <div class="size-small text-muted mb-1" *ngIf="selectedDeskTreasuryKeys?.length">
+            {{ 'tr_desk_purchase_treasury_amounts_hint' | translate }}
+          </div>
+          <div
+            class="desk-treasury-split-row"
+            *ngFor="let tKey of selectedDeskTreasuryKeys; trackBy: trackDeskTreasuryKey"
+          >
+            <span class="desk-treasury-split-row__label">
+              {{ treasuryOptionLabel(tKey) }}
+              <span class="purchase-qty-show-in size-small text-muted">
+                ({{ showInLabelKey(treasuryOptionShowIn(tKey)) | translate }})
+              </span>
+            </span>
+            <input
+              type="number"
+              class="s-control desk-treasury-split-row__amount"
+              min="0"
+              step="0.01"
+              [(ngModel)]="deskTreasuryAmounts[tKey]"
+              [ngModelOptions]="{ standalone: true }"
+              [name]="'purchaseQtyTreasuryAmt_' + tKey"
+            />
+          </div>
+          <div class="size-small mt-2" [class.text-error]="deskTreasuryOverAllocated()">
+            {{ 'tr_desk_purchase_treasury_allocated' | translate }}:
+            <strong>{{ deskTreasurySplitsTotal() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            /
+            <strong>{{ totalCost | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+          <div
+            class="size-small text-muted mt-1"
+            *ngIf="deskTreasuryRemaining() > 0.005 && !deskTreasuryOverAllocated()"
+          >
+            {{ 'tr_desk_purchase_treasury_remaining' | translate }}:
+            <strong>{{ deskTreasuryRemaining() | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer border-top plr-4 ptb-3 flex flex-space-between flex-middle">
+        <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+          {{ 'tr_cancel' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
+          {{ saving ? ('tr_loading' | translate) : ('tr_purchase_quantity_submit' | translate) }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

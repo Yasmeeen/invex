@@ -236,6 +236,21 @@ body[dir=rtl] {
   max-height: none;
 }
 
+/* Trim dialog: let ng-select panel render/receive clicks inside the overlay */
+.cdk-overlay-pane.trim-dialog-panel {
+  max-width: 96vw !important;
+}
+
+.trim-dialog-panel .mat-dialog-container,
+.trim-dialog-panel .mat-mdc-dialog-container {
+  overflow: visible !important;
+  padding: 0;
+}
+
+.trim-dialog-panel .ng-dropdown-panel {
+  z-index: 10050 !important;
+}
+
 .cdk-overlay-backdrop.drawer-close-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

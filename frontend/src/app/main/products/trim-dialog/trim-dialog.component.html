@@ -1,0 +1,125 @@
+<div class="trim-dialog" id="trim-dialog-root">
+  <h2 mat-dialog-title class="trim-dialog__title">{{ 'tr_trim' | translate }}</h2>
+
+  <div mat-dialog-content class="trim-dialog__body">
+    <div class="trim-dialog__source">
+      <div class="trim-dialog__source-name">{{ product?.name }}</div>
+      <div class="trim-dialog__source-meta text-muted">
+        <span *ngIf="product?.code">{{ product.code }}</span>
+        <span *ngIf="categoryName"> · {{ categoryName }}</span>
+        <span> · {{ 'tr_stock' | translate }}: {{ productStock }}</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_trim_input_qty' | translate }}</label>
+          <input
+            class="s-control"
+            type="number"
+            step="0.001"
+            min="0"
+            [(ngModel)]="inputQty"
+            [attr.max]="productStock"
+          />
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>{{ 'tr_trim_yielded_qty' | translate }}</label>
+          <input class="s-control" type="number" [ngModel]="yieldedQty" [disabled]="true" />
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-group">
+          <label>
+            {{ 'tr_trim_waste' | translate }}
+            <button
+              type="button"
+              class="trim-suggest-btn"
+              (click)="fillSuggestedWaste()"
+              [disabled]="!inputQty"
+            >
+              {{ 'tr_trim_fill_waste' | translate }}
+            </button>
+          </label>
+          <input
+            class="s-control"
+            type="number"
+            step="0.001"
+            min="0"
+            [(ngModel)]="wasteQty"
+            [placeholder]="suggestedWaste"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="trim-outputs">
+      <div class="trim-outputs__head">
+        <h3 class="trim-outputs__title">{{ 'tr_trim_outputs' | translate }}</h3>
+        <button type="button" class="s-btn btn-secondary btn-sm" (click)="addOutputRow()">
+          <i class="fa fa-plus" aria-hidden="true"></i>
+          {{ 'tr_trim_add_output' | translate }}
+        </button>
+      </div>
+      <p class="text-muted size-caption mb-2" *ngIf="loadingProducts">
+        {{ 'tr_loading' | translate }}
+      </p>
+      <p class="text-muted size-caption mb-2" *ngIf="!loadingProducts && !categoryProducts.length">
+        {{ 'tr_trim_no_category_products' | translate }}
+      </p>
+
+      <div class="trim-output-row trim-output-row--head" *ngIf="categoryProducts.length">
+        <span>{{ 'tr_trim_output_product' | translate }}</span>
+        <span>{{ 'tr_trim_qty' | translate }}</span>
+        <span></span>
+      </div>
+
+      <div class="trim-output-row" *ngFor="let row of outputRows; let i = index; trackBy: trackOutputRow">
+        <ng-select
+          class="s-control s-select"
+          [items]="categoryProducts"
+          bindLabel="name"
+          bindValue="_id"
+          [(ngModel)]="row.productId"
+          [compareWith]="compareProductId"
+          [clearable]="true"
+          [searchable]="true"
+          [placeholder]="'tr_trim_pick_product' | translate"
+          appendTo="#trim-dialog-root"
+        ></ng-select>
+        <input
+          class="s-control"
+          type="number"
+          step="0.001"
+          min="0"
+          [(ngModel)]="row.quantity"
+        />
+        <button
+          type="button"
+          class="s-btn btn-secondary trim-output-row__remove"
+          (click)="removeOutputRow(i)"
+          [attr.title]="'tr_action.delete' | translate"
+        >
+          <i class="fa fa-trash" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="form-group mb-0 mt-3">
+      <label>{{ 'tr_notes' | translate }}</label>
+      <textarea class="s-control width-100" rows="2" [(ngModel)]="notes"></textarea>
+    </div>
+  </div>
+
+  <div mat-dialog-actions align="end" class="trim-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving">
+      {{ 'tr_trim_submit' | translate }}
+    </button>
+  </div>
+</div>

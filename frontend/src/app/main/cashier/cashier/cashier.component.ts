@@ -60,6 +60,9 @@ import {
 import { MatDialog } from '@angular/material/dialog';
 import { CreateEditProductComponent } from '../../products/create-edit-product/create-edit-product.component';
 import {
+  PurchaseQuantityDialogComponent,
+} from '../../products/purchase-quantity-dialog/purchase-quantity-dialog.component';
+import {
   ProductDetailsDialogComponent,
 } from '../../products/product-details-dialog/product-details-dialog.component';
 import {
@@ -629,6 +632,40 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(this.drawerOpeningBalance);
+  }
+
+  /** Desk product purchase (inventory intake); receipt print uses shared component. */
+  openPurchaseQuantityDialog(): void {
+    const selectedBranchId = this.resolveCashierBranchId();
+    if (!selectedBranchId) {
+      this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));
+      return;
+    }
+
+    const branchLabel =
+      canPickBranchRole(this.curentUser?.role)
+        ? this.branches.find((b) => String(b._id) === String(selectedBranchId))?.name || ''
+        : String(this.globals.currentUser?.branch?.name || '');
+
+    const ref = this.dialog.open(PurchaseQuantityDialogComponent, {
+      width: '780px',
+      maxWidth: '96vw',
+      data: {
+        cashierMode: true,
+        forcedBranchId: String(selectedBranchId),
+        forcedBranchLabel: branchLabel,
+      },
+    });
+
+    ref.afterClosed().subscribe((res: any) => {
+      if (!res?.ok) return;
+      if (res.purchase) {
+        this.createdDeskPurchase = res.purchase;
+        this.printMode = 'deskPurchase';
+        this.printDeskPurchaseReceipt();
+      }
+      this.loadProducts();
+    });
   }
 
   /** Desk intake purchase popup (`exchange`: trade-in step; defer purchase receipt until after sale checkout). */

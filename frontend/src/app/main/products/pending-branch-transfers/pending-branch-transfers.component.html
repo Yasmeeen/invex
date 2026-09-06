@@ -203,76 +203,148 @@
   </div>
 
   <div class="plr-4 mt-4" *ngIf="!loading">
-    <div class="table-container" *ngIf="transfers.length > 0">
-      <table class="s-table table pending-transfers-table">
-        <thead>
-          <tr>
-            <th>{{ 'tr_product_name' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_from' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_to_branch' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_quantity' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_status_col' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_date' | translate }}</th>
-            <th>{{ 'tr_branch_transfer_by' | translate }}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let t of transfers">
-            <td>
-              <span class="pending-transfers-product">{{ transferProductName(t) || '—' }}</span>
-              <span class="text-muted size-small d-block" *ngIf="transferProductCode(t)">{{
-                transferProductCode(t)
-              }}</span>
-            </td>
-            <td>{{ transferFromLabel(t) }}</td>
-            <td>{{ t.toBranch?.name || '—' }}</td>
-            <td>{{ t.quantity }}</td>
-            <td>
-              <span
-                [class.text-warning]="t.status === 'pending'"
-                [class.text-danger]="t.status === 'rejected'"
-                [class.text-success]="t.status === 'approved'"
-              >
-                {{ statusLabelKey(t) | translate }}
-              </span>
-              <span
-                class="text-muted size-small d-block pending-transfers-reject-reason"
-                *ngIf="t.status === 'rejected' && t.rejectReason"
-              >
-                {{ 'tr_branch_transfer_reject_reason' | translate }}: {{ t.rejectReason }}
-              </span>
-            </td>
-            <td>
-              <span class="size-small">{{ formatTransferDate(t.createdAt) || '—' }}</span>
-            </td>
-            <td>
-              <span class="size-small text-muted">{{ t.initiatedBy?.name || '—' }}</span>
-            </td>
-            <td class="pending-transfers-actions">
-              <ng-container *ngIf="canResolve(t)">
-                <button
-                  type="button"
-                  class="s-btn btn-primary size-small"
-                  (click)="approve(t)"
-                  [disabled]="actingId === t._id"
+    <ng-container *ngIf="transfers.length > 0">
+      <div class="table-container pending-transfers-table-wrap">
+        <table class="s-table table pending-transfers-table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_product_name' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_from' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_to_branch' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_quantity' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_status_col' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_date' | translate }}</th>
+              <th>{{ 'tr_branch_transfer_by' | translate }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of transfers">
+              <td>
+                <span class="pending-transfers-product">{{ transferProductName(t) || '—' }}</span>
+                <span class="text-muted size-small d-block" *ngIf="transferProductCode(t)">{{
+                  transferProductCode(t)
+                }}</span>
+              </td>
+              <td>{{ transferFromLabel(t) }}</td>
+              <td>{{ t.toBranch?.name || '—' }}</td>
+              <td>{{ t.quantity }}</td>
+              <td>
+                <span
+                  [class.text-warning]="t.status === 'pending'"
+                  [class.text-danger]="t.status === 'rejected'"
+                  [class.text-success]="t.status === 'approved'"
                 >
-                  {{ 'tr_branch_transfer_approve' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="s-btn btn-secondary size-small"
-                  (click)="startReject(t)"
-                  [disabled]="actingId === t._id"
+                  {{ statusLabelKey(t) | translate }}
+                </span>
+                <span
+                  class="text-muted size-small d-block pending-transfers-reject-reason"
+                  *ngIf="t.status === 'rejected' && t.rejectReason"
                 >
-                  {{ 'tr_branch_transfer_reject' | translate }}
-                </button>
-              </ng-container>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+                  {{ 'tr_branch_transfer_reject_reason' | translate }}: {{ t.rejectReason }}
+                </span>
+              </td>
+              <td>
+                <span class="size-small">{{ formatTransferDate(t.createdAt) || '—' }}</span>
+              </td>
+              <td>
+                <span class="size-small text-muted">{{ t.initiatedBy?.name || '—' }}</span>
+              </td>
+              <td class="pending-transfers-actions">
+                <ng-container *ngIf="canResolve(t)">
+                  <button
+                    type="button"
+                    class="s-btn btn-primary size-small"
+                    (click)="approve(t)"
+                    [disabled]="actingId === t._id"
+                  >
+                    {{ 'tr_branch_transfer_approve' | translate }}
+                  </button>
+                  <button
+                    type="button"
+                    class="s-btn btn-secondary size-small"
+                    (click)="startReject(t)"
+                    [disabled]="actingId === t._id"
+                  >
+                    {{ 'tr_branch_transfer_reject' | translate }}
+                  </button>
+                </ng-container>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pending-transfers-cards">
+        <article class="pending-transfer-card" *ngFor="let t of transfers">
+          <div class="pending-transfer-card__head">
+            <div class="pending-transfer-card__title-wrap">
+              <h3 class="pending-transfer-card__name">{{ transferProductName(t) || '—' }}</h3>
+              <p class="pending-transfer-card__meta mb-0" *ngIf="transferProductCode(t)">
+                {{ transferProductCode(t) }}
+              </p>
+            </div>
+            <span
+              class="pending-transfer-card__status"
+              [class.text-warning]="t.status === 'pending'"
+              [class.text-danger]="t.status === 'rejected'"
+              [class.text-success]="t.status === 'approved'"
+            >
+              {{ statusLabelKey(t) | translate }}
+            </span>
+          </div>
+
+          <div class="pending-transfer-card__grid">
+            <div class="pending-transfer-card__field">
+              <span class="pending-transfer-card__label">{{ 'tr_branch_transfer_from' | translate }}</span>
+              <span class="pending-transfer-card__value">{{ transferFromLabel(t) }}</span>
+            </div>
+            <div class="pending-transfer-card__field">
+              <span class="pending-transfer-card__label">{{ 'tr_branch_transfer_to_branch' | translate }}</span>
+              <span class="pending-transfer-card__value">{{ t.toBranch?.name || '—' }}</span>
+            </div>
+            <div class="pending-transfer-card__field">
+              <span class="pending-transfer-card__label">{{ 'tr_branch_transfer_quantity' | translate }}</span>
+              <span class="pending-transfer-card__value">{{ t.quantity }}</span>
+            </div>
+            <div class="pending-transfer-card__field">
+              <span class="pending-transfer-card__label">{{ 'tr_branch_transfer_date' | translate }}</span>
+              <span class="pending-transfer-card__value">{{ formatTransferDate(t.createdAt) || '—' }}</span>
+            </div>
+            <div class="pending-transfer-card__field pending-transfer-card__field--full">
+              <span class="pending-transfer-card__label">{{ 'tr_branch_transfer_by' | translate }}</span>
+              <span class="pending-transfer-card__value">{{ t.initiatedBy?.name || '—' }}</span>
+            </div>
+          </div>
+
+          <p
+            class="pending-transfer-card__reject text-muted size-small mb-0"
+            *ngIf="t.status === 'rejected' && t.rejectReason"
+          >
+            {{ 'tr_branch_transfer_reject_reason' | translate }}: {{ t.rejectReason }}
+          </p>
+
+          <div class="pending-transfer-card__actions" *ngIf="canResolve(t)">
+            <button
+              type="button"
+              class="s-btn btn-primary size-small"
+              (click)="approve(t)"
+              [disabled]="actingId === t._id"
+            >
+              {{ 'tr_branch_transfer_approve' | translate }}
+            </button>
+            <button
+              type="button"
+              class="s-btn btn-secondary size-small"
+              (click)="startReject(t)"
+              [disabled]="actingId === t._id"
+            >
+              {{ 'tr_branch_transfer_reject' | translate }}
+            </button>
+          </div>
+        </article>
+      </div>
+    </ng-container>
 
     <div class="empty-state-here text-center ptb-8" *ngIf="transfers.length === 0">
       <p>{{ 'tr_branch_transfers_empty' | translate }}</p>

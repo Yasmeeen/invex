@@ -23,36 +23,62 @@
     </div>
   </div>
 
-  <div class="table-container plr-4 pb-4">
-    <table class="table" *ngIf="!loading && tickets.length">
-      <thead>
-        <tr>
-          <th>{{ 'tr_date' | translate }}</th>
-          <th>{{ 'tr_slaughter_location' | translate }}</th>
-          <th>{{ 'tr_slaughter_animal' | translate }}</th>
-          <th>{{ 'tr_slaughter_share' | translate }}</th>
-          <th>{{ 'tr_slaughter_outputs' | translate }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let t of tickets">
-          <td>{{ t.createdAt | date: 'short' }}</td>
-          <td>{{ ticketLocationLabel(t) }}</td>
-          <td>{{ ticketFarmName(t) }}</td>
-          <td>{{ t.share }}</td>
-          <td class="slaughter-outputs-cell">{{ ticketOutputsLabel(t) }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
-      {{ 'tr_slaughter_empty' | translate }}
+  <div class="plr-4 pb-4" *ngIf="!loading && tickets.length">
+    <div class="table-container history-table-wrap">
+      <table class="table history-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_slaughter_location' | translate }}</th>
+            <th>{{ 'tr_slaughter_animal' | translate }}</th>
+            <th>{{ 'tr_slaughter_share' | translate }}</th>
+            <th>{{ 'tr_slaughter_outputs' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of tickets">
+            <td>{{ t.createdAt | date: 'short' }}</td>
+            <td>{{ ticketLocationLabel(t) }}</td>
+            <td>{{ ticketFarmName(t) }}</td>
+            <td>{{ t.share }}</td>
+            <td class="slaughter-outputs-cell">{{ ticketOutputsLabel(t) }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
-      <pagination
-        [paginationData]="paginationData"
-        [perPage]="15"
-        (paginationUpdate)="onPagination($event)"
-      ></pagination>
+
+    <div class="history-cards">
+      <article class="history-card" *ngFor="let t of tickets">
+        <div class="history-card__head">
+          <h3 class="history-card__title">{{ ticketFarmName(t) || ('tr_slaughter' | translate) }}</h3>
+          <span class="history-card__date">{{ t.createdAt | date: 'short' }}</span>
+        </div>
+        <div class="history-card__grid">
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_slaughter_location' | translate }}</span>
+            <span class="history-card__value">{{ ticketLocationLabel(t) }}</span>
+          </div>
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_slaughter_share' | translate }}</span>
+            <span class="history-card__value">{{ t.share }}</span>
+          </div>
+        </div>
+        <div class="history-card__outputs">
+          <span class="history-card__label">{{ 'tr_slaughter_outputs' | translate }}</span>
+          <span class="history-card__value">{{ ticketOutputsLabel(t) || '—' }}</span>
+        </div>
+      </article>
     </div>
+  </div>
+
+  <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
+    {{ 'tr_slaughter_empty' | translate }}
+  </div>
+  <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+    <pagination
+      [paginationData]="paginationData"
+      [perPage]="15"
+      (paginationUpdate)="onPagination($event)"
+    ></pagination>
   </div>
 </div>

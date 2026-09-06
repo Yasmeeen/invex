@@ -23,40 +23,74 @@
     </div>
   </div>
 
-  <div class="table-container plr-4 pb-4">
-    <table class="table" *ngIf="!loading && tickets.length">
-      <thead>
-        <tr>
-          <th>{{ 'tr_date' | translate }}</th>
-          <th>{{ 'tr_branch' | translate }}</th>
-          <th>{{ 'tr_trim_source' | translate }}</th>
-          <th>{{ 'tr_trim_input_qty' | translate }}</th>
-          <th>{{ 'tr_trim_waste' | translate }}</th>
-          <th>{{ 'tr_trim_yielded_qty' | translate }}</th>
-          <th>{{ 'tr_trim_outputs' | translate }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let t of tickets">
-          <td>{{ t.createdAt | date: 'short' }}</td>
-          <td>{{ t.branch?.name || '—' }}</td>
-          <td>{{ sourceName(t) }}</td>
-          <td>{{ t.inputQty }}</td>
-          <td>{{ t.wasteQty != null ? t.wasteQty : 0 }}</td>
-          <td>{{ t.outputQty != null ? t.outputQty : 0 }}</td>
-          <td class="trim-outputs-cell">{{ outputsLabel(t) }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
-      {{ 'tr_trim_empty' | translate }}
+  <div class="plr-4 pb-4" *ngIf="!loading && tickets.length">
+    <div class="table-container history-table-wrap">
+      <table class="table history-table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_branch' | translate }}</th>
+            <th>{{ 'tr_trim_source' | translate }}</th>
+            <th>{{ 'tr_trim_input_qty' | translate }}</th>
+            <th>{{ 'tr_trim_waste' | translate }}</th>
+            <th>{{ 'tr_trim_yielded_qty' | translate }}</th>
+            <th>{{ 'tr_trim_outputs' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let t of tickets">
+            <td>{{ t.createdAt | date: 'short' }}</td>
+            <td>{{ t.branch?.name || '—' }}</td>
+            <td>{{ sourceName(t) }}</td>
+            <td>{{ t.inputQty }}</td>
+            <td>{{ t.wasteQty != null ? t.wasteQty : 0 }}</td>
+            <td>{{ t.outputQty != null ? t.outputQty : 0 }}</td>
+            <td class="trim-outputs-cell">{{ outputsLabel(t) }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
-      <pagination
-        [paginationData]="paginationData"
-        [perPage]="15"
-        (paginationUpdate)="onPagination($event)"
-      ></pagination>
+
+    <div class="history-cards">
+      <article class="history-card" *ngFor="let t of tickets">
+        <div class="history-card__head">
+          <h3 class="history-card__title">{{ sourceName(t) || ('tr_trim' | translate) }}</h3>
+          <span class="history-card__date">{{ t.createdAt | date: 'short' }}</span>
+        </div>
+        <div class="history-card__grid">
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_branch' | translate }}</span>
+            <span class="history-card__value">{{ t.branch?.name || '—' }}</span>
+          </div>
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_trim_input_qty' | translate }}</span>
+            <span class="history-card__value">{{ t.inputQty }}</span>
+          </div>
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_trim_waste' | translate }}</span>
+            <span class="history-card__value">{{ t.wasteQty != null ? t.wasteQty : 0 }}</span>
+          </div>
+          <div class="history-card__field">
+            <span class="history-card__label">{{ 'tr_trim_yielded_qty' | translate }}</span>
+            <span class="history-card__value">{{ t.outputQty != null ? t.outputQty : 0 }}</span>
+          </div>
+        </div>
+        <div class="history-card__outputs">
+          <span class="history-card__label">{{ 'tr_trim_outputs' | translate }}</span>
+          <span class="history-card__value">{{ outputsLabel(t) || '—' }}</span>
+        </div>
+      </article>
     </div>
+  </div>
+
+  <div class="plr-4 ptb-5 text-center text-muted" *ngIf="!loading && !tickets.length">
+    {{ 'tr_trim_empty' | translate }}
+  </div>
+  <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+    <pagination
+      [paginationData]="paginationData"
+      [perPage]="15"
+      (paginationUpdate)="onPagination($event)"
+    ></pagination>
   </div>
 </div>

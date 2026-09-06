@@ -1,8 +1,29 @@
 .price-list-table {
+  min-width: 860px;
+
   td,
   th {
     vertical-align: middle;
   }
+
+  td:nth-child(1),
+  th:nth-child(1) {
+    width: 3rem;
+  }
+
+  td:nth-child(2),
+  th:nth-child(2) {
+    width: 14rem;
+  }
+
+  td:nth-child(7),
+  th:nth-child(7) {
+    width: 9rem;
+  }
+}
+
+.price-list-table-wrap {
+  -webkit-overflow-scrolling: touch;
 }
 
 .price-edit {
@@ -10,6 +31,11 @@
   align-items: center;
   gap: 0.4rem;
   max-width: 9rem;
+}
+
+.price-edit--card {
+  max-width: none;
+  width: 100%;
 }
 
 .price-edit__input {
@@ -28,6 +54,7 @@
   border-radius: 4px;
   background: #e8f5e9;
   color: #2e7d32;
+  white-space: nowrap;
 }
 
 .stock-pill--out {
@@ -41,4 +68,112 @@
 
 .price-row--recent td {
   background: #fff8e1;
+}
+
+.price-list-cards {
+  display: none;
+}
+
+.price-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.price-card--recent {
+  background: #fff8e1;
+  border-color: #f5d98a;
+}
+
+.price-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.price-card__index {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  color: #6b7280;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.price-card__title-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.price-card__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  word-break: break-word;
+}
+
+.price-card__meta {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+  word-break: break-word;
+}
+
+.price-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.price-card__field {
+  min-width: 0;
+}
+
+.price-card__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+
+.price-card__value {
+  display: block;
+  font-size: 0.9rem;
+  color: #111827;
+  word-break: break-word;
+}
+
+.price-card__price {
+  padding-top: 0.65rem;
+  border-top: 1px solid #eef0f3;
+}
+
+@media (max-width: 767px) {
+  .filters-card {
+    .col-md-3 {
+      flex: 0 0 100%;
+      max-width: 100%;
+      margin-bottom: 0.65rem;
+    }
+  }
+
+  .price-list-table-wrap {
+    display: none;
+  }
+
+  .price-list-cards {
+    display: block;
+  }
+
+  .price-edit__input {
+    min-width: 0;
+    font-size: 1rem;
+  }
 }

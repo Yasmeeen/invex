@@ -1,5 +1,114 @@
 .pending-transfers-table {
   font-size: 0.9rem;
+  min-width: 900px;
+
+  td,
+  th {
+    vertical-align: middle;
+  }
+}
+
+.pending-transfers-table-wrap {
+  -webkit-overflow-scrolling: touch;
+}
+
+.pending-transfers-cards {
+  display: none;
+}
+
+.pending-transfer-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.pending-transfer-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.pending-transfer-card__title-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pending-transfer-card__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  word-break: break-word;
+}
+
+.pending-transfer-card__meta {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  color: #6b7280;
+  word-break: break-word;
+}
+
+.pending-transfer-card__status {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pending-transfer-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.pending-transfer-card__field {
+  min-width: 0;
+}
+
+.pending-transfer-card__field--full {
+  grid-column: 1 / -1;
+}
+
+.pending-transfer-card__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+
+.pending-transfer-card__value {
+  display: block;
+  font-size: 0.9rem;
+  color: #111827;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.pending-transfer-card__reject {
+  margin-bottom: 0.75rem !important;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.pending-transfer-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #eef0f3;
+
+  .s-btn {
+    flex: 1 1 calc(50% - 0.25rem);
+    margin: 0;
+    text-align: center;
+  }
 }
 
 .products-toolbar {
@@ -66,6 +175,22 @@
     flex: 0 0 auto;
     min-width: 2.375rem;
     padding-inline: 0.65rem;
+  }
+
+  .filters-card {
+    .col-md-3 {
+      flex: 0 0 100%;
+      max-width: 100%;
+      margin-bottom: 0.65rem;
+    }
+  }
+
+  .pending-transfers-table-wrap {
+    display: none;
+  }
+
+  .pending-transfers-cards {
+    display: block;
   }
 }
 

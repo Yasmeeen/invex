@@ -46,7 +46,7 @@ import {
   resolveSellByWeight,
   roundWeight,
 } from '@shared/utils/sale-quantity.util';
-import { canPickBranchRole } from '@core/utils/role-utils';
+import { canPickBranchRole, isCashier } from '@core/utils/role-utils';
 import {
   isInstallmentSale as orderIsInstallmentSale,
   isPayLaterMethod,
@@ -634,8 +634,15 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }).format(this.drawerOpeningBalance);
   }
 
+  /** Purchase quantity from cashier desk — not available to Cashier role. */
+  canPurchaseQuantityFromCashier(): boolean {
+    return !isCashier(this.curentUser?.role);
+  }
+
   /** Desk product purchase (inventory intake); receipt print uses shared component. */
   openPurchaseQuantityDialog(): void {
+    if (!this.canPurchaseQuantityFromCashier()) return;
+
     const selectedBranchId = this.resolveCashierBranchId();
     if (!selectedBranchId) {
       this.translate.get('tr_branch_required').subscribe((msg) => this.appNotificationService.push(msg, 'error'));

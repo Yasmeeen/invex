@@ -346,7 +346,6 @@ function canPurchaseQuantityRole(role, destinationType) {
   if (isAutoApproverRole(role)) return true;
   const r = String(role || '').trim();
   if (r === 'Warehouse' && (destinationType === 'warehouse' || destinationType === 'factory')) return true;
-  if (r === 'Cashier' && destinationType === 'branch') return true;
   return false;
 }
 

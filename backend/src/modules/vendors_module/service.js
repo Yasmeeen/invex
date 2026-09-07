@@ -408,17 +408,22 @@ export const getVendorHistory = async (req, res) => {
     const phoneCandidates = buildPhoneSearchCandidates(vendor.phone);
     const purchaseMatchOr = [
       { 'productPayload.acquiredFrom.vendorId': vendor._id },
+      { 'lines.productPayload.acquiredFrom.vendorId': vendor._id },
     ];
     if (phoneCandidates.length) {
       purchaseMatchOr.push({
         'productPayload.acquiredFrom.phone': { $in: phoneCandidates },
         'productPayload.acquiredFrom.partyType': 'supplier',
       });
+      purchaseMatchOr.push({
+        'lines.productPayload.acquiredFrom.phone': { $in: phoneCandidates },
+        'lines.productPayload.acquiredFrom.partyType': 'supplier',
+      });
     }
 
     const deskPurchaseRows = await ProductPurchaseRequest.find({ $or: purchaseMatchOr })
       .select(
-        'status quantity purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits productPayload createdAt amountPaid'
+        'status quantity purchaseTreasuryKey purchaseTreasuryLabel purchaseTreasurySplits productPayload lines costPerKg animalWeightKg createdAt amountPaid'
       )
       .sort({ createdAt: -1 })
       .limit(200)
@@ -426,13 +431,36 @@ export const getVendorHistory = async (req, res) => {
 
     const purchases = deskPurchaseRows.map((p) => {
       const pp = p.productPayload || {};
+      const sourceLines = Array.isArray(p.lines) && p.lines.length
+        ? p.lines
+        : [
+            {
+              productPayload: pp,
+              quantity: p.quantity,
+              costPerKg: p.costPerKg,
+              animalWeightKg: p.animalWeightKg,
+            },
+          ];
+      const lines = sourceLines.map((line) => {
+        const linePayload = line?.productPayload || {};
+        const rawQty = Number(line?.quantity);
+        return {
+          productName: linePayload.name || '',
+          productCode: linePayload.code || '',
+          quantity: Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1,
+          costPerKg: Number(line?.costPerKg) || 0,
+          animalWeightKg: Number(line?.animalWeightKg) || 0,
+        };
+      });
+      const firstLine = lines[0] || {};
       return {
         _id: p._id,
         status: p.status,
         createdAt: p.createdAt,
-        productName: pp.name || '',
-        productCode: pp.code || '',
-        quantity: Math.max(1, Math.floor(Number(p.quantity) || 1)),
+        productName: firstLine.productName || '',
+        productCode: firstLine.productCode || '',
+        quantity: firstLine.quantity || 1,
+        lines,
         purchaseTreasuryKey: p.purchaseTreasuryKey,
         purchaseTreasuryLabel: p.purchaseTreasuryLabel || '',
       };

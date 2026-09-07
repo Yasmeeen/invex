@@ -111,6 +111,40 @@ export class ProductPurchaseApprovalDialogComponent implements OnInit {
     return this.dialogData?.data || {};
   }
 
+  get displayLines(): any[] {
+    const p = this.purchase;
+    if (!p) return [];
+    if (Array.isArray(p.lines) && p.lines.length) return p.lines;
+    if (!p.productPayload) return [];
+    return [
+      {
+        productPayload: p.productPayload,
+        quantity: p.quantity,
+        costPerKg: p.costPerKg,
+        animalWeightKg: p.animalWeightKg,
+      },
+    ];
+  }
+
+  get sourceParty(): any {
+    const root = this.purchase?.productPayload?.acquiredFrom;
+    if (root) return root;
+    return (
+      this.displayLines.find((line) => line?.productPayload?.acquiredFrom)?.productPayload
+        ?.acquiredFrom || null
+    );
+  }
+
+  lineTotal(line: any): number {
+    const rawQty = Number(line?.quantity);
+    const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+    return Math.round((Number(line?.productPayload?.netPrice) || 0) * qty * 100) / 100;
+  }
+
+  get invoiceTotal(): number {
+    return Math.round(this.displayLines.reduce((sum, line) => sum + this.lineTotal(line), 0) * 100) / 100;
+  }
+
   get headingKey(): string {
     if (this.status === 'approved') return 'tr_product_purchase_dialog_heading_approved';
     if (this.status === 'rejected') return 'tr_product_purchase_dialog_heading_rejected';

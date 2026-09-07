@@ -368,6 +368,13 @@ export interface VendorDeskPurchaseRow {
   productName?: string;
   productCode?: string;
   quantity?: number;
+  lines?: Array<{
+    productName?: string;
+    productCode?: string;
+    quantity?: number;
+    costPerKg?: number;
+    animalWeightKg?: number;
+  }>;
   purchaseTreasuryKey?: string;
   purchaseTreasuryLabel?: string;
 }

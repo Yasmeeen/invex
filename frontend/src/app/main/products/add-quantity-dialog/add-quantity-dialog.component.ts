@@ -78,6 +78,8 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
   ) {
     this.form = this.fb.group({
       quantity: [1, [Validators.required, Validators.min(this.minQuantity)]],
+      costPerKg: [null as number | null],
+      animalWeightKg: [null as number | null],
       totalCost: [null as number | null, [Validators.required, Validators.min(0.01)]],
     });
     this.sourcePartyForm = this.fb.group({
@@ -100,7 +102,15 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
   }
 
   get isFarm(): boolean {
-    return String(this.product?.productType || '').toLowerCase() === 'farm';
+    const product = this.product;
+    if (!product) return false;
+    if (String(product.productType || '').toLowerCase() === 'farm') return true;
+    const key = String((product as any).catalogKey || '');
+    if (key.startsWith('farm_')) return true;
+    const catCode = String((product.category as any)?.code || '')
+      .trim()
+      .toUpperCase();
+    return catCode === 'FARM';
   }
 
   get minQuantity(): number {
@@ -120,17 +130,39 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
     return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
   }
 
+  /** Farm: totalCost = quantity × animalWeightKg × costPerKg */
+  get computedFarmTotalCost(): number {
+    const qty = Number(this.form.get('quantity')?.value);
+    const costPerKg = Number(this.form.get('costPerKg')?.value);
+    const animalWeightKg = Number(this.form.get('animalWeightKg')?.value);
+    if (
+      !Number.isFinite(qty) ||
+      qty <= 0 ||
+      !Number.isFinite(costPerKg) ||
+      costPerKg <= 0 ||
+      !Number.isFinite(animalWeightKg) ||
+      animalWeightKg <= 0
+    ) {
+      return 0;
+    }
+    return Math.round(qty * animalWeightKg * costPerKg * 100) / 100;
+  }
+
   get isDeferredSelected(): boolean {
     return this.selectedDeskTreasuryKeys.includes(AddQuantityDialogComponent.DEFERRED_KEY);
   }
 
   ngOnInit(): void {
     this.syncTreasuryOptions();
+    this.syncFarmCostFields();
     this.subscriptions.push(
       this.storeSettings.settings$.subscribe(() => this.syncTreasuryOptions())
     );
     this.subscriptions.push(
-      this.form.valueChanges.subscribe(() => this.ensureDefaultDeskTreasuryAmounts())
+      this.form.valueChanges.subscribe(() => {
+        this.recomputeFarmTotalCost();
+        this.ensureDefaultDeskTreasuryAmounts();
+      })
     );
     this.initSourcePartyPhoneLookup();
     this.initVendorTypeahead();
@@ -289,8 +321,15 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.isFarm) {
+      this.recomputeFarmTotalCost();
+    }
     const qty = Number(this.form.get('quantity')?.value);
     const totalCost = this.totalCost;
+    const costPerKg = this.isFarm ? Number(this.form.get('costPerKg')?.value) : undefined;
+    const animalWeightKg = this.isFarm
+      ? Number(this.form.get('animalWeightKg')?.value)
+      : undefined;
     const acquiredFrom = this.buildAcquiredFromPayload();
 
     const branchId =
@@ -309,6 +348,9 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
         purchaseTreasurySplits: splits,
         ...(acquiredFrom ? { acquiredFrom } : {}),
         ...(branchId ? { branchId } : {}),
+        ...(this.isFarm && Number.isFinite(costPerKg) && Number.isFinite(animalWeightKg)
+          ? { costPerKg, animalWeightKg }
+          : {}),
       })
       .subscribe({
         next: () => {
@@ -391,6 +433,38 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
     }
     this.deskTreasuryAmounts = next;
     this.selectedDeskTreasuryKeys = ids;
+  }
+
+  private syncFarmCostFields(): void {
+    const costPerKgCtrl = this.form.get('costPerKg');
+    const weightCtrl = this.form.get('animalWeightKg');
+    const totalCostCtrl = this.form.get('totalCost');
+    if (!costPerKgCtrl || !weightCtrl || !totalCostCtrl) return;
+
+    if (this.isFarm) {
+      costPerKgCtrl.setValidators([Validators.required, Validators.min(0.01)]);
+      weightCtrl.setValidators([Validators.required, Validators.min(0.001)]);
+      this.recomputeFarmTotalCost();
+    } else {
+      costPerKgCtrl.clearValidators();
+      weightCtrl.clearValidators();
+      costPerKgCtrl.setValue(null, { emitEvent: false });
+      weightCtrl.setValue(null, { emitEvent: false });
+    }
+    costPerKgCtrl.updateValueAndValidity({ emitEvent: false });
+    weightCtrl.updateValueAndValidity({ emitEvent: false });
+    totalCostCtrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private recomputeFarmTotalCost(): void {
+    if (!this.isFarm) return;
+    const total = this.computedFarmTotalCost;
+    const ctrl = this.form.get('totalCost');
+    if (!ctrl) return;
+    const next = total > 0 ? total : null;
+    if (ctrl.value !== next) {
+      ctrl.setValue(next, { emitEvent: false });
+    }
   }
 
   private ensureDefaultDeskTreasuryAmounts(): void {

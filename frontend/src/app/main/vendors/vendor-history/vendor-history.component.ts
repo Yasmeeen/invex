@@ -144,6 +144,17 @@ export class VendorHistoryComponent implements OnInit, OnDestroy {
     return this.slicePage(this.history?.purchases || [], this.purchasesPage);
   }
 
+  purchaseLines(purchase: any): any[] {
+    if (Array.isArray(purchase?.lines) && purchase.lines.length) return purchase.lines;
+    return [
+      {
+        productName: purchase?.productName || '',
+        productCode: purchase?.productCode || '',
+        quantity: purchase?.quantity ?? 1,
+      },
+    ];
+  }
+
   get pagedPurchasingRequests() {
     return this.slicePage(this.history?.purchasingRequests || [], this.purchasingPage);
   }

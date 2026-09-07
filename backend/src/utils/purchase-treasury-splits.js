@@ -32,6 +32,9 @@ export function getPurchaseLines(purchase) {
       .map((l) => ({
         productPayload: l?.productPayload || null,
         quantity: coercePurchaseLineQty(l?.quantity),
+        costPerKg: l?.costPerKg,
+        animalWeightKg: l?.animalWeightKg,
+        templateProductId: l?.templateProductId,
         createdProductId: l?.createdProductId,
         createdProductIds: Array.isArray(l?.createdProductIds) ? l.createdProductIds : undefined,
       }))
@@ -42,6 +45,9 @@ export function getPurchaseLines(purchase) {
     {
       productPayload: doc.productPayload,
       quantity: coercePurchaseLineQty(doc.quantity),
+      costPerKg: doc.costPerKg,
+      animalWeightKg: doc.animalWeightKg,
+      templateProductId: doc.stockTopUpTemplateProductId,
       createdProductId: doc.createdProductId,
       createdProductIds: Array.isArray(doc.createdProductIds) ? doc.createdProductIds : undefined,
     },
@@ -100,6 +106,8 @@ export function expandDeskPurchaseDetailLines(purchase, { branchName = '' } = {}
           productName: name,
           productCode: String(d?.code || '').trim(),
           quantity: 1,
+          costPerKg: line.costPerKg,
+          animalWeightKg: line.animalWeightKg,
           unitCost,
           lineTotal: unitCost,
         });
@@ -115,6 +123,8 @@ export function expandDeskPurchaseDetailLines(purchase, { branchName = '' } = {}
           productName: name,
           productCode: code,
           quantity: 1,
+          costPerKg: line.costPerKg,
+          animalWeightKg: line.animalWeightKg,
           unitCost,
           lineTotal: unitCost,
         });
@@ -128,6 +138,8 @@ export function expandDeskPurchaseDetailLines(purchase, { branchName = '' } = {}
       productName: name,
       productCode: String(pp.code || '').trim(),
       quantity: q,
+      costPerKg: line.costPerKg,
+      animalWeightKg: line.animalWeightKg,
       unitCost,
       lineTotal: purchaseLineNetTotal(line),
     });

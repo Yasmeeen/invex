@@ -300,9 +300,30 @@
                 </button>
                 <span *ngIf="!p._id">—</span>
               </td>
-              <td>{{ p.productName }}</td>
-              <td>{{ p.productCode }}</td>
-              <td>{{ p.quantity }}</td>
+              <td>
+                <div *ngFor="let line of purchaseLines(p)" class="mb-1">
+                  <div>{{ line.productName || '—' }}</div>
+                  <div class="size-small text-muted" *ngIf="line.animalWeightKg || line.costPerKg">
+                    <span *ngIf="line.animalWeightKg">
+                      {{ 'tr_farm_purchase_animal_weight' | translate }}: {{ line.animalWeightKg }}
+                    </span>
+                    <span *ngIf="line.animalWeightKg && line.costPerKg"> · </span>
+                    <span *ngIf="line.costPerKg">
+                      {{ 'tr_farm_purchase_cost_per_kg' | translate }}: {{ line.costPerKg }}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div *ngFor="let line of purchaseLines(p)" class="mb-1">
+                  {{ line.productCode || '—' }}
+                </div>
+              </td>
+              <td>
+                <div *ngFor="let line of purchaseLines(p)" class="mb-1">
+                  {{ line.quantity }}
+                </div>
+              </td>
               <td>{{ p.purchaseTreasuryLabel || p.purchaseTreasuryKey || '—' }}</td>
               <td>{{ purchaseStatusLabel(p.status) }}</td>
               <td>{{ p.createdAt | date:'short' }}</td>

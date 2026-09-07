@@ -53,3 +53,12 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
+
+.purchase-review-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}

@@ -31,6 +31,29 @@
         <td>{{ 'tr_receipt_purchase_treasury' | receiptTranslate: st.receiptLanguage }}</td>
         <td>{{ purchaseTreasuryDisplay }}</td>
       </tr>
+      <ng-container *ngIf="sourceParty as party">
+        <tr>
+          <td>{{ 'tr_party_type' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>
+            {{
+              (party?.partyType === 'supplier' ? 'tr_party_supplier' : 'tr_party_client')
+                | receiptTranslate: st.receiptLanguage
+            }}
+          </td>
+        </tr>
+        <tr>
+          <td>{{ 'tr_purchase_invoice_party' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ party?.displayName || party?.name || party?.phone || '-' }}</td>
+        </tr>
+        <tr *ngIf="party?.phone">
+          <td>{{ 'tr_client_phone' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ party.phone }}</td>
+        </tr>
+        <tr *ngIf="party?.address">
+          <td>{{ 'tr_address' | receiptTranslate: st.receiptLanguage }}</td>
+          <td>{{ party.address }}</td>
+        </tr>
+      </ng-container>
     </table>
 
     <table class="invoice-table products-table">
@@ -49,6 +72,16 @@
       <tr *ngFor="let line of receiptLines">
         <td class="item-name">
           {{ line?.productPayload?.name }}
+          <div class="invoice-item-attrs" *ngIf="line?.animalWeightKg || line?.costPerKg">
+            <span class="invoice-item-attr" *ngIf="line?.animalWeightKg">
+              <bdi>{{ 'tr_farm_purchase_animal_weight' | receiptTranslate: st.receiptLanguage }}:</bdi>
+              <bdi>{{ line.animalWeightKg }}</bdi>
+            </span>
+            <span class="invoice-item-attr" *ngIf="line?.costPerKg">
+              <bdi>{{ 'tr_farm_purchase_cost_per_kg' | receiptTranslate: st.receiptLanguage }}:</bdi>
+              <bdi>{{ line.costPerKg }}</bdi>
+            </span>
+          </div>
           <div class="invoice-item-attrs" *ngIf="attrLinesFor(line?.productPayload).length">
             <span
               class="invoice-item-attr"

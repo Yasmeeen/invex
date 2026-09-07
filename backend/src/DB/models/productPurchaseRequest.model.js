@@ -162,6 +162,15 @@ const productPurchaseRequestSchema = new mongoose.Schema(
             },
           },
           quantity: { type: Number, required: true, min: 0, default: 1 },
+          /** Stock top-up: template SKU this line adds quantity to. */
+          templateProductId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Product',
+            required: false,
+          },
+          /** Farm line inputs (optional). */
+          costPerKg: { type: Number, required: false, min: 0 },
+          animalWeightKg: { type: Number, required: false, min: 0 },
           createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
           createdProductIds: {
             type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
@@ -211,6 +220,13 @@ const productPurchaseRequestSchema = new mongoose.Schema(
       ref: 'Factory',
       required: false,
     },
+
+    /**
+     * Farm stock purchase inputs (optional).
+     * totalCost is derived as quantity (heads) × animalWeightKg × costPerKg when provided.
+     */
+    costPerKg: { type: Number, required: false, min: 0 },
+    animalWeightKg: { type: Number, required: false, min: 0 },
 
     /** Store pays party the difference (trade-in credit > sale); affects drawer when cash. */
     exchangeSettlementSplits: { type: [purchaseTreasurySplitSchema], default: undefined },

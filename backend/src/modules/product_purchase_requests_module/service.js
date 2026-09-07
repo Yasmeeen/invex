@@ -96,6 +96,50 @@ const normalizeImageUrl = (raw) => {
 const normalizeAddedBy = (raw) => String(raw ?? '').trim().slice(0, 200);
 
 /**
+ * Farm purchases: optionally derive totalCost from heads × animal weight × cost/kg.
+ * Returns { totalCost, costPerKg, animalWeightKg } or { error }.
+ */
+function resolveFarmPurchaseTotalCost({
+  isFarm,
+  quantity,
+  totalCostRaw,
+  costPerKgRaw,
+  animalWeightKgRaw,
+}) {
+  const costPerKg = Math.round((Number(costPerKgRaw) || 0) * 100) / 100;
+  const animalWeightKg = Math.round((Number(animalWeightKgRaw) || 0) * 1000) / 1000;
+  const hasFarmInputs =
+    (costPerKgRaw != null && String(costPerKgRaw).trim() !== '') ||
+    (animalWeightKgRaw != null && String(animalWeightKgRaw).trim() !== '');
+
+  if (isFarm && hasFarmInputs) {
+    if (!Number.isFinite(costPerKg) || costPerKg <= 0) {
+      return { error: 'costPerKg must be a number > 0 for farm purchases' };
+    }
+    if (!Number.isFinite(animalWeightKg) || animalWeightKg <= 0) {
+      return { error: 'animalWeightKg must be a number > 0 for farm purchases' };
+    }
+    const derived =
+      Math.round(Number(quantity) * animalWeightKg * costPerKg * 100) / 100;
+    if (!Number.isFinite(derived) || derived <= 0) {
+      return { error: 'totalCost must be a number > 0' };
+    }
+    return { totalCost: derived, costPerKg, animalWeightKg };
+  }
+
+  const totalCost = Math.round((Number(totalCostRaw) || 0) * 100) / 100;
+  if (!Number.isFinite(totalCost) || totalCost <= 0) {
+    return { error: 'totalCost must be a number > 0' };
+  }
+  const out = { totalCost };
+  if (isFarm && Number.isFinite(costPerKg) && costPerKg > 0) out.costPerKg = costPerKg;
+  if (isFarm && Number.isFinite(animalWeightKg) && animalWeightKg > 0) {
+    out.animalWeightKg = animalWeightKg;
+  }
+  return out;
+}
+
+/**
  * Soft-removed or sold-out (stock 0) products may be revived on re-purchase,
  * but only under the same category. Overwriting category with a different one
  * was allowing the same serial under the wrong category.
@@ -372,6 +416,104 @@ async function applyStockTopUpToProduct(product, q, { unitNet, acquiredFromField
   }
   await product.save({ session });
   return product;
+}
+
+/**
+ * Validate one stock top-up line and build productPayload + qty + unit cost.
+ * Returns { error } or prepared line fields.
+ */
+async function prepareStockTopUpLine(session, {
+  productId,
+  qtyRaw,
+  totalCostRaw,
+  costPerKgRaw,
+  animalWeightKgRaw,
+  settings,
+  notes,
+}) {
+  if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
+    return { error: 'productId is required for each line' };
+  }
+  const template = await Product.findById(productId)
+    .populate('category', 'name code sellByWeight')
+    .session(session);
+  if (!template) {
+    return { error: 'Product not found' };
+  }
+  if (isServiceProduct(template)) {
+    return { error: `Cannot add stock to a service product (${template.code || productId})` };
+  }
+
+  const isWeight = resolveSellByWeight({
+    weightSalesEnabled: !!settings?.weightSalesEnabled,
+    category: template.category,
+    product: template,
+  });
+  const isFarm = isFarmProduct(template);
+  const qtyNum = Number(qtyRaw);
+  if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+    return { error: `quantity must be a number > 0 for ${template.code || productId}` };
+  }
+
+  let q;
+  if (isFarm) {
+    q = roundFarmHeads(qtyNum);
+    if (q <= 0) {
+      return { error: `quantity must be at least 0.25 head for ${template.code || productId}` };
+    }
+  } else if (isWeight) {
+    q = normalizeWeightQuantity(qtyNum);
+    if (q <= 0) {
+      return { error: `quantity must be a valid weight > 0 for ${template.code || productId}` };
+    }
+  } else {
+    q = Math.max(1, Math.floor(qtyNum));
+  }
+
+  const farmCost = resolveFarmPurchaseTotalCost({
+    isFarm,
+    quantity: q,
+    totalCostRaw,
+    costPerKgRaw,
+    animalWeightKgRaw,
+  });
+  if (farmCost.error) {
+    return { error: `${farmCost.error} (${template.code || productId})` };
+  }
+  const totalCost = farmCost.totalCost;
+  const unitNet = Math.round((totalCost / q) * 100) / 100;
+  const categoryId = template.category?._id || template.category;
+  if (!categoryId) {
+    return { error: `Product has no category (${template.code || productId})` };
+  }
+
+  const payload = {
+    name: String(template.name || '').trim(),
+    code: String(template.code || '').trim(),
+    category: new mongoose.Types.ObjectId(String(categoryId)),
+    price: Number(template.price) || 0,
+    netPrice: unitNet,
+    discount: Number(template.discount) || 0,
+    attributes:
+      template.attributes && typeof template.attributes === 'object' && !Array.isArray(template.attributes)
+        ? template.attributes
+        : {},
+    imageUrl: normalizeImageUrl(template.imageUrl),
+    notes: notes || 'Stock purchase',
+  };
+
+  return {
+    template,
+    q,
+    totalCost,
+    unitNet,
+    isFarm,
+    isWeight,
+    categoryId,
+    payload,
+    costPerKg: farmCost.costPerKg,
+    animalWeightKg: farmCost.animalWeightKg,
+  };
 }
 
 async function collectApproverUserIds(branchId) {
@@ -1791,16 +1933,6 @@ export const approveProductPurchaseRequest = async (req, res) => {
     }
 
     if (purchase.isStockTopUp) {
-      const pp = purchase.productPayload || {};
-      const template = await Product.findById(purchase.stockTopUpTemplateProductId)
-        .populate('category', 'name code sellByWeight')
-        .session(session);
-      if (!template) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: 'Template product not found for stock top-up' });
-      }
-
       const isWarehouseDest = !!purchase.stockTopUpInWarehouse;
       const destinationFactoryId = purchase.stockTopUpDestinationFactoryId
         ? String(purchase.stockTopUpDestinationFactoryId)
@@ -1815,74 +1947,156 @@ export const approveProductPurchaseRequest = async (req, res) => {
         .select('businessActivityType weightSalesEnabled')
         .session(session)
         .lean();
-      const isWeight = resolveSellByWeight({
-        weightSalesEnabled: !!settings?.weightSalesEnabled,
-        category: template.category,
-        product: template,
-      });
-      const isFarm = isFarmProduct(template);
 
-      let q;
-      const qtyNum = Number(purchase.quantity);
-      if (isFarm) {
-        q = roundFarmHeads(qtyNum);
-      } else if (isWeight) {
-        q = normalizeWeightQuantity(qtyNum);
-      } else {
-        q = Math.max(1, Math.floor(qtyNum));
-      }
-      if (!Number.isFinite(q) || q <= 0) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: 'Invalid quantity on purchase request' });
-      }
+      const rawLines =
+        Array.isArray(purchase.lines) && purchase.lines.length
+          ? purchase.lines
+          : [
+              {
+                productPayload: purchase.productPayload,
+                quantity: purchase.quantity,
+                templateProductId: purchase.stockTopUpTemplateProductId,
+              },
+            ];
 
-      const unitNet = Math.round(Number(pp.netPrice) * 100) / 100;
-      const totalCost = Math.round(unitNet * q * 100) / 100;
-      const categoryIdStr = String(pp.category);
+      const appliedLines = [];
+      let invoiceTotal = 0;
+      let firstAcquiredFromFields = {};
 
-      let acquiredFromFields = {};
-      try {
-        const resolved = await resolveProductAcquiredFrom(
-          { acquiredFrom: pp.acquiredFrom },
-          { categoryId: categoryIdStr, branchOid: purchase.branch }
-        );
-        if (resolved?.acquiredFrom) {
-          acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i] || {};
+        const pp = line.productPayload || purchase.productPayload || {};
+        const templateId =
+          line.templateProductId ||
+          (i === 0 ? purchase.stockTopUpTemplateProductId : null) ||
+          null;
+        if (!templateId) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            error: `Template product missing for stock top-up line ${i + 1}`,
+          });
         }
-      } catch (e) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+
+        const template = await Product.findById(templateId)
+          .populate('category', 'name code sellByWeight')
+          .session(session);
+        if (!template) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            error: `Template product not found for stock top-up line ${i + 1}`,
+          });
+        }
+
+        const isWeight = resolveSellByWeight({
+          weightSalesEnabled: !!settings?.weightSalesEnabled,
+          category: template.category,
+          product: template,
+        });
+        const isFarm = isFarmProduct(template);
+
+        let q;
+        const qtyNum = Number(line.quantity != null ? line.quantity : purchase.quantity);
+        if (isFarm) {
+          q = roundFarmHeads(qtyNum);
+        } else if (isWeight) {
+          q = normalizeWeightQuantity(qtyNum);
+        } else {
+          q = Math.max(1, Math.floor(qtyNum));
+        }
+        if (!Number.isFinite(q) || q <= 0) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            error: `Invalid quantity on purchase request line ${i + 1}`,
+          });
+        }
+
+        const unitNet = Math.round(Number(pp.netPrice) * 100) / 100;
+        const lineTotal = Math.round(unitNet * q * 100) / 100;
+        invoiceTotal = Math.round((invoiceTotal + lineTotal) * 100) / 100;
+        const categoryIdStr = String(pp.category || template.category?._id || template.category);
+
+        let acquiredFromFields = {};
+        try {
+          const resolved = await resolveProductAcquiredFrom(
+            { acquiredFrom: pp.acquiredFrom || purchase.productPayload?.acquiredFrom },
+            { categoryId: categoryIdStr, branchOid: purchase.branch }
+          );
+          if (resolved?.acquiredFrom) {
+            acquiredFromFields = { acquiredFrom: resolved.acquiredFrom };
+            if (i === 0) firstAcquiredFromFields = acquiredFromFields;
+          }
+        } catch (e) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
+        }
+
+        const resolvedDest = await resolveOrCreateProductAtDestination(session, template, {
+          isWarehouse: isWarehouseDest,
+          branchOid: destinationBranchId,
+          factoryOid: destinationFactoryId,
+        });
+        if (resolvedDest.error || !resolvedDest.product) {
+          await session.abortTransaction();
+          session.endSession();
+          return res
+            .status(400)
+            .json({ error: resolvedDest.error || 'Could not resolve product at destination' });
+        }
+        const product = resolvedDest.product;
+
+        await applyStockTopUpToProduct(product, q, {
+          unitNet,
+          acquiredFromFields,
+          isFarm,
+          isWeight,
+          session,
+        });
+
+        const linePayload = {
+          ...pp,
+          ...(acquiredFromFields.acquiredFrom
+            ? { acquiredFrom: acquiredFromFields.acquiredFrom }
+            : {}),
+        };
+        appliedLines.push({
+          productPayload: linePayload,
+          quantity: q,
+          templateProductId: template._id,
+          ...(line.costPerKg != null ? { costPerKg: line.costPerKg } : {}),
+          ...(line.animalWeightKg != null ? { animalWeightKg: line.animalWeightKg } : {}),
+          createdProductId: product._id,
+          _product: product,
+          _unitNet: unitNet,
+          _lineTotal: lineTotal,
+        });
       }
 
-      const resolvedDest = await resolveOrCreateProductAtDestination(session, template, {
-        isWarehouse: isWarehouseDest,
-        branchOid: destinationBranchId,
-        factoryOid: destinationFactoryId,
-      });
-      if (resolvedDest.error || !resolvedDest.product) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: resolvedDest.error || 'Could not resolve product at destination' });
-      }
-      const product = resolvedDest.product;
-
-      await applyStockTopUpToProduct(product, q, {
-        unitNet,
-        acquiredFromFields,
-        isFarm,
-        isWeight,
-        session,
-      });
-
+      const first = appliedLines[0];
       purchase.status = 'approved';
       purchase.resolvedBy = actor._id;
       purchase.resolvedAt = new Date();
       purchase.resolutionNote = String(resolutionNote || '').trim().slice(0, 500);
-      purchase.createdProductId = product._id;
-      purchase.lines = [{ productPayload: pp, quantity: q, createdProductId: product._id }];
+      purchase.productPayload = first.productPayload;
+      purchase.quantity = first.quantity;
+      purchase.stockTopUpTemplateProductId = first.templateProductId;
+      purchase.createdProductId = first.createdProductId;
+      purchase.createdProductIds = appliedLines.map((l) => l.createdProductId);
+      purchase.lines = appliedLines.map(
+        ({ productPayload, quantity, templateProductId, costPerKg, animalWeightKg, createdProductId }) => ({
+          productPayload,
+          quantity,
+          templateProductId,
+          ...(costPerKg != null ? { costPerKg } : {}),
+          ...(animalWeightKg != null ? { animalWeightKg } : {}),
+          createdProductId,
+        })
+      );
       purchase.markModified('lines');
+      purchase.markModified('createdProductIds');
       await purchase.save({ session });
 
       await session.commitTransaction();
@@ -1895,9 +2109,9 @@ export const approveProductPurchaseRequest = async (req, res) => {
 
       if (purchaseHasDeferredTreasury(purchase)) {
         try {
-          if (acquiredFromFields.acquiredFrom) {
+          if (firstAcquiredFromFields.acquiredFrom) {
             purchase.productPayload = purchase.productPayload || {};
-            purchase.productPayload.acquiredFrom = acquiredFromFields.acquiredFrom;
+            purchase.productPayload.acquiredFrom = firstAcquiredFromFields.acquiredFrom;
           }
           await syncDeferredSupplierDeskPurchase(purchase, {
             userId: actor._id,
@@ -1908,29 +2122,31 @@ export const approveProductPurchaseRequest = async (req, res) => {
         }
       }
 
-      try {
-        await StockMovement.create({
-          movementType: 'purchase',
-          productId: product._id,
-          productName: product.name,
-          branchId: purchase.branch,
-          fromBranchId: null,
-          toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
-          factoryId: isFactoryDest ? destinationFactoryId : null,
-          toFactoryId: isFactoryDest ? destinationFactoryId : null,
-          quantity: q,
-          unitPrice: unitNet,
-          totalValue: totalCost,
-          referenceType: 'productPurchaseRequest',
-          referenceId: purchase._id,
-          notes: isFactoryDest
-            ? 'Stock purchase (factory, approved)'
-            : isWarehouseDest
-              ? 'Stock purchase (warehouse, approved)'
-              : 'Stock purchase (branch, approved)',
-        });
-      } catch (e) {
-        console.warn('⚠️ stock top-up approve stock movement:', e?.message || e);
+      for (const line of appliedLines) {
+        try {
+          await StockMovement.create({
+            movementType: 'purchase',
+            productId: line._product._id,
+            productName: line._product.name,
+            branchId: purchase.branch,
+            fromBranchId: null,
+            toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
+            factoryId: isFactoryDest ? destinationFactoryId : null,
+            toFactoryId: isFactoryDest ? destinationFactoryId : null,
+            quantity: line.quantity,
+            unitPrice: line._unitNet,
+            totalValue: line._lineTotal,
+            referenceType: 'productPurchaseRequest',
+            referenceId: purchase._id,
+            notes: isFactoryDest
+              ? 'Stock purchase (factory, approved)'
+              : isWarehouseDest
+                ? 'Stock purchase (warehouse, approved)'
+                : 'Stock purchase (branch, approved)',
+          });
+        } catch (e) {
+          console.warn('⚠️ stock top-up approve stock movement:', e?.message || e);
+        }
       }
 
       await auditLog(req, {
@@ -1940,15 +2156,14 @@ export const approveProductPurchaseRequest = async (req, res) => {
         entityId: purchase._id,
         message: 'Stock quantity purchase approved',
         metadata: {
-          productId: String(product._id),
-          productCode: product.code,
-          quantity: q,
-          totalCost,
+          lineCount: appliedLines.length,
+          productIds: appliedLines.map((l) => String(l.createdProductId)),
+          totalCost: invoiceTotal,
         },
       });
 
       const purchaseOut = await leanPurchaseForResponse(purchase._id);
-      const productOut = await Product.findById(product._id)
+      const productOut = await Product.findById(first.createdProductId)
         .populate('category', 'name code sellByWeight')
         .populate('branch', 'name')
         .lean();
@@ -2647,6 +2862,8 @@ export const addQuantityToExistingProduct = async (req, res) => {
       productId,
       quantity: qtyRaw,
       totalCost: totalCostRaw,
+      costPerKg: costPerKgRaw,
+      animalWeightKg: animalWeightKgRaw,
       acquiredFrom,
       purchaseTreasurySplits: treasurySplitsRaw,
       purchaseTreasuryKey: treasuryKeyRaw,
@@ -2778,12 +2995,22 @@ export const addQuantityToExistingProduct = async (req, res) => {
       q = Math.max(1, Math.floor(qtyNum));
     }
 
-    const totalCost = Math.round((Number(totalCostRaw) || 0) * 100) / 100;
-    if (!Number.isFinite(totalCost) || totalCost <= 0) {
+    const farmCost = resolveFarmPurchaseTotalCost({
+      isFarm,
+      quantity: q,
+      totalCostRaw,
+      costPerKgRaw,
+      animalWeightKgRaw,
+    });
+    if (farmCost.error) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: 'totalCost must be a number > 0' });
+      return res.status(400).json({ error: farmCost.error });
     }
+    const totalCost = farmCost.totalCost;
+    const farmCostFields = {};
+    if (farmCost.costPerKg != null) farmCostFields.costPerKg = farmCost.costPerKg;
+    if (farmCost.animalWeightKg != null) farmCostFields.animalWeightKg = farmCost.animalWeightKg;
 
     const unitNet = Math.round((totalCost / q) * 100) / 100;
     const categoryId = product.category?._id || product.category;
@@ -2876,7 +3103,14 @@ export const addQuantityToExistingProduct = async (req, res) => {
           createdBy: actor._id,
           productPayload: payload,
           quantity: q,
-          lines: [{ productPayload: payload, quantity: q, createdProductId: product._id }],
+          lines: [
+            {
+              productPayload: payload,
+              quantity: q,
+              createdProductId: product._id,
+              ...farmCostFields,
+            },
+          ],
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
           purchaseTreasurySplits,
@@ -2885,6 +3119,7 @@ export const addQuantityToExistingProduct = async (req, res) => {
           resolvedAt: new Date(),
           resolutionNote: 'Stock top-up (auto-approved)',
           ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
+          ...farmCostFields,
         },
       ],
       { session }
@@ -3054,6 +3289,9 @@ export const purchaseQuantity = async (req, res) => {
       productId,
       quantity: qtyRaw,
       totalCost: totalCostRaw,
+      costPerKg: costPerKgRaw,
+      animalWeightKg: animalWeightKgRaw,
+      lines: linesRaw,
       acquiredFrom,
       purchaseTreasurySplits: treasurySplitsRaw,
       purchaseTreasuryKey: treasuryKeyRaw,
@@ -3071,11 +3309,6 @@ export const purchaseQuantity = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ error: 'userId is required' });
-    }
-    if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ error: 'productId is required' });
     }
 
     const actor = await User.findById(userId).select('_id name role branch').session(session);
@@ -3173,20 +3406,6 @@ export const purchaseQuantity = async (req, res) => {
       }
     }
 
-    const template = await Product.findById(productId)
-      .populate('category', 'name code sellByWeight')
-      .session(session);
-    if (!template) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ error: 'Product not found' });
-    }
-    if (isServiceProduct(template)) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ error: 'Cannot add stock to a service product' });
-    }
-
     if (!isWarehouseDest && !isFactoryDest) {
       const branch = await Branch.findById(destinationBranchId).select('_id').session(session).lean();
       if (!branch) {
@@ -3227,71 +3446,62 @@ export const purchaseQuantity = async (req, res) => {
       .select('businessActivityType weightSalesEnabled')
       .lean();
 
-    const isWeight = resolveSellByWeight({
-      weightSalesEnabled: !!settings?.weightSalesEnabled,
-      category: template.category,
-      product: template,
-    });
-    const isFarm = isFarmProduct(template);
-    const qtyNum = Number(qtyRaw);
-    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+    const notes = isFactoryDest
+      ? 'Stock purchase (factory)'
+      : isWarehouseDest
+        ? 'Stock purchase (warehouse)'
+        : 'Stock purchase (branch)';
+
+    const inputLines =
+      Array.isArray(linesRaw) && linesRaw.length
+        ? linesRaw
+        : [
+            {
+              productId,
+              quantity: qtyRaw,
+              totalCost: totalCostRaw,
+              costPerKg: costPerKgRaw,
+              animalWeightKg: animalWeightKgRaw,
+            },
+          ];
+
+    if (!inputLines.length) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ error: 'quantity must be a number > 0' });
+      return res.status(400).json({ error: 'At least one product line is required' });
     }
 
-    let q;
-    if (isFarm) {
-      q = roundFarmHeads(qtyNum);
-      if (q <= 0) {
+    const preparedLines = [];
+    let invoiceTotal = 0;
+    for (let i = 0; i < inputLines.length; i++) {
+      const row = inputLines[i] || {};
+      const prepared = await prepareStockTopUpLine(session, {
+        productId: row.productId,
+        qtyRaw: row.quantity,
+        totalCostRaw: row.totalCost,
+        costPerKgRaw: row.costPerKg,
+        animalWeightKgRaw: row.animalWeightKg,
+        settings,
+        notes,
+      });
+      if (prepared.error) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ error: 'quantity must be at least 0.25 head' });
+        return res.status(400).json({ error: prepared.error });
       }
-    } else if (isWeight) {
-      q = normalizeWeightQuantity(qtyNum);
-      if (q <= 0) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({ error: 'quantity must be a valid weight > 0' });
-      }
-    } else {
-      q = Math.max(1, Math.floor(qtyNum));
+      invoiceTotal = Math.round((invoiceTotal + prepared.totalCost) * 100) / 100;
+      preparedLines.push(prepared);
     }
 
-    const totalCost = Math.round((Number(totalCostRaw) || 0) * 100) / 100;
-    if (!Number.isFinite(totalCost) || totalCost <= 0) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ error: 'totalCost must be a number > 0' });
-    }
-
-    const unitNet = Math.round((totalCost / q) * 100) / 100;
-    const categoryId = template.category?._id || template.category;
-    if (!categoryId) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ error: 'Product has no category' });
-    }
-
-    const payload = {
-      name: String(template.name || '').trim(),
-      code: String(template.code || '').trim(),
-      category: new mongoose.Types.ObjectId(String(categoryId)),
-      price: Number(template.price) || 0,
-      netPrice: unitNet,
-      discount: Number(template.discount) || 0,
-      attributes:
-        template.attributes && typeof template.attributes === 'object' && !Array.isArray(template.attributes)
-          ? template.attributes
-          : {},
-      imageUrl: normalizeImageUrl(template.imageUrl),
-      notes: isFactoryDest
-        ? 'Stock purchase (factory)'
-        : isWarehouseDest
-          ? 'Stock purchase (warehouse)'
-          : 'Stock purchase (branch)',
-    };
+    const firstPrepared = preparedLines[0];
+    const template = firstPrepared.template;
+    const payload = { ...firstPrepared.payload };
+    const q = firstPrepared.q;
+    const totalCost = invoiceTotal;
+    const categoryId = firstPrepared.categoryId;
+    const farmCostFields = {};
+    if (firstPrepared.costPerKg != null) farmCostFields.costPerKg = firstPrepared.costPerKg;
+    if (firstPrepared.animalWeightKg != null) farmCostFields.animalWeightKg = firstPrepared.animalWeightKg;
 
     let acquiredFromFields = {};
     try {
@@ -3301,6 +3511,9 @@ export const purchaseQuantity = async (req, res) => {
       );
       if (resolvedParty?.acquiredFrom) {
         acquiredFromFields = { acquiredFrom: resolvedParty.acquiredFrom };
+        for (const prep of preparedLines) {
+          prep.payload.acquiredFrom = resolvedParty.acquiredFrom;
+        }
         payload.acquiredFrom = resolvedParty.acquiredFrom;
       }
     } catch (e) {
@@ -3308,6 +3521,14 @@ export const purchaseQuantity = async (req, res) => {
       session.endSession();
       return res.status(400).json({ error: e?.message || 'Invalid source party', code: e?.code });
     }
+
+    const purchaseLinesDraft = preparedLines.map((prep) => ({
+      productPayload: prep.payload,
+      quantity: prep.q,
+      templateProductId: prep.template._id,
+      ...(prep.costPerKg != null ? { costPerKg: prep.costPerKg } : {}),
+      ...(prep.animalWeightKg != null ? { animalWeightKg: prep.animalWeightKg } : {}),
+    }));
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
     const tMap = treasuryMethodMap(treasuryMethods);
@@ -3363,7 +3584,7 @@ export const purchaseQuantity = async (req, res) => {
           createdBy: actor._id,
           productPayload: payload,
           quantity: q,
-          lines: [{ productPayload: payload, quantity: q }],
+          lines: purchaseLinesDraft,
           purchaseTreasuryKey: treasuryKeyNorm,
           purchaseTreasuryLabel,
           purchaseTreasurySplits,
@@ -3387,6 +3608,7 @@ export const purchaseQuantity = async (req, res) => {
               }
             : {}),
           ...(treasuryHasDeferred ? { amountPaid: treasuryAmountPaid } : {}),
+          ...farmCostFields,
         },
       ],
       { session }
@@ -3402,12 +3624,17 @@ export const purchaseQuantity = async (req, res) => {
       await session.commitTransaction();
       session.endSession();
 
+      const lineSummary =
+        preparedLines.length > 1
+          ? `${preparedLines.length} products · ${payload.name}…`
+          : `${payload.name} (${payload.code}) — ${q} unit(s)`;
+
       try {
         const recipientIds = await collectApproverUserIds(treasuryBranchId);
         const notification = await Notification.create({
           type: 'product_purchase_pending',
           title: 'Stock purchase pending approval',
-          body: `${payload.name} (${payload.code}) — ${q} unit(s) · Branch: ${treasuryBranch?.name || 'Branch'}`,
+          body: `${lineSummary} · Branch: ${treasuryBranch?.name || 'Branch'}`,
           data: {
             purchaseId: created._id,
             branchId: treasuryBranchId,
@@ -3422,6 +3649,7 @@ export const purchaseQuantity = async (req, res) => {
               netPrice: payload.netPrice,
             },
             quantity: q,
+            lineCount: preparedLines.length,
             isStockTopUp: true,
           },
           recipients: recipientIds,
@@ -3439,9 +3667,8 @@ export const purchaseQuantity = async (req, res) => {
         entityId: created._id,
         message: 'Stock quantity purchase created (pending approval)',
         metadata: {
-          templateProductId: String(template._id),
-          productCode: payload.code,
-          quantity: q,
+          templateProductIds: preparedLines.map((p) => String(p.template._id)),
+          lineCount: preparedLines.length,
           totalCost,
           destinationType,
           destinationBranchId,
@@ -3456,30 +3683,56 @@ export const purchaseQuantity = async (req, res) => {
       });
     }
 
-    const resolved = await resolveOrCreateProductAtDestination(session, template, {
-      isWarehouse: isWarehouseDest,
-      branchOid: destinationBranchId,
-      factoryOid: destinationFactoryId,
-    });
-    if (resolved.error || !resolved.product) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ error: resolved.error || 'Could not resolve product at destination' });
+    const appliedLines = [];
+    for (const prep of preparedLines) {
+      const resolved = await resolveOrCreateProductAtDestination(session, prep.template, {
+        isWarehouse: isWarehouseDest,
+        branchOid: destinationBranchId,
+        factoryOid: destinationFactoryId,
+      });
+      if (resolved.error || !resolved.product) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ error: resolved.error || 'Could not resolve product at destination' });
+      }
+      const product = resolved.product;
+      await applyStockTopUpToProduct(product, prep.q, {
+        unitNet: prep.unitNet,
+        acquiredFromFields,
+        isFarm: prep.isFarm,
+        isWeight: prep.isWeight,
+        session,
+      });
+      appliedLines.push({
+        productPayload: prep.payload,
+        quantity: prep.q,
+        templateProductId: prep.template._id,
+        ...(prep.costPerKg != null ? { costPerKg: prep.costPerKg } : {}),
+        ...(prep.animalWeightKg != null ? { animalWeightKg: prep.animalWeightKg } : {}),
+        createdProductId: product._id,
+        _product: product,
+        _unitNet: prep.unitNet,
+        _lineTotal: prep.totalCost,
+        _created: !!resolved.created,
+      });
     }
-    const product = resolved.product;
 
-    created.createdProductId = product._id;
-    created.lines = [{ productPayload: payload, quantity: q, createdProductId: product._id }];
+    const firstApplied = appliedLines[0];
+    created.createdProductId = firstApplied.createdProductId;
+    created.createdProductIds = appliedLines.map((l) => l.createdProductId);
+    created.lines = appliedLines.map(
+      ({ productPayload, quantity, templateProductId, costPerKg, animalWeightKg, createdProductId }) => ({
+        productPayload,
+        quantity,
+        templateProductId,
+        ...(costPerKg != null ? { costPerKg } : {}),
+        ...(animalWeightKg != null ? { animalWeightKg } : {}),
+        createdProductId,
+      })
+    );
     created.markModified('lines');
+    created.markModified('createdProductIds');
     await created.save({ session });
-
-    await applyStockTopUpToProduct(product, q, {
-      unitNet,
-      acquiredFromFields,
-      isFarm,
-      isWeight,
-      session,
-    });
 
     await session.commitTransaction();
     session.endSession();
@@ -3495,29 +3748,31 @@ export const purchaseQuantity = async (req, res) => {
       }
     }
 
-    try {
-      await StockMovement.create({
-        movementType: 'purchase',
-        productId: product._id,
-        productName: product.name,
-        branchId: treasuryBranchId,
-        fromBranchId: null,
-        toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
-        factoryId: isFactoryDest ? destinationFactoryId : null,
-        toFactoryId: isFactoryDest ? destinationFactoryId : null,
-        quantity: q,
-        unitPrice: unitNet,
-        totalValue: totalCost,
-        referenceType: 'productPurchaseRequest',
-        referenceId: created._id,
-        notes: isFactoryDest
-          ? 'Stock purchase (factory)'
-          : isWarehouseDest
-            ? 'Stock purchase (warehouse)'
-            : 'Stock purchase (branch)',
-      });
-    } catch (e) {
-      console.warn('⚠️ purchase-quantity stock movement:', e?.message || e);
+    for (const line of appliedLines) {
+      try {
+        await StockMovement.create({
+          movementType: 'purchase',
+          productId: line._product._id,
+          productName: line._product.name,
+          branchId: treasuryBranchId,
+          fromBranchId: null,
+          toBranchId: isWarehouseDest || isFactoryDest ? null : destinationBranchId,
+          factoryId: isFactoryDest ? destinationFactoryId : null,
+          toFactoryId: isFactoryDest ? destinationFactoryId : null,
+          quantity: line.quantity,
+          unitPrice: line._unitNet,
+          totalValue: line._lineTotal,
+          referenceType: 'productPurchaseRequest',
+          referenceId: created._id,
+          notes: isFactoryDest
+            ? 'Stock purchase (factory)'
+            : isWarehouseDest
+              ? 'Stock purchase (warehouse)'
+              : 'Stock purchase (branch)',
+        });
+      } catch (e) {
+        console.warn('⚠️ purchase-quantity stock movement:', e?.message || e);
+      }
     }
 
     await auditLog(req, {
@@ -3527,22 +3782,19 @@ export const purchaseQuantity = async (req, res) => {
       entityId: created._id,
       message: 'Stock quantity purchased',
       metadata: {
-        productId: String(product._id),
-        productCode: product.code,
-        quantity: q,
+        lineCount: appliedLines.length,
+        productIds: appliedLines.map((l) => String(l.createdProductId)),
         totalCost,
-        unitNet,
         destinationType,
         destinationBranchId,
         destinationFactoryId,
-        productCreatedAtDestination: !!resolved.created,
       },
     });
 
     await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId: treasuryBranchId });
 
     const purchaseOut = await leanPurchaseForResponse(created._id);
-    const productOut = await Product.findById(product._id)
+    const productOut = await Product.findById(firstApplied.createdProductId)
       .populate('category', 'name code sellByWeight')
       .populate('branch', 'name')
       .lean();
@@ -3552,7 +3804,7 @@ export const purchaseQuantity = async (req, res) => {
       purchase: purchaseOut || (created.toObject ? created.toObject() : created),
       product: productOut,
       destinationType,
-      productCreatedAtDestination: !!resolved.created,
+      lineCount: appliedLines.length,
     });
   } catch (e) {
     await session.abortTransaction();

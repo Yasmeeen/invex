@@ -48,6 +48,18 @@ export interface PurchaseQuantityDialogResult {
   pending?: boolean;
 }
 
+interface PurchaseQtyCartLine {
+  productId: string;
+  productName: string;
+  productCode: string;
+  categoryName: string;
+  quantity: number;
+  totalCost: number;
+  costPerKg?: number;
+  animalWeightKg?: number;
+  isFarm: boolean;
+}
+
 @Component({
   selector: 'app-purchase-quantity-dialog',
   templateUrl: './purchase-quantity-dialog.component.html',
@@ -70,6 +82,8 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
   productsLoading = false;
   selectedCategoryId: string | null = null;
   selectedProductId: string | null = null;
+  /** Products already added to this purchase invoice. */
+  cartLines: PurchaseQtyCartLine[] = [];
 
   selectedDeskTreasuryKeys: string[] = ['cash'];
   deskTreasuryAmounts: Record<string, number> = {};
@@ -111,6 +125,8 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     this.form = this.fb.group({
       branchId: [null as string | null, Validators.required],
       quantity: [1, [Validators.required, Validators.min(1)]],
+      costPerKg: [null as number | null],
+      animalWeightKg: [null as number | null],
       totalCost: [null as number | null, [Validators.required, Validators.min(0.01)]],
     });
     this.sourcePartyForm = this.fb.group({
@@ -146,8 +162,26 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
 
   get isFarm(): boolean {
     const product = this.selectedProduct;
-    if (!product) return false;
-    return String(product.productType || '').toLowerCase() === 'farm';
+    if (product) {
+      if (String(product.productType || '').toLowerCase() === 'farm') return true;
+      const key = String((product as any).catalogKey || '');
+      if (key.startsWith('farm_')) return true;
+      const catCode = String(
+        (product.category as any)?.code || this.selectedCategory?.code || ''
+      )
+        .trim()
+        .toUpperCase();
+      if (catCode === 'FARM') return true;
+    }
+    const selectedCatCode = String(this.selectedCategory?.code || '')
+      .trim()
+      .toUpperCase();
+    return selectedCatCode === 'FARM';
+  }
+
+  get selectedCategory(): Category | null {
+    if (!this.selectedCategoryId) return null;
+    return this.categories.find((c) => String(c._id) === String(this.selectedCategoryId)) || null;
   }
 
   get minQuantity(): number {
@@ -163,8 +197,35 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
   }
 
   get totalCost(): number {
+    let sum = this.cartLines.reduce((acc, line) => acc + (Number(line.totalCost) || 0), 0);
+    if (this.selectedProductId) {
+      const draft = Number(this.form.get('totalCost')?.value);
+      if (Number.isFinite(draft) && draft > 0) sum += draft;
+    }
+    return Math.round(sum * 100) / 100;
+  }
+
+  get draftLineCost(): number {
     const n = Number(this.form.get('totalCost')?.value);
     return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+
+  /** Farm: totalCost = quantity × animalWeightKg × costPerKg */
+  get computedFarmTotalCost(): number {
+    const qty = Number(this.form.get('quantity')?.value);
+    const costPerKg = Number(this.form.get('costPerKg')?.value);
+    const animalWeightKg = Number(this.form.get('animalWeightKg')?.value);
+    if (
+      !Number.isFinite(qty) ||
+      qty <= 0 ||
+      !Number.isFinite(costPerKg) ||
+      costPerKg <= 0 ||
+      !Number.isFinite(animalWeightKg) ||
+      animalWeightKg <= 0
+    ) {
+      return 0;
+    }
+    return Math.round(qty * animalWeightKg * costPerKg * 100) / 100;
   }
 
   get isDeferredSelected(): boolean {
@@ -199,6 +260,7 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     );
     this.subscriptions.push(
       this.form.valueChanges.subscribe(() => {
+        this.recomputeFarmTotalCost();
         this.ensureDefaultDeskTreasuryAmounts();
         this.syncQuantityValidators();
       })
@@ -290,6 +352,7 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     this.selectedCategoryId = categoryId ? String(categoryId) : null;
     this.selectedProductId = null;
     this.products = [];
+    this.syncFarmCostFields();
     if (this.selectedCategoryId) {
       this.loadProductsForCategory();
     }
@@ -297,6 +360,7 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
 
   onProductChange(productId: string | null): void {
     this.selectedProductId = productId ? String(productId) : null;
+    this.syncFarmCostFields();
     this.syncQuantityValidators();
   }
 
@@ -351,6 +415,140 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
     if (!qtyCtrl) return;
     qtyCtrl.setValidators([Validators.required, Validators.min(this.minQuantity)]);
     qtyCtrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private syncFarmCostFields(): void {
+    const costPerKgCtrl = this.form.get('costPerKg');
+    const weightCtrl = this.form.get('animalWeightKg');
+    const totalCostCtrl = this.form.get('totalCost');
+    if (!costPerKgCtrl || !weightCtrl || !totalCostCtrl) return;
+
+    if (this.isFarm) {
+      costPerKgCtrl.setValidators([Validators.required, Validators.min(0.01)]);
+      weightCtrl.setValidators([Validators.required, Validators.min(0.001)]);
+      this.recomputeFarmTotalCost();
+    } else {
+      costPerKgCtrl.clearValidators();
+      weightCtrl.clearValidators();
+      costPerKgCtrl.setValue(null, { emitEvent: false });
+      weightCtrl.setValue(null, { emitEvent: false });
+    }
+    costPerKgCtrl.updateValueAndValidity({ emitEvent: false });
+    weightCtrl.updateValueAndValidity({ emitEvent: false });
+    totalCostCtrl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private recomputeFarmTotalCost(): void {
+    if (!this.isFarm) return;
+    const total = this.computedFarmTotalCost;
+    const ctrl = this.form.get('totalCost');
+    if (!ctrl) return;
+    const next = total > 0 ? total : null;
+    if (ctrl.value !== next) {
+      ctrl.setValue(next, { emitEvent: false });
+    }
+  }
+
+  private resetDraftProductFields(): void {
+    this.selectedProductId = null;
+    this.selectedCategoryId = null;
+    this.products = [];
+    this.form.patchValue(
+      {
+        quantity: 1,
+        costPerKg: null,
+        animalWeightKg: null,
+        totalCost: null,
+      },
+      { emitEvent: false }
+    );
+    this.syncFarmCostFields();
+    this.syncQuantityValidators();
+  }
+
+  private buildDraftCartLine(): PurchaseQtyCartLine | null {
+    const product = this.selectedProduct;
+    if (!product || !this.selectedProductId) return null;
+    if (this.isFarm) this.recomputeFarmTotalCost();
+
+    const qty = Number(this.form.get('quantity')?.value);
+    const lineCost = this.draftLineCost;
+    if (!Number.isFinite(qty) || qty < this.minQuantity) return null;
+    if (!Number.isFinite(lineCost) || lineCost <= 0) return null;
+    if (this.isFarm) {
+      const costPerKg = Number(this.form.get('costPerKg')?.value);
+      const animalWeightKg = Number(this.form.get('animalWeightKg')?.value);
+      if (!Number.isFinite(costPerKg) || costPerKg <= 0) return null;
+      if (!Number.isFinite(animalWeightKg) || animalWeightKg <= 0) return null;
+    }
+
+    const categoryName =
+      this.selectedCategory?.name ||
+      (typeof product.category === 'object' ? String((product.category as any)?.name || '') : '') ||
+      '';
+
+    const line: PurchaseQtyCartLine = {
+      productId: String(this.selectedProductId),
+      productName: String(product.name || ''),
+      productCode: String(product.code || ''),
+      categoryName,
+      quantity: qty,
+      totalCost: lineCost,
+      isFarm: this.isFarm,
+    };
+    if (this.isFarm) {
+      line.costPerKg = Number(this.form.get('costPerKg')?.value);
+      line.animalWeightKg = Number(this.form.get('animalWeightKg')?.value);
+    }
+    return line;
+  }
+
+  addLineToCart(): void {
+    if (!this.selectedProductId) {
+      this.notify.push(this.translate.instant('tr_purchase_quantity_product_required'), 'error');
+      return;
+    }
+    this.form.markAllAsTouched();
+    const qtyCtrl = this.form.get('quantity');
+    const totalCtrl = this.form.get('totalCost');
+    if (qtyCtrl?.invalid || totalCtrl?.invalid) {
+      this.notify.push(this.translate.instant('tr_fill_required_fields'), 'error');
+      return;
+    }
+    if (this.isFarm) {
+      const costCtrl = this.form.get('costPerKg');
+      const weightCtrl = this.form.get('animalWeightKg');
+      if (costCtrl?.invalid || weightCtrl?.invalid) {
+        this.notify.push(this.translate.instant('tr_fill_required_fields'), 'error');
+        return;
+      }
+    }
+
+    const line = this.buildDraftCartLine();
+    if (!line) {
+      this.notify.push(this.translate.instant('tr_fill_required_fields'), 'error');
+      return;
+    }
+
+    if (this.cartLines.some((l) => l.productId === line.productId)) {
+      this.notify.push(this.translate.instant('tr_purchase_quantity_product_already_added'), 'error');
+      return;
+    }
+
+    this.cartLines = [...this.cartLines, line];
+    this.resetDraftProductFields();
+    this.ensureDefaultDeskTreasuryAmounts();
+    this.notify.push(this.translate.instant('tr_purchase_quantity_line_added'), 'success');
+  }
+
+  removeCartLine(index: number): void {
+    if (index < 0 || index >= this.cartLines.length) return;
+    this.cartLines = this.cartLines.filter((_, i) => i !== index);
+    this.ensureDefaultDeskTreasuryAmounts();
+  }
+
+  trackCartLine(_i: number, line: PurchaseQtyCartLine): string {
+    return line.productId;
   }
 
   close(): void {
@@ -495,16 +693,32 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       this.notify.push(this.translate.instant('tr_purchase_quantity_treasury_branch_required'), 'error');
       return;
     }
-    if (!this.selectedProductId) {
+    if (!this.selectedProductId && !this.cartLines.length) {
       this.activeTab = 'product';
       this.notify.push(this.translate.instant('tr_purchase_quantity_product_required'), 'error');
       return;
     }
 
-    this.form.markAllAsTouched();
-    if (this.form.invalid) {
+    const submitLines: PurchaseQtyCartLine[] = [...this.cartLines];
+    if (this.selectedProductId) {
+      this.form.markAllAsTouched();
+      const draft = this.buildDraftCartLine();
+      if (!draft) {
+        this.activeTab = 'product';
+        this.notify.push(this.translate.instant('tr_fill_required_fields'), 'error');
+        return;
+      }
+      if (submitLines.some((l) => l.productId === draft.productId)) {
+        this.activeTab = 'product';
+        this.notify.push(this.translate.instant('tr_purchase_quantity_product_already_added'), 'error');
+        return;
+      }
+      submitLines.push(draft);
+    }
+
+    if (!submitLines.length) {
       this.activeTab = 'product';
-      this.notify.push(this.translate.instant('tr_fill_required_fields'), 'error');
+      this.notify.push(this.translate.instant('tr_purchase_quantity_lines_required'), 'error');
       return;
     }
 
@@ -529,8 +743,8 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const qty = Number(this.form.get('quantity')?.value);
-    const totalCost = this.totalCost;
+    const invoiceTotal =
+      Math.round(submitLines.reduce((acc, l) => acc + (Number(l.totalCost) || 0), 0) * 100) / 100;
     const acquiredFrom = this.buildAcquiredFromPayload();
     const branchId = this.form.get('branchId')?.value
       ? String(this.form.get('branchId')?.value)
@@ -540,13 +754,21 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
         ? branchId || String(this.globals.currentUser?.branch?._id || '')
         : branchId;
 
+    const linesPayload = submitLines.map((l) => ({
+      productId: l.productId,
+      quantity: l.quantity,
+      totalCost: l.totalCost,
+      ...(l.isFarm && l.costPerKg != null && l.animalWeightKg != null
+        ? { costPerKg: l.costPerKg, animalWeightKg: l.animalWeightKg }
+        : {}),
+    }));
+
     this.saving = true;
     this.productPurchaseRequests
       .purchaseQuantity({
         userId: uid,
-        productId: String(this.selectedProductId),
-        quantity: qty,
-        totalCost,
+        lines: linesPayload,
+        totalCost: invoiceTotal,
         destinationType: this.destinationType,
         ...(branchId ? { branchId } : {}),
         ...(this.destinationType === 'factory' && this.factoryId

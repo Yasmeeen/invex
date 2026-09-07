@@ -233,8 +233,9 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
     const lineNames = Array.isArray(p?.lines)
       ? p.lines.map((l: any) => String(l?.productPayload?.name || '').toLowerCase()).join(' ')
       : '';
-    const party = String(pp.acquiredFrom?.displayName || pp.acquiredFrom?.name || '').toLowerCase();
-    const phone = String(pp.acquiredFrom?.phone || '').toLowerCase();
+    const af = this.purchaseParty(p);
+    const party = String(af?.displayName || af?.name || '').toLowerCase();
+    const phone = String(af?.phone || '').toLowerCase();
     const id = String(p?._id || '').toLowerCase();
     const ref = this.purchaseRef(p).toLowerCase();
     return (
@@ -252,15 +253,36 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
     if (Array.isArray(p?.lines) && p.lines.length) {
       return Math.round(
         p.lines.reduce((sum: number, line: any) => {
-          const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+          const rawQty = Number(line?.quantity);
+          const q = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
           const net = Number(line?.productPayload?.netPrice) || 0;
           return sum + net * q;
         }, 0) * 100
       ) / 100;
     }
-    const q = Math.max(1, Math.floor(Number(p?.quantity) || 1));
+    const rawQty = Number(p?.quantity);
+    const q = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
     const net = Number(p?.productPayload?.netPrice) || 0;
     return Math.round(net * q * 100) / 100;
+  }
+
+  purchaseLines(p: any): any[] {
+    if (Array.isArray(p?.lines) && p.lines.length) return p.lines;
+    if (!p?.productPayload) return [];
+    return [
+      {
+        productPayload: p.productPayload,
+        quantity: p.quantity,
+        costPerKg: p.costPerKg,
+        animalWeightKg: p.animalWeightKg,
+      },
+    ];
+  }
+
+  hasWeightDetails(p: any): boolean {
+    return this.purchaseLines(p).some(
+      (line) => Number(line?.animalWeightKg) > 0 || Number(line?.costPerKg) > 0
+    );
   }
 
   purchaseProductLabel(p: any): string {
@@ -359,15 +381,22 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
   }
 
   partyTypeLabel(p: any): string {
-    const t = String(p?.productPayload?.acquiredFrom?.partyType || 'client').toLowerCase();
+    const t = String(this.purchaseParty(p)?.partyType || 'client').toLowerCase();
     return t === 'supplier'
       ? this.translate.instant('tr_party_supplier')
       : this.translate.instant('tr_party_client');
   }
 
   partyNameRaw(p: any): string {
-    const af = p?.productPayload?.acquiredFrom;
+    const af = this.purchaseParty(p);
     return String(af?.displayName || af?.name || af?.phone || '').trim();
+  }
+
+  purchaseParty(p: any): any {
+    const root = p?.productPayload?.acquiredFrom;
+    if (root) return root;
+    const line = this.purchaseLines(p).find((l) => l?.productPayload?.acquiredFrom);
+    return line?.productPayload?.acquiredFrom || null;
   }
 
   partyName(p: any): string {

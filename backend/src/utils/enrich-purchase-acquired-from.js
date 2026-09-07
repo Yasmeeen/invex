@@ -13,6 +13,19 @@ function idString(ref) {
   return String(ref);
 }
 
+function acquiredFromEntries(purchase) {
+  const entries = [];
+  const root = purchase?.productPayload?.acquiredFrom;
+  if (root) entries.push(root);
+  if (Array.isArray(purchase?.lines)) {
+    for (const line of purchase.lines) {
+      const af = line?.productPayload?.acquiredFrom;
+      if (af && !entries.includes(af)) entries.push(af);
+    }
+  }
+  return entries;
+}
+
 /**
  * Fill missing acquiredFrom.displayName on purchase list/detail payloads (clientId/vendorId only).
  */
@@ -23,12 +36,13 @@ export async function enrichPurchasesAcquiredFromDisplay(purchases) {
   const vendorIds = new Set();
 
   for (const p of purchases) {
-    const af = p?.productPayload?.acquiredFrom;
-    if (!af || partyNameFromAcquiredFrom(af)) continue;
-    const cid = idString(af.clientId);
-    const vid = idString(af.vendorId);
-    if (cid && mongoose.Types.ObjectId.isValid(cid)) clientIds.add(cid);
-    if (vid && mongoose.Types.ObjectId.isValid(vid)) vendorIds.add(vid);
+    for (const af of acquiredFromEntries(p)) {
+      if (partyNameFromAcquiredFrom(af)) continue;
+      const cid = idString(af.clientId);
+      const vid = idString(af.vendorId);
+      if (cid && mongoose.Types.ObjectId.isValid(cid)) clientIds.add(cid);
+      if (vid && mongoose.Types.ObjectId.isValid(vid)) vendorIds.add(vid);
+    }
   }
 
   if (!clientIds.size && !vendorIds.size) return purchases;
@@ -50,20 +64,21 @@ export async function enrichPurchasesAcquiredFromDisplay(purchases) {
   const vendorMap = new Map(vendors.map((v) => [String(v._id), v]));
 
   for (const p of purchases) {
-    const af = p?.productPayload?.acquiredFrom;
-    if (!af || partyNameFromAcquiredFrom(af)) continue;
+    for (const af of acquiredFromEntries(p)) {
+      if (partyNameFromAcquiredFrom(af)) continue;
 
-    const cid = idString(af.clientId);
-    const vid = idString(af.vendorId);
+      const cid = idString(af.clientId);
+      const vid = idString(af.vendorId);
 
-    if (vid && vendorMap.has(vid)) {
-      const v = vendorMap.get(vid);
-      af.displayName = String(v.nameOfcompany || v.name || '').trim();
-      if (!af.phone) af.phone = String(v.phone || '').trim();
-    } else if (cid && clientMap.has(cid)) {
-      const c = clientMap.get(cid);
-      af.displayName = String(c.name || '').trim();
-      if (!af.phone) af.phone = String(c.phoneNumber || '').trim();
+      if (vid && vendorMap.has(vid)) {
+        const v = vendorMap.get(vid);
+        af.displayName = String(v.nameOfcompany || v.name || '').trim();
+        if (!af.phone) af.phone = String(v.phone || '').trim();
+      } else if (cid && clientMap.has(cid)) {
+        const c = clientMap.get(cid);
+        af.displayName = String(c.name || '').trim();
+        if (!af.phone) af.phone = String(c.phoneNumber || '').trim();
+      }
     }
   }
 

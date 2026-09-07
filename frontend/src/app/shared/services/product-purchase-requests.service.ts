@@ -68,6 +68,10 @@ export class ProductPurchaseRequestsService {
     productId: string;
     quantity: number;
     totalCost: number;
+    /** Farm purchase: cost per kg (used with animalWeightKg to derive totalCost). */
+    costPerKg?: number;
+    /** Farm purchase: weight of one animal in kg. */
+    animalWeightKg?: number;
     purchaseTreasurySplits?: PurchaseTreasurySplit[];
     purchaseTreasuryKey?: string;
     acquiredFrom?: ProductAcquiredFrom | null;
@@ -79,9 +83,20 @@ export class ProductPurchaseRequestsService {
   /** Purchase quantity with category/product pick and branch, warehouse, or factory destination. */
   purchaseQuantity(payload: {
     userId: string;
-    productId: string;
-    quantity: number;
-    totalCost: number;
+    /** Legacy single-product fields (used when `lines` is omitted). */
+    productId?: string;
+    quantity?: number;
+    totalCost?: number;
+    costPerKg?: number;
+    animalWeightKg?: number;
+    /** Multi-product invoice lines (preferred). */
+    lines?: Array<{
+      productId: string;
+      quantity: number;
+      totalCost: number;
+      costPerKg?: number;
+      animalWeightKg?: number;
+    }>;
     destinationType: 'branch' | 'warehouse' | 'factory';
     branchId?: string;
     factoryId?: string;

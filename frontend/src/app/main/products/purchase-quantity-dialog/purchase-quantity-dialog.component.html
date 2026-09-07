@@ -165,6 +165,46 @@
             {{ 'tr_branch' | translate }}:
             <strong>{{ forcedBranchLabel }}</strong>
           </p>
+
+          <div class="purchase-qty-cart mb-3" *ngIf="cartLines.length">
+            <div class="purchase-qty-cart__title weight-medium mb-2">
+              {{ 'tr_purchase_quantity_invoice_lines' | translate }}
+              <span class="text-muted size-small">({{ cartLines.length }})</span>
+            </div>
+            <div
+              class="purchase-qty-cart__row"
+              *ngFor="let line of cartLines; let i = index; trackBy: trackCartLine"
+            >
+              <div class="purchase-qty-cart__info">
+                <div class="weight-medium">{{ line.productName }}</div>
+                <div class="size-small text-muted">
+                  {{ line.productCode }}
+                  <span *ngIf="line.categoryName"> · {{ line.categoryName }}</span>
+                  · {{ 'tr_quantity' | translate }}: {{ line.quantity }}
+                </div>
+                <div class="size-small text-muted" *ngIf="line.isFarm">
+                  {{ 'tr_farm_purchase_animal_weight' | translate }}: {{ line.animalWeightKg }}
+                  · {{ 'tr_farm_purchase_cost_per_kg' | translate }}: {{ line.costPerKg }}
+                </div>
+              </div>
+              <div class="purchase-qty-cart__cost weight-medium">
+                {{ line.totalCost | currency:'EGP ':'symbol':'1.2-2' }}
+              </div>
+              <button
+                type="button"
+                class="s-btn btn-secondary purchase-qty-cart__remove"
+                (click)="removeCartLine(i)"
+                [attr.aria-label]="'tr_delete' | translate"
+              >
+                ×
+              </button>
+            </div>
+            <div class="size-small mt-2">
+              {{ 'tr_purchase_quantity_invoice_total' | translate }}:
+              <strong>{{ totalCost | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+            </div>
+          </div>
+
           <div class="row">
             <div class="col-md-6">
               <div class="form-group">
@@ -230,7 +270,7 @@
                   [min]="minQuantity"
                   [step]="quantityStep"
                 />
-                <p class="size-small text-muted m-0 mt-1" *ngIf="isWeight">
+                <p class="size-small text-muted m-0 mt-1" *ngIf="isWeight && !isFarm">
                   {{ 'tr_weight' | translate }}
                 </p>
                 <p class="size-small text-muted m-0 mt-1" *ngIf="isFarm">
@@ -238,23 +278,80 @@
                 </p>
               </div>
             </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
-                <input
-                  type="number"
-                  class="s-control width-100"
-                  formControlName="totalCost"
-                  min="0.01"
-                  step="0.01"
-                />
+            <ng-container *ngIf="isFarm; else nonFarmTotalCost">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_farm_purchase_cost_per_kg' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="costPerKg"
+                    min="0.01"
+                    step="0.01"
+                  />
+                </div>
               </div>
-            </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_farm_purchase_animal_weight' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="animalWeightKg"
+                    min="0.001"
+                    step="0.001"
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="totalCost"
+                    min="0.01"
+                    step="0.01"
+                    readonly
+                  />
+                  <p class="size-small text-muted m-0 mt-1">
+                    {{ 'tr_farm_purchase_total_hint' | translate }}
+                  </p>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #nonFarmTotalCost>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="totalCost"
+                    min="0.01"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </ng-template>
           </div>
-          <p class="size-small text-muted m-0" *ngIf="selectedProduct">
-            {{ 'tr_purchase_quantity_product_selected' | translate }}:
-            <strong>{{ selectedProduct?.name }}</strong> ({{ selectedProduct?.code }})
-          </p>
+          <div class="flex flex-space-between flex-middle mt-2 mb-2">
+            <p class="size-small text-muted m-0" *ngIf="selectedProduct">
+              {{ 'tr_purchase_quantity_product_selected' | translate }}:
+              <strong>{{ selectedProduct?.name }}</strong> ({{ selectedProduct?.code }})
+            </p>
+            <p class="size-small text-muted m-0" *ngIf="!selectedProduct && cartLines.length">
+              {{ 'tr_purchase_quantity_add_another_hint' | translate }}
+            </p>
+            <button
+              type="button"
+              class="s-btn btn-secondary"
+              (click)="addLineToCart()"
+              [disabled]="!selectedProductId || saving"
+            >
+              {{ 'tr_purchase_quantity_add_line' | translate }}
+            </button>
+          </div>
         </div>
 
         <div [hidden]="activeTab !== 'source'">

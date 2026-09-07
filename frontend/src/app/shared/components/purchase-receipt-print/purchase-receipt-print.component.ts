@@ -62,14 +62,21 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     return s.length > 10 ? s.slice(-10).toUpperCase() : s.toUpperCase();
   }
 
-  get receiptLines(): Array<{ productPayload: any; quantity: number }> {
+  get receiptLines(): Array<{
+    productPayload: any;
+    quantity: number;
+    costPerKg?: number;
+    animalWeightKg?: number;
+  }> {
     const p = this.purchase;
     if (!p) return [];
     if (Array.isArray(p.lines) && p.lines.length) {
       return p.lines
         .map((l: any) => ({
           productPayload: l?.productPayload,
-          quantity: Math.max(1, Math.floor(Number(l?.quantity) || 1)),
+          quantity: this.normalizeQuantity(l?.quantity),
+          costPerKg: l?.costPerKg,
+          animalWeightKg: l?.animalWeightKg,
         }))
         .filter((l: any) => l.productPayload);
     }
@@ -77,7 +84,9 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     return [
       {
         productPayload: p.productPayload,
-        quantity: Math.max(1, Math.floor(Number(p.quantity) || 1)),
+        quantity: this.normalizeQuantity(p.quantity),
+        costPerKg: p.costPerKg,
+        animalWeightKg: p.animalWeightKg,
       },
     ];
   }
@@ -92,8 +101,22 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
   }
 
   lineRowTotal(line: { productPayload?: any; quantity?: number }): number {
-    const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+    const q = this.normalizeQuantity(line?.quantity);
     return Math.round(this.lineUnitNet(line) * q * 100) / 100;
+  }
+
+  get sourceParty(): any {
+    const root = this.purchase?.productPayload?.acquiredFrom;
+    if (root) return root;
+    return (
+      this.receiptLines.find((line) => line?.productPayload?.acquiredFrom)?.productPayload
+        ?.acquiredFrom || null
+    );
+  }
+
+  private normalizeQuantity(raw: any): number {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 1;
   }
 
   get lineTotal(): number {

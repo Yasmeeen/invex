@@ -63,7 +63,7 @@
                   [min]="minQuantity"
                   [step]="quantityStep"
                 />
-                <p class="size-small text-muted m-0 mt-1" *ngIf="isWeight">
+                <p class="size-small text-muted m-0 mt-1" *ngIf="isWeight && !isFarm">
                   {{ 'tr_weight' | translate }}
                 </p>
                 <p class="size-small text-muted m-0 mt-1" *ngIf="isFarm">
@@ -71,18 +71,62 @@
                 </p>
               </div>
             </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
-                <input
-                  type="number"
-                  class="s-control width-100"
-                  formControlName="totalCost"
-                  min="0.01"
-                  step="0.01"
-                />
+            <ng-container *ngIf="isFarm; else nonFarmTotalCost">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_farm_purchase_cost_per_kg' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="costPerKg"
+                    min="0.01"
+                    step="0.01"
+                  />
+                </div>
               </div>
-            </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_farm_purchase_animal_weight' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="animalWeightKg"
+                    min="0.001"
+                    step="0.001"
+                  />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="totalCost"
+                    min="0.01"
+                    step="0.01"
+                    readonly
+                  />
+                  <p class="size-small text-muted m-0 mt-1">
+                    {{ 'tr_farm_purchase_total_hint' | translate }}
+                  </p>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #nonFarmTotalCost>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label>{{ 'tr_product_add_quantity_cost' | translate }} *</label>
+                  <input
+                    type="number"
+                    class="s-control width-100"
+                    formControlName="totalCost"
+                    min="0.01"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+            </ng-template>
           </div>
         </div>
 

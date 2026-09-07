@@ -37,71 +37,70 @@
 
   <div class="size-small text-muted mb-3" *ngIf="dialogData?.body && isPending">{{ dialogData.body }}</div>
 
-  <div class="card mb-3" *ngIf="displayBlock as d">
+  <div class="card mb-3" *ngIf="sourceParty as party">
     <div class="card-body">
       <div class="row">
         <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_name' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.name || d?.productName || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_code' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.code || d?.productCode || '-' }}</div>
-        </div>
-        <div class="col-12 mb-2" *ngIf="(d?.product?.unitCodes?.length ?? 0) > 1 && !(d?.product?.unitDetails?.length > 1)">
-          <div class="size-small text-muted">{{ 'tr_product_unit_codes_title' | translate }}</div>
-          <div class="weight-bold text-break">{{ d?.product?.unitCodes?.join(', ') }}</div>
-        </div>
-        <div class="col-12 mb-2" *ngIf="(d?.product?.unitDetails?.length ?? 0) > 1">
-          <div class="size-small text-muted mb-1">{{ 'tr_product_unit_details_title' | translate }}</div>
-          <div class="size-small mb-2" *ngFor="let u of d.product.unitDetails; let i = index">
-            <div class="flex flex-middle">
-              <img
-                *ngIf="u.imageUrl"
-                [src]="u.imageUrl"
-                alt=""
-                class="unit-detail-thumb mr-2"
-              />
-              <div>
-                <span class="weight-bold">{{ u.code }}</span>
-                — {{ 'tr_sell_price' | translate }}: {{ u.price }}
-                · {{ 'tr_net_price' | translate }}: {{ u.netPrice }}
-                <ng-container *ngIf="u.discount"> · {{ 'tr_discount' | translate }}: {{ u.discount }}%</ng-container>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_branch' | translate }}</div>
-          <div class="weight-bold">{{ d?.branchName || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_quantity' | translate }}</div>
-          <div class="weight-bold">{{ d?.quantity || 1 }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_purchase_price' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.netPrice || '-' }}</div>
-        </div>
-        <div class="col-md-6 mb-2">
-          <div class="size-small text-muted">{{ 'tr_sale_price' | translate }}</div>
-          <div class="weight-bold">{{ d?.product?.price || '-' }}</div>
-        </div>
-        <div class="col-md-12 mb-2" *ngIf="d?.treasurySplits?.length > 1">
-          <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
-          <ul class="m-0 pl-3 weight-bold">
-            <li *ngFor="let s of d.treasurySplits">
-              {{ s.label || s.key }}:
-              {{ s.amount | currency:'EGP ':'symbol':'1.2-2' }}
-            </li>
-          </ul>
-        </div>
-        <div class="col-md-6 mb-2" *ngIf="(d?.treasuryKey || d?.treasuryLabel) && !(d?.treasurySplits?.length > 1)">
-          <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
+          <div class="size-small text-muted">{{ 'tr_party_type' | translate }}</div>
           <div class="weight-bold">
-            {{ d?.treasuryLabel || d?.treasuryKey || '—' }}
-            <span class="text-muted size-small" *ngIf="d?.treasuryLabel && d?.treasuryKey">({{ d?.treasuryKey }})</span>
+            {{
+              (party?.partyType === 'supplier' ? 'tr_party_supplier' : 'tr_party_client')
+                | translate
+            }}
           </div>
+        </div>
+        <div class="col-md-6 mb-2">
+          <div class="size-small text-muted">{{ 'tr_purchase_invoice_party' | translate }}</div>
+          <div class="weight-bold">
+            {{ party?.displayName || party?.name || party?.phone || '-' }}
+          </div>
+        </div>
+        <div class="col-md-6 mb-2" *ngIf="party?.phone">
+          <div class="size-small text-muted">{{ 'tr_client_phone' | translate }}</div>
+          <div class="weight-bold">{{ party.phone }}</div>
+        </div>
+        <div class="col-md-6 mb-2" *ngIf="party?.address">
+          <div class="size-small text-muted">{{ 'tr_address' | translate }}</div>
+          <div class="weight-bold">{{ party.address }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="weight-bold mb-2">{{ 'tr_purchase_quantity_invoice_lines' | translate }}</div>
+      <div class="purchase-review-line" *ngFor="let line of displayLines">
+        <div>
+          <div class="weight-bold">
+            {{ line?.productPayload?.name || '-' }}
+            <span class="text-muted">({{ line?.productPayload?.code || '-' }})</span>
+          </div>
+          <div class="size-small text-muted">
+            {{ 'tr_quantity' | translate }}: {{ line?.quantity }}
+            <ng-container *ngIf="line?.animalWeightKg">
+              · {{ 'tr_farm_purchase_animal_weight' | translate }}: {{ line.animalWeightKg }}
+            </ng-container>
+            <ng-container *ngIf="line?.costPerKg">
+              · {{ 'tr_farm_purchase_cost_per_kg' | translate }}: {{ line.costPerKg }}
+            </ng-container>
+          </div>
+        </div>
+        <div class="weight-bold">
+          {{ lineTotal(line) | currency:'EGP ':'symbol':'1.2-2' }}
+        </div>
+      </div>
+
+      <div class="flex flex-space-between mt-3">
+        <span class="weight-bold">{{ 'tr_purchase_quantity_invoice_total' | translate }}</span>
+        <span class="weight-bold">{{ invoiceTotal | currency:'EGP ':'symbol':'1.2-2' }}</span>
+      </div>
+
+      <div class="mt-3" *ngIf="purchase?.purchaseTreasurySplits?.length">
+        <div class="size-small text-muted">{{ 'tr_purchase_treasury_method' | translate }}</div>
+        <div *ngFor="let split of purchase.purchaseTreasurySplits">
+          {{ split?.label || split?.key }}:
+          {{ split?.amount | currency:'EGP ':'symbol':'1.2-2' }}
         </div>
       </div>
     </div>

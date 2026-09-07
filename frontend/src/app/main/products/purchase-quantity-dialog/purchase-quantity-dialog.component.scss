@@ -1,5 +1,14 @@
 @import '../add-quantity-dialog/add-quantity-dialog.component.scss';
 
+#purchase-quantity-modal-root {
+  position: relative;
+  overflow: visible;
+}
+
+.modal-body {
+  overflow: visible;
+}
+
 .storage-choice {
   display: flex;
   flex-wrap: wrap;
@@ -52,4 +61,87 @@
   padding: 0.15rem 0.5rem;
   line-height: 1.2;
   font-size: 1.25rem;
+}
+
+/* The global s-select style makes the container static, which can place the
+ * appended dropdown over the searchable input inside this dialog. */
+::ng-deep .purchase-product-select.ng-select {
+  position: relative;
+  z-index: 5;
+}
+
+::ng-deep .purchase-product-select.ng-select .ng-select-container {
+  position: relative !important;
+  min-width: 0;
+}
+
+::ng-deep .purchase-product-select.ng-select-opened {
+  z-index: 20 !important;
+}
+
+::ng-deep .purchase-product-select.ng-select-opened .ng-input {
+  z-index: 2;
+}
+
+::ng-deep .purchase-product-select.ng-select-opened .ng-input input {
+  opacity: 1 !important;
+  color: #2c3e50;
+  background: #fff;
+}
+
+::ng-deep .purchase-product-select.ng-select-opened .ng-value {
+  visibility: hidden;
+}
+
+::ng-deep #purchase-quantity-modal-root .ng-dropdown-panel {
+  z-index: 10050 !important;
+}
+
+::ng-deep #purchase-quantity-modal-root .ng-dropdown-panel-items {
+  max-height: 260px !important;
+}
+
+.purchase-product-option,
+.purchase-product-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.purchase-product-option {
+  padding: 0.35rem 0.15rem;
+}
+
+.purchase-product-option__name,
+.purchase-product-label__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-product-option__name {
+  font-weight: 600;
+}
+
+.purchase-product-option__code,
+.purchase-product-label__code {
+  direction: ltr;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: #607d8b;
+  font-size: 0.78rem;
+}
+
+.purchase-product-option__code {
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  background: #eef2f4;
+}
+
+.purchase-product-label__code {
+  margin-inline-end: 1.25rem;
 }

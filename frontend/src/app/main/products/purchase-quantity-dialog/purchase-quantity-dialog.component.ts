@@ -376,6 +376,9 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
       limit: 1000,
       categoryId: this.selectedCategoryId,
       includeRemoved: true,
+      // Products here are templates for any destination; include factory-only SKUs
+      // such as "كندوز ثلاجة" as well as branch/warehouse rows.
+      includeFactory: true,
     };
 
     this.productsService.getProducts(params).subscribe({
@@ -398,16 +401,32 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
   }
 
   private dedupeProductsByCode(products: Product[]): Product[] {
-    const seen = new Set<string>();
-    const out: Product[] = [];
+    const bestByCode = new Map<string, Product>();
     for (const p of products) {
       const code = String(p.code || '').trim();
-      if (!code || seen.has(code)) continue;
+      if (!code) continue;
       if (String(p.productType || '').toLowerCase() === 'service') continue;
-      seen.add(code);
-      out.push(p);
+      const current = bestByCode.get(code);
+      if (!current || this.productTemplatePriority(p) > this.productTemplatePriority(current)) {
+        bestByCode.set(code, p);
+      }
     }
+    const out = [...bestByCode.values()];
     return out.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+  }
+
+  /**
+   * The same catalog SKU can exist in several branches with different legacy names.
+   * Prefer the warehouse/canonical row so e.g. "كندوز ثلاجة" is not hidden by an
+   * older branch row named "لحم كندوز" that shares the same product code.
+   */
+  private productTemplatePriority(product: Product): number {
+    let score = 0;
+    if ((product as any).inWarehouse === true) score += 100;
+    if (!(product as any).branch) score += 20;
+    if ((product as any).catalogKey) score += 10;
+    if ((product as any).removedWhenOutOfStock !== true) score += 1;
+    return score;
   }
 
   private syncQuantityValidators(): void {

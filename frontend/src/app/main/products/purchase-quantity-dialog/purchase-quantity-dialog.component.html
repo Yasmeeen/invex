@@ -233,7 +233,7 @@
                 <label>{{ 'tr_product_name' | translate }} *</label>
                 <div class="input-with-icon bg-white">
                   <ng-select
-                    class="s-control s-select"
+                    class="s-control s-select purchase-product-select"
                     [items]="products"
                     bindLabel="name"
                     bindValue="_id"
@@ -246,14 +246,20 @@
                     placeholder="{{ 'tr_select' | translate }}"
                     [clearable]="true"
                     [searchable]="true"
+                    dropdownPosition="bottom"
                     notFoundText="{{ 'tr_no_items_found' | translate }}"
                   >
                     <ng-template ng-option-tmp let-item="item">
-                      <div class="weight-medium">{{ item.name }}</div>
-                      <div class="size-small text-muted">{{ item.code }}</div>
+                      <div class="purchase-product-option">
+                        <span class="purchase-product-option__name">{{ item.name }}</span>
+                        <span class="purchase-product-option__code">{{ item.code }}</span>
+                      </div>
                     </ng-template>
                     <ng-template ng-label-tmp let-item="item">
-                      {{ item.name }} — {{ item.code }}
+                      <span class="purchase-product-label">
+                        <span class="purchase-product-label__name">{{ item.name }}</span>
+                        <span class="purchase-product-label__code">{{ item.code }}</span>
+                      </span>
                     </ng-template>
                   </ng-select>
                   <i class="fa fa-caret-down input-icon"></i>

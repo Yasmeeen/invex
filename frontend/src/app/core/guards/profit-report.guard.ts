@@ -14,11 +14,11 @@ export class ProfitReportGuard implements CanActivate {
 
   canActivate(route: ActivatedRouteSnapshot): boolean {
     const reportType = route.data['reportType'] as string | undefined;
-    if (reportType !== 'profit') {
+    if (reportType !== 'profit' && reportType !== 'accounting') {
       return true;
     }
     const user = this.authenticationService.getUserFromLocalStorage();
-    if (user?.role === 'Co Admin' || user?.role === 'Branch Manager') {
+    if (user?.role !== 'Super Admin') {
       this.router.navigate(['/reports/sales']);
       return false;
     }

@@ -353,9 +353,24 @@ export class AddQuantityDialogComponent implements OnInit, OnDestroy {
           : {}),
       })
       .subscribe({
-        next: () => {
+        next: (res: any) => {
           this.saving = false;
           this.notify.push(this.translate.instant('tr_product_add_quantity_ok'), 'success');
+          const animalSerials = (res?.purchase?.lines || []).reduce(
+            (all: string[], line: any) => [
+              ...all,
+              ...(Array.isArray(line?.farmAnimalSerials) ? line.farmAnimalSerials.map(String) : []),
+            ],
+            []
+          );
+          if (animalSerials.length) {
+            this.notify.push(
+              this.translate.instant('tr_farm_purchase_generated_serials', {
+                codes: animalSerials.join('، '),
+              }),
+              'success'
+            );
+          }
           this.dialogRef.close(true);
         },
         error: (err) => {

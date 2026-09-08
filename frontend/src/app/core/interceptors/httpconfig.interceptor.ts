@@ -25,6 +25,7 @@ export class HttpConfigInterceptor implements HttpInterceptor {
     ) { }
     returnUrl: any;
     intercept(request: any, next: HttpHandler): Observable<HttpEvent<any>> {
+        const token = this.authenticationService.getUserFromLocalStorage()?.token;
         let headers = {
           'Access-Control-Allow-Origin': '*'
       };
@@ -36,7 +37,9 @@ export class HttpConfigInterceptor implements HttpInterceptor {
         //     };
         // }
         request = request.clone({
-            setHeaders: { ...headers, ...request.headers.headers }
+            setHeaders: token
+              ? { ...headers, Authorization: `Bearer ${token}` }
+              : headers
         });
 
             return next.handle(request).pipe(

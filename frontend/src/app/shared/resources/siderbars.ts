@@ -30,6 +30,11 @@ export const AdminSidebar = [
         icon: 'fa fa-barcode icon',
       },
       {
+        name: 'tr_farm_animals_registry',
+        routerLink: '/products/farm-animals',
+        icon: 'fa fa-paw icon',
+      },
+      {
         name: 'tr_branch_transfers_pending',
         routerLink: '/products/branch-transfers',
         icon: 'fa fa-exchange icon',
@@ -161,6 +166,11 @@ export const AdminSidebar = [
     children: [
       { name: 'tr_reports_sales', routerLink: '/reports/sales', icon: 'fa fa-line-chart icon' },
       { name: 'tr_reports_profit', routerLink: '/reports/profit', icon: 'fa fa-area-chart icon' },
+      {
+        name: 'tr_report_title_accounting',
+        routerLink: '/reports/accounting',
+        icon: 'fa fa-balance-scale icon',
+      },
       { name: 'tr_reports_products', routerLink: '/reports/products', icon: 'fa fa-cube icon' },
       { name: 'tr_reports_stock', routerLink: '/reports/stock', icon: 'fa fa-exchange icon' },
       { name: 'tr_reports_customers', routerLink: '/reports/customers', icon: 'fa fa-users icon' },
@@ -236,7 +246,10 @@ export const CoAdminSidebar = AdminSidebar.filter((item) => item.routerLink !== 
       return item;
     }
     const children = item.children.filter(
-      (c) => c.routerLink !== '/reports/profit' && c.routerLink !== '/settings/permissions'
+      (c) =>
+        c.routerLink !== '/reports/profit' &&
+        c.routerLink !== '/reports/accounting' &&
+        c.routerLink !== '/settings/permissions'
     );
     if (item.name === 'tr_treasury_menu') {
       return {

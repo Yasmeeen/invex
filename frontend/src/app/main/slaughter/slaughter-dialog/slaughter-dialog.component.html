@@ -46,12 +46,37 @@
           ></ng-select>
         </div>
       </div>
+      <div class="col-md-12" *ngIf="farmProductId">
+        <div class="form-group">
+          <label>{{ 'tr_farm_sale_select_animal' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="individualAnimals"
+            bindLabel="serial"
+            bindValue="_id"
+            [(ngModel)]="farmAnimalId"
+            (ngModelChange)="onIndividualAnimalChange()"
+            [clearable]="true"
+            [searchable]="true"
+            [placeholder]="loadingIndividualAnimals ? ('tr_loading' | translate) : ('tr_farm_sale_select_animal' | translate)"
+            appendTo="#slaughter-dialog-root"
+          >
+            <ng-template ng-option-tmp let-animal="item">
+              <strong>{{ animal.serial }}</strong>
+              — {{ animal.remainingShare }}
+              <span *ngIf="animal.currentWeightKg || animal.purchaseWeightKg">
+                — {{ animal.currentWeightKg || animal.purchaseWeightKg }} kg
+              </span>
+            </ng-template>
+          </ng-select>
+        </div>
+      </div>
       <div class="col-md-4">
         <div class="form-group">
           <label>{{ 'tr_slaughter_share' | translate }}</label>
           <select class="s-control" [(ngModel)]="share">
-            <option [ngValue]="1">1</option>
-            <option [ngValue]="0.5">1/2</option>
+            <option [ngValue]="1" [disabled]="farmAnimalId && selectedAnimalRemainingShare < 1">1</option>
+            <option [ngValue]="0.5" [disabled]="farmAnimalId && selectedAnimalRemainingShare < 0.5">1/2</option>
             <option [ngValue]="0.25">1/4</option>
           </select>
         </div>

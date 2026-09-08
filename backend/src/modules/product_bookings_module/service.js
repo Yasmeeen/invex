@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import ProductBooking from '../../DB/models/productBooking.model.js';
 import Product from '../../DB/models/product.model.js';
+import FarmAnimal from '../../DB/models/farmAnimal.model.js';
 import Client from '../../DB/models/client.model.js';
 import User from '../../DB/models/user.model.js';
 import Notification from '../../DB/models/notification.model.js';
@@ -567,12 +568,14 @@ export const createProductBooking = async (req, res) => {
       userId,
       branchId: branchIdBody,
       pickupBranchId: pickupBranchIdBody,
+      farmAnimalId,
+      farmAnimalWeightKg,
     } = req.body;
 
     if (!productId || !mongoose.Types.ObjectId.isValid(String(productId))) {
       return res.status(400).json({ error: 'Valid productId is required' });
     }
-    const quantity = Math.max(1, Math.floor(Number(qtyRaw)) || 1);
+    let quantity = Math.max(1, Math.floor(Number(qtyRaw)) || 1);
     if (!customerName || !String(customerName).trim()) {
       return res.status(400).json({ error: 'Customer name is required' });
     }
@@ -659,6 +662,25 @@ export const createProductBooking = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
     const pid = product._id;
+    let farmAnimal = null;
+    if (farmAnimalId) {
+      if (!mongoose.Types.ObjectId.isValid(String(farmAnimalId))) {
+        return res.status(400).json({ error: 'Invalid farm animal id' });
+      }
+      farmAnimal = await FarmAnimal.findOne({
+        _id: farmAnimalId,
+        product: pid,
+        status: 'available',
+        remainingShare: { $gt: 0 },
+      }).lean();
+      if (!farmAnimal) {
+        return res.status(409).json({
+          error: 'Selected farm animal is not available',
+          code: 'FARM_ANIMAL_NOT_AVAILABLE',
+        });
+      }
+      quantity = Number(farmAnimal.remainingShare) || 1;
+    }
     const alreadyBooked = await sumActiveBookedQuantity(pid);
     const transferReserved = Number(product.transferReservedQuantity) || 0;
     const capacity = Math.max(0, Number(product.stock) - transferReserved);
@@ -669,7 +691,21 @@ export const createProductBooking = async (req, res) => {
     }
 
     const branchOid = product.branch || null;
-    const unitPrice = Math.round((Number(product.price) || 0) * 100) / 100;
+    const animalWeight = farmAnimal
+      ? Math.round(
+          (Number(farmAnimalWeightKg) ||
+            Number(farmAnimal.currentWeightKg) ||
+            Number(farmAnimal.purchaseWeightKg) ||
+            0) * 1000
+        ) / 1000
+      : 0;
+    if (farmAnimal && animalWeight <= 0) {
+      return res.status(400).json({ error: 'Valid farm animal weight is required' });
+    }
+    const pricePerKg = Math.round((Number(product.price) || 0) * 100) / 100;
+    const unitPrice = farmAnimal
+      ? Math.round(animalWeight * pricePerKg * 100) / 100
+      : pricePerKg;
 
     let pickupBranchOid = null;
     let pickupShippingLabel = String(shippingAddress || '').trim();
@@ -713,6 +749,14 @@ export const createProductBooking = async (req, res) => {
       product: pid,
       branch: branchOid,
       productInWarehouse: !!product.inWarehouse,
+      ...(farmAnimal
+        ? {
+            farmAnimal: farmAnimal._id,
+            farmAnimalSerial: farmAnimal.serial,
+            farmAnimalWeightKg: animalWeight,
+            farmPricePerKg: pricePerKg,
+          }
+        : {}),
       client: client._id,
       customerName: String(customerName).trim(),
       customerPhone: String(customerPhone).trim(),
@@ -733,6 +777,30 @@ export const createProductBooking = async (req, res) => {
       status: 'active',
       createdBy: userId,
     });
+
+    if (farmAnimal) {
+      const reserved = await FarmAnimal.findOneAndUpdate(
+        { _id: farmAnimal._id, status: 'available' },
+        {
+          $set: {
+            status: 'reserved',
+            booking: booking._id,
+            reservedForType: 'client',
+            reservedForId: client._id,
+            reservedAt: new Date(),
+            currentWeightKg: animalWeight,
+          },
+        },
+        { new: true }
+      );
+      if (!reserved) {
+        await ProductBooking.deleteOne({ _id: booking._id });
+        return res.status(409).json({
+          error: 'Selected farm animal was reserved by another user',
+          code: 'FARM_ANIMAL_NOT_AVAILABLE',
+        });
+      }
+    }
 
     const cashDrawerAmount = cashAmountFromPaymentSplits(depositPayments, feeAllocations);
     if (cashDrawerAmount > 0) {
@@ -978,6 +1046,20 @@ export const cancelProductBooking = async (req, res) => {
       booking.cancelReason = String(reason).trim();
     }
     await booking.save();
+    if (booking.farmAnimal) {
+      await FarmAnimal.updateOne(
+        { _id: booking.farmAnimal, booking: booking._id, status: 'reserved' },
+        {
+          $set: { status: 'available' },
+          $unset: {
+            booking: 1,
+            reservedForType: 1,
+            reservedForId: 1,
+            reservedAt: 1,
+          },
+        }
+      );
+    }
 
     await recalcProductBookingTotals(booking.product);
 
@@ -1404,7 +1486,7 @@ export const getActiveReservationsForProduct = async (req, res) => {
     })
       .sort({ bookingDate: 1, createdAt: 1 })
       .select(
-        '_id product client customerName customerPhone quantity depositAmount productUnitPrice confirmed createdAt bookingDate source'
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice farmAnimal farmAnimalSerial confirmed createdAt bookingDate source'
       )
       .lean();
 
@@ -1473,7 +1555,7 @@ export const getActiveBookingsForCheckout = async (req, res) => {
     const bookings = await ProductBooking.find(match)
       .sort({ createdAt: 1 })
       .select(
-        '_id product client customerName customerPhone quantity depositAmount productUnitPrice productNameSnapshot productCodeSnapshot confirmed createdAt bookingDate source'
+        '_id product client customerName customerPhone quantity depositAmount productUnitPrice productNameSnapshot productCodeSnapshot farmAnimal farmAnimalSerial confirmed createdAt bookingDate source'
       )
       .populate('product', 'name code price')
       .lean();

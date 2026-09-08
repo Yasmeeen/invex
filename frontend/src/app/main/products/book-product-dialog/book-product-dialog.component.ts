@@ -20,7 +20,7 @@ import {
 } from 'rxjs/operators';
 import { environment } from 'src/environments/environment';
 import { AuthenticationService } from '@core/services/authentication.service';
-import { Product, Branch } from '@core/models/products.model';
+import { Product, Branch, FarmAnimal } from '@core/models/products.model';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.service';
@@ -28,6 +28,7 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductBookingsService } from '@shared/services/product-bookings.service';
 import { BookingReprintService } from '@shared/services/booking-reprint.service';
 import { BranchesServce } from '@shared/services/branches.service';
+import { FarmAnimalsService } from '@shared/services/farm-animals.service';
 import {
   PaymentSplitsDialogComponent,
   PaymentSplitsDialogData,
@@ -57,6 +58,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   product: Product;
   branches: Branch[] = [];
   readonly maxQuantity: number;
+  availableFarmAnimals: FarmAnimal[] = [];
+  farmAnimalsLoading = false;
   readonly pickupTypeOptions: Array<{ id: string; labelKey: string }> = [
     { id: 'branch_pickup', labelKey: 'tr_booking_branch_pickup' },
     { id: 'online_shipping', labelKey: 'tr_booking_online_shipping' },
@@ -83,7 +86,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private dialog: MatDialog,
     private bookingReprint: BookingReprintService,
-    private branchesApi: BranchesServce
+    private branchesApi: BranchesServce,
+    private farmAnimalsApi: FarmAnimalsService
   ) {
     this.product = data.product;
     this.maxQuantity = Math.max(1, Math.floor(Number(data.maxQuantity)) || 1);
@@ -92,6 +96,8 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
         1,
         [Validators.required, Validators.min(1), Validators.max(this.maxQuantity)],
       ],
+      farmAnimalId: [''],
+      farmAnimalWeightKg: [null],
       customerPhone: ['', [Validators.required, this.phoneFormatValidator]],
       customerName: ['', Validators.required],
       registeredAddress: [''],
@@ -103,6 +109,16 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    if (this.isFarmProduct) {
+      this.form.get('farmAnimalId')?.setValidators(Validators.required);
+      this.form.get('farmAnimalId')?.updateValueAndValidity();
+      this.form.get('farmAnimalWeightKg')?.setValidators([
+        Validators.required,
+        Validators.min(0.001),
+      ]);
+      this.form.get('farmAnimalWeightKg')?.updateValueAndValidity();
+      this.loadAvailableFarmAnimals();
+    }
     const productBranchId = this.productBranchId();
     this.form.patchValue({ pickupBranchId: productBranchId });
     this.branchesApi.getBranchs({ page: 1, limit: 1000 }).subscribe({
@@ -196,6 +212,52 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       });
   }
 
+  get isFarmProduct(): boolean {
+    return (
+      String(this.product?.productType || '').toLowerCase() === 'farm' ||
+      String(this.product?.catalogKey || '').startsWith('farm_') ||
+      String(this.product?.category?.code || '').toUpperCase() === 'FARM'
+    );
+  }
+
+  private loadAvailableFarmAnimals(): void {
+    this.farmAnimalsLoading = true;
+    const branchRaw = this.product?.branch;
+    const branchId =
+      branchRaw && typeof branchRaw === 'object' ? branchRaw._id : branchRaw || undefined;
+    this.farmAnimalsApi
+      .list({
+        productId: this.product._id,
+        available: true,
+        ...(branchId
+          ? { branchId: String(branchId) }
+          : this.product?.inWarehouse
+            ? { inWarehouse: true }
+            : {}),
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (response) => {
+          this.availableFarmAnimals = (response?.animals || []).filter(
+            (animal) => Number(animal.remainingShare) >= 1
+          );
+          this.farmAnimalsLoading = false;
+        },
+        () => {
+          this.availableFarmAnimals = [];
+          this.farmAnimalsLoading = false;
+        }
+      );
+  }
+
+  onFarmAnimalChange(): void {
+    const id = String(this.form.get('farmAnimalId')?.value || '');
+    const animal = this.availableFarmAnimals.find((row) => String(row._id) === id);
+    if (!animal) return;
+    const weight = Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || null;
+    this.form.patchValue({ farmAnimalWeightKg: weight });
+  }
+
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
@@ -229,7 +291,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
   }
 
   @HostListener('document:keydown.escape', ['$event'])
-  onEscape(event?: KeyboardEvent): void {
+  onEscape(event?: Event): void {
     if (this.depositPreviewUrl) {
       event?.preventDefault?.();
       this.closeDepositPreview();
@@ -468,6 +530,10 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     this.bookings
       .createBooking({
         productId: this.product._id,
+        farmAnimalId: this.isFarmProduct ? String(v.farmAnimalId || '') : undefined,
+        farmAnimalWeightKg: this.isFarmProduct
+          ? Number(v.farmAnimalWeightKg)
+          : undefined,
         quantity,
         customerName: v.customerName.trim(),
         customerPhone: v.customerPhone.trim(),
@@ -532,6 +598,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       customerPhone: booking?.customerPhone || formValue.customerPhone,
       productName: booking?.productNameSnapshot || this.product.name,
       productCode: booking?.productCodeSnapshot || this.product.code,
+      farmAnimalSerial: booking?.farmAnimalSerial,
       quantity: Number(booking?.quantity) || quantity,
       unitPrice,
       depositAmount: Number(booking?.depositAmount) || depositAmount,

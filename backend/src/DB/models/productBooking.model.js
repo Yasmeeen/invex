@@ -22,6 +22,15 @@ const productBookingSchema = new mongoose.Schema(
       index: true,
     },
     productInWarehouse: { type: Boolean, default: false },
+    farmAnimal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FarmAnimal',
+      default: null,
+      index: true,
+    },
+    farmAnimalSerial: { type: String, default: '', trim: true },
+    farmAnimalWeightKg: { type: Number, default: 0, min: 0 },
+    farmPricePerKg: { type: Number, default: 0, min: 0 },
     client: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Client',

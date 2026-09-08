@@ -282,13 +282,28 @@ const orderSchema = new mongoose.Schema(
         name: { type: String, required: true },
         code: { type: String, required: true },
         quantity: { type: Number, required: true },
-        /** piece = integer count; weight = kg/g amount in quantity. */
-        saleUnit: { type: String, enum: ['piece', 'weight'], default: 'piece' },
+        /** piece = integer count; weight = kg/g amount; head = farm animal count. */
+        saleUnit: { type: String, enum: ['piece', 'weight', 'head'], default: 'piece' },
         /** Snapshot when saleUnit is weight. */
         weightUnit: { type: String, enum: ['kg', 'g'], required: false },
         /** Units already returned on this line. */
         returnedQuantity: { type: Number, default: 0, min: 0 },
         price: { type: Number, required: true },
+        /** Farm sale snapshots. quantity remains heads; price remains derived price per head. */
+        farmAnimalWeightKg: { type: Number, required: false, min: 0 },
+        farmPricePerKg: { type: Number, required: false, min: 0 },
+        productTypeSnapshot: {
+          type: String,
+          enum: ['good', 'service', 'farm'],
+          required: false,
+        },
+        farmAnimalId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'FarmAnimal',
+          required: false,
+          index: true,
+        },
+        farmAnimalSerial: { type: String, required: false, trim: true },
         /** Snapshot item cost at time of sale (for profit reports). */
         cost: { type: Number, required: false, default: 0, min: 0 },
         isApplyDiscount: { type: Boolean, default: false },

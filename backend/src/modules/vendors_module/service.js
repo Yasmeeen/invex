@@ -14,6 +14,7 @@ import {
 import {
   buildNetBalanceMessage,
   buildSettlementPreview,
+  computeTotalDebitDue,
   computeTotalCreditOwed,
 } from "../../utils/vendor-balance-summary.js";
 import {
@@ -147,13 +148,16 @@ export const getVendors = async (req, res) => {
         const owesFromSales = owesFromSalesMap.get(id) || 0;
         const openingDebit =
           Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
-        const supplierOwesUs =
-          Math.round((owesFromSales + openingDebit) * 100) / 100;
         const prepaidBalance =
           Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
         const buyerPrepaidBalance =
           Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
         const purchasePayable = purchasePayableMap.get(id) || 0;
+        const supplierOwesUs = computeTotalDebitDue(
+          owesFromSales,
+          openingDebit,
+          prepaidBalance
+        );
         const weOweSupplier = computeTotalCreditOwed(
           prepaidBalance,
           purchasePayable,
@@ -168,6 +172,10 @@ export const getVendors = async (req, res) => {
           ...vendor,
           supplierOwesUs,
           weOweSupplier,
+          supplierPrepaidAsset: prepaidBalance,
+          supplierReceivable: Math.round((owesFromSales + openingDebit) * 100) / 100,
+          supplierPayable: purchasePayable,
+          supplierDepositLiability: buyerPrepaidBalance,
           balanceSide: side,
           netBalanceMessage,
         };
@@ -306,12 +314,16 @@ export const getVendorHistory = async (req, res) => {
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
     const owesFromOpeningBalance =
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
-    const supplierOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
     const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const buyerPrepaidBalance =
       Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
     const purchasePayableBreakdown = await computePurchasePayableBreakdown(vendor._id);
     const purchasePayable = purchasePayableBreakdown.total;
+    const supplierOwesUs = computeTotalDebitDue(
+      owesFromSales,
+      owesFromOpeningBalance,
+      prepaidBalance
+    );
     const weOweSupplier = computeTotalCreditOwed(
       prepaidBalance,
       purchasePayable,
@@ -319,6 +331,7 @@ export const getVendorHistory = async (req, res) => {
     );
     const ledgerPurchases = await PurchasingRequest.find({
       supplier: vendor._id,
+      status: 'Received',
       paymentStatus: { $in: ['Installments', 'Deferred'] },
     }).lean();
 
@@ -477,6 +490,12 @@ export const getVendorHistory = async (req, res) => {
       weOweSupplier,
       prepaidBalance,
       buyerPrepaidBalance,
+      supplierPrepaidAsset: prepaidBalance,
+      supplierReceivable: Math.round(
+        (owesFromSales + owesFromOpeningBalance) * 100
+      ) / 100,
+      supplierPayable: purchasePayable,
+      supplierDepositLiability: buyerPrepaidBalance,
       purchasePayable,
       purchasePayableInstallments: purchasePayableBreakdown.installments,
       purchasePayableDeferred: purchasePayableBreakdown.deferred,
@@ -502,7 +521,7 @@ export const settleVendorBalances = async (req, res) => {
       return res.status(404).json({ message: 'Vendor not found' });
     }
 
-    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+    const supplierReceivableBefore = await computeSupplierOwesUs(vendor._id);
     const prepaidBefore = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const buyerPrepaidBefore =
       Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
@@ -512,6 +531,9 @@ export const settleVendorBalances = async (req, res) => {
       purchasePayableBefore.total,
       buyerPrepaidBefore
     );
+    const supplierOwesUs = Math.round(
+      (supplierReceivableBefore + prepaidBefore) * 100
+    ) / 100;
     const settleAmount = Math.min(supplierOwesUs, totalCreditBefore);
 
     if (settleAmount <= 0) {
@@ -570,14 +592,18 @@ export const settleVendorBalances = async (req, res) => {
       remaining = Math.round((remaining - fromOpening) * 100) / 100;
     }
 
+    if (remaining > 0) {
+      const fromPrepaidAsset = Math.min(remaining, prepaidBefore);
+      vendor.creditBalance = Math.round(
+        (prepaidBefore - fromPrepaidAsset) * 100
+      ) / 100;
+      remaining = Math.round((remaining - fromPrepaidAsset) * 100) / 100;
+    }
+
     let creditToReduce = settleAmount;
     const fromBuyerPrepaid = Math.min(creditToReduce, buyerPrepaidBefore);
     vendor.buyerPrepaidBalance = Math.round((buyerPrepaidBefore - fromBuyerPrepaid) * 100) / 100;
     creditToReduce = Math.round((creditToReduce - fromBuyerPrepaid) * 100) / 100;
-
-    const fromPrepaid = Math.min(creditToReduce, prepaidBefore);
-    vendor.creditBalance = Math.round((prepaidBefore - fromPrepaid) * 100) / 100;
-    creditToReduce = Math.round((creditToReduce - fromPrepaid) * 100) / 100;
 
     if (creditToReduce > 0) {
       await applyPurchasePayableSettlement(vendor._id, creditToReduce, {
@@ -599,7 +625,6 @@ export const settleVendorBalances = async (req, res) => {
     const newOwesFromSales = await computeSupplierOwesFromOrders(vendor._id);
     const newOwesFromOpening =
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
-    const newSupplierOwesUs = await computeSupplierOwesUs(vendor._id);
     const newPrepaid = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const newBuyerPrepaid =
       Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
@@ -608,6 +633,11 @@ export const settleVendorBalances = async (req, res) => {
       newPrepaid,
       newPayableBreakdown.total,
       newBuyerPrepaid
+    );
+    const newSupplierOwesUs = computeTotalDebitDue(
+      newOwesFromSales,
+      newOwesFromOpening,
+      newPrepaid
     );
     const netBalanceMessage = buildNetBalanceMessage(newSupplierOwesUs, newWeOwe);
     const settlementPreview = buildSettlementPreview(newSupplierOwesUs, newWeOwe);
@@ -851,7 +881,11 @@ export const setVendorOpeningDebitBalance = async (req, res) => {
     await vendor.save();
 
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
-    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+    const supplierOwesUs = computeTotalDebitDue(
+      owesFromSales,
+      vendor.openingDebitBalance,
+      vendor.creditBalance
+    );
 
     res.json({
       message: 'Opening debit balance set',
@@ -925,7 +959,11 @@ export const payVendorOpeningDebitBalance = async (req, res) => {
     }
 
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
-    const supplierOwesUs = await computeSupplierOwesUs(vendor._id);
+    const supplierOwesUs = computeTotalDebitDue(
+      owesFromSales,
+      vendor.openingDebitBalance,
+      vendor.creditBalance
+    );
 
     res.json({
       message: 'Opening debit payment recorded',

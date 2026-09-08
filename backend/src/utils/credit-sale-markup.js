@@ -49,6 +49,10 @@ export function distributeAmountOntoLinePrices(orderProducts, amount) {
       i === lastIdx ? roundMoney(fee - allocated) : roundMoney(fee * (lineTotals[i] / base));
     const extraUnit = roundMoney(share / qty);
     products[i].price = roundMoney((Number(products[i].price) || 0) + extraUnit);
+    const farmWeight = Number(products[i].farmAnimalWeightKg) || 0;
+    if (farmWeight > 0 && products[i].farmPricePerKg != null) {
+      products[i].farmPricePerKg = roundMoney(products[i].price / farmWeight);
+    }
     allocated = roundMoney(allocated + extraUnit * qty);
   }
   return allocated;

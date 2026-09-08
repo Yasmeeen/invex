@@ -58,6 +58,7 @@ export const UPLOAD_PRODUCT_IMAGE_URL = BASE_URL + '/uploads/product-image';
 export const REPORTS_URL = BASE_URL + '/reports';
 
 export const PRODUCT_BOOKINGS_URL = BASE_URL + '/product-bookings';
+export const FARM_ANIMALS_URL = BASE_URL + '/farm-animals';
 export const NOTIFICATIONS_URL = BASE_URL + '/notifications';
 export const PRODUCT_PURCHASE_REQUESTS_URL = BASE_URL + '/product-purchase-requests';
 

@@ -72,6 +72,16 @@ const treasuryLedgerEntrySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
+    /**
+     * Stable business-event identifier used to make retries idempotent.
+     * Legacy rows intentionally have no key and remain valid.
+     */
+    eventKey: {
+      type: String,
+      trim: true,
+      maxlength: 300,
+      default: undefined,
+    },
     /** Opposite account for transfers / settlements. */
     counterAccountKey: {
       type: String,
@@ -104,6 +114,10 @@ treasuryLedgerEntrySchema.index({ branch: 1, accountKey: 1, occurredAt: -1 });
 treasuryLedgerEntrySchema.index({ accountKey: 1, occurredAt: -1 });
 treasuryLedgerEntrySchema.index({ sourceType: 1, sourceId: 1 });
 treasuryLedgerEntrySchema.index({ branch: 1, businessDate: 1, accountKey: 1 });
+treasuryLedgerEntrySchema.index(
+  { eventKey: 1 },
+  { unique: true, partialFilterExpression: { eventKey: { $type: 'string' } } }
+);
 
 export const TREASURY_LEDGER_SOURCE_TYPES = SOURCE_TYPES;
 

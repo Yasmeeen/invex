@@ -82,6 +82,12 @@
               <bdi>{{ line.costPerKg }}</bdi>
             </span>
           </div>
+          <div class="invoice-item-attrs" *ngIf="line?.farmAnimalSerials?.length">
+            <span class="invoice-item-attr">
+              <bdi>{{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:</bdi>
+              <bdi>{{ line.farmAnimalSerials?.join('، ') }}</bdi>
+            </span>
+          </div>
           <div class="invoice-item-attrs" *ngIf="attrLinesFor(line?.productPayload).length">
             <span
               class="invoice-item-attr"

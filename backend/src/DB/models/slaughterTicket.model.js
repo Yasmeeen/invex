@@ -21,6 +21,8 @@ const slaughterTicketSchema = new mongoose.Schema(
     inWarehouse: { type: Boolean, default: false, index: true },
     farmProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     farmProductName: { type: String, default: '', trim: true },
+    farmAnimalId: { type: mongoose.Schema.Types.ObjectId, ref: 'FarmAnimal', default: null, index: true },
+    farmAnimalSerial: { type: String, default: '', trim: true },
     templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'SlaughterTemplate', default: null },
     templateCode: { type: String, default: '', trim: true },
     share: { type: Number, required: true, min: 0.25, max: 1 },

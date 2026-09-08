@@ -52,6 +52,9 @@
                   ><i class="fa fa-cubes" aria-hidden="true"></i>
                   {{ b.quantity ?? 1 }}</span
                 >
+                <span *ngIf="b.farmAnimalSerial" class="booking-card__badge">
+                  {{ 'tr_farm_animal_serial' | translate }}: {{ b.farmAnimalSerial }}
+                </span>
                 <span *ngIf="b.source === 'ecommerce'" class="booking-card__badge">
                   <i class="fa fa-globe" aria-hidden="true"></i>
                   {{ 'tr_booking_source_ecommerce' | translate }}

@@ -21,6 +21,7 @@ export interface BookingReceiptData {
   customerPhone?: string;
   productName?: string;
   productCode?: string;
+  farmAnimalSerial?: string;
   quantity?: number;
   unitPrice?: number;
   depositAmount?: number;

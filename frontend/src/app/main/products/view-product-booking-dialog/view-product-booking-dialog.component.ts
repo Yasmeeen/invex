@@ -108,7 +108,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
   }
 
   @HostListener('document:keydown.escape', ['$event'])
-  onEscape(event?: KeyboardEvent): void {
+  onEscape(event?: Event): void {
     if (this.depositPreviewUrl) {
       event?.preventDefault?.();
       this.closeDepositPreview();

@@ -23,6 +23,8 @@ export interface SlaughterTicket {
   inWarehouse?: boolean;
   farmProductId?: { _id: string; name?: string; catalogKey?: string; stock?: number };
   farmProductName?: string;
+  farmAnimalId?: string;
+  farmAnimalSerial?: string;
   templateCode?: string;
   share: number;
   liveWeightKg?: number;

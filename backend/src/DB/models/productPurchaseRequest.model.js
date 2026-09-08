@@ -171,6 +171,12 @@ const productPurchaseRequestSchema = new mongoose.Schema(
           /** Farm line inputs (optional). */
           costPerKg: { type: Number, required: false, min: 0 },
           animalWeightKg: { type: Number, required: false, min: 0 },
+          /** Individual farm animals generated when this purchase is approved. */
+          farmAnimalIds: {
+            type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'FarmAnimal' }],
+            default: undefined,
+          },
+          farmAnimalSerials: { type: [String], default: undefined },
           createdProductId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
           createdProductIds: {
             type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],

@@ -1178,3 +1178,48 @@
     line-height: 1;
   }
 }
+
+.farm-sale-field {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+
+  &__input {
+    width: 4.5rem;
+    min-width: 3.5rem;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.28rem 0.35rem;
+    text-align: center;
+    background: transparent;
+
+    &--price {
+      width: 5rem;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  &__unit {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.35rem;
+    background: #f3f4f6;
+    color: #4b5563;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+
+.farm-animal-select {
+  min-width: 9rem;
+  margin-bottom: 0.35rem;
+  text-align: start;
+}

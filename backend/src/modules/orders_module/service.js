@@ -10,6 +10,7 @@ import ProductPurchaseRequest from '../../DB/models/productPurchaseRequest.model
 import StockMovement from '../../DB/models/stockMovement.model.js';
 
 import mongoose from 'mongoose';
+import FarmAnimal from '../../DB/models/farmAnimal.model.js';
 import moment from 'moment-timezone';
 import { auditLog } from '../audit_module/audit.service.js';
 import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
@@ -440,7 +441,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
+          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.farmAnimalWeightKg products.farmPricePerKg products.farmAnimalId products.farmAnimalSerial products.productTypeSnapshot products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -536,12 +537,14 @@ export const createOrder = async (req, res) => {
     return res.status(400).json({ error: 'Order must contain at least one product' });
   }
 
-  const needsTransaction = orderNeedsTransaction({
+  const needsTransaction =
+    products.some((item) => item?.selectedProduct?.farmAnimalId) ||
+    orderNeedsTransaction({
     partyType,
     exchangePurchaseIdsRaw,
     exchangePurchaseIdRaw,
     bookingDepositAllocationsRaw,
-  });
+    });
 
   let session = null;
   if (needsTransaction) {
@@ -665,7 +668,7 @@ export const createOrder = async (req, res) => {
       uniqueProductIds.length > 0
         ? q(
             Product.find({ _id: { $in: uniqueProductIds } }).select(
-              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType processingExtraCost'
+              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType catalogKey processingExtraCost'
             )
           )
         : Promise.resolve([]),
@@ -686,7 +689,7 @@ export const createOrder = async (req, res) => {
       if (extraSourceIds.length) {
         const extraDocs = await q(
           Product.find({ _id: { $in: extraSourceIds } }).select(
-            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType processingExtraCost'
+            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId productType catalogKey processingExtraCost'
           )
         );
         for (const doc of extraDocs) {
@@ -713,6 +716,8 @@ export const createOrder = async (req, res) => {
     const nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
 
     const dirtyProductIds = new Set();
+    const soldFarmAnimals = [];
+    const seenFarmAnimalIds = new Set();
 
     const clientReservedByProduct = await clientReservedQtyByProductId({
       session,
@@ -753,7 +758,59 @@ export const createOrder = async (req, res) => {
 
       let price = Number(selected.price) || 0;
       let itemCost = Number(selected.netPrice ?? selected.cost ?? 0);
-      const isApplyDiscount = !!selected.isApplyDiscount;
+      let isApplyDiscount = !!selected.isApplyDiscount;
+      let farmAnimalWeightKg;
+      let farmPricePerKg;
+      let farmAnimalSerial = '';
+
+      if (isFarm) {
+        farmAnimalWeightKg =
+          Math.round((Number(selected.farmAnimalWeightKg) || 0) * 1000) / 1000;
+        farmPricePerKg =
+          Math.round((Number(selected.farmPricePerKg) || 0) * 100) / 100;
+        if (!Number.isFinite(farmAnimalWeightKg) || farmAnimalWeightKg <= 0) {
+          throw new Error(`Valid animal weight is required for ${productDoc.name}`);
+        }
+        if (!Number.isFinite(farmPricePerKg) || farmPricePerKg <= 0) {
+          throw new Error(`Valid price per kg is required for ${productDoc.name}`);
+        }
+        // Product.price is the configured farm selling rate per kg. Snapshot the
+        // actual rate and store the derived per-head price for compatibility.
+        price = Math.round(farmAnimalWeightKg * farmPricePerKg * 100) / 100;
+        isApplyDiscount = false;
+
+        const farmAnimalId = String(selected.farmAnimalId || '').trim();
+        if (farmAnimalId) {
+          if (
+            !mongoose.Types.ObjectId.isValid(farmAnimalId) ||
+            seenFarmAnimalIds.has(farmAnimalId)
+          ) {
+            throw new Error(`Invalid or duplicate farm animal for ${productDoc.name}`);
+          }
+          const farmAnimal = await q(FarmAnimal.findById(farmAnimalId));
+          if (
+            !farmAnimal ||
+            String(farmAnimal.product) !== String(productDoc._id) ||
+            Number(farmAnimal.remainingShare) < quantity - 0.0001 ||
+            !['available', 'reserved'].includes(String(farmAnimal.status))
+          ) {
+            throw new Error(`Farm animal is not available for ${productDoc.name}`);
+          }
+          if (
+            farmAnimal.status === 'reserved' &&
+            farmAnimal.reservedForId &&
+            String(farmAnimal.reservedForId) !== String(finalClientId || '')
+          ) {
+            throw new Error(`Farm animal ${farmAnimal.serial} is reserved for another client`);
+          }
+          seenFarmAnimalIds.add(farmAnimalId);
+          farmAnimalSerial = String(farmAnimal.serial || '');
+          soldFarmAnimals.push({ animal: farmAnimal, selected, quantity });
+          if (Number(farmAnimal.currentWeightKg) > 0 && !(Number(selected.farmAnimalWeightKg) > 0)) {
+            farmAnimalWeightKg = Number(farmAnimal.currentWeightKg);
+          }
+        }
+      }
 
       if (isApplyDiscount && selected.discount > 0) {
         price = price - (price * selected.discount) / 100;
@@ -816,8 +873,21 @@ export const createOrder = async (req, res) => {
         name: selected.name,
         code: selected.code,
         quantity,
-        saleUnit: isWeight ? 'weight' : 'piece',
+        saleUnit: isFarm ? 'head' : isWeight ? 'weight' : 'piece',
         ...(isWeight ? { weightUnit } : {}),
+        ...(isFarm
+          ? {
+              farmAnimalWeightKg,
+              farmPricePerKg,
+              productTypeSnapshot: 'farm',
+              ...(selected.farmAnimalId
+                ? {
+                    farmAnimalId: selected.farmAnimalId,
+                    farmAnimalSerial,
+                  }
+                : {}),
+            }
+          : {}),
         price,
         cost: itemCost || Number(productDoc.netPrice || 0),
         isApplyDiscount,
@@ -1381,6 +1451,24 @@ export const createOrder = async (req, res) => {
       w()
     );
 
+    for (const entry of soldFarmAnimals) {
+      const animal = entry.animal;
+      animal.remainingShare = Math.max(
+        0,
+        Math.round((Number(animal.remainingShare) - Number(entry.quantity)) * 4) / 4
+      );
+      animal.currentWeightKg =
+        Math.round((Number(entry.selected.farmAnimalWeightKg) || animal.currentWeightKg || 0) * 1000) /
+        1000;
+      animal.status = animal.remainingShare > 0 ? 'available' : 'sold';
+      animal.order = newOrder._id;
+      animal.soldAt = new Date();
+      animal.booking = null;
+      animal.reservedForId = null;
+      animal.reservedAt = null;
+      await animal.save(w());
+    }
+
     // Finalize exchange trade-ins (create products/stock) only when the sale commits.
     const exchangePurchaseStockMovements = [];
     if (exchangeProductPurchaseRequestIds.length) {
@@ -1524,6 +1612,9 @@ export const addOrderPayment = async (req, res) => {
     });
 
     order.payments = order.payments || [];
+    const existingPaymentIds = new Set(
+      order.payments.map((payment) => String(payment?._id || '')).filter(Boolean)
+    );
     const noteStr = String(note || '').trim();
     let primaryMethod = '';
 
@@ -1651,13 +1742,13 @@ export const addOrderPayment = async (req, res) => {
       const branchForLedger =
         resolvedPaymentBranch || order.branch || (await resolveBranchForCashDrawer({ userId }));
       if (!branchForLedger) return;
-      const recent = (order.payments || []).slice(-20);
-      const justAdded = recent.filter(
-        (p) => p.paidAt && Math.abs(new Date(p.paidAt).getTime() - dt.getTime()) < 2000
+      const justAdded = (order.payments || []).filter(
+        (payment) => payment?._id && !existingPaymentIds.has(String(payment._id))
       );
+      if (!justAdded.length) return;
       await postOrderPaymentLinesToLedger({
         branchId: branchForLedger,
-        payments: justAdded.length ? justAdded : recent.slice(-5),
+        payments: justAdded,
         orderId: order._id,
         createdBy: userId,
       });
@@ -1885,12 +1976,16 @@ export const restoreOrder = async (req, res) => {
         (await resolveBranchForCashDrawer({ userId: actorUserId, branchId: body.branchId }));
       if (!branchForLedger) return;
       const ret = result.returnRecord;
+      const refundEventKey = ret?._id
+        ? `order_refund:${String(updated._id)}:${String(ret._id)}`
+        : undefined;
       await postRefundPaymentLinesToLedger({
         branchId: branchForLedger,
         refundPaymentSplits: ret?.refundPaymentSplits || [],
         orderId: updated._id,
         createdBy: actorUserId,
         occurredAt: ret?.returnedAt || new Date(),
+        eventKeyPrefix: refundEventKey,
       });
       const treasuryLines = salesReturnTreasuryRefundLines(ret);
       if (treasuryLines.length) {
@@ -1899,6 +1994,9 @@ export const restoreOrder = async (req, res) => {
           splits: treasuryLines,
           sourceType: 'order_refund',
           sourceId: updated._id,
+          eventKeyPrefix: refundEventKey
+            ? `${refundEventKey}:treasury`
+            : undefined,
           createdBy: actorUserId,
         });
       }

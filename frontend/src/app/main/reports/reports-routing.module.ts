@@ -21,6 +21,12 @@ const routes: Routes = [
     canActivate: [ProfitReportGuard, WarehouseStockReportGuard],
   },
   {
+    path: 'accounting',
+    component: ReportsPageComponent,
+    data: { reportType: 'accounting' },
+    canActivate: [ProfitReportGuard, WarehouseStockReportGuard],
+  },
+  {
     path: 'products',
     component: ReportsPageComponent,
     data: { reportType: 'products' },

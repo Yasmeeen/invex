@@ -44,9 +44,10 @@ export class AuthenticationService {
     return this.http.post<User>(USER_LOGIN_URL, userLogin).pipe(
       tap({
         next: (user:any) =>{
-          this.setUserToLocalStorage(user.user);
-          this.globals.currentUser = user.user
-          this.userSubject.next(user.user);
+          const authenticatedUser = { ...user.user, token: user.token };
+          this.setUserToLocalStorage(authenticatedUser);
+          this.globals.currentUser = authenticatedUser
+          this.userSubject.next(authenticatedUser);
         },
         error: (errorResponse:any) => {
           this.appNotificationService.push(this.extractErrorMessage(errorResponse, 'Login failed'), 'error');
@@ -59,8 +60,12 @@ export class AuthenticationService {
     return this.http.post<User>(USER_UPDATE_PASSWORD_URL, userLogin).pipe(
       tap({
         next: (user:User) =>{
-          this.setUserToLocalStorage(user);
-          this.userSubject.next(user);
+          const authenticatedUser = {
+            ...user,
+            token: this.getUserFromLocalStorage()?.token,
+          };
+          this.setUserToLocalStorage(authenticatedUser);
+          this.userSubject.next(authenticatedUser as User);
         },
         error: (errorResponse:any) => {
           this.appNotificationService.push(this.extractErrorMessage(errorResponse, 'Update password failed'), 'error');

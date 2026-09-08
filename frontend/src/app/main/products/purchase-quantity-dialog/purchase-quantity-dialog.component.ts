@@ -801,10 +801,25 @@ export class PurchaseQuantityDialogComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.saving = false;
           const pending = !!res?.pending || String(res?.purchase?.status || '').toLowerCase() === 'pending';
+          const animalSerials = (res?.purchase?.lines || []).reduce(
+            (all: string[], line: any) => [
+              ...all,
+              ...(Array.isArray(line?.farmAnimalSerials) ? line.farmAnimalSerials.map(String) : []),
+            ],
+            []
+          );
           this.notify.push(
             this.translate.instant(pending ? 'tr_purchase_quantity_pending_ok' : 'tr_purchase_quantity_ok'),
             'success'
           );
+          if (animalSerials.length) {
+            this.notify.push(
+              this.translate.instant('tr_farm_purchase_generated_serials', {
+                codes: animalSerials.join('، '),
+              }),
+              'success'
+            );
+          }
           this.dialogRef.close({ ok: true, purchase: res?.purchase, pending });
         },
         error: (err) => {

@@ -405,6 +405,16 @@
                  </div>
                 <div *ngFor="let product of order.products">
                   <span>{{product.quantity}} {{'tr_items'| translate}} {{'tr_from' | translate}} {{product.code}}</span>
+                  <div *ngIf="product.farmAnimalSerial">
+                    {{ 'tr_farm_animal_serial' | translate }}: {{ product.farmAnimalSerial }}
+                  </div>
+                  <div class="order-line-invoice-attrs" *ngIf="product.farmAnimalWeightKg && product.farmPricePerKg">
+                    <span>
+                      {{ 'tr_farm_sale_animal_weight' | translate }}: {{ product.farmAnimalWeightKg }} kg
+                      × {{ 'tr_farm_sale_price_per_kg' | translate }}:
+                      {{ product.farmPricePerKg | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                    </span>
+                  </div>
                   <div class="order-line-invoice-attrs" *ngIf="product.invoiceAttributes?.length">
                     <span *ngFor="let ia of product.invoiceAttributes"><bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi></span>
                   </div>
@@ -568,6 +578,16 @@
                 {{ 'tr_from' | translate }} {{ product.code }}
                 <span class="muted" *ngIf="product.name"> — {{ product.name }}</span>
               </span>
+              <div *ngIf="product.farmAnimalSerial">
+                {{ 'tr_farm_animal_serial' | translate }}: {{ product.farmAnimalSerial }}
+              </div>
+              <div class="order-line-invoice-attrs" *ngIf="product.farmAnimalWeightKg && product.farmPricePerKg">
+                <span>
+                  {{ 'tr_farm_sale_animal_weight' | translate }}: {{ product.farmAnimalWeightKg }} kg
+                  × {{ 'tr_farm_sale_price_per_kg' | translate }}:
+                  {{ product.farmPricePerKg | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </span>
+              </div>
               <div class="order-line-invoice-attrs" *ngIf="product.invoiceAttributes?.length">
                 <span *ngFor="let ia of product.invoiceAttributes"><bdi>{{ ia.label }}:</bdi> <bdi>{{ ia.value }}</bdi></span>
               </div>

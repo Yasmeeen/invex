@@ -1,0 +1,64 @@
+<div class="farm-animals-page">
+  <div class="s-header">
+    <div>
+      <h2>{{ 'tr_farm_animals_registry' | translate }}</h2>
+      <p class="text-muted">{{ 'tr_farm_animals_registry_hint' | translate }}</p>
+    </div>
+  </div>
+
+  <div class="farm-animals-filters">
+    <input
+      class="s-control"
+      [(ngModel)]="search"
+      (keyup.enter)="load()"
+      [placeholder]="'tr_farm_animal_serial' | translate"
+    />
+    <select class="s-control" [(ngModel)]="status" (ngModelChange)="load()">
+      <option value="">{{ 'tr_all' | translate }}</option>
+      <option value="available">{{ 'tr_farm_animal_status_available' | translate }}</option>
+      <option value="reserved">{{ 'tr_farm_animal_status_reserved' | translate }}</option>
+      <option value="sold">{{ 'tr_farm_animal_status_sold' | translate }}</option>
+      <option value="slaughtered">{{ 'tr_farm_animal_status_slaughtered' | translate }}</option>
+    </select>
+    <button class="s-btn btn-primary" type="button" (click)="load()">
+      {{ 'tr_search' | translate }}
+    </button>
+  </div>
+
+  <div class="table-container" *ngIf="!loading && animals.length">
+    <table class="s-table table">
+      <thead>
+        <tr>
+          <th>{{ 'tr_farm_animal_serial' | translate }}</th>
+          <th>{{ 'tr_product_name' | translate }}</th>
+          <th>{{ 'tr_weight' | translate }}</th>
+          <th>{{ 'tr_slaughter_share' | translate }}</th>
+          <th>{{ 'tr_status' | translate }}</th>
+          <th>{{ 'tr_location' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let animal of animals">
+          <td><strong>{{ animal.serial }}</strong></td>
+          <td>{{ productName(animal) }}</td>
+          <td>{{ animal.currentWeightKg || animal.purchaseWeightKg || '—' }}</td>
+          <td>{{ animal.remainingShare }}</td>
+          <td>{{ ('tr_farm_animal_status_' + animal.status) | translate }}</td>
+          <td>
+            <ng-container *ngIf="animal.inWarehouse; else otherLocation">
+              {{ 'tr_warehouse' | translate }}
+            </ng-container>
+            <ng-template #otherLocation>{{ locationName(animal) }}</ng-template>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="text-center text-muted ptb-5" *ngIf="loading">
+    {{ 'tr_loading' | translate }}
+  </div>
+  <div class="text-center text-muted ptb-5" *ngIf="!loading && !animals.length">
+    {{ 'tr_no_items_found' | translate }}
+  </div>
+</div>

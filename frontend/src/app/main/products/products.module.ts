@@ -21,6 +21,7 @@ import { AddQuantityDialogComponent } from './add-quantity-dialog/add-quantity-d
 import { TrimDialogComponent } from './trim-dialog/trim-dialog.component';
 import { PurchaseQuantityDialogModule } from './purchase-quantity-dialog/purchase-quantity-dialog.module';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
+import { FarmAnimalsListComponent } from './farm-animals-list/farm-animals-list.component';
 
 
 @NgModule({
@@ -37,6 +38,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     SerialTrackComponent,
     AddQuantityDialogComponent,
     TrimDialogComponent,
+    FarmAnimalsListComponent,
   ],
   imports: [
     CommonModule,

@@ -17,12 +17,17 @@ import { getEffectiveMoneyAccountsFromDb } from '../settings_module/moneyAccount
 import { buildPhoneSearchCandidates, digitsOnly } from '../../utils/phone-utils.js';
 import {
   aggregateTreasuryAmountsFromPurchases,
+  deskPurchaseLineTotal,
   expandDeskPurchaseDetailLines,
   resolvePurchaseTreasurySplits,
 } from '../../utils/purchase-treasury-splits.js';
 import { NON_OPERATING_DAILY_EXPENSE_TYPES } from '../../utils/daily-expense-categories.js';
 import { companyOpeningForAccount, isCashDrawerAccount } from '../../utils/treasury-ledger.js';
 import { getCurrentDrawerCash, sumCurrentDrawerCashAllBranches } from '../drawer_close_module/service.js';
+import {
+  deferredPurchaseRemaining,
+  unpaidInstallmentsTotal,
+} from '../../utils/vendor-purchase-ledger.js';
 
 /** Business calendar for report date filters (matches orders/dashboard). */
 const REPORT_TZ = 'Africa/Cairo';
@@ -76,6 +81,7 @@ async function getOperatingDailyExpensesForReport({ from, to, branchId, groupBy 
   const match = {
     createdAt: { $gte: from, $lte: to },
     expenseType: { $nin: NON_OPERATING_DAILY_EXPENSE_TYPES },
+    accountingTreatment: { $nin: ['cash_movement', 'overhead_payment'] },
   };
   if (branchId) match.branch = branchId;
 
@@ -194,7 +200,7 @@ const appendOrderCustomerFilters = (match, f) => {
   }
 };
 
-const parseCommonFilters = (query) => {
+const parseCommonFilters = (query, actor) => {
   const nowCairo = moment.tz(REPORT_TZ);
   const from = toDate(
     query.from,
@@ -205,12 +211,20 @@ const parseCommonFilters = (query) => {
 
   const categoryIds = parseOidCsvList(query.category_id ?? query.categoryId);
 
+  const requestedBranchId = mongoose.Types.ObjectId.isValid(String(query.branch_id || ''))
+    ? new mongoose.Types.ObjectId(String(query.branch_id))
+    : null;
+  const actorBranchId =
+    actor?.role === 'Branch Manager' &&
+    mongoose.Types.ObjectId.isValid(String(actor?.branch || ''))
+      ? new mongoose.Types.ObjectId(String(actor.branch))
+      : null;
+
   return {
     from,
     to,
-    branchId: mongoose.Types.ObjectId.isValid(String(query.branch_id || ''))
-      ? new mongoose.Types.ObjectId(String(query.branch_id))
-      : null,
+    /** Branch managers are always scoped from the authenticated DB user, never query input. */
+    branchId: actorBranchId || requestedBranchId,
     productId: mongoose.Types.ObjectId.isValid(String(query.product_id || ''))
       ? new mongoose.Types.ObjectId(String(query.product_id))
       : null,
@@ -395,6 +409,77 @@ const hasInstallmentsExpr = {
   $gt: [{ $size: { $ifNull: ['$installments', []] } }, 0],
 };
 
+/**
+ * Expand sale lines with invoice discount/surcharge allocated proportionally.
+ * Product prices already include item-level discounts; invoiceDiscountAmount is
+ * positive for a discount and negative for a surcharge.
+ */
+const profitLineValueStages = (lineProductIdFilter) => [
+  {
+    $addFields: {
+      orderLineGrossTotal: {
+        $reduce: {
+          input: { $ifNull: ['$products', []] },
+          initialValue: 0,
+          in: {
+            $add: [
+              '$$value',
+              {
+                $multiply: [
+                  { $ifNull: ['$$this.price', 0] },
+                  { $ifNull: ['$$this.quantity', 0] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+  { $unwind: '$products' },
+  ...(lineProductIdFilter
+    ? [{ $match: { 'products.productId': lineProductIdFilter } }]
+    : []),
+  {
+    $addFields: {
+      lineGrossRevenue: {
+        $multiply: [
+          { $ifNull: ['$products.price', 0] },
+          { $ifNull: ['$products.quantity', 0] },
+        ],
+      },
+      lineCostBeforeReturns: {
+        $multiply: [
+          { $ifNull: ['$products.cost', 0] },
+          { $ifNull: ['$products.quantity', 0] },
+        ],
+      },
+    },
+  },
+  {
+    $addFields: {
+      lineInvoiceDiscount: {
+        $cond: [
+          { $gt: ['$orderLineGrossTotal', 0] },
+          {
+            $multiply: [
+              { $ifNull: ['$invoiceDiscountAmount', 0] },
+              { $divide: ['$lineGrossRevenue', '$orderLineGrossTotal'] },
+            ],
+          },
+          0,
+        ],
+      },
+    },
+  },
+  {
+    $addFields: {
+      revenue: { $subtract: ['$lineGrossRevenue', '$lineInvoiceDiscount'] },
+      cost: '$lineCostBeforeReturns',
+    },
+  },
+];
+
 /** Cash; credit; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
 const salesPaymentCategoryExpr = {
   $cond: [
@@ -423,7 +508,7 @@ const salesPaymentCategoryExpr = {
 
 export const getSalesReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const lineProductIdFilter = f.productId
       ? f.productId
       : await resolveCategoryProductIdFilter(f.categoryIds);
@@ -574,8 +659,8 @@ export const getSalesReport = async (req, res) => {
 
 export const getProfitReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
-    const baseOrderMatch = { status: { $ne: 'restored' } };
+    const f = parseCommonFilters(req.query, req.user);
+    const baseOrderMatch = {};
     if (f.branchId) baseOrderMatch.branch = f.branchId;
     appendOrderCustomerFilters(baseOrderMatch, f);
     const lineProductIdFilter = f.productId
@@ -583,10 +668,6 @@ export const getProfitReport = async (req, res) => {
       : await resolveCategoryProductIdFilter(f.categoryIds);
     if (lineProductIdFilter) baseOrderMatch['products.productId'] = lineProductIdFilter;
     if (f.sellerName) baseOrderMatch.sellerName = f.sellerName;
-    const unwindMatch = lineProductIdFilter
-      ? { 'products.productId': lineProductIdFilter }
-      : {};
-
     /** Accrual sales: exclude installment invoices (their profit is recognized on collection). */
     const nonInstallmentMatch = {
       ...baseOrderMatch,
@@ -612,21 +693,71 @@ export const getProfitReport = async (req, res) => {
 
     const [aggSummary] = await Order.aggregate([
       { $match: nonInstallmentMatch },
-      { $unwind: '$products' },
-      { $match: unwindMatch },
+      ...profitLineValueStages(lineProductIdFilter),
       {
-        $addFields: {
-          revenue: { $multiply: ['$products.price', '$products.quantity'] },
-          cost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
+        $group: {
+          _id: null,
+          grossRevenue: { $sum: '$lineGrossRevenue' },
+          invoiceDiscounts: { $sum: '$lineInvoiceDiscount' },
+          totalRevenue: { $sum: '$revenue' },
+          totalCost: { $sum: '$cost' },
         },
       },
-      { $group: { _id: null, totalRevenue: { $sum: '$revenue' }, totalCost: { $sum: '$cost' } } },
       {
         $project: {
           _id: 0,
+          grossRevenue: { $round: ['$grossRevenue', 2] },
+          invoiceDiscounts: { $round: ['$invoiceDiscounts', 2] },
           totalRevenue: { $round: ['$totalRevenue', 2] },
           totalCost: { $round: ['$totalCost', 2] },
           tradingProfit: { $round: [{ $subtract: ['$totalRevenue', '$totalCost'] }, 2] },
+        },
+      },
+    ]);
+
+    const returnMatch = {
+      ...baseOrderMatch,
+      'returns.returnedAt': { $gte: f.from, $lte: f.to },
+      $expr: { $eq: [{ $size: { $ifNull: ['$installments', []] } }, 0] },
+    };
+    const [returnSummary] = await Order.aggregate([
+      { $match: returnMatch },
+      { $unwind: '$returns' },
+      { $match: { 'returns.returnedAt': { $gte: f.from, $lte: f.to } } },
+      { $unwind: '$returns.items' },
+      ...(lineProductIdFilter
+        ? [{ $match: { 'returns.items.productId': lineProductIdFilter } }]
+        : []),
+      {
+        $addFields: {
+          returnedProductLine: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: { $ifNull: ['$products', []] },
+                  as: 'productLine',
+                  cond: {
+                    $eq: ['$$productLine.productId', '$returns.items.productId'],
+                  },
+                },
+              },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          salesReturns: { $sum: { $ifNull: ['$returns.items.lineTotal', 0] } },
+          returnedCostReversal: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$returnedProductLine.cost', 0] },
+                { $ifNull: ['$returns.items.quantity', 0] },
+              ],
+            },
+          },
         },
       },
     ]);
@@ -782,8 +913,12 @@ export const getProfitReport = async (req, res) => {
       [...installmentByPeriod.values()].reduce((s, n) => s + n, 0)
     );
 
-    const totalRevenue = aggSummary?.totalRevenue ?? 0;
-    const totalCost = aggSummary?.totalCost ?? 0;
+    const grossRevenueAfterDiscount = Number(aggSummary?.totalRevenue) || 0;
+    const grossCostBeforeReturns = Number(aggSummary?.totalCost) || 0;
+    const salesReturns = round2(returnSummary?.salesReturns ?? 0);
+    const returnedCostReversal = round2(returnSummary?.returnedCostReversal ?? 0);
+    const totalRevenue = round2(grossRevenueAfterDiscount - salesReturns);
+    const totalCost = round2(grossCostBeforeReturns - returnedCostReversal);
     const cashSalesTrading = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
     const tradingProfit = round2(cashSalesTrading + installmentProfitCollected);
     const dailyExpensesTotal = dailyExpenses.total;
@@ -796,6 +931,10 @@ export const getProfitReport = async (req, res) => {
         : 0;
 
     const summary = {
+      grossRevenue: round2(aggSummary?.grossRevenue ?? 0),
+      invoiceDiscounts: round2(aggSummary?.invoiceDiscounts ?? 0),
+      salesReturns,
+      returnedCostReversal,
       totalRevenue,
       totalCost,
       tradingProfit,
@@ -823,14 +962,7 @@ export const getProfitReport = async (req, res) => {
 
     const profitOverTimeRaw = await Order.aggregate([
       { $match: nonInstallmentMatch },
-      { $unwind: '$products' },
-      { $match: unwindMatch },
-      {
-        $addFields: {
-          revenue: { $multiply: ['$products.price', '$products.quantity'] },
-          cost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
-        },
-      },
+      ...profitLineValueStages(lineProductIdFilter),
       { $group: { _id: getDateGroupExpr(f.groupBy), revenue: { $sum: '$revenue' }, cost: { $sum: '$cost' } } },
       { $sort: { _id: 1 } },
       {
@@ -843,12 +975,57 @@ export const getProfitReport = async (req, res) => {
       },
     ]);
 
+    const returnsOverTimeRaw = await Order.aggregate([
+      { $match: returnMatch },
+      { $unwind: '$returns' },
+      { $match: { 'returns.returnedAt': { $gte: f.from, $lte: f.to } } },
+      { $unwind: '$returns.items' },
+      ...(lineProductIdFilter
+        ? [{ $match: { 'returns.items.productId': lineProductIdFilter } }]
+        : []),
+      {
+        $addFields: {
+          returnedProductLine: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: { $ifNull: ['$products', []] },
+                  as: 'productLine',
+                  cond: { $eq: ['$$productLine.productId', '$returns.items.productId'] },
+                },
+              },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: getDateGroupExprForField(f.groupBy, '$returns.returnedAt'),
+          revenue: { $sum: { $ifNull: ['$returns.items.lineTotal', 0] } },
+          cost: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$returnedProductLine.cost', 0] },
+                { $ifNull: ['$returns.items.quantity', 0] },
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
     const salesByPeriod = new Map(
       (profitOverTimeRaw || []).map((row) => [String(row.period), row])
+    );
+    const returnsByPeriod = new Map(
+      (returnsOverTimeRaw || []).map((row) => [String(row._id), row])
     );
     const allPeriods = [
       ...new Set([
         ...salesByPeriod.keys(),
+        ...returnsByPeriod.keys(),
         ...installmentByPeriod.keys(),
         ...dailyExpenses.byPeriod.keys(),
       ]),
@@ -856,8 +1033,11 @@ export const getProfitReport = async (req, res) => {
 
     const profitOverTime = allPeriods.map((period) => {
       const row = salesByPeriod.get(period);
-      const revenue = Number(row?.revenue) || 0;
-      const cost = Number(row?.cost) || 0;
+      const returnRow = returnsByPeriod.get(period);
+      const salesReturnsForPeriod = Number(returnRow?.revenue) || 0;
+      const returnedCostForPeriod = Number(returnRow?.cost) || 0;
+      const revenue = round2((Number(row?.revenue) || 0) - salesReturnsForPeriod);
+      const cost = round2((Number(row?.cost) || 0) - returnedCostForPeriod);
       const installmentProfit = installmentByPeriod.get(period) || 0;
       const trading = round2(revenue - cost + installmentProfit);
       let overheadAlloc = 0;
@@ -872,6 +1052,8 @@ export const getProfitReport = async (req, res) => {
         period,
         revenue,
         cost,
+        salesReturns: round2(salesReturnsForPeriod),
+        returnedCostReversal: round2(returnedCostForPeriod),
         installmentProfit,
         tradingProfit: trading,
         branchOverheadAllocated: overheadAlloc,
@@ -897,12 +1079,37 @@ export const getProfitReport = async (req, res) => {
 
     const [invoiceFacet] = await Order.aggregate([
       { $match: invoiceCreatedMatch },
-      { $unwind: '$products' },
-      { $match: unwindMatch },
+      ...profitLineValueStages(lineProductIdFilter),
       {
         $addFields: {
-          lineRevenue: { $multiply: ['$products.price', '$products.quantity'] },
-          lineCost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
+          remainingRatio: {
+            $cond: [
+              { $gt: [{ $ifNull: ['$products.quantity', 0] }, 0] },
+              {
+                $divide: [
+                  {
+                    $max: [
+                      0,
+                      {
+                        $subtract: [
+                          { $ifNull: ['$products.quantity', 0] },
+                          { $ifNull: ['$products.returnedQuantity', 0] },
+                        ],
+                      },
+                    ],
+                  },
+                  { $ifNull: ['$products.quantity', 1] },
+                ],
+              },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $addFields: {
+          lineRevenue: { $multiply: ['$revenue', '$remainingRatio'] },
+          lineCost: { $multiply: ['$cost', '$remainingRatio'] },
         },
       },
       {
@@ -1085,9 +1292,586 @@ export const getProfitReport = async (req, res) => {
   }
 };
 
+/** Consolidated management-accounting report (accrual P&L + cash and position snapshots). */
+export const getAccountingSummaryReport = async (req, res) => {
+  try {
+    const f = parseCommonFilters(req.query, req.user);
+    const basis = String(req.query.basis || 'accrual').toLowerCase();
+    if (basis !== 'accrual') {
+      return res.status(400).json({
+        error: 'Only accrual basis is available until legacy payment events are reconciled',
+      });
+    }
+
+    const orderScope = {};
+    if (f.branchId) orderScope.branch = f.branchId;
+    const createdOrderMatch = {
+      ...orderScope,
+      createdAt: { $gte: f.from, $lte: f.to },
+    };
+    const returnOrderMatch = {
+      ...orderScope,
+      'returns.returnedAt': { $gte: f.from, $lte: f.to },
+    };
+
+    const [
+      salesRows,
+      returnRows,
+      expenseData,
+      paymentFeeRows,
+      purchaseDocs,
+      purchaseReturnDocs,
+      treasuryPeriodRows,
+      treasuryPriorRows,
+      treasuryOpeningDocs,
+      inventoryRows,
+      customerOpeningRows,
+      vendors,
+      receivableOrderRows,
+      payableRequests,
+      linkedBranchPurchases,
+      duplicateLedgerRows,
+      orphanOrderLedgerRows,
+    ] = await Promise.all([
+      Order.aggregate([
+        { $match: createdOrderMatch },
+        ...profitLineValueStages(null),
+        {
+          $group: {
+            _id: getDateGroupExpr(f.groupBy),
+            grossSales: { $sum: '$lineGrossRevenue' },
+            invoiceDiscounts: { $sum: '$lineInvoiceDiscount' },
+            netBeforeReturns: { $sum: '$revenue' },
+            costBeforeReturns: { $sum: '$cost' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Order.aggregate([
+        { $match: returnOrderMatch },
+        { $unwind: '$returns' },
+        { $match: { 'returns.returnedAt': { $gte: f.from, $lte: f.to } } },
+        { $unwind: '$returns.items' },
+        {
+          $addFields: {
+            returnedProductLine: {
+              $arrayElemAt: [
+                {
+                  $filter: {
+                    input: { $ifNull: ['$products', []] },
+                    as: 'line',
+                    cond: { $eq: ['$$line.productId', '$returns.items.productId'] },
+                  },
+                },
+                0,
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: getDateGroupExprForField(f.groupBy, '$returns.returnedAt'),
+            salesReturns: { $sum: { $ifNull: ['$returns.items.lineTotal', 0] } },
+            returnedCost: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$returnedProductLine.cost', 0] },
+                  { $ifNull: ['$returns.items.quantity', 0] },
+                ],
+              },
+            },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      getOperatingDailyExpensesForReport({
+        from: f.from,
+        to: f.to,
+        branchId: f.branchId,
+        groupBy: f.groupBy,
+      }),
+      Order.aggregate([
+        { $match: { ...orderScope, 'payments.paidAt': { $gte: f.from, $lte: f.to } } },
+        { $unwind: '$payments' },
+        {
+          $match: {
+            'payments.paidAt': { $gte: f.from, $lte: f.to },
+            'payments.feeNet': { $gt: 0 },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$payments.feeNet' } } },
+      ]),
+      ProductPurchaseRequest.find({
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        status: { $in: ['approved', 'partially_returned', 'returned'] },
+        createdAt: { $gte: f.from, $lte: f.to },
+      }).lean(),
+      ProductPurchaseRequest.find({
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        'returns.returnedAt': { $gte: f.from, $lte: f.to },
+      })
+        .select('returns')
+        .lean(),
+      TreasuryLedgerEntry.aggregate([
+        {
+          $match: {
+            ...(f.branchId ? { branch: f.branchId } : {}),
+            occurredAt: { $gte: f.from, $lte: f.to },
+          },
+        },
+        {
+          $group: {
+            _id: '$accountKey',
+            inflows: {
+              $sum: { $cond: [{ $eq: ['$direction', 'in'] }, '$amount', 0] },
+            },
+            outflows: {
+              $sum: { $cond: [{ $eq: ['$direction', 'out'] }, '$amount', 0] },
+            },
+            internalTransfers: {
+              $sum: { $cond: [{ $eq: ['$sourceType', 'transfer'] }, '$amount', 0] },
+            },
+          },
+        },
+      ]),
+      TreasuryLedgerEntry.aggregate([
+        {
+          $match: {
+            ...(f.branchId ? { branch: f.branchId } : {}),
+            occurredAt: { $lt: f.from },
+          },
+        },
+        {
+          $group: {
+            _id: '$accountKey',
+            net: {
+              $sum: {
+                $cond: [{ $eq: ['$direction', 'in'] }, '$amount', { $multiply: ['$amount', -1] }],
+              },
+            },
+          },
+        },
+      ]),
+      TreasuryAccountOpening.find(f.branchId ? { branch: f.branchId } : {}).lean(),
+      Product.aggregate([
+        {
+          $match: {
+            ...(f.branchId ? { branch: f.branchId } : {}),
+            removedWhenOutOfStock: { $ne: true },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            value: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$stock', 0] },
+                  { $ifNull: ['$netPrice', 0] },
+                ],
+              },
+            },
+          },
+        },
+      ]),
+      f.branchId
+        ? Promise.resolve([])
+        : Client.aggregate([
+            {
+              $group: {
+                _id: null,
+                openingDebit: { $sum: { $ifNull: ['$openingDebitBalance', 0] } },
+                prepaidLiability: { $sum: { $ifNull: ['$creditBalance', 0] } },
+              },
+            },
+          ]),
+      f.branchId
+        ? Promise.resolve([])
+        : Vendor.find({})
+            .select('creditBalance buyerPrepaidBalance openingDebitBalance')
+            .lean(),
+      Order.aggregate([
+        { $match: { ...orderScope, status: { $ne: 'restored' } } },
+        {
+          $group: {
+            _id: '$partyType',
+            receivable: {
+              $sum: {
+                $max: [
+                  0,
+                  {
+                    $subtract: [
+                      { $ifNull: ['$totalPrice', 0] },
+                      { $ifNull: ['$amountPaid', 0] },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ]),
+      PurchasingRequest.find({
+        status: 'Received',
+        paymentStatus: { $in: ['Installments', 'Deferred'] },
+      }).lean(),
+      f.branchId
+        ? ProductPurchaseRequest.find({
+            branch: f.branchId,
+            linkedPurchasingRequestId: { $ne: null },
+          })
+            .select('linkedPurchasingRequestId')
+            .lean()
+        : Promise.resolve([]),
+      TreasuryLedgerEntry.aggregate([
+        {
+          $match: {
+            eventKey: { $exists: false },
+            sourceId: { $ne: null },
+            occurredAt: { $gte: f.from, $lte: f.to },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              branch: '$branch',
+              accountKey: '$accountKey',
+              direction: '$direction',
+              amount: '$amount',
+              sourceType: '$sourceType',
+              sourceId: '$sourceId',
+              occurredAt: '$occurredAt',
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $match: { count: { $gt: 1 } } },
+        { $limit: 100 },
+      ]),
+      TreasuryLedgerEntry.aggregate([
+        {
+          $match: {
+            sourceType: { $in: ['order_payment', 'order_refund'] },
+            sourceId: { $ne: null },
+            occurredAt: { $gte: f.from, $lte: f.to },
+          },
+        },
+        {
+          $lookup: {
+            from: 'orders',
+            localField: 'sourceId',
+            foreignField: '_id',
+            as: 'sourceOrder',
+          },
+        },
+        { $match: { sourceOrder: { $size: 0 } } },
+        { $count: 'count' },
+      ]),
+    ]);
+
+    const [
+      paymentSourceIds,
+      postedPaymentSourceIds,
+      expenseSourceIds,
+      postedExpenseSourceIds,
+      purchaseReturnSourceIds,
+      postedPurchaseReturnSourceIds,
+    ] = await Promise.all([
+      Order.distinct('_id', {
+        ...orderScope,
+        payments: {
+          $elemMatch: {
+            paidAt: { $gte: f.from, $lte: f.to },
+            amount: { $gt: 0 },
+          },
+        },
+      }),
+      TreasuryLedgerEntry.distinct('sourceId', {
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        sourceType: 'order_payment',
+        occurredAt: { $gte: f.from, $lte: f.to },
+      }),
+      DailyExpense.distinct('_id', {
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        createdAt: { $gte: f.from, $lte: f.to },
+      }),
+      TreasuryLedgerEntry.distinct('sourceId', {
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        sourceType: 'daily_expense',
+        occurredAt: { $gte: f.from, $lte: f.to },
+      }),
+      ProductPurchaseRequest.distinct('_id', {
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        returns: { $elemMatch: { returnedAt: { $gte: f.from, $lte: f.to } } },
+      }),
+      TreasuryLedgerEntry.distinct('sourceId', {
+        ...(f.branchId ? { branch: f.branchId } : {}),
+        sourceType: 'purchase_return',
+        occurredAt: { $gte: f.from, $lte: f.to },
+      }),
+    ]);
+    const missingCount = (sourceIds, postedIds) => {
+      const posted = new Set((postedIds || []).map(String));
+      return (sourceIds || []).filter((id) => !posted.has(String(id))).length;
+    };
+
+    const sumRows = (rows, key) =>
+      round2((rows || []).reduce((sum, row) => sum + (Number(row?.[key]) || 0), 0));
+    const grossSales = sumRows(salesRows, 'grossSales');
+    const invoiceDiscounts = sumRows(salesRows, 'invoiceDiscounts');
+    const salesReturns = sumRows(returnRows, 'salesReturns');
+    const salesBeforeReturns = sumRows(salesRows, 'netBeforeReturns');
+    const costBeforeReturns = sumRows(salesRows, 'costBeforeReturns');
+    const returnedCostReversal = sumRows(returnRows, 'returnedCost');
+    const netSales = round2(salesBeforeReturns - salesReturns);
+    const costOfGoodsSold = round2(costBeforeReturns - returnedCostReversal);
+    const grossProfit = round2(netSales - costOfGoodsSold);
+    const overhead = await getBranchOverheadForReport(f.branchId);
+    const allocatedOverhead = round2(
+      overhead.dailyRate * calendarDaysInclusive(f.from, f.to)
+    );
+    const paymentProcessingFees = round2(paymentFeeRows?.[0]?.total ?? 0);
+    const operatingExpenses = round2(expenseData.total);
+    const netProfit = round2(
+      grossProfit - operatingExpenses - paymentProcessingFees - allocatedOverhead
+    );
+
+    const inventoryPurchases = round2(
+      (purchaseDocs || []).reduce(
+        (sum, purchase) => sum + deskPurchaseLineTotal(purchase),
+        0
+      )
+    );
+    const purchaseReturns = round2(
+      (purchaseReturnDocs || []).reduce(
+        (sum, purchase) =>
+          sum +
+          (purchase.returns || [])
+            .filter((ret) => {
+              const when = new Date(ret.returnedAt);
+              return when >= f.from && when <= f.to;
+            })
+            .reduce((retSum, ret) => retSum + (Number(ret.refundTotal) || 0), 0),
+        0
+      )
+    );
+
+    const openingByAccount = new Map();
+    for (const opening of treasuryOpeningDocs || []) {
+      const key = String(opening.accountKey || '').toLowerCase();
+      if (!openingByAccount.has(key)) openingByAccount.set(key, []);
+      openingByAccount.get(key).push(Number(opening.amount) || 0);
+    }
+    const priorByAccount = new Map(
+      (treasuryPriorRows || []).map((row) => [String(row._id), Number(row.net) || 0])
+    );
+    const periodByAccount = new Map(
+      (treasuryPeriodRows || []).map((row) => [String(row._id), row])
+    );
+    const treasuryKeys = new Set([
+      ...openingByAccount.keys(),
+      ...priorByAccount.keys(),
+      ...periodByAccount.keys(),
+    ]);
+    const treasuryAccounts = [...treasuryKeys].sort().map((accountKey) => {
+      const configuredOpening = f.branchId
+        ? round2((openingByAccount.get(accountKey) || []).reduce((sum, n) => sum + n, 0))
+        : companyOpeningForAccount(accountKey, openingByAccount.get(accountKey) || []);
+      const opening = round2(configuredOpening + (priorByAccount.get(accountKey) || 0));
+      const period = periodByAccount.get(accountKey) || {};
+      const inflows = round2(period.inflows || 0);
+      const outflows = round2(period.outflows || 0);
+      return {
+        accountKey,
+        opening,
+        inflows,
+        outflows,
+        closing: round2(opening + inflows - outflows),
+      };
+    });
+
+    const orderReceivables = new Map(
+      (receivableOrderRows || []).map((row) => [
+        String(row._id || 'client'),
+        round2(row.receivable),
+      ])
+    );
+    const customerOpening = round2(customerOpeningRows?.[0]?.openingDebit ?? 0);
+    const customerPrepaidLiability = round2(
+      customerOpeningRows?.[0]?.prepaidLiability ?? 0
+    );
+    const supplierPrepaidAsset = round2(
+      (vendors || []).reduce((sum, vendor) => sum + (Number(vendor.creditBalance) || 0), 0)
+    );
+    const supplierOpeningReceivable = round2(
+      (vendors || []).reduce(
+        (sum, vendor) => sum + (Number(vendor.openingDebitBalance) || 0),
+        0
+      )
+    );
+    const supplierDepositLiability = round2(
+      (vendors || []).reduce(
+        (sum, vendor) => sum + (Number(vendor.buyerPrepaidBalance) || 0),
+        0
+      )
+    );
+
+    const branchLinkedRequestIds = new Set(
+      (linkedBranchPurchases || []).map((row) => String(row.linkedPurchasingRequestId))
+    );
+    const scopedPayableRequests = f.branchId
+      ? (payableRequests || []).filter((request) =>
+          branchLinkedRequestIds.has(String(request._id))
+        )
+      : payableRequests || [];
+    const supplierPayable = round2(
+      scopedPayableRequests.reduce((sum, request) => {
+        if (request.paymentStatus === 'Installments') {
+          return sum + unpaidInstallmentsTotal(request);
+        }
+        return sum + deferredPurchaseRemaining(request);
+      }, 0)
+    );
+
+    const salesByPeriod = new Map((salesRows || []).map((row) => [String(row._id), row]));
+    const returnsByPeriod = new Map(
+      (returnRows || []).map((row) => [String(row._id), row])
+    );
+    const timelinePeriods = [
+      ...new Set([
+        ...salesByPeriod.keys(),
+        ...returnsByPeriod.keys(),
+        ...expenseData.byPeriod.keys(),
+      ]),
+    ].sort();
+    const timeline = timelinePeriods.map((period) => {
+      const sale = salesByPeriod.get(period) || {};
+      const ret = returnsByPeriod.get(period) || {};
+      const periodSales = round2(
+        (Number(sale.netBeforeReturns) || 0) - (Number(ret.salesReturns) || 0)
+      );
+      const periodCost = round2(
+        (Number(sale.costBeforeReturns) || 0) - (Number(ret.returnedCost) || 0)
+      );
+      const periodExpenses = round2(expenseData.byPeriod.get(period) || 0);
+      let periodOverhead = overhead.dailyRate;
+      if (f.groupBy === 'monthly') {
+        periodOverhead =
+          overhead.dailyRate * daysInMonthOverlappingRange(period, f.from, f.to);
+      }
+      return {
+        period,
+        netSales: periodSales,
+        costOfGoodsSold: periodCost,
+        operatingExpenses: periodExpenses,
+        netProfit: round2(periodSales - periodCost - periodExpenses - periodOverhead),
+      };
+    });
+
+    const missingOrderPaymentPostings = missingCount(
+      paymentSourceIds,
+      postedPaymentSourceIds
+    );
+    const missingExpensePostings = missingCount(expenseSourceIds, postedExpenseSourceIds);
+    const missingPurchaseReturnPostings = missingCount(
+      purchaseReturnSourceIds,
+      postedPurchaseReturnSourceIds
+    );
+    const warnings = [
+      'tax_snapshots_missing',
+      'factory_sales_excluded',
+    ];
+    if (
+      missingOrderPaymentPostings ||
+      missingExpensePostings ||
+      missingPurchaseReturnPostings
+    ) {
+      warnings.push('treasury_postings_missing');
+    }
+    if (duplicateLedgerRows.length) warnings.push('treasury_duplicates_suspected');
+    if (f.branchId) {
+      warnings.push(
+        'branch_opening_balances_excluded'
+      );
+    }
+    return res.json({
+      meta: {
+        currency: 'EGP',
+        timezone: REPORT_TZ,
+        basis,
+        dataCompleteness: warnings.length ? 'partial' : 'complete',
+        from: f.from,
+        to: f.to,
+        branchId: f.branchId,
+      },
+      profitAndLoss: {
+        grossSales,
+        invoiceDiscounts,
+        salesReturns,
+        netSales,
+        costBeforeReturns,
+        returnedCostReversal,
+        costOfGoodsSold,
+        grossProfit,
+        operatingExpenses,
+        paymentProcessingFees,
+        allocatedOverhead,
+        netProfit,
+      },
+      purchases: {
+        inventoryPurchases,
+        purchaseReturns,
+        netPurchases: round2(inventoryPurchases - purchaseReturns),
+      },
+      receivables: {
+        customers: round2((orderReceivables.get('client') || 0) + customerOpening),
+        suppliers: round2(
+          (orderReceivables.get('supplier') || 0) +
+            supplierOpeningReceivable +
+            supplierPrepaidAsset
+        ),
+        supplierPrepaidAsset,
+      },
+      payables: {
+        suppliers: supplierPayable,
+        customerDeposits: customerPrepaidLiability,
+        supplierDeposits: supplierDepositLiability,
+      },
+      treasury: {
+        opening: round2(treasuryAccounts.reduce((sum, row) => sum + row.opening, 0)),
+        inflows: round2(treasuryAccounts.reduce((sum, row) => sum + row.inflows, 0)),
+        outflows: round2(treasuryAccounts.reduce((sum, row) => sum + row.outflows, 0)),
+        closing: round2(treasuryAccounts.reduce((sum, row) => sum + row.closing, 0)),
+        accounts: treasuryAccounts,
+      },
+      inventory: {
+        closingCostValue: round2(inventoryRows?.[0]?.value ?? 0),
+      },
+      taxes: {
+        available: false,
+        salesTax: null,
+        purchaseTax: null,
+        netTaxPayable: null,
+      },
+      timeline,
+      reconciliation: {
+        suspectedDuplicateLegacyGroups: duplicateLedgerRows.length,
+        orphanOrderLedgerEntries: Number(orphanOrderLedgerRows?.[0]?.count) || 0,
+        missingOrderPaymentPostings,
+        missingExpensePostings,
+        missingPurchaseReturnPostings,
+        warnings,
+      },
+    });
+  } catch (error) {
+    console.error('getAccountingSummaryReport:', error);
+    return res.status(500).json({ error: 'Failed to generate accounting summary report' });
+  }
+};
+
 export const getProductsReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const lowStockThreshold = Math.max(0, Number(req.query.lowStockThreshold) || 5);
     const supplierProductIds =
       f.supplierPhone || f.supplierId
@@ -1267,7 +2051,7 @@ export const getProductsReport = async (req, res) => {
 
 export const getStockReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const match = { createdAt: { $gte: f.from, $lte: f.to } };
     if (f.productId) match.productId = f.productId;
     if (f.branchId) {
@@ -1306,7 +2090,7 @@ export const getStockReport = async (req, res) => {
 
 export const getCustomersReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const match = { createdAt: { $gte: f.from, $lte: f.to }, status: { $ne: 'restored' } };
     if (f.branchId) match.branch = f.branchId;
     appendOrderCustomerFilters(match, f);
@@ -1346,7 +2130,7 @@ export const getCustomersReport = async (req, res) => {
 
 export const getInstallmentsReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const collectorIdRaw = String(req.query.collector_id || req.query.collectorId || '').trim();
     const hasCollectorFilter = mongoose.Types.ObjectId.isValid(collectorIdRaw);
     const collectorOid = hasCollectorFilter
@@ -1612,7 +2396,7 @@ export const getInstallmentsReport = async (req, res) => {
 /** Online / branch pickup bookings in date range (default: active only). */
 export const getBookingsReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const status = String(req.query.booking_status || 'active');
     const match = {
       bookingDate: { $gte: f.from, $lte: f.to },
@@ -1672,7 +2456,7 @@ export const getBookingsReport = async (req, res) => {
 /** Desk purchase / trade-in cost by configured purchase treasury (cash drawer vs banks/wallets). */
 export const getDeskPurchasesTreasuryReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const match = {
       createdAt: { $gte: f.from, $lte: f.to },
     };
@@ -1765,7 +2549,7 @@ async function ledgerTotalsByAccount(match) {
  */
 export const getTreasuryAccountsReport = async (req, res) => {
   try {
-    const f = parseCommonFilters(req.query);
+    const f = parseCommonFilters(req.query, req.user);
     const { moneyAccounts, paymentMethodAccountMap, paymentMethodsCatalog } =
       await getEffectiveMoneyAccountsFromDb();
     const accounts = moneyAccounts || [];

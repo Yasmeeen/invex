@@ -190,10 +190,10 @@ export const AL_RAJI_CATEGORIES = [
     name: 'المزرعة',
     sellByWeight: false,
     products: [
-      { skuKey: 'farm_barqi_sheep', name: 'خروف برقي', productType: 'farm', price: 4500, netPrice: 3800, stock: 0 },
-      { skuKey: 'farm_baladi_sheep', name: 'خروف بلدي', productType: 'farm', price: 4800, netPrice: 4000, stock: 0 },
+      { skuKey: 'farm_barqi_sheep', name: 'خروف برقي', productType: 'farm', price: 300, netPrice: 3800, stock: 0 },
+      { skuKey: 'farm_baladi_sheep', name: 'خروف بلدي', productType: 'farm', price: 260, netPrice: 4000, stock: 0 },
       { skuKey: 'farm_beef_calf', name: 'عجل بقري', productType: 'farm', price: 28000, netPrice: 24000, stock: 0 },
-      { skuKey: 'farm_buffalo_calf', name: 'عجل جاموسي', productType: 'farm', price: 27000, netPrice: 23000, stock: 0 },
+      { skuKey: 'farm_buffalo_calf', name: 'عجل جاموسي', productType: 'farm', price: 195, netPrice: 23000, stock: 0 },
       { skuKey: 'farm_veal', name: 'بتلو حي', productType: 'farm', price: 18000, netPrice: 15000, stock: 0 },
       { skuKey: 'farm_baladi_goat', name: 'جدي بلدي', productType: 'farm', price: 3500, netPrice: 2900, stock: 0 },
       { skuKey: 'farm_barqi_goat', name: 'جدي برقي', productType: 'farm', price: 3200, netPrice: 2700, stock: 0 },

@@ -16,6 +16,10 @@ export class ReportsService {
     return this.http.get(`${REPORTS_URL}/profit`, { params });
   }
 
+  getAccountingSummaryReport(params: any) {
+    return this.http.get(`${REPORTS_URL}/accounting-summary`, { params });
+  }
+
   getProductsReport(params: any) {
     return this.http.get(`${REPORTS_URL}/products`, { params });
   }

@@ -28,7 +28,7 @@ import {
   parseScaleBarcode,
   scaleBarcodeLookupCodes,
 } from '@shared/utils/scale-barcode.util';
-import { Branch, Product } from '@core/models/products.model';
+import { Branch, FarmAnimal, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -36,6 +36,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 import { CollectionsService } from '@shared/services/collections.service';
+import { FarmAnimalsService } from '@shared/services/farm-animals.service';
 import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
@@ -226,6 +227,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private invoiceReprint: InvoiceReprintService,
     private productPurchaseRequests: ProductPurchaseRequestsService,
     private collectionsService: CollectionsService,
+    private farmAnimalsService: FarmAnimalsService,
     private cdr: ChangeDetectorRef
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
@@ -1989,7 +1991,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   /** Units sellable without touching reserved quantity. */
   freeSellableQty(product: Product | any): number {
     const stock = this.displayStock(product);
-    if (this.isWeightProduct(product)) {
+    if (this.isWeightProduct(product) || this.isFarmProduct(product)) {
       return Math.max(0, roundWeight(stock) - this.bookedQty(product));
     }
     return Math.max(0, Math.floor(stock) - this.bookedQty(product));
@@ -2035,6 +2037,18 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  isFarmProduct(product: any): boolean {
+    if (String(product?.productType || product?.productTypeSnapshot || '').toLowerCase() === 'farm') {
+      return true;
+    }
+    if (String(product?.catalogKey || '').startsWith('farm_')) return true;
+    return String(product?.category?.code || '').trim().toUpperCase() === 'FARM';
+  }
+
+  isFarmLine(item: any): boolean {
+    return this.isFarmProduct(item) || String(item?.saleUnit || '').toLowerCase() === 'head';
+  }
+
   isWeightLine(item: any): boolean {
     if (isWeightSaleUnit(item?.saleUnit)) return true;
     return this.isWeightProduct(item);
@@ -2049,6 +2063,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   formatLineQuantity(item: any): string {
+    if (this.isFarmLine(item)) {
+      const q = Number(item?.quantity);
+      return String(Number.isFinite(q) && q > 0 ? q : 0);
+    }
     if (!this.isWeightLine(item)) {
       return String(Math.max(1, Math.floor(Number(item?.quantity) || 0)));
     }
@@ -2117,6 +2135,18 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private validateOrderItemsForCheckout(): string | null {
     for (const item of this.orderItems) {
+      if (this.isFarmLine(item)) {
+        if (!item?.farmAnimalId) {
+          return 'tr_farm_sale_animal_required';
+        }
+        if (!(Number(item?.farmAnimalWeightKg) > 0)) {
+          return 'tr_farm_sale_weight_required';
+        }
+        if (!(Number(item?.farmPricePerKg) > 0)) {
+          return 'tr_farm_sale_price_required';
+        }
+        continue;
+      }
       if (this.isWeightLine(item)) {
         const w = normalizeWeightQuantity(item.quantity);
         if (w <= 0) {
@@ -2193,6 +2223,59 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   addProduct(product: any, opts?: { quantity?: number }) {
     if (this.freeSellableQty(product) <= 0) return;
 
+    if (this.isFarmProduct(product)) {
+      this.pendingScaleWeightKg = null;
+      const alreadyInCart = this.orderItems
+        .filter((item) => String(item?.productId || item?._id) === String(product?._id))
+        .reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+      const remaining = Math.max(0, this.freeSellableQty(product) - alreadyInCart);
+      if (remaining < 0.25) return;
+      const requested = Number(opts?.quantity);
+      const quantity = Math.min(
+        Number.isFinite(requested) && requested >= 0.25 ? requested : 1,
+        remaining
+      );
+      const line: any = {
+        ...product,
+        quantity: Math.min(1, quantity),
+        productId: product._id,
+        saleUnit: 'head',
+        farmAnimalWeightKg: null,
+        farmPricePerKg: Math.round((Number(product?.price) || 0) * 100) / 100,
+        price: 0,
+        isApplyDiscount: false,
+        farmAnimalId: null,
+        farmAnimalSerial: '',
+        availableFarmAnimals: [],
+        farmAnimalsLoading: true,
+      };
+      this.orderItems.push(line);
+      this.farmAnimalsService
+        .list({
+          productId: String(product._id),
+          available: true,
+          ...(product?.branch?._id
+            ? { branchId: String(product.branch._id) }
+            : product?.inWarehouse
+              ? { inWarehouse: true }
+              : {}),
+        })
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(
+          (response) => {
+            line.availableFarmAnimals = response?.animals || [];
+            line.farmAnimalsLoading = false;
+          },
+          () => {
+            line.availableFarmAnimals = [];
+            line.farmAnimalsLoading = false;
+          }
+        );
+      this.focusBarcodeInput();
+      this.refreshExchangePaymentDefaults();
+      return;
+    }
+
     if (this.isWeightProduct(product)) {
       const fromLabel = normalizeWeightQuantity(
         Number(opts?.quantity) || this.pendingScaleWeightKg || 0
@@ -2249,6 +2332,98 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.notifyMatchedBookingDeposit();
   }
 
+  onFarmAnimalSelected(item: any, animalId: string | null): void {
+    const animal = (item?.availableFarmAnimals || []).find(
+      (row: FarmAnimal) => String(row._id) === String(animalId || '')
+    );
+    if (!animal) {
+      item.farmAnimalId = null;
+      item.farmAnimalSerial = '';
+      return;
+    }
+    if (
+      this.orderItems.some(
+        (line) => line !== item && String(line?.farmAnimalId || '') === String(animal._id)
+      )
+    ) {
+      item.farmAnimalId = null;
+      this.appNotificationService.push(
+        this.translate.instant('tr_farm_sale_animal_already_added'),
+        'warning'
+      );
+      return;
+    }
+    item.farmAnimalId = animal._id;
+    item.farmAnimalSerial = animal.serial;
+    item.quantity = Number(animal.remainingShare) || 1;
+    item.farmAnimalWeightKg =
+      Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || null;
+    this.onFarmPricingChange(item);
+  }
+
+  private addScannedFarmAnimal(animal: FarmAnimal): void {
+    if (!animal || !['available', 'reserved'].includes(String(animal.status))) {
+      this.appNotificationService.push(
+        this.translate.instant('tr_farm_sale_animal_not_available'),
+        'error'
+      );
+      return;
+    }
+    if (this.orderItems.some((line) => String(line?.farmAnimalId || '') === String(animal._id))) {
+      this.appNotificationService.push(
+        this.translate.instant('tr_farm_sale_animal_already_added'),
+        'warning'
+      );
+      return;
+    }
+    const product = animal.product as Product;
+    if (!product || typeof product !== 'object') return;
+    const line: any = {
+      ...product,
+      quantity: Number(animal.remainingShare) || 1,
+      productId: product._id,
+      saleUnit: 'head',
+      farmAnimalId: animal._id,
+      farmAnimalSerial: animal.serial,
+      farmAnimalWeightKg:
+        Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || null,
+      farmPricePerKg: Math.round((Number(product.price) || 0) * 100) / 100,
+      price: 0,
+      isApplyDiscount: false,
+      availableFarmAnimals: [animal],
+    };
+    this.onFarmPricingChange(line);
+    this.orderItems.push(line);
+    this.barcode = '';
+    this.refreshExchangePaymentDefaults();
+  }
+
+  private tryScanFarmAnimal(code: string): boolean {
+    const normalized = String(code || '').trim();
+    if (!/^(?:\d+|FA-\d+)$/i.test(normalized)) return false;
+    this.farmAnimalsService
+      .lookup(normalized)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(
+        (response) => this.addScannedFarmAnimal(response.animal),
+        () => {
+          // Numeric product barcodes are still supported: if the number is not
+          // an animal serial, continue through the normal product lookup.
+          if (/^\d+$/.test(normalized)) {
+            this.resolveProductByScannedCode(normalized)
+              .pipe(takeUntil(this.destroy$))
+              .subscribe((product) => this.finishScanLookup(normalized, product));
+            return;
+          }
+          this.appNotificationService.push(
+            this.translate.instant('tr_farm_sale_animal_not_found'),
+            'error'
+          );
+        }
+      );
+    return true;
+  }
+
   /**
    * Auto-add when scanner/type finishes (no Enter needed).
    * Scanners dump chars quickly then pause; debounce waits for that pause.
@@ -2260,10 +2435,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     const code = (this.barcode || '').trim();
     if (!code) return;
-    if (this.inputLooksLikeName(code)) return;
+    if (this.inputLooksLikeName(code) && !/^FA-\d+$/i.test(code)) return;
 
     this.barcodeScanTimer = setTimeout(() => {
       this.barcodeScanTimer = null;
+      if (this.tryScanFarmAnimal(code)) return;
       this.resolveProductByScannedCode(code)
         .pipe(takeUntil(this.destroy$))
         .subscribe((product) => {
@@ -2317,6 +2493,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     const trimmed = String(code || '').trim();
     if (!trimmed) return;
+    if (this.tryScanFarmAnimal(trimmed)) return;
     this.resolveProductByScannedCode(trimmed)
       .pipe(takeUntil(this.destroy$))
       .subscribe((product) => {
@@ -2326,7 +2503,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   increaseQty(i: number) {
     const item = this.orderItems[i];
-    if (this.isWeightLine(item)) return;
+    if (this.isWeightLine(item) || this.isFarmLine(item)) return;
     const maxStock = Math.max(0, Math.floor(Number(item.stock ?? 0)));
     if (item.quantity >= maxStock) {
       this.focusBarcodeInput();
@@ -2339,7 +2516,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.focusBarcodeInput();
   }
   decreaseQty(i: number) {
-    if (this.isWeightLine(this.orderItems[i])) return;
+    if (this.isWeightLine(this.orderItems[i]) || this.isFarmLine(this.orderItems[i])) return;
     if (this.orderItems[i].quantity > 1) this.orderItems[i].quantity--;
     this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
@@ -2431,11 +2608,28 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** Unit price after product-level discount (matches backend). */
   lineUnitPrice(item: any): number {
+    if (this.isFarmLine(item)) {
+      const weight = Number(item?.farmAnimalWeightKg) || 0;
+      const rate = Number(item?.farmPricePerKg) || 0;
+      return Math.round(weight * rate * 100) / 100;
+    }
     let p = Number(item?.price) || 0;
     if (item?.isApplyDiscount && Number(item?.discount) > 0) {
       p = p - (p * Number(item.discount)) / 100;
     }
     return Math.round(p * 10000) / 10000;
+  }
+
+  onFarmPricingChange(item: any): void {
+    if (!item || !this.isFarmLine(item)) return;
+    const weight = Math.max(0, Number(item.farmAnimalWeightKg) || 0);
+    const rate = Math.max(0, Number(item.farmPricePerKg) || 0);
+    item.farmAnimalWeightKg = weight;
+    item.farmPricePerKg = rate;
+    item.price = Math.round(weight * rate * 100) / 100;
+    item.isApplyDiscount = false;
+    item.priceOverridden = true;
+    this.refreshExchangePaymentDefaults();
   }
 
   /** Product card price after discount% (visual only; cards don't toggle discount). */
@@ -2447,6 +2641,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   cardHasDiscount(product: any): boolean {
+    if (this.isFarmProduct(product)) return false;
     return (Number(product?.discount) || 0) > 0;
   }
 
@@ -2713,6 +2908,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         discount: item.discount,
         isApplyDiscount: item.isApplyDiscount,
         sellByWeightOverride: item.sellByWeightOverride,
+        ...(this.isFarmLine(item)
+          ? {
+              farmAnimalWeightKg: Number(item.farmAnimalWeightKg),
+              farmPricePerKg: Number(item.farmPricePerKg),
+              farmAnimalId: item.farmAnimalId,
+              farmAnimalSerial: item.farmAnimalSerial,
+            }
+          : {}),
       },
       quantity: item.quantity,
     };
@@ -2725,6 +2928,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.checkoutInProgress = true;
     const weightErrKey = this.validateOrderItemsForCheckout();
     if (weightErrKey) {
+      this.checkoutInProgress = false;
       this.translate.get(weightErrKey).subscribe((msg) =>
         this.appNotificationService.push(msg, 'error')
       );

@@ -15,6 +15,16 @@
     </button>
   </app-report-filters>
 
+  <div
+    class="alert alert-warning mt-2"
+    *ngIf="reportType === 'accounting' && accountingWarnings.length > 0"
+  >
+    <strong>{{ 'tr_accounting_data_notes' | translate }}</strong>
+    <ul class="mb-0">
+      <li *ngFor="let warning of accountingWarnings">{{ warning }}</li>
+    </ul>
+  </div>
+
   <div class="reports-page__cards">
     <app-report-card
       *ngFor="let card of cards; let i = index"
@@ -78,6 +88,11 @@
     <app-report-table [columns]="salesPaymentColumns" [rows]="salesPaymentRows"></app-report-table>
   </div>
 
+  <div class="mt-3" *ngIf="reportType === 'accounting' && salesPaymentRows.length > 0">
+    <h3 class="reports-page__subtitle">{{ 'tr_accounting_income_statement' | translate }}</h3>
+    <app-report-table [columns]="salesPaymentColumns" [rows]="salesPaymentRows"></app-report-table>
+  </div>
+
   <div class="mt-3" *ngIf="reportType === 'installments' && salesPaymentRows.length > 0">
     <h3 class="reports-page__subtitle">{{ 'tr_collections_collectors_perf' | translate }}</h3>
     <app-report-table [columns]="salesPaymentColumns" [rows]="salesPaymentRows"></app-report-table>
@@ -113,6 +128,12 @@
       *ngIf="reportType === 'profit' && tableRows.length > 0"
     >
       {{ 'tr_report_chart_profit_over_time' | translate }}
+    </h3>
+    <h3
+      class="reports-page__subtitle"
+      *ngIf="reportType === 'accounting' && tableRows.length > 0"
+    >
+      {{ 'tr_accounting_profit_timeline' | translate }}
     </h3>
     <app-report-table [columns]="tableColumns" [rows]="tableRows" [roomy]="reportType === 'bookings'"></app-report-table>
   </div>
@@ -163,8 +184,18 @@
     <app-report-table [columns]="treasuryMethodColumns" [rows]="treasuryMethodRows"></app-report-table>
   </div>
 
+  <div class="mt-4" *ngIf="reportType === 'accounting' && treasuryMethodRows.length > 0">
+    <h3 class="reports-page__subtitle">{{ 'tr_accounting_position_summary' | translate }}</h3>
+    <app-report-table [columns]="treasuryMethodColumns" [rows]="treasuryMethodRows"></app-report-table>
+  </div>
+
   <div class="mt-4" *ngIf="reportType === 'treasury' && treasurySourceRows.length > 0">
     <h3 class="reports-page__subtitle">{{ 'tr_report_treasury_sources_title' | translate }}</h3>
+    <app-report-table [columns]="treasurySourceColumns" [rows]="treasurySourceRows"></app-report-table>
+  </div>
+
+  <div class="mt-4" *ngIf="reportType === 'accounting' && treasurySourceRows.length > 0">
+    <h3 class="reports-page__subtitle">{{ 'tr_accounting_treasury_accounts' | translate }}</h3>
     <app-report-table [columns]="treasurySourceColumns" [rows]="treasurySourceRows"></app-report-table>
   </div>
 

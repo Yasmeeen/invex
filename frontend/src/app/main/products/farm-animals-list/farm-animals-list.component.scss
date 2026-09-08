@@ -1,0 +1,16 @@
+.farm-animals-page {
+  padding: 1.25rem;
+}
+
+.farm-animals-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+@media (max-width: 720px) {
+  .farm-animals-filters {
+    grid-template-columns: 1fr;
+  }
+}

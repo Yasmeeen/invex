@@ -32,6 +32,16 @@ const dailyExpenseSchema = new mongoose.Schema(
       trim: true,
       maxlength: 200,
     },
+    /**
+     * Prevents cash-only movements or payments of already-allocated fixed
+     * overhead from being counted again as operating expenses.
+     */
+    accountingTreatment: {
+      type: String,
+      enum: ['operating', 'overhead_payment', 'cash_movement'],
+      default: 'operating',
+      index: true,
+    },
     notes: {
       type: String,
       default: '',

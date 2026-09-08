@@ -32,7 +32,11 @@ import {
   purchaseHasDeferredTreasury,
 } from '../../utils/purchase-treasury-splits.js';
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
-import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import {
+  postTreasurySplitInflows,
+  postTreasurySplitOutflows,
+  safeTreasuryPost,
+} from '../../utils/treasury-ledger.js';
 import { butcherFeaturesEnabled } from '../../utils/business-activity.util.js';
 import {
   isFarmProduct,
@@ -46,6 +50,7 @@ import {
   roundWeight,
 } from '../../utils/sale-quantity.util.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
+import { registerPurchasedFarmAnimals } from '../farm_animals_module/service.js';
 
 function ecommerceCatalogFieldsFromSource(src) {
   return {
@@ -2098,6 +2103,24 @@ export const approveProductPurchaseRequest = async (req, res) => {
       purchase.markModified('lines');
       purchase.markModified('createdProductIds');
       await purchase.save({ session });
+      for (let i = 0; i < appliedLines.length; i++) {
+        const line = appliedLines[i];
+        if (!isFarmProduct(line._product)) continue;
+        const registeredAnimals = await registerPurchasedFarmAnimals({
+          product: line._product,
+          purchaseRequest: purchase,
+          quantity: line.quantity,
+          animalWeightKg: line.animalWeightKg,
+          costPerKg: line.costPerKg,
+          unitNet: line._unitNet,
+          actorId: actor._id,
+          session,
+        });
+        purchase.lines[i].farmAnimalIds = registeredAnimals.map((animal) => animal._id);
+        purchase.lines[i].farmAnimalSerials = registeredAnimals.map((animal) => animal.serial);
+      }
+      purchase.markModified('lines');
+      await purchase.save({ session });
 
       await session.commitTransaction();
       session.endSession();
@@ -2814,6 +2837,27 @@ export const returnProductPurchaseRequest = async (req, res) => {
       cashTreasuryLabel: body.cashTreasuryLabel,
     });
 
+    await safeTreasuryPost('purchase_return', async () => {
+      const ret = result.returnRecord;
+      const splits = Array.isArray(ret?.refundTreasurySplits)
+        ? ret.refundTreasurySplits
+        : [];
+      if (!splits.length) return;
+      const eventKeyPrefix = ret?._id
+        ? `purchase_return:${String(result.purchase._id)}:${String(ret._id)}`
+        : undefined;
+      await postTreasurySplitInflows({
+        branchId: result.purchase.branch,
+        splits,
+        occurredAt: ret.returnedAt,
+        sourceType: 'purchase_return',
+        sourceId: result.purchase._id,
+        eventKeyPrefix,
+        note: ret.note || 'Purchase return',
+        createdBy: body.userId,
+      });
+    });
+
     await auditLog(req, {
       action: 'return',
       module: 'product_purchase_requests',
@@ -3146,6 +3190,22 @@ export const addQuantityToExistingProduct = async (req, res) => {
       product.markModified('acquiredFrom');
     }
     await product.save({ session });
+    if (isFarm) {
+      const registeredAnimals = await registerPurchasedFarmAnimals({
+        product,
+        purchaseRequest: created,
+        quantity: q,
+        animalWeightKg: farmCostFields.animalWeightKg,
+        costPerKg: farmCostFields.costPerKg,
+        unitNet,
+        actorId: actor._id,
+        session,
+      });
+      created.lines[0].farmAnimalIds = registeredAnimals.map((animal) => animal._id);
+      created.lines[0].farmAnimalSerials = registeredAnimals.map((animal) => animal.serial);
+      created.markModified('lines');
+      await created.save({ session });
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -3732,6 +3792,24 @@ export const purchaseQuantity = async (req, res) => {
     );
     created.markModified('lines');
     created.markModified('createdProductIds');
+    await created.save({ session });
+    for (let i = 0; i < appliedLines.length; i++) {
+      const line = appliedLines[i];
+      if (!isFarmProduct(line._product)) continue;
+      const registeredAnimals = await registerPurchasedFarmAnimals({
+        product: line._product,
+        purchaseRequest: created,
+        quantity: line.quantity,
+        animalWeightKg: line.animalWeightKg,
+        costPerKg: line.costPerKg,
+        unitNet: line._unitNet,
+        actorId: actor._id,
+        session,
+      });
+      created.lines[i].farmAnimalIds = registeredAnimals.map((animal) => animal._id);
+      created.lines[i].farmAnimalSerials = registeredAnimals.map((animal) => animal.serial);
+    }
+    created.markModified('lines');
     await created.save({ session });
 
     await session.commitTransaction();

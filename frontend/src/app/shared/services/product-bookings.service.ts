@@ -6,6 +6,8 @@ import { ProductActiveBooking } from '@core/models/products.model';
 
 export interface CreateProductBookingPayload {
   productId: string;
+  farmAnimalId?: string;
+  farmAnimalWeightKg?: number;
   quantity?: number;
   customerName: string;
   customerPhone: string;
@@ -84,6 +86,8 @@ export interface CheckoutActiveBooking {
   customerName?: string;
   customerPhone?: string;
   quantity: number;
+  farmAnimal?: string;
+  farmAnimalSerial?: string;
   depositAmount: number;
   productUnitPrice?: number;
   confirmed?: boolean;

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import moment from 'moment-timezone';
+import crypto from 'crypto';
 import TreasuryLedgerEntry from '../DB/models/treasuryLedgerEntry.model.js';
 import TreasuryAccountOpening from '../DB/models/treasuryAccountOpening.model.js';
 import {
@@ -10,6 +11,17 @@ import {
 import { isDeferredPurchaseTreasury } from '../modules/settings_module/treasuryMethods.js';
 
 const BUSINESS_TZ = 'Africa/Cairo';
+
+function paymentBatchEventKey(sourceType, sourceId, payments) {
+  const refs = (payments || []).map((payment, index) =>
+    String(
+      payment?._id ||
+        `${index}:${payment?.paidAt || ''}:${payment?.method || ''}:${round2(payment?.amount)}`
+    )
+  );
+  const digest = crypto.createHash('sha256').update(refs.join('|')).digest('hex');
+  return `${String(sourceType || 'order_payment')}:${String(sourceId || '')}:${digest}`;
+}
 
 export function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -70,6 +82,7 @@ export async function recordTreasuryLedgerEntry({
   occurredAt,
   sourceType,
   sourceId,
+  eventKey,
   counterAccountKey,
   transferGroupId,
   note,
@@ -101,6 +114,9 @@ export async function recordTreasuryLedgerEntry({
       sourceId && mongoose.Types.ObjectId.isValid(String(sourceId))
         ? new mongoose.Types.ObjectId(String(sourceId))
         : null,
+    ...(String(eventKey || '').trim()
+      ? { eventKey: String(eventKey).trim().slice(0, 300) }
+      : {}),
     counterAccountKey: String(counterAccountKey || '')
       .trim()
       .toLowerCase()
@@ -117,8 +133,15 @@ export async function recordTreasuryLedgerEntry({
   };
 
   const opts = session ? { session } : {};
-  const [created] = await TreasuryLedgerEntry.create([doc], opts);
-  return created;
+  try {
+    const [created] = await TreasuryLedgerEntry.create([doc], opts);
+    return created;
+  } catch (error) {
+    if (error?.code === 11000 && doc.eventKey) {
+      return TreasuryLedgerEntry.findOne({ eventKey: doc.eventKey }).session(session || null);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -513,6 +536,7 @@ export async function postPaymentMethodInflows({
   occurredAt,
   sourceType,
   sourceId,
+  eventKeyPrefix,
   note,
   createdBy,
   session,
@@ -539,6 +563,7 @@ export async function postPaymentMethodInflows({
       occurredAt,
       sourceType,
       sourceId,
+      eventKey: eventKeyPrefix ? `${eventKeyPrefix}:method:${method}` : undefined,
       note: note || method,
       createdBy,
       session,
@@ -577,6 +602,7 @@ export async function postTreasurySplitOutflows({
   occurredAt,
   sourceType,
   sourceId,
+  eventKeyPrefix,
   note,
   createdBy,
   session,
@@ -584,7 +610,7 @@ export async function postTreasurySplitOutflows({
   if (!Array.isArray(splits) || !splits.length) return [];
   const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const created = [];
-  for (const row of splits) {
+  for (const [index, row] of splits.entries()) {
     const accountKey = spendAccountKeyForSplit(row?.key, moneyAccounts, paymentMethodAccountMap);
     if (!accountKey) continue;
     const amt = round2(row?.amount);
@@ -597,6 +623,9 @@ export async function postTreasurySplitOutflows({
       occurredAt,
       sourceType,
       sourceId,
+      eventKey: eventKeyPrefix
+        ? `${eventKeyPrefix}:split:${index}:${String(row?.key || '').trim().toLowerCase()}`
+        : undefined,
       note,
       createdBy,
       session,
@@ -615,6 +644,7 @@ export async function postTreasurySplitInflows({
   occurredAt,
   sourceType,
   sourceId,
+  eventKeyPrefix,
   note,
   createdBy,
   session,
@@ -622,7 +652,7 @@ export async function postTreasurySplitInflows({
   if (!Array.isArray(splits) || !splits.length) return [];
   const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const created = [];
-  for (const row of splits) {
+  for (const [index, row] of splits.entries()) {
     const accountKey = spendAccountKeyForSplit(row?.key, moneyAccounts, paymentMethodAccountMap);
     if (!accountKey) continue;
     const amt = round2(row?.amount);
@@ -635,6 +665,9 @@ export async function postTreasurySplitInflows({
       occurredAt,
       sourceType,
       sourceId,
+      eventKey: eventKeyPrefix
+        ? `${eventKeyPrefix}:split:${index}:${String(row?.key || '').trim().toLowerCase()}`
+        : undefined,
       note,
       createdBy,
       session,
@@ -1025,6 +1058,7 @@ export async function postOrderPaymentLinesToLedger({
     occurredAt: payments[0]?.paidAt || new Date(),
     sourceType,
     sourceId: orderId,
+    eventKeyPrefix: paymentBatchEventKey(sourceType, orderId, payments),
     createdBy,
   });
 }
@@ -1038,12 +1072,13 @@ export async function postRefundPaymentLinesToLedger({
   orderId,
   createdBy,
   occurredAt,
+  eventKeyPrefix,
 } = {}) {
   if (!branchId || !Array.isArray(refundPaymentSplits) || !refundPaymentSplits.length) return [];
   const { paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const map = paymentMethodToAccountMap(paymentMethodAccountMap);
   const created = [];
-  for (const s of refundPaymentSplits) {
+  for (const [index, s] of refundPaymentSplits.entries()) {
     const method = String(s?.method || '')
       .trim()
       .toLowerCase();
@@ -1059,6 +1094,9 @@ export async function postRefundPaymentLinesToLedger({
       occurredAt: occurredAt || new Date(),
       sourceType: 'order_refund',
       sourceId: orderId,
+      eventKey: eventKeyPrefix
+        ? `${eventKeyPrefix}:method:${index}:${method}`
+        : undefined,
       note: method,
       createdBy,
     });

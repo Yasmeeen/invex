@@ -79,8 +79,22 @@
       <tr *ngFor="let item of order?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.farmAnimalSerial">
+            {{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:
+            {{ item.farmAnimalSerial }}
+          </div>
           <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
             {{ item.code }}
+          </div>
+          <div class="invoice-item-attrs" *ngIf="item.farmAnimalWeightKg && item.farmPricePerKg">
+            <span class="invoice-item-attr">
+              {{ 'tr_farm_sale_animal_weight' | receiptTranslate: st.receiptLanguage }}:
+              {{ item.farmAnimalWeightKg }} kg
+              ×
+              {{ 'tr_farm_sale_price_per_kg' | receiptTranslate: st.receiptLanguage }}:
+              {{ formatReceiptAmount(item.farmPricePerKg) }}
+              {{ receiptCurrencyLabel(st.receiptLanguage) }}/kg
+            </span>
           </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
@@ -111,8 +125,22 @@
       <tr *ngFor="let item of order?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.farmAnimalSerial">
+            {{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:
+            {{ item.farmAnimalSerial }}
+          </div>
           <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
             {{ item.code }}
+          </div>
+          <div class="invoice-item-attrs" *ngIf="item.farmAnimalWeightKg && item.farmPricePerKg">
+            <span class="invoice-item-attr">
+              {{ 'tr_farm_sale_animal_weight' | receiptTranslate: st.receiptLanguage }}:
+              {{ item.farmAnimalWeightKg }} kg
+              ×
+              {{ 'tr_farm_sale_price_per_kg' | receiptTranslate: st.receiptLanguage }}:
+              {{ formatReceiptAmount(item.farmPricePerKg) }}
+              {{ receiptCurrencyLabel(st.receiptLanguage) }}/kg
+            </span>
           </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">

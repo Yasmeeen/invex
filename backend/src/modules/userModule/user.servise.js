@@ -1,6 +1,7 @@
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
 import { auditLog } from '../audit_module/audit.service.js';
+import { createAuthToken } from '../../middleware/auth.js';
 
 import bcrypt from 'bcryptjs';
 
@@ -286,7 +287,8 @@ export const loginUser = async (req, res) => {
       statusCode: 200,
     });
 
-    res.json({ message: "✅ Login successful", user: formattedUser });
+    const token = createAuthToken(user);
+    res.json({ message: "✅ Login successful", user: formattedUser, token });
   } catch (error) {
     console.error("❌ Login error:", error);
     res.status(500).json({ message: "Server error", details: error.message });

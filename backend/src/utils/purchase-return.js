@@ -423,6 +423,7 @@ export async function processPurchaseReturn(purchase, body = {}) {
 
   purchase.returns = purchase.returns || [];
   purchase.returns.push(returnRecord);
+  const persistedReturnRecord = purchase.returns[purchase.returns.length - 1];
 
   if (purchaseIsFullyReturned(purchase)) {
     purchase.status = 'returned';
@@ -441,7 +442,12 @@ export async function processPurchaseReturn(purchase, body = {}) {
   const cashRefundTotal =
     cashRefundVia === 'drawer' ? cashAmountFromTreasurySplits(refundTreasurySplits) : 0;
 
-  return { purchase, returnRecord, cashRefundTotal, deferredAdjustmentAmount };
+  return {
+    purchase,
+    returnRecord: persistedReturnRecord,
+    cashRefundTotal,
+    deferredAdjustmentAmount,
+  };
 }
 
 export function refundTreasuryCashFromReturnRecord(returnRecord) {

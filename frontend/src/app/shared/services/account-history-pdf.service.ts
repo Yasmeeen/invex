@@ -62,17 +62,17 @@ export class AccountHistoryPdfService {
         value: helpers.formatMoney(history.owesFromSales || 0),
       });
     }
-
-    summaryRows.push({
-      label: t('tr_vendor_credit_balance'),
-      value: helpers.formatMoney(history.weOweSupplier),
-    });
     if ((history.prepaidBalance || 0) > 0) {
       summaryRows.push({
         label: t('tr_vendor_credit_prepaid'),
         value: helpers.formatMoney(history.prepaidBalance || 0),
       });
     }
+
+    summaryRows.push({
+      label: t('tr_vendor_credit_balance'),
+      value: helpers.formatMoney(history.weOweSupplier),
+    });
     if ((history.buyerPrepaidBalance || 0) > 0) {
       summaryRows.push({
         label: t('tr_vendor_buyer_prepaid'),

@@ -39,7 +39,12 @@
           <tr *ngFor="let t of tickets">
             <td>{{ t.createdAt | date: 'short' }}</td>
             <td>{{ ticketLocationLabel(t) }}</td>
-            <td>{{ ticketFarmName(t) }}</td>
+            <td>
+              {{ ticketFarmName(t) }}
+              <div *ngIf="t.farmAnimalSerial">
+                {{ 'tr_farm_animal_serial' | translate }}: {{ t.farmAnimalSerial }}
+              </div>
+            </td>
             <td>{{ t.share }}</td>
             <td class="slaughter-outputs-cell">{{ ticketOutputsLabel(t) }}</td>
           </tr>
@@ -51,6 +56,7 @@
       <article class="history-card" *ngFor="let t of tickets">
         <div class="history-card__head">
           <h3 class="history-card__title">{{ ticketFarmName(t) || ('tr_slaughter' | translate) }}</h3>
+          <span *ngIf="t.farmAnimalSerial">{{ t.farmAnimalSerial }}</span>
           <span class="history-card__date">{{ t.createdAt | date: 'short' }}</span>
         </div>
         <div class="history-card__grid">

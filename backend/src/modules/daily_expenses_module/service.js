@@ -55,6 +55,7 @@ export const createDailyExpense = async (req, res) => {
       branch,
       amount: amountRaw,
       expenseType,
+      accountingTreatment: accountingTreatmentRaw,
       notes,
       userId,
       expenseTreasurySplits: splitsRaw,
@@ -77,6 +78,16 @@ export const createDailyExpense = async (req, res) => {
     const typeTrim = String(expenseType || '').trim();
     if (!typeTrim) {
       return res.status(400).json({ error: 'Expense type is required' });
+    }
+    const requestedTreatment = String(accountingTreatmentRaw || 'operating').trim();
+    const allowedTreatments = new Set(['operating', 'overhead_payment', 'cash_movement']);
+    if (!allowedTreatments.has(requestedTreatment)) {
+      return res.status(400).json({ error: 'Invalid accounting treatment' });
+    }
+    if (requestedTreatment !== 'operating' && !ADMIN_ROLES.includes(actor.role)) {
+      return res.status(403).json({
+        error: 'Only administrators can exclude an expense from operating costs',
+      });
     }
 
     const treasuryMethods = await getEffectivePurchaseTreasuryMethodsFromDb();
@@ -118,6 +129,7 @@ export const createDailyExpense = async (req, res) => {
       branch,
       amount: lineTotal,
       expenseType: typeTrim,
+      accountingTreatment: requestedTreatment,
       notes: String(notes || '').trim().slice(0, 2000),
       recordedBy: userId,
       expenseTreasuryKey,
@@ -131,6 +143,7 @@ export const createDailyExpense = async (req, res) => {
         splits: expenseTreasurySplits,
         sourceType: 'daily_expense',
         sourceId: doc._id,
+        eventKeyPrefix: `daily_expense:${String(doc._id)}`,
         note: typeTrim,
         createdBy: userId,
       });

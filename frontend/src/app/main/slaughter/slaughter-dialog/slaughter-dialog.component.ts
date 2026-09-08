@@ -1,10 +1,11 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Globals } from '@core/globals';
-import { Branch, Product } from '@core/models/products.model';
+import { Branch, FarmAnimal, Product } from '@core/models/products.model';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { FarmAnimalsService } from '@shared/services/farm-animals.service';
 import {
   SlaughterService,
   SlaughterTemplate,
@@ -42,6 +43,8 @@ export class SlaughterDialogComponent implements OnInit {
   loadingFarm = false;
   loadingOutputs = false;
   farmAnimals: Product[] = [];
+  individualAnimals: FarmAnimal[] = [];
+  loadingIndividualAnimals = false;
   outputProducts: Product[] = [];
   /** Stable list for ng-select (do not rebuild on every CD cycle). */
   visibleOutputProducts: Product[] = [];
@@ -53,6 +56,7 @@ export class SlaughterDialogComponent implements OnInit {
   locationType: 'branch' | 'warehouse' = 'branch';
   branchId = '';
   farmProductId = '';
+  farmAnimalId = '';
   share = 1;
   liveWeightKg: number | null = null;
   wasteKg: number | null = null;
@@ -65,6 +69,7 @@ export class SlaughterDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: SlaughterDialogData,
     private slaughter: SlaughterService,
     private products: ProductsSerivce,
+    private farmAnimalsApi: FarmAnimalsService,
     private notify: AppNotificationService,
     private translate: TranslateService,
     public globals: Globals
@@ -103,6 +108,13 @@ export class SlaughterDialogComponent implements OnInit {
     return this.selectedTemplate ? this.selectedTemplate.name : '';
   }
 
+  get selectedAnimalRemainingShare(): number {
+    const animal = this.individualAnimals.find(
+      (row) => String(row._id) === String(this.farmAnimalId)
+    );
+    return Number(animal?.remainingShare) || 0;
+  }
+
   kindLabel(kind?: string): string {
     const key =
       kind === 'fridge'
@@ -119,6 +131,8 @@ export class SlaughterDialogComponent implements OnInit {
 
   onLocationTypeChange(): void {
     this.farmProductId = '';
+    this.farmAnimalId = '';
+    this.individualAnimals = [];
     this.selectedTemplate = null;
     this.outputRows = [{ productId: null, quantity: null, kind: 'offal' }];
     this.farmAnimals = [];
@@ -131,6 +145,8 @@ export class SlaughterDialogComponent implements OnInit {
 
   onBranchChange(): void {
     this.farmProductId = '';
+    this.farmAnimalId = '';
+    this.individualAnimals = [];
     this.selectedTemplate = null;
     this.outputRows = [{ productId: null, quantity: null, kind: 'offal' }];
     this.outputCategoryIds = [];
@@ -299,6 +315,42 @@ export class SlaughterDialogComponent implements OnInit {
     // Free pick: do not lock outputs to template SKUs (e.g. buffalo → كندوز ثلاجة only).
     this.outputRows = [{ productId: null, quantity: null, kind: 'fridge' }];
     this.rebuildVisibleOutputProducts();
+    this.farmAnimalId = '';
+    this.individualAnimals = [];
+    if (!this.farmProductId) return;
+    this.loadingIndividualAnimals = true;
+    this.farmAnimalsApi
+      .list({
+        productId: this.farmProductId,
+        available: true,
+        ...(this.inWarehouse
+          ? { inWarehouse: true }
+          : this.branchId
+            ? { branchId: this.branchId }
+            : {}),
+      })
+      .subscribe(
+        (response) => {
+          this.individualAnimals = response?.animals || [];
+          this.loadingIndividualAnimals = false;
+        },
+        () => {
+          this.individualAnimals = [];
+          this.loadingIndividualAnimals = false;
+        }
+      );
+  }
+
+  onIndividualAnimalChange(): void {
+    const animal = this.individualAnimals.find(
+      (row) => String(row._id) === String(this.farmAnimalId)
+    );
+    if (!animal) return;
+    this.liveWeightKg =
+      Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || this.liveWeightKg;
+    if (Number(animal.remainingShare) < this.share) {
+      this.share = Number(animal.remainingShare) >= 0.5 ? 0.5 : 0.25;
+    }
   }
 
   findTemplateOutputProduct(o: { skuKey?: string; label?: string }): Product | undefined {
@@ -363,11 +415,11 @@ export class SlaughterDialogComponent implements OnInit {
 
   submit(): void {
     if (this.inWarehouse) {
-      if (!this.farmProductId) {
+      if (!this.farmProductId || !this.farmAnimalId) {
         this.notify.push(this.translate.instant('tr_slaughter_form_incomplete'), 'error');
         return;
       }
-    } else if (!this.branchId || !this.farmProductId) {
+    } else if (!this.branchId || !this.farmProductId || !this.farmAnimalId) {
       this.notify.push(this.translate.instant('tr_slaughter_form_incomplete'), 'error');
       return;
     }
@@ -395,6 +447,7 @@ export class SlaughterDialogComponent implements OnInit {
     const body: any = {
       userId: this.globals.currentUser?._id,
       farmProductId: this.farmProductId,
+      farmAnimalId: this.farmAnimalId,
       share: this.share,
       liveWeightKg: this.liveWeightKg,
       wasteKg: this.wasteKg,

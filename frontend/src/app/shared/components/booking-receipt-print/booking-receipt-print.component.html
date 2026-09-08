@@ -78,6 +78,10 @@
         <td class="item-name">
           {{ productName() }}
           <div class="invoice-item-code" *ngIf="productCode()">{{ productCode() }}</div>
+          <div class="invoice-item-code" *ngIf="booking?.farmAnimalSerial">
+            {{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:
+            {{ booking?.farmAnimalSerial }}
+          </div>
         </td>
         <td>{{ quantity() }}</td>
         <td class="money">

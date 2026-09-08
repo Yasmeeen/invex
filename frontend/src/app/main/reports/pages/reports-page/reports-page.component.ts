@@ -70,6 +70,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   treasuryMethodRows: any[] = [];
   treasurySourceColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   treasurySourceRows: any[] = [];
+  accountingWarnings: string[] = [];
 
   /** Sales report: breakdown by cash / card / application payment types. */
   salesPaymentColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
@@ -92,6 +93,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   private readonly reportTitleKeys: Record<string, string> = {
     sales: 'tr_report_title_sales',
     profit: 'tr_report_title_profit',
+    accounting: 'tr_report_title_accounting',
     products: 'tr_report_title_products',
     stock: 'tr_report_title_stock',
     customers: 'tr_report_title_customers',
@@ -237,6 +239,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     const map: any = {
       sales: this.reportsService.getSalesReport.bind(this.reportsService),
       profit: this.reportsService.getProfitReport.bind(this.reportsService),
+      accounting: this.reportsService.getAccountingSummaryReport.bind(this.reportsService),
       products: this.reportsService.getProductsReport.bind(this.reportsService),
       stock: this.reportsService.getStockReport.bind(this.reportsService),
       customers: this.reportsService.getCustomersReport.bind(this.reportsService),
@@ -292,12 +295,117 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.treasuryMethodRows = [];
     this.treasurySourceColumns = [];
     this.treasurySourceRows = [];
+    this.accountingWarnings = [];
     this.branchCapitalColumns = [];
     this.branchCapitalRows = [];
     const t = (key: string, params?: object) => this.translate.instant(key, params);
 
     if (this.reportType === 'bookings') {
       this.bindBookingsReportData(res as BookingsReportResponse, t);
+      return;
+    }
+
+    if (this.reportType === 'accounting') {
+      const p = res.profitAndLoss || {};
+      const treasury = res.treasury || {};
+      const receivables = res.receivables || {};
+      const payables = res.payables || {};
+      const inventory = res.inventory || {};
+      const receivableTotal =
+        Number(receivables.customers || 0) + Number(receivables.suppliers || 0);
+      const payableTotal =
+        Number(payables.suppliers || 0) +
+        Number(payables.customerDeposits || 0) +
+        Number(payables.supplierDeposits || 0);
+      const netProfit = Number(p.netProfit || 0);
+      this.cards = [
+        { titleKey: 'tr_accounting_net_sales', value: p.netSales || 0, money: true },
+        { titleKey: 'tr_accounting_gross_profit', value: p.grossProfit || 0, money: true },
+        {
+          titleKey: netProfit < 0 ? 'tr_net_loss' : 'tr_net_profit',
+          value: Math.abs(netProfit),
+          money: true,
+          tone: netProfit < 0 ? 'loss' : undefined,
+        },
+        { titleKey: 'tr_accounting_treasury_closing', value: treasury.closing || 0, money: true },
+        { titleKey: 'tr_accounting_receivables', value: receivableTotal, money: true },
+        { titleKey: 'tr_accounting_payables', value: payableTotal, money: true },
+        {
+          titleKey: 'tr_accounting_inventory_value',
+          value: inventory.closingCostValue || 0,
+          money: true,
+        },
+      ];
+
+      this.tableColumns = [
+        { key: 'period', labelKey: 'tr_report_col_period' },
+        { key: 'netSales', labelKey: 'tr_accounting_net_sales', format: 'money' },
+        { key: 'costOfGoodsSold', labelKey: 'tr_accounting_cogs', format: 'money' },
+        {
+          key: 'operatingExpenses',
+          labelKey: 'tr_accounting_operating_expenses',
+          format: 'money',
+        },
+        { key: 'netProfit', labelKey: 'tr_net_profit', format: 'money' },
+      ];
+      const timeline = res.timeline || [];
+      this.tableRows = [...timeline].reverse();
+      this.chartOptions = this.lineChart(
+        t('tr_accounting_profit_timeline'),
+        timeline.map((x: any) => x.period),
+        [
+          {
+            name: t('tr_accounting_net_sales'),
+            data: timeline.map((x: any) => Number(x.netSales || 0)),
+          },
+          {
+            name: t('tr_net_profit'),
+            data: timeline.map((x: any) => Number(x.netProfit || 0)),
+          },
+        ]
+      );
+
+      this.salesPaymentColumns = [
+        { key: 'label', labelKey: 'tr_report_col_label' },
+        { key: 'value', labelKey: 'tr_report_col_value', format: 'money' },
+      ];
+      this.salesPaymentRows = [
+        { label: t('tr_accounting_gross_sales'), value: p.grossSales || 0 },
+        { label: t('tr_accounting_invoice_discounts'), value: p.invoiceDiscounts || 0 },
+        { label: t('tr_accounting_sales_returns'), value: p.salesReturns || 0 },
+        { label: t('tr_accounting_net_sales'), value: p.netSales || 0 },
+        { label: t('tr_accounting_cogs'), value: p.costOfGoodsSold || 0 },
+        { label: t('tr_accounting_gross_profit'), value: p.grossProfit || 0 },
+        { label: t('tr_accounting_operating_expenses'), value: p.operatingExpenses || 0 },
+        { label: t('tr_accounting_payment_fees'), value: p.paymentProcessingFees || 0 },
+        { label: t('tr_accounting_allocated_overhead'), value: p.allocatedOverhead || 0 },
+        { label: t('tr_net_profit'), value: p.netProfit || 0 },
+      ];
+
+      this.treasuryMethodColumns = [
+        { key: 'label', labelKey: 'tr_report_col_label' },
+        { key: 'value', labelKey: 'tr_report_col_value', format: 'money' },
+      ];
+      this.treasuryMethodRows = [
+        { label: t('tr_accounting_customer_receivables'), value: receivables.customers || 0 },
+        { label: t('tr_accounting_supplier_receivables'), value: receivables.suppliers || 0 },
+        { label: t('tr_accounting_supplier_payables'), value: payables.suppliers || 0 },
+        { label: t('tr_accounting_customer_deposits'), value: payables.customerDeposits || 0 },
+        { label: t('tr_accounting_supplier_deposits'), value: payables.supplierDeposits || 0 },
+        { label: t('tr_accounting_inventory_value'), value: inventory.closingCostValue || 0 },
+      ];
+
+      this.treasurySourceColumns = [
+        { key: 'accountKey', labelKey: 'tr_treasury_account' },
+        { key: 'opening', labelKey: 'tr_report_treasury_opening_start', format: 'money' },
+        { key: 'inflows', labelKey: 'tr_treasury_in', format: 'money' },
+        { key: 'outflows', labelKey: 'tr_treasury_out', format: 'money' },
+        { key: 'closing', labelKey: 'tr_accounting_treasury_closing', format: 'money' },
+      ];
+      this.treasurySourceRows = treasury.accounts || [];
+      this.accountingWarnings = (res.reconciliation?.warnings || []).map((warning: string) =>
+        t(`tr_accounting_warning_${warning}`)
+      );
       return;
     }
 
@@ -366,6 +474,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       const marginIsLoss = profitMargin < 0;
       const lossBadge = t('tr_report_loss_badge');
       this.cards = [
+        { titleKey: 'tr_accounting_gross_sales', value: s.grossRevenue ?? s.totalRevenue ?? 0, money: true },
+        { titleKey: 'tr_accounting_invoice_discounts', value: s.invoiceDiscounts ?? 0, money: true },
+        { titleKey: 'tr_accounting_sales_returns', value: s.salesReturns ?? 0, money: true },
         { titleKey: 'tr_report_card_revenue', value: s.totalRevenue ?? 0, money: true },
         { titleKey: 'tr_report_card_cost', value: s.totalCost ?? 0, money: true },
         {
@@ -1015,6 +1126,34 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       .replace(/\s+/g, '_')
       .toLowerCase();
 
+    if (this.reportType === 'accounting') {
+      const t = (key: string) => this.translate.instant(key);
+      const summaryRows = this.cards.map((c) => ({
+        [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+        [t('tr_report_col_value')]: this.formatCardExportValue(c),
+      }));
+      this.exportService.exportToExcelMultiSheet(filename, [
+        { name: t('tr_report_sheet_summary'), rows: summaryRows },
+        {
+          name: t('tr_accounting_income_statement'),
+          rows: this.mapRowsForExport(this.salesPaymentColumns, this.salesPaymentRows),
+        },
+        {
+          name: t('tr_accounting_profit_timeline'),
+          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        },
+        {
+          name: t('tr_accounting_position_summary'),
+          rows: this.mapRowsForExport(this.treasuryMethodColumns, this.treasuryMethodRows),
+        },
+        {
+          name: t('tr_accounting_treasury_accounts'),
+          rows: this.mapRowsForExport(this.treasurySourceColumns, this.treasurySourceRows),
+        },
+      ]);
+      return;
+    }
+
     if (this.reportType === 'products') {
       const t = (key: string) => this.translate.instant(key);
       const summaryRows = this.cards.map((c) => ({
@@ -1182,6 +1321,33 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       label: this.translate.instant(c.titleKey, c.titleParams || {}),
       value: this.formatCardExportValue(c),
     }));
+
+    if (this.reportType === 'accounting') {
+      const sections = [
+        {
+          title: this.translate.instant('tr_accounting_income_statement'),
+          columns: this.salesPaymentColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.salesPaymentColumns, this.salesPaymentRows),
+        },
+        {
+          title: this.translate.instant('tr_accounting_profit_timeline'),
+          columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        },
+        {
+          title: this.translate.instant('tr_accounting_position_summary'),
+          columns: this.treasuryMethodColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.treasuryMethodColumns, this.treasuryMethodRows),
+        },
+        {
+          title: this.translate.instant('tr_accounting_treasury_accounts'),
+          columns: this.treasurySourceColumns.map((c) => this.translate.instant(c.labelKey)),
+          rows: this.mapRowsForExport(this.treasurySourceColumns, this.treasurySourceRows),
+        },
+      ];
+      await this.exportService.exportMultiSectionPdf(title, summaryRows, sections);
+      return;
+    }
 
     if (this.reportType === 'products') {
       const sections = [];

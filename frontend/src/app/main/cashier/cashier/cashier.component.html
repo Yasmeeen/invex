@@ -386,6 +386,7 @@
           <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
           <div class="product-price" *ngIf="!cardHasDiscount(product)">
             {{ product.price | currency:'EGP ':'symbol':'1.2-2' }}
+            <span *ngIf="isFarmProduct(product)">/ {{ 'tr_weight_unit_kg' | translate }}</span>
           </div>
           <div class="product-price product-price--with-discount" *ngIf="cardHasDiscount(product)">
             <div class="product-price__old">
@@ -393,6 +394,7 @@
             </div>
             <div class="product-price__new">
               {{ cardDiscountedPrice(product) | currency:'EGP ':'symbol':'1.2-2' }}
+              <span *ngIf="isFarmProduct(product)">/ {{ 'tr_weight_unit_kg' | translate }}</span>
             </div>
           </div>
         </div>
@@ -601,6 +603,46 @@
               </span>
             </td>
             <td>
+              <ng-container *ngIf="isFarmLine(item); else regularQtyControls">
+                <ng-select
+                  class="farm-animal-select"
+                  [items]="item.availableFarmAnimals || []"
+                  bindLabel="serial"
+                  bindValue="_id"
+                  [loading]="item.farmAnimalsLoading"
+                  [clearable]="false"
+                  [searchable]="true"
+                  [(ngModel)]="item.farmAnimalId"
+                  (ngModelChange)="onFarmAnimalSelected(item, $event)"
+                  [ngModelOptions]="{ standalone: true }"
+                  [placeholder]="'tr_farm_sale_select_animal' | translate"
+                >
+                  <ng-template ng-option-tmp let-animal="item">
+                    <strong>{{ animal.serial }}</strong>
+                    <span *ngIf="animal.currentWeightKg || animal.purchaseWeightKg">
+                      — {{ animal.currentWeightKg || animal.purchaseWeightKg }} kg
+                    </span>
+                  </ng-template>
+                </ng-select>
+                <div class="farm-sale-field">
+                  <input
+                    type="number"
+                    inputmode="decimal"
+                    class="farm-sale-field__input s-control"
+                    min="0.001"
+                    step="0.001"
+                    [(ngModel)]="item.farmAnimalWeightKg"
+                    (ngModelChange)="onFarmPricingChange(item)"
+                    [ngModelOptions]="{ standalone: true }"
+                    [attr.aria-label]="'tr_farm_sale_animal_weight' | translate"
+                  />
+                  <span class="farm-sale-field__unit">kg</span>
+                </div>
+                <div class="size-small text-muted mt-1">
+                  {{ item.quantity }} {{ 'tr_farm_sale_head' | translate }}
+                </div>
+              </ng-container>
+              <ng-template #regularQtyControls>
               <ng-container *ngIf="isWeightLine(item); else pieceQtyControls">
                 <div class="order-line-weight-field">
                   <input
@@ -621,8 +663,24 @@
                 {{ item.quantity }}
                 <button (click)="increaseQty(i)">+</button>
               </ng-template>
+              </ng-template>
             </td>
             <td class="order-line-price-cell">
+              <div class="farm-sale-field" *ngIf="isFarmLine(item); else regularPrice">
+                <input
+                  type="number"
+                  inputmode="decimal"
+                  class="farm-sale-field__input farm-sale-field__input--price s-control"
+                  min="0.01"
+                  step="0.01"
+                  [(ngModel)]="item.farmPricePerKg"
+                  (ngModelChange)="onFarmPricingChange(item)"
+                  [ngModelOptions]="{ standalone: true }"
+                  [attr.aria-label]="'tr_farm_sale_price_per_kg' | translate"
+                />
+                <span class="farm-sale-field__unit">/kg</span>
+              </div>
+              <ng-template #regularPrice>
               <input
                 *ngIf="editingPriceIndex === i"
                 type="number"
@@ -647,6 +705,7 @@
                 {{ lineUnitPrice(item) | currency:'EGP ':'symbol':'1.2-2' }}
                 <i class="fa fa-pencil" aria-hidden="true"></i>
               </button>
+              </ng-template>
             </td>
             <td>{{ lineUnitPrice(item) * item.quantity | currency:'EGP ':'symbol':'1.2-2'}}</td>
             <td><button (click)="removeItem(i)">x</button></td>
@@ -834,8 +893,22 @@
       <tr *ngFor="let item of createdOrder?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.farmAnimalSerial">
+            {{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:
+            {{ item.farmAnimalSerial }}
+          </div>
           <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
             {{ item.code }}
+          </div>
+          <div class="invoice-item-attrs" *ngIf="item.farmAnimalWeightKg && item.farmPricePerKg">
+            <span class="invoice-item-attr">
+              {{ 'tr_farm_sale_animal_weight' | receiptTranslate: st.receiptLanguage }}:
+              {{ item.farmAnimalWeightKg }} kg
+              ×
+              {{ 'tr_farm_sale_price_per_kg' | receiptTranslate: st.receiptLanguage }}:
+              {{ formatReceiptAmount(item.farmPricePerKg) }}
+              {{ receiptCurrencyLabel(st.receiptLanguage) }}/kg
+            </span>
           </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">
@@ -866,8 +939,22 @@
       <tr *ngFor="let item of createdOrder?.products">
         <td class="item-name">
           {{ item.name }}
+          <div class="invoice-item-code" *ngIf="item.farmAnimalSerial">
+            {{ 'tr_farm_animal_serial' | receiptTranslate: st.receiptLanguage }}:
+            {{ item.farmAnimalSerial }}
+          </div>
           <div class="invoice-item-code" *ngIf="item.showProductCodeOnInvoice && item.code">
             {{ item.code }}
+          </div>
+          <div class="invoice-item-attrs" *ngIf="item.farmAnimalWeightKg && item.farmPricePerKg">
+            <span class="invoice-item-attr">
+              {{ 'tr_farm_sale_animal_weight' | receiptTranslate: st.receiptLanguage }}:
+              {{ item.farmAnimalWeightKg }} kg
+              ×
+              {{ 'tr_farm_sale_price_per_kg' | receiptTranslate: st.receiptLanguage }}:
+              {{ formatReceiptAmount(item.farmPricePerKg) }}
+              {{ receiptCurrencyLabel(st.receiptLanguage) }}/kg
+            </span>
           </div>
           <div class="invoice-item-attrs" *ngIf="item.invoiceAttributes?.length">
             <span class="invoice-item-attr" *ngFor="let ia of item.invoiceAttributes">

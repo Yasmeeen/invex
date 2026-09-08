@@ -67,6 +67,7 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
     quantity: number;
     costPerKg?: number;
     animalWeightKg?: number;
+    farmAnimalSerials?: string[];
   }> {
     const p = this.purchase;
     if (!p) return [];
@@ -77,6 +78,9 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
           quantity: this.normalizeQuantity(l?.quantity),
           costPerKg: l?.costPerKg,
           animalWeightKg: l?.animalWeightKg,
+          farmAnimalSerials: Array.isArray(l?.farmAnimalSerials)
+            ? l.farmAnimalSerials.map(String)
+            : [],
         }))
         .filter((l: any) => l.productPayload);
     }

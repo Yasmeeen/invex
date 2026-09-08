@@ -56,11 +56,35 @@ export interface Product {
   /** Extra processing cost per unit/kg (butcher manufactured goods). */
   processingExtraCost?: number;
   catalogKey?: string;
-  /** Cashier / order line: piece or weight. */
-  saleUnit?: 'piece' | 'weight';
+  /** Cashier / order line: piece, weight, or farm head. */
+  saleUnit?: 'piece' | 'weight' | 'head';
   weightUnit?: 'kg' | 'g';
+  /** Farm cashier snapshots; price is the derived price per head. */
+  farmAnimalWeightKg?: number;
+  farmPricePerKg?: number;
+  productTypeSnapshot?: 'good' | 'service' | 'farm';
   /** Optional source: client or supplier the product was acquired from */
   acquiredFrom?: ProductAcquiredFrom | null;
+}
+
+export interface FarmAnimal {
+  _id: string;
+  serial: string;
+  serialNumber: number;
+  product: Product | string;
+  acquiredShare: number;
+  remainingShare: number;
+  status: 'available' | 'reserved' | 'sold' | 'slaughtered' | 'removed';
+  branch?: Branch | string | null;
+  inWarehouse?: boolean;
+  factory?: { _id: string; name?: string } | string | null;
+  purchaseWeightKg?: number;
+  currentWeightKg?: number;
+  costPerKg?: number;
+  acquisitionCost?: number;
+  booking?: string | null;
+  reservedForId?: string | null;
+  notes?: string;
 }
 
 /** Payload / API shape for optional product source (client or supplier). */
@@ -80,6 +104,8 @@ export interface ProductActiveBooking {
   customerName: string;
   customerPhone: string;
   quantity?: number;
+  farmAnimal?: string;
+  farmAnimalSerial?: string;
   pickupType: 'branch_pickup' | 'online_shipping';
   shippingAddress?: string;
   /** Pickup branch snapshot (ecommerce customer choice or product branch). */
@@ -177,8 +203,13 @@ export interface OrderProductLine {
   code: string;
   quantity: number;
   returnedQuantity?: number;
-  saleUnit?: 'piece' | 'weight';
+  saleUnit?: 'piece' | 'weight' | 'head';
   weightUnit?: 'kg' | 'g';
+  farmAnimalWeightKg?: number;
+  farmPricePerKg?: number;
+  productTypeSnapshot?: 'good' | 'service' | 'farm';
+  farmAnimalId?: string;
+  farmAnimalSerial?: string;
   price?: number;
   cost?: number;
   isApplyDiscount?: boolean;
@@ -325,6 +356,7 @@ export interface Vendor {
   transactionCurrency?: string;
   paymentTerms: string[] ;
   categories: Category[];         // Array of Category IDs
+  /** Advance paid to supplier: an asset due from the supplier. */
   creditBalance?: number;
   /** Supplier prepaid with us (for buying from the store). */
   buyerPrepaidBalance?: number;
@@ -336,6 +368,10 @@ export interface Vendor {
   supplierOwesUs?: number;
   /** Credit — we owe supplier. */
   weOweSupplier?: number;
+  supplierPrepaidAsset?: number;
+  supplierReceivable?: number;
+  supplierPayable?: number;
+  supplierDepositLiability?: number;
   balanceSide?: 'debit' | 'credit' | 'even' | 'none';
   netBalanceMessage?: { who: 'supplier' | 'store' | 'even'; amount: number } | null;
 }
@@ -444,13 +480,17 @@ export interface VendorHistoryResponse {
   owesFromSales?: number;
   /** Pre-system credit sales debt (opening debit). */
   owesFromOpeningBalance?: number;
-  /** Total credit = prepaid + purchase payables (for display and netting). */
+  /** Actual liabilities: purchase payables + supplier deposits held. */
   weOweSupplier: number;
-  /** Prepaid we paid supplier (subset of weOweSupplier). */
+  /** Advance paid to supplier (asset, included in supplierOwesUs). */
   prepaidBalance?: number;
-  /** Prepaid supplier paid us for sales (subset of weOweSupplier). */
+  /** Prepaid supplier paid us for sales (liability). */
   buyerPrepaidBalance?: number;
-  /** Unpaid installment + deferred amounts (subset of weOweSupplier). */
+  supplierPrepaidAsset?: number;
+  supplierReceivable?: number;
+  supplierPayable?: number;
+  supplierDepositLiability?: number;
+  /** Unpaid received installment + deferred purchases. */
   purchasePayable?: number;
   purchasePayableInstallments?: number;
   purchasePayableDeferred?: number;

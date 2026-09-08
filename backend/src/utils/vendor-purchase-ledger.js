@@ -43,6 +43,7 @@ export function deferredPurchaseRemaining(request) {
 export async function computePurchasePayableBreakdown(vendorId) {
   const requests = await PurchasingRequest.find({
     supplier: vendorId,
+    status: 'Received',
     paymentStatus: { $in: ['Installments', 'Deferred'] },
   }).lean();
 
@@ -72,6 +73,7 @@ export async function computePurchasePayablesByVendorIds(vendorIds) {
 
   const requests = await PurchasingRequest.find({
     supplier: { $in: ids },
+    status: 'Received',
     paymentStatus: { $in: ['Installments', 'Deferred'] },
   }).lean();
 
@@ -139,6 +141,13 @@ export async function syncVendorPurchaseLedger(request, { userId } = {}) {
   const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
     ? new mongoose.Types.ObjectId(String(userId))
     : undefined;
+
+  if (request.status !== 'Received') {
+    vendor.ledgerEntries = rest;
+    vendor.markModified('ledgerEntries');
+    await vendor.save();
+    return;
+  }
 
   if (request.paymentStatus === 'Installments') {
     const amount = Number(request.totalAmount) || 0;

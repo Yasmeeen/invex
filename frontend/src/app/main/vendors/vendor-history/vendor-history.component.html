@@ -117,6 +117,10 @@
               {{ 'tr_vendor_debit_from_sales' | translate }}:
               {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
             </p>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.prepaidBalance || 0) > 0">
+              {{ 'tr_vendor_credit_prepaid' | translate }}:
+              {{ history.prepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
           </div>
         </div>
         <div class="col-md-4 mb-3">
@@ -125,10 +129,6 @@
             <div class="balance-card__value">
               {{ history.weOweSupplier | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
             </div>
-            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.prepaidBalance || 0) > 0">
-              {{ 'tr_vendor_credit_prepaid' | translate }}:
-              {{ history.prepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
-            </p>
             <p class="size-small text-muted m-0 mt-1" *ngIf="(history.buyerPrepaidBalance || 0) > 0">
               {{ 'tr_vendor_buyer_prepaid' | translate }}:
               {{ history.buyerPrepaidBalance | currency:'EGP':'symbol':'1.2-2':'en-EG' }}

@@ -6,6 +6,7 @@ import User from '../../DB/models/user.model.js';
 import StockMovement from '../../DB/models/stockMovement.model.js';
 import SlaughterTemplate from '../../DB/models/slaughterTemplate.model.js';
 import SlaughterTicket from '../../DB/models/slaughterTicket.model.js';
+import FarmAnimal from '../../DB/models/farmAnimal.model.js';
 import {
   AL_RAJI_CATEGORIES,
   AL_RAJI_SLAUGHTER_TEMPLATES,
@@ -512,6 +513,25 @@ async function persistSlaughterTicket(req, session) {
   if (!isFarmProduct(farm)) {
     throw httpError(400, 'Selected product is not a farm animal');
   }
+  const farmAnimalId = String(req.body.farmAnimalId || '').trim();
+  if (!farmAnimalId || !mongoose.Types.ObjectId.isValid(farmAnimalId)) {
+    throw httpError(400, 'A farm animal serial must be selected');
+  }
+  const farmAnimal = await q(FarmAnimal.findById(farmAnimalId), session);
+  if (
+    !farmAnimal ||
+    String(farmAnimal.product) !== String(farm._id) ||
+    farmAnimal.status !== 'available' ||
+    Number(farmAnimal.remainingShare) + 0.0001 < share
+  ) {
+    throw httpError(409, 'Selected farm animal is not available for slaughter');
+  }
+  if (
+    (inWarehouse && !farmAnimal.inWarehouse) ||
+    (!inWarehouse && String(farmAnimal.branch) !== String(branchId))
+  ) {
+    throw httpError(400, 'Selected farm animal is not in this location');
+  }
   const farmStock = roundFarmHeads(farm.stock);
   if (farmStock + 0.0001 < share) {
     throw httpError(
@@ -630,6 +650,8 @@ async function persistSlaughterTicket(req, session) {
         inWarehouse,
         farmProductId: farm._id,
         farmProductName: farm.name,
+        farmAnimalId: farmAnimal._id,
+        farmAnimalSerial: farmAnimal.serial,
         templateId: template?._id || null,
         templateCode: template?.code || '',
         share,
@@ -645,6 +667,11 @@ async function persistSlaughterTicket(req, session) {
     createOpts
   );
   const ticket = Array.isArray(ticketDocs) ? ticketDocs[0] : ticketDocs;
+  farmAnimal.remainingShare = roundFarmHeads(Number(farmAnimal.remainingShare) - share);
+  farmAnimal.status = farmAnimal.remainingShare > 0 ? 'available' : 'slaughtered';
+  farmAnimal.slaughterTicket = ticket._id;
+  if (farmAnimal.status === 'slaughtered') farmAnimal.slaughteredAt = new Date();
+  await farmAnimal.save(session ? { session } : undefined);
 
   await StockMovement.create(
     [

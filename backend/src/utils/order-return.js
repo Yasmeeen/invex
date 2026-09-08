@@ -3,6 +3,7 @@ import Product from '../DB/models/product.model.js';
 import StockMovement from '../DB/models/stockMovement.model.js';
 import AuditLog from '../DB/models/auditLog.model.js';
 import ProductPurchaseRequest from '../DB/models/productPurchaseRequest.model.js';
+import FarmAnimal from '../DB/models/farmAnimal.model.js';
 import { isClientCreditOrder } from './client-order-utils.js';
 import {
   buildSalesRefundPaymentSplits,
@@ -12,7 +13,7 @@ import {
 } from './return-refund-mirror.js';
 import { getEffectivePurchaseTreasuryMethodsFromDb, treasuryMethodMap } from '../modules/settings_module/treasuryMethods.js';
 import { netSettlementFeesOnPaymentSplits } from './treasury-ledger.js';
-import { isServiceProduct } from './product-type.util.js';
+import { isServiceProduct, roundFarmHeads } from './product-type.util.js';
 import {
   isWeightSaleUnit,
   normalizeSaleQuantity,
@@ -43,6 +44,9 @@ function lineQtyNumber(raw, line) {
   if (isWeightSaleUnit(line?.saleUnit)) {
     return normalizeWeightQuantity(raw);
   }
+  if (String(line?.saleUnit || '').toLowerCase() === 'head') {
+    return roundFarmHeads(Math.max(0, Number(raw) || 0));
+  }
   return Math.max(0, Math.floor(Number(raw) || 0));
 }
 
@@ -60,7 +64,10 @@ function returnedQtyFromHistory(order, productId, line = null) {
       }
     }
   }
-  return isWeightSaleUnit(line?.saleUnit) ? roundWeight(sum) : sum;
+  if (isWeightSaleUnit(line?.saleUnit)) return roundWeight(sum);
+  return String(line?.saleUnit || '').toLowerCase() === 'head'
+    ? roundFarmHeads(sum)
+    : sum;
 }
 
 export function orderLineRemainingQty(line, order = null) {
@@ -70,7 +77,10 @@ export function orderLineRemainingQty(line, order = null) {
   const fromHistory = order ? returnedQtyFromHistory(order, line?.productId, line) : 0;
   const returned = Math.max(fromLine, fromHistory);
   const remaining = Math.max(0, sold - returned);
-  return isWeight ? roundWeight(remaining) : remaining;
+  if (isWeight) return roundWeight(remaining);
+  return String(line?.saleUnit || '').toLowerCase() === 'head'
+    ? roundFarmHeads(remaining)
+    : remaining;
 }
 
 export function orderIsFullyReturned(order) {
@@ -209,6 +219,19 @@ export async function restoreProductStockForReturn(order, line, quantity) {
   const isWeight = isWeightSaleUnit(line?.saleUnit);
   const qty = normalizeSaleQuantity(Number(quantity) || 0, isWeight);
   if (qty <= 0) return null;
+
+  if (line?.farmAnimalId && mongoose.Types.ObjectId.isValid(String(line.farmAnimalId))) {
+    const animal = await FarmAnimal.findById(line.farmAnimalId);
+    if (animal && animal.status === 'sold') {
+      animal.remainingShare = roundFarmHeads(
+        Math.min(Number(animal.acquiredShare) || 1, Number(animal.remainingShare) + qty)
+      );
+      animal.status = 'available';
+      animal.order = null;
+      animal.soldAt = null;
+      await animal.save();
+    }
+  }
 
   const lineProduct = line?.productId
     ? await Product.findById(line.productId).select('productType')

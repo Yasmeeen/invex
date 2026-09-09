@@ -282,6 +282,95 @@
       </ng-template>
     </ng-container>
 
+    <!-- CRM -->
+    <ng-container *ngIf="activeTab === 'crm'">
+      <div class="store-settings-card__section-head">
+        <h2 class="store-settings-card__section-title">{{ 'tr_crm_integration_title' | translate }}</h2>
+        <p class="store-settings-card__hint">{{ 'tr_crm_integration_hint' | translate }}</p>
+      </div>
+
+      <ng-container *ngIf="form.crmIntegrationFeatureAvailable; else crmLocked">
+        <div class="store-settings-card__field">
+          <label class="store-settings-card__enable checkbox-row">
+            <input
+              type="checkbox"
+              name="crmIntegrationEnabled"
+              [(ngModel)]="form.crmIntegrationEnabled"
+            />
+            <span>{{ 'tr_crm_integration_enable' | translate }}</span>
+          </label>
+        </div>
+
+        <ng-container *ngIf="form.crmIntegrationEnabled">
+          <div class="store-settings-card__field">
+            <label class="store-settings-card__label" for="crmBaseUrl">
+              {{ 'tr_crm_base_url' | translate }}
+            </label>
+            <p class="store-settings-card__hint">{{ 'tr_crm_base_url_hint' | translate }}</p>
+            <input
+              id="crmBaseUrl"
+              type="url"
+              class="s-control"
+              name="crmBaseUrl"
+              [(ngModel)]="form.crmBaseUrl"
+              maxlength="500"
+              autocomplete="url"
+              [placeholder]="'tr_crm_base_url_ph' | translate"
+            />
+          </div>
+
+          <div class="store-settings-card__field">
+            <label class="store-settings-card__label" for="crmSharedKey">
+              {{ 'tr_crm_shared_key' | translate }}
+            </label>
+            <p class="store-settings-card__hint">{{ 'tr_crm_shared_key_hint' | translate }}</p>
+            <div class="store-settings-card__secret-row">
+              <input
+                id="crmSharedKey"
+                [type]="showCrmSharedKey ? 'text' : 'password'"
+                class="s-control"
+                name="crmSharedKey"
+                [(ngModel)]="form.crmSharedKey"
+                maxlength="200"
+                autocomplete="new-password"
+                [placeholder]="
+                  form.crmHasSharedKey ? '••••••••' : ('tr_crm_shared_key_ph' | translate)
+                "
+              />
+              <button
+                type="button"
+                class="s-btn btn-secondary btn-sm"
+                (click)="showCrmSharedKey = !showCrmSharedKey"
+              >
+                {{ (showCrmSharedKey ? 'tr_hide_key' : 'tr_show_key') | translate }}
+              </button>
+            </div>
+            <p *ngIf="form.crmHasSharedKey && !form.crmSharedKey" class="store-settings-card__hint">
+              {{ 'tr_crm_shared_key_stored' | translate }}
+            </p>
+          </div>
+
+          <div class="store-settings-card__api-box">
+            <h3>{{ 'tr_crm_invex_api_title' | translate }}</h3>
+            <p>{{ 'tr_crm_invex_api_hint' | translate }}</p>
+            <code>{{ invexCrmApiUrl }}</code>
+            <ul>
+              <li><strong>GET</strong> <code>/catalog?branchId=...</code></li>
+              <li><strong>POST</strong> <code>/orders</code></li>
+              <li><strong>GET</strong> <code>/orders/:crmOrderId</code></li>
+            </ul>
+            <p class="store-settings-card__api-auth">
+              {{ 'tr_crm_invex_api_auth' | translate }}
+            </p>
+          </div>
+        </ng-container>
+      </ng-container>
+
+      <ng-template #crmLocked>
+        <p class="store-settings-card__locked">{{ 'tr_crm_feature_locked' | translate }}</p>
+      </ng-template>
+    </ng-container>
+
     <div class="store-settings-card__actions">
       <button
         type="button"

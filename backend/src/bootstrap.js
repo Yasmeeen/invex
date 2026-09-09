@@ -30,6 +30,7 @@ import trimRoutes from './modules/trim_module/router.js';
 import factoryRoutes from './modules/factory_module/router.js';
 import integrationsRoutes from './modules/integrations_module/router.js';
 import farmAnimalsRoutes from './modules/farm_animals_module/router.js';
+import onlineOrdersRoutes from './modules/online_orders_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -95,6 +96,7 @@ const bootstrap = (app, express) => {
   app.use('/api/trim', trimRoutes);
   app.use('/api/factory', factoryRoutes);
   app.use('/api/integrations', integrationsRoutes);
+  app.use('/api/online-orders', onlineOrdersRoutes);
   app.use('/api/farm-animals', farmAnimalsRoutes);
 
   return app;

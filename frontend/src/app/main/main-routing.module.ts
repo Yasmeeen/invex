@@ -111,6 +111,15 @@ const routes: Routes = [
         },
       },
       {
+        path: 'online-orders',
+        loadChildren: () =>
+          import('./online-orders/online-orders.module').then((m) => m.OnlineOrdersModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
+        },
+      },
+      {
         path: 'home',
         loadChildren: () => import('./home/home.module').then(m => m.HomeModule),
         canActivate: [RoleGuard],

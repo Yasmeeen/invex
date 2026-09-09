@@ -321,8 +321,12 @@ export async function createBookingFromEcommerceOrder({
   pickupLocation = '',
   pickupBranchId = '',
   paidOnline = false,
+  allowFractionalQuantity = false,
 }) {
-  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+  const rawQuantity = Number(quantity);
+  const qty = allowFractionalQuantity
+    ? Math.round(Math.max(0.001, rawQuantity || 0.001) * 1000) / 1000
+    : Math.max(1, Math.floor(rawQuantity || 1));
   const name = String(customer?.name || '').trim() || 'Online customer';
   const phone = String(customer?.phone || '').trim();
   const isPickup = pickupType === 'branch_pickup';

@@ -244,6 +244,10 @@ export interface Order {
   /** Credit sales tracking */
   amountPaid?: number;
   paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  /** Invoice origin; e-commerce invoices can be collected after delivery. */
+  source?: 'pos' | 'ecommerce';
+  ecommerceOrderId?: string;
+  ecommerceOrderNumber?: string;
   payments?: Array<{
     amount: number;
     paidAt: string;

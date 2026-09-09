@@ -1,0 +1,133 @@
+<section class="online-orders">
+  <header class="online-orders__header">
+    <div>
+      <h1>{{ 'tr_online_orders' | translate }}</h1>
+      <p>{{ 'tr_online_orders_hint' | translate }}</p>
+    </div>
+    <select class="s-control online-orders__filter" [(ngModel)]="status" (change)="page = 1; load()">
+      <option value="">{{ 'tr_online_orders_all_statuses' | translate }}</option>
+      <option value="pending">{{ 'tr_online_order_pending' | translate }}</option>
+      <option value="preparing">{{ 'tr_online_order_preparing' | translate }}</option>
+      <option value="ready">{{ 'tr_online_order_ready' | translate }}</option>
+      <option value="completed">{{ 'tr_online_order_completed' | translate }}</option>
+      <option value="cancelled">{{ 'tr_online_order_cancelled' | translate }}</option>
+    </select>
+  </header>
+
+  <div class="online-orders__layout">
+    <div class="online-orders__list content-shadow bg-white">
+      <div class="online-orders__empty" *ngIf="loading">{{ 'tr_loading' | translate }}</div>
+      <div class="online-orders__empty" *ngIf="!loading && !orders.length">
+        {{ 'tr_online_orders_empty' | translate }}
+      </div>
+
+      <button
+        type="button"
+        class="order-row"
+        *ngFor="let order of orders"
+        [class.order-row--selected]="selectedOrder?._id === order._id"
+        (click)="select(order)"
+      >
+        <span class="order-row__number">#{{ order.crmOrderNumber }}</span>
+        <span class="order-row__customer">
+          <strong>{{ order.customer?.name }}</strong>
+          <small>{{ order.customer?.phone }}</small>
+        </span>
+        <span>{{ order.branch?.name || order.branchSnapshot?.name }}</span>
+        <span>{{ order.total | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
+        <span>{{ age(order.createdAt) }}</span>
+        <span class="status-pill" [attr.data-status]="order.status">
+          {{ ('tr_online_order_' + order.status) | translate }}
+        </span>
+      </button>
+
+      <footer class="online-orders__pagination" *ngIf="totalPages > 1">
+        <button class="s-btn btn-secondary" (click)="setPage(page - 1)" [disabled]="page === 1">
+          ‹
+        </button>
+        <span>{{ page }} / {{ totalPages }}</span>
+        <button
+          class="s-btn btn-secondary"
+          (click)="setPage(page + 1)"
+          [disabled]="page === totalPages"
+        >
+          ›
+        </button>
+      </footer>
+    </div>
+
+    <aside class="order-detail content-shadow bg-white" *ngIf="selectedOrder">
+      <div class="order-detail__title">
+        <div>
+          <h2>#{{ selectedOrder.crmOrderNumber }}</h2>
+          <span class="status-pill" [attr.data-status]="selectedOrder.status">
+            {{ ('tr_online_order_' + selectedOrder.status) | translate }}
+          </span>
+        </div>
+        <button type="button" class="order-detail__close" (click)="selectedOrder = null">×</button>
+      </div>
+
+      <dl class="order-detail__customer">
+        <div><dt>{{ 'tr_client_name' | translate }}</dt><dd>{{ selectedOrder.customer?.name }}</dd></div>
+        <div><dt>{{ 'tr_phone_number' | translate }}</dt><dd>{{ selectedOrder.customer?.phone }}</dd></div>
+        <div><dt>{{ 'tr_address' | translate }}</dt><dd>{{ selectedOrder.deliveryAddress || selectedOrder.customer?.address || '—' }}</dd></div>
+        <div><dt>{{ 'tr_branches' | translate }}</dt><dd>{{ selectedOrder.branch?.name || selectedOrder.branchSnapshot?.name }}</dd></div>
+      </dl>
+
+      <div class="cart-line" *ngFor="let item of selectedOrder.items">
+        <div>
+          <strong>{{ item.name }}</strong>
+          <small>{{ item.code }}</small>
+        </div>
+        <span>{{ item.quantity }} <small>{{ item.saleUnit === 'weight' ? item.weightUnit : '' }}</small></span>
+        <span>{{ item.unitPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
+        <strong>{{ item.lineTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </div>
+
+      <div class="order-detail__total">
+        <span>{{ 'tr_total_amount' | translate }}</span>
+        <strong>{{ selectedOrder.total | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </div>
+      <p class="order-detail__notes" *ngIf="selectedOrder.notes">{{ selectedOrder.notes }}</p>
+
+      <div class="order-detail__payment-note" *ngIf="selectedOrder.status === 'completed'">
+        {{ 'tr_online_order_unpaid_hint' | translate }}
+      </div>
+
+      <div class="order-detail__actions">
+        <button
+          class="s-btn btn-primary"
+          type="button"
+          *ngIf="nextStatus(selectedOrder)"
+          [disabled]="actionLoading"
+          (click)="advance(selectedOrder)"
+        >
+          {{
+            (selectedOrder.status === 'ready'
+              ? 'tr_online_order_create_invoice'
+              : selectedOrder.status === 'pending'
+              ? 'tr_online_order_start_preparing'
+              : 'tr_online_order_mark_ready') | translate
+          }}
+        </button>
+        <button
+          class="s-btn btn-secondary"
+          type="button"
+          *ngIf="selectedOrder.status === 'completed'"
+          (click)="openInvoice(selectedOrder)"
+        >
+          {{ 'tr_online_order_open_invoice' | translate }}
+        </button>
+        <button
+          class="s-btn btn-danger"
+          type="button"
+          *ngIf="selectedOrder.status === 'pending' || selectedOrder.status === 'preparing' || selectedOrder.status === 'ready'"
+          [disabled]="actionLoading"
+          (click)="cancel(selectedOrder)"
+        >
+          {{ 'tr_cancel' | translate }}
+        </button>
+      </div>
+    </aside>
+  </div>
+</section>

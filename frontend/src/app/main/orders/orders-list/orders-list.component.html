@@ -556,6 +556,16 @@
             </div>
           </div>
 
+          <button
+            type="button"
+            class="s-btn btn-primary width-100 mt-3"
+            *ngIf="isOnlineCollectionDue(order)"
+            (click)="openPayDialog(order)"
+          >
+            <i class="fa fa-money mr-2" aria-hidden="true"></i>
+            {{ 'tr_record_collection' | translate }}
+          </button>
+
           <div class="order-card__row" *ngIf="orderInvoiceExtraDiscount(order) > 0 || orderInvoiceSurcharge(order) > 0">
             <span class="muted">{{ 'tr_invoice_extra_discount' | translate }}:</span>
             <span>

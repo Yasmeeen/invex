@@ -27,6 +27,7 @@ import {
   hasOrderReturns,
   isCreditOnlyOutstanding,
   isCreditOnlySettled,
+  isDeferredCollectionOrder,
   isInstallmentOutstanding,
   isInstallmentSale,
   isInstallmentSettled,
@@ -189,8 +190,14 @@ export class OrdersListComponent implements OnInit {
   canPayOrder(order: Order): boolean {
     if (!order?._id) return false;
     if (order.status === 'restored') return false;
-    if (!isPayLaterMethod(order.paymentMethod)) return false;
+    if (!isPayLaterMethod(order.paymentMethod) && !isDeferredCollectionOrder(order)) {
+      return false;
+    }
     return orderDisplayRemaining(order) > 0;
+  }
+
+  isOnlineCollectionDue(order: Order): boolean {
+    return isDeferredCollectionOrder(order) && orderDisplayRemaining(order) > 0;
   }
 
   canReturnOrder(order: Order): boolean {

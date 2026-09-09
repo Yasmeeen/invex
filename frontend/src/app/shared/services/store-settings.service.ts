@@ -108,6 +108,12 @@ export interface StoreSettings {
   ecommerceSharedKey?: string;
   ecommerceCatalogMode?: 'all' | 'online_only';
   onlineBranchId?: string | null;
+  /** Independently env-gated CRM integration. */
+  crmIntegrationFeatureAvailable?: boolean;
+  crmIntegrationEnabled?: boolean;
+  crmBaseUrl?: string;
+  crmSharedKey?: string;
+  crmHasSharedKey?: boolean;
   /** Roles that must not see product cost / purchase price. Super Admin is never hidden. */
   rolesHiddenFromCostPrice?: string[];
 }
@@ -144,6 +150,11 @@ const DEFAULTS: StoreSettings = {
   ecommerceSharedKey: '',
   ecommerceCatalogMode: 'all',
   onlineBranchId: null,
+  crmIntegrationFeatureAvailable: false,
+  crmIntegrationEnabled: false,
+  crmBaseUrl: '',
+  crmSharedKey: '',
+  crmHasSharedKey: false,
   rolesHiddenFromCostPrice: [...DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE],
 };
 
@@ -369,6 +380,11 @@ export class StoreSettingsService {
           ecommerceCatalogMode:
             data.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
           onlineBranchId: data.onlineBranchId ?? null,
+          crmIntegrationFeatureAvailable: Boolean(data.crmIntegrationFeatureAvailable),
+          crmIntegrationEnabled: Boolean(data.crmIntegrationEnabled),
+          crmBaseUrl: data.crmBaseUrl ?? '',
+          crmSharedKey: '',
+          crmHasSharedKey: Boolean(data.crmHasSharedKey),
           rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(
             data.rolesHiddenFromCostPrice
           ),

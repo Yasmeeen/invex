@@ -132,6 +132,64 @@
   line-height: 1.45;
 }
 
+.store-settings-card__secret-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+
+  .s-control {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+.store-settings-card__api-box {
+  margin-top: 0.25rem;
+  padding: 1rem;
+  border: 1px solid #dbe7de;
+  border-radius: 12px;
+  background: #f7fbf8;
+  color: #374151;
+
+  h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.95rem;
+    color: #1f2937;
+  }
+
+  p {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+
+  code {
+    overflow-wrap: anywhere;
+    direction: ltr;
+    unicode-bidi: embed;
+  }
+
+  > code {
+    display: block;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e1e9e3;
+    color: #1e4d2b;
+  }
+
+  ul {
+    margin: 0.8rem 0;
+    padding-inline-start: 1.25rem;
+    font-size: 0.85rem;
+    line-height: 1.8;
+  }
+
+  .store-settings-card__api-auth {
+    margin-bottom: 0;
+  }
+}
+
 .store-settings-card__logo-row {
   display: flex;
   flex-wrap: wrap;
@@ -218,5 +276,10 @@
     min-width: calc(50% - 0.2rem);
     font-size: 0.82rem;
     padding: 0.5rem 0.45rem;
+  }
+
+  .store-settings-card__secret-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

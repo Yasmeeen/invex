@@ -20,6 +20,35 @@
   margin: 0 0 0.75rem;
 }
 
+.reports-page__data-notes {
+  margin-bottom: 1rem;
+  padding: 1rem 1.125rem;
+  color: #422006 !important;
+  background-color: #fde68a !important;
+  border: 1px solid #d97706 !important;
+  border-inline-start-width: 4px;
+  border-radius: 0.5rem;
+  line-height: 1.6;
+  box-shadow: 0 2px 8px rgba(146, 64, 14, 0.16);
+
+  strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #422006 !important;
+    font-weight: 700;
+  }
+
+  ul {
+    margin-top: 0.25rem;
+    padding-inline-start: 1.25rem;
+  }
+
+  li {
+    color: #422006 !important;
+    font-weight: 500;
+  }
+}
+
 .reports-page__pagination {
   display: flex;
   align-items: center;

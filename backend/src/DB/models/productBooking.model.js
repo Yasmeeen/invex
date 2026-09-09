@@ -45,7 +45,8 @@ const productBookingSchema = new mongoose.Schema(
     },
     shippingAddress: { type: String, default: '', trim: true },
     /** Units reserved by this booking (SKU quantity). */
-    quantity: { type: Number, required: true, min: 1, default: 1 },
+    /** Weight-based online orders may reserve fractional quantities. */
+    quantity: { type: Number, required: true, min: 0.001, default: 1 },
     depositAmount: { type: Number, required: true, min: 0 },
     /** Deposit payment breakdown (cashier-style methods). */
     depositPayments: {

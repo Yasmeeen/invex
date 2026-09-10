@@ -45,13 +45,13 @@
     </p>
   </div>
 
-  <div mat-dialog-actions class="complete-oo-dialog__actions" align="end">
-    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+  <div class="complete-oo-dialog__actions">
+    <button type="button" class="s-btn btn-sm btn-secondary" (click)="cancel()">
       {{ 'tr_cancel' | translate }}
     </button>
     <button
       type="button"
-      class="s-btn btn-primary"
+      class="s-btn btn-sm btn-primary"
       [disabled]="!canConfirm"
       (click)="confirm()"
     >

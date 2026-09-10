@@ -124,9 +124,17 @@ async function latestSettings(session) {
 
 /** Recalc + notify without blocking the HTTP response (large orders). */
 function scheduleProductSideEffects(productIds, label = 'CRM post-update') {
+  // Callers may pass an Array or a Set of product ids.
+  const list = Array.isArray(productIds)
+    ? productIds
+    : productIds instanceof Set
+      ? [...productIds]
+      : productIds
+        ? [productIds]
+        : [];
   const unique = [
     ...new Set(
-      (productIds || [])
+      list
         .map((id) => String(id || ''))
         .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
     ),
@@ -816,7 +824,11 @@ async function cancelOnlineOrder(order, actor) {
       const sourceId = cutFromSourceEnabled ? sourceProductIdOf(cut) : null;
       if (sourceId) notifyIds.add(sourceId);
     }
-    scheduleProductSideEffects(notifyIds, 'CRM cancellation post-update');
+    try {
+      scheduleProductSideEffects(notifyIds, 'CRM cancellation post-update');
+    } catch (sideEffectError) {
+      console.error('CRM cancellation post-update schedule:', sideEffectError);
+    }
     return current;
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction();
@@ -1068,7 +1080,11 @@ async function completeOnlineOrder(order, actor, paymentMethod, options = {}) {
     ]);
     await session.commitTransaction();
 
-    scheduleProductSideEffects(touched, 'CRM completion post-update');
+    try {
+      scheduleProductSideEffects(touched, 'CRM completion post-update');
+    } catch (sideEffectError) {
+      console.error('CRM completion post-update schedule:', sideEffectError);
+    }
     return current;
   } catch (error) {
     if (session.inTransaction()) await session.abortTransaction();

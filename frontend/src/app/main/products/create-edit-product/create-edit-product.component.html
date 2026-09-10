@@ -215,8 +215,10 @@
                           [ngModelOptions]="{ standalone: true }"
                           (ngModelChange)="onSourceProductChange($event)"
                           (open)="loadSourceStockCandidates()"
+                          [loading]="sourceStockLoading"
                           appendTo="#create-edit-product-modal-root"
                           [clearable]="true"
+                          [searchable]="true"
                           [placeholder]="'tr_cut_source_none' | translate"
                           notFoundText="{{ 'tr_no_items_found' | translate }}"
                         >

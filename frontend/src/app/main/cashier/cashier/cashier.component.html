@@ -55,6 +55,8 @@
     </div>
   </div>
 
+  <app-online-orders-banner variant="cashier"></app-online-orders-banner>
+
   <div class="cashier-opening-balance cashier-opening-balance--closed" *ngIf="drawerPeriodAlreadyClosed" role="status">
     <i class="fa fa-check-circle" aria-hidden="true"></i>
     <span>{{ 'tr_drawer_close_period_already_closed' | translate }}</span>
@@ -567,64 +569,76 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of orderItems; let i = index">
+          <tr *ngFor="let item of orderItems; let i = index" [class.order-line--farm]="isFarmLine(item)">
             <td>
-              <span class="order-line-product">
-                <img
-                  *ngIf="productImageVisible(item)"
-                  class="order-line-thumb order-line-thumb--clickable"
-                  [src]="item.imageUrl"
-                  alt=""
-                  (click)="openProductDetails(item)"
-                  (error)="onProductImageError(item.productId || item._id)"
-                  [attr.title]="'tr_product_details' | translate"
-                />
-                <span
-                  *ngIf="!productImageVisible(item)"
-                  class="order-line-thumb order-line-thumb--placeholder order-line-thumb--clickable"
-                  (click)="openProductDetails(item)"
-                  [attr.title]="'tr_product_details' | translate"
-                  aria-hidden="true"
-                >
-                  <i class="fa fa-cube"></i>
-                </span>
-                <span class="order-line-product__text">
+              <span class="order-line-product" [class.order-line-product--farm]="isFarmLine(item)">
+                <span class="order-line-product__main">
+                  <img
+                    *ngIf="productImageVisible(item)"
+                    class="order-line-thumb order-line-thumb--clickable"
+                    [class.order-line-thumb--farm]="isFarmLine(item)"
+                    [src]="item.imageUrl"
+                    alt=""
+                    (click)="openProductDetails(item)"
+                    (error)="onProductImageError(item.productId || item._id)"
+                    [attr.title]="'tr_product_details' | translate"
+                  />
                   <span
-                    class="order-line-product__name order-line-product__name--clickable"
-                    [class.order-line-product__name--reserved]="lineShowsForeignBookingWarning(item)"
-                    [class.order-line-product__name--deposit-matched]="
-                      !lineShowsForeignBookingWarning(item) && lineShowsMatchedDepositInfo(item)
-                    "
+                    *ngIf="!productImageVisible(item)"
+                    class="order-line-thumb order-line-thumb--placeholder order-line-thumb--clickable"
+                    [class.order-line-thumb--farm]="isFarmLine(item)"
                     (click)="openProductDetails(item)"
                     [attr.title]="'tr_product_details' | translate"
-                  >{{ item.name }}</span>
-                  <span class="order-line-product__code" *ngIf="item.code">{{ item.code }}</span>
+                    aria-hidden="true"
+                  >
+                    <i class="fa fa-cube"></i>
+                  </span>
+                  <span class="order-line-product__text">
+                    <span
+                      class="order-line-product__name order-line-product__name--clickable"
+                      [class.order-line-product__name--reserved]="lineShowsForeignBookingWarning(item)"
+                      [class.order-line-product__name--deposit-matched]="
+                        !lineShowsForeignBookingWarning(item) && lineShowsMatchedDepositInfo(item)
+                      "
+                      (click)="openProductDetails(item)"
+                      [attr.title]="'tr_product_details' | translate"
+                    >{{ item.name }}</span>
+                    <span class="order-line-product__code" *ngIf="item.code">{{ item.code }}</span>
+                  </span>
                 </span>
+                <ng-container *ngIf="isFarmLine(item)">
+                  <ng-select
+                    class="farm-animal-select"
+                    [items]="item.availableFarmAnimals || []"
+                    bindLabel="serial"
+                    bindValue="_id"
+                    [loading]="item.farmAnimalsLoading"
+                    [clearable]="false"
+                    [searchable]="true"
+                    [(ngModel)]="item.farmAnimalId"
+                    (ngModelChange)="onFarmAnimalSelected(item, $event)"
+                    [ngModelOptions]="{ standalone: true }"
+                    [placeholder]="'tr_farm_sale_select_animal' | translate"
+                  >
+                    <ng-template ng-label-tmp let-animal="item">
+                      <span class="farm-animal-select__value">#{{ animal?.serial }}</span>
+                    </ng-template>
+                    <ng-template ng-option-tmp let-animal="item">
+                      <strong>#{{ animal.serial }}</strong>
+                      <span *ngIf="animal.currentWeightKg || animal.purchaseWeightKg">
+                        — {{ animal.currentWeightKg || animal.purchaseWeightKg }} kg
+                      </span>
+                    </ng-template>
+                  </ng-select>
+                  <span class="farm-sale-meta" *ngIf="item.farmRecordedWeightKg">
+                    {{ 'tr_farm_sale_recorded_weight_hint' | translate:{ weight: item.farmRecordedWeightKg } }}
+                  </span>
+                </ng-container>
               </span>
             </td>
-            <td>
+            <td [class.order-line-qty--farm]="isFarmLine(item)">
               <ng-container *ngIf="isFarmLine(item); else regularQtyControls">
-                <ng-select
-                  class="farm-animal-select"
-                  [items]="item.availableFarmAnimals || []"
-                  bindLabel="serial"
-                  bindValue="_id"
-                  [loading]="item.farmAnimalsLoading"
-                  [clearable]="false"
-                  [searchable]="true"
-                  [(ngModel)]="item.farmAnimalId"
-                  (ngModelChange)="onFarmAnimalSelected(item, $event)"
-                  [ngModelOptions]="{ standalone: true }"
-                  [placeholder]="'tr_farm_sale_select_animal' | translate"
-                >
-                  <ng-template ng-option-tmp let-animal="item">
-                    <strong>{{ animal.serial }}</strong>
-                    <span *ngIf="animal.currentWeightKg || animal.purchaseWeightKg">
-                      — {{ animal.currentWeightKg || animal.purchaseWeightKg }} kg
-                    </span>
-                  </ng-template>
-                </ng-select>
-                <div class="farm-sale-field">
+                <div class="farm-sale-field farm-sale-field--weight">
                   <input
                     type="number"
                     inputmode="decimal"
@@ -634,12 +648,12 @@
                     [(ngModel)]="item.farmAnimalWeightKg"
                     (ngModelChange)="onFarmPricingChange(item)"
                     [ngModelOptions]="{ standalone: true }"
+                    [attr.data-farm-weight-for]="item.farmAnimalId || item.productId"
+                    [attr.placeholder]="'tr_farm_sale_weight_placeholder' | translate"
                     [attr.aria-label]="'tr_farm_sale_animal_weight' | translate"
+                    [attr.title]="'tr_farm_sale_animal_weight' | translate"
                   />
                   <span class="farm-sale-field__unit">kg</span>
-                </div>
-                <div class="size-small text-muted mt-1">
-                  {{ item.quantity }} {{ 'tr_farm_sale_head' | translate }}
                 </div>
               </ng-container>
               <ng-template #regularQtyControls>
@@ -677,6 +691,7 @@
                   (ngModelChange)="onFarmPricingChange(item)"
                   [ngModelOptions]="{ standalone: true }"
                   [attr.aria-label]="'tr_farm_sale_price_per_kg' | translate"
+                  [attr.title]="'tr_farm_sale_price_per_kg' | translate"
                 />
                 <span class="farm-sale-field__unit">/kg</span>
               </div>

@@ -10,6 +10,7 @@ import { FarmAnimalsService } from '@shared/services/farm-animals.service';
 export class FarmAnimalsListComponent implements OnInit {
   animals: FarmAnimal[] = [];
   loading = false;
+  isFilterOpen = true;
   search = '';
   status = '';
 

@@ -21,6 +21,15 @@ export interface DrawerDeskPurchaseDevice {
   isExchangeTradeIn?: boolean;
 }
 
+export interface DrawerSoldProduct {
+  productId?: string | null;
+  name: string;
+  code?: string;
+  quantity: number;
+  saleUnit: 'piece' | 'weight' | 'head';
+  weightUnit?: 'kg' | 'g';
+}
+
 export interface DrawerClosePreview {
   businessDate: string;
   branchId: string;
@@ -35,6 +44,8 @@ export interface DrawerClosePreview {
   salesReturnRefundsByTreasury?: DeskPurchaseTreasuryLine[];
   restoredInvoiceCount: number;
   invoiceCount: number;
+  /** Net sold products for the branch period (after returns). */
+  soldProducts?: DrawerSoldProduct[];
   dailyExpenseTotal: number;
   /** Cash paid from physical drawer for desk purchases only (legacy alias). */
   deskPurchaseCashOutTotal: number;
@@ -80,6 +91,8 @@ export interface DrawerCloseRecord {
   openingCashBalance?: number;
   periodNetCashMovements?: number;
   snapshot?: DrawerClosePreview & Record<string, unknown>;
+  /** Net sold products for the close period (from snapshot or computed for older closes). */
+  soldProducts?: DrawerSoldProduct[];
   expectedCashInDrawer: number;
   actualCashCounted: number;
   variance: number;

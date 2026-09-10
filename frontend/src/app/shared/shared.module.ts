@@ -27,6 +27,7 @@ import { PaymentReceiptPrintComponent } from './components/payment-receipt-print
 import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/invoice-reprint-host.component';
 import { BookingReprintHostComponent } from './components/booking-reprint-host/booking-reprint-host.component';
 import { RichTextEditorComponent } from './components/rich-text-editor/rich-text-editor.component';
+import { OnlineOrdersBannerComponent } from './components/online-orders-banner/online-orders-banner.component';
 
 
 
@@ -49,6 +50,7 @@ import { RichTextEditorComponent } from './components/rich-text-editor/rich-text
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
     RichTextEditorComponent,
+    OnlineOrdersBannerComponent,
   ],
   imports: [
     CommonModule,
@@ -87,6 +89,7 @@ import { RichTextEditorComponent } from './components/rich-text-editor/rich-text
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
     RichTextEditorComponent,
+    OnlineOrdersBannerComponent,
   ],
   providers: [VersionCheckService,UpdateService]
 })

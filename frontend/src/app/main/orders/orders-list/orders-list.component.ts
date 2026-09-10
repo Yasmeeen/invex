@@ -104,6 +104,17 @@ export class OrdersListComponent implements OnInit {
   /** Filter installment invoices by plan months (null = all). */
   selectedInstallmentMonths: number | null = null;
   readonly installmentMonthsOptions = [6, 12, 18, 24, 36];
+  /** null = all; 'uncollected' = unpaid+partial */
+  selectedPaymentStatus: string | null = null;
+  readonly paymentStatusOptions: Array<{ id: string; labelKey: string }> = [
+    { id: 'uncollected', labelKey: 'tr_invoices_filter_uncollected' },
+    { id: 'unpaid', labelKey: 'tr_unpaid' },
+    { id: 'partial', labelKey: 'tr_partial' },
+    { id: 'paid', labelKey: 'tr_paid' },
+  ];
+  /** Delivery person name filter (null = all) */
+  selectedDeliveryPersonName: string | null = null;
+  deliveryPersonOptions: string[] = [];
   viewMode: 'table' | 'cards' = 'cards';
 
   private subscriptions: Subscription[] = [];
@@ -297,7 +308,22 @@ export class OrdersListComponent implements OnInit {
     }
   this.branchesServce.getBranchs(params).subscribe((response: any) => {
       this.branches = response.branches
+      this.rebuildDeliveryPersonOptions();
     })
+  }
+
+  private rebuildDeliveryPersonOptions(): void {
+    const names = new Set<string>();
+    for (const branch of this.branches || []) {
+      const staff = (branch as any)?.deliveryStaff || [];
+      for (const row of staff) {
+        const name = String(row?.name || '').trim();
+        if (name && row?.active !== false) names.add(name);
+      }
+    }
+    this.deliveryPersonOptions = Array.from(names).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
   }
 
   getOrders() {
@@ -316,6 +342,18 @@ export class OrdersListComponent implements OnInit {
       this.params['paymentMethod'] = this.selectedPaymentMethod;
     } else {
       delete this.params['paymentMethod'];
+    }
+
+    if (this.selectedPaymentStatus) {
+      this.params['paymentStatus'] = this.selectedPaymentStatus;
+    } else {
+      delete this.params['paymentStatus'];
+    }
+
+    if (this.selectedDeliveryPersonName) {
+      this.params['deliveryPersonName'] = this.selectedDeliveryPersonName;
+    } else {
+      delete this.params['deliveryPersonName'];
     }
 
     if (this.selectedInstallmentMonths) {
@@ -370,6 +408,16 @@ export class OrdersListComponent implements OnInit {
   }
 
   onPaymentMethodFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  onPaymentStatusFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  onDeliveryPersonFilterChange(): void {
     this.params.page = 1;
     this.getOrders();
   }

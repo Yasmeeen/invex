@@ -1,0 +1,61 @@
+<div class="complete-oo-dialog">
+  <h2 mat-dialog-title class="complete-oo-dialog__title">
+    {{ 'tr_online_order_invoice_confirm_title' | translate }}
+  </h2>
+
+  <div mat-dialog-content class="complete-oo-dialog__body">
+    <p class="complete-oo-dialog__message">
+      {{ 'tr_online_order_invoice_confirm_message' | translate }}
+    </p>
+
+    <div class="form-group mb-0" *ngIf="!loadingStaff">
+      <label>
+        {{ 'tr_delivery_person_name' | translate }}
+        <span class="size_tiny text-error" *ngIf="requireDeliveryPerson && deliveryStaff.length">*</span>
+        <span class="size_tiny" *ngIf="!requireDeliveryPerson && deliveryStaff.length">
+          ({{ 'tr_optional' | translate }})
+        </span>
+      </label>
+
+      <div class="input-with-icon bg-white width-100" *ngIf="deliveryStaff.length">
+        <ng-select
+          class="s-control s-select"
+          [items]="deliveryStaff"
+          [clearable]="true"
+          [searchable]="true"
+          [placeholder]="'tr_cashier_select_delivery_person' | translate"
+          [(ngModel)]="selectedDeliveryPersonName"
+          [ngModelOptions]="{ standalone: true }"
+          name="deliveryPersonName"
+        >
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+
+      <p class="complete-oo-dialog__hint muted" *ngIf="!deliveryStaff.length && !staffLoadFailed">
+        {{ 'tr_online_order_no_delivery_staff' | translate }}
+      </p>
+      <p class="complete-oo-dialog__hint muted" *ngIf="staffLoadFailed">
+        {{ 'tr_online_order_delivery_staff_load_failed' | translate }}
+      </p>
+    </div>
+
+    <p class="complete-oo-dialog__hint muted" *ngIf="loadingStaff">
+      {{ 'tr_loading' | translate }}
+    </p>
+  </div>
+
+  <div mat-dialog-actions class="complete-oo-dialog__actions" align="end">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      [disabled]="!canConfirm"
+      (click)="confirm()"
+    >
+      {{ 'tr_online_order_create_invoice' | translate }}
+    </button>
+  </div>
+</div>

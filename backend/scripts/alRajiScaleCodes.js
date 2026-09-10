@@ -113,6 +113,10 @@ export const SCALE_CODE_BY_SKU = {
   dairy_olive: '108',
   dairy_butter: '109',
   kandouz_masoura: '110',
+  offal_heart_kidney: '111',
+  kandouz_mince_fatty: '112',
+  kandouz_mince_lean: '113',
+  offal_testicles: '400',
 };
 
 export function scaleCodeForSku(skuKey) {

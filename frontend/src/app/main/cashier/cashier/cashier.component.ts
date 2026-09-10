@@ -48,6 +48,7 @@ import {
   roundWeight,
 } from '@shared/utils/sale-quantity.util';
 import { canPickBranchRole, isCashier } from '@core/utils/role-utils';
+import { OnlineOrdersAlertService } from '@shared/services/online-orders-alert.service';
 import {
   isInstallmentSale as orderIsInstallmentSale,
   isPayLaterMethod,
@@ -228,7 +229,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private productPurchaseRequests: ProductPurchaseRequestsService,
     private collectionsService: CollectionsService,
     private farmAnimalsService: FarmAnimalsService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private onlineOrdersAlert: OnlineOrdersAlertService
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
     if (canPickBranchRole(this.curentUser?.role)) {
@@ -245,6 +247,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.rebuildPaymentMethods();
     this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
     this.loadDrawerOpeningBalance();
+    this.syncOnlineOrdersBannerBranch();
   }
 
   ngOnDestroy(): void {
@@ -256,6 +259,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.barcodeScanTimer = null;
     }
     this.disposeCashierPrint();
+    // Restore global banner for Super Admin / Co Admin after leaving cashier.
+    this.onlineOrdersAlert.clearScopeBranchId();
   }
 
   private rebuildPaymentMethods(): void {
@@ -1264,12 +1269,19 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.adminSelectedBranchId = this.branches[0]._id
       this.loadProducts();
       this.loadBranchSalespeople();
+      this.syncOnlineOrdersBannerBranch();
    })
   }
 
   onAdminBranchChange(): void {
     this.loadProducts();
     this.loadBranchSalespeople();
+    this.syncOnlineOrdersBannerBranch();
+  }
+
+  /** Limit online-order banner to the cashier's active branch (pickup / fulfill branch). */
+  private syncOnlineOrdersBannerBranch(): void {
+    this.onlineOrdersAlert.setScopeBranchId(this.cashierBranchId());
   }
 
   private resolveCashierBranchId(): string | null {
@@ -2129,8 +2141,25 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  productImageVisible(product: { _id?: string; imageUrl?: string } | null | undefined): boolean {
-    return !!product?.imageUrl && !this.brokenProductImageIds.has(String(product?._id));
+  productImageVisible(product: { _id?: string; productId?: string; imageUrl?: string } | null | undefined): boolean {
+    if (!product?.imageUrl) return false;
+    const id = String(product?.productId || product?._id || '');
+    return !id || !this.brokenProductImageIds.has(id);
+  }
+
+  /** Farm animal APIs may omit imageUrl — reuse the catalog card image when possible. */
+  private ensureOrderLineProductImage(line: any, productLike?: any): void {
+    if (!line || line.imageUrl) return;
+    if (productLike?.imageUrl) {
+      line.imageUrl = productLike.imageUrl;
+      return;
+    }
+    const id = String(line.productId || line._id || productLike?._id || '');
+    if (!id) return;
+    const fromCatalog = (this.products || []).find((p: Product) => String(p._id) === id);
+    if (fromCatalog?.imageUrl) {
+      line.imageUrl = fromCatalog.imageUrl;
+    }
   }
 
   private validateOrderItemsForCheckout(): string | null {
@@ -2220,8 +2249,21 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  private notifyNoStock(product: Product | any): void {
+    this.appNotificationService.push(
+      this.translate.instant('tr_cashier_no_stock', {
+        name: product?.name || product?.code || '',
+      }),
+      'error'
+    );
+    this.focusBarcodeInput();
+  }
+
   addProduct(product: any, opts?: { quantity?: number }) {
-    if (this.freeSellableQty(product) <= 0) return;
+    if (this.freeSellableQty(product) <= 0) {
+      this.notifyNoStock(product);
+      return;
+    }
 
     if (this.isFarmProduct(product)) {
       this.pendingScaleWeightKg = null;
@@ -2229,7 +2271,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         .filter((item) => String(item?.productId || item?._id) === String(product?._id))
         .reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
       const remaining = Math.max(0, this.freeSellableQty(product) - alreadyInCart);
-      if (remaining < 0.25) return;
+      if (remaining < 0.25) {
+        this.notifyNoStock(product);
+        return;
+      }
       const requested = Number(opts?.quantity);
       const quantity = Math.min(
         Number.isFinite(requested) && requested >= 0.25 ? requested : 1,
@@ -2241,6 +2286,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         productId: product._id,
         saleUnit: 'head',
         farmAnimalWeightKg: null,
+        farmRecordedWeightKg: null,
         farmPricePerKg: Math.round((Number(product?.price) || 0) * 100) / 100,
         price: 0,
         isApplyDiscount: false,
@@ -2250,6 +2296,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         farmAnimalsLoading: true,
       };
       this.orderItems.push(line);
+      this.ensureOrderLineProductImage(line, product);
       this.farmAnimalsService
         .list({
           productId: String(product._id),
@@ -2308,7 +2355,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       }
       const maxStock = Math.max(0, Math.floor(Number(product.stock ?? item.stock ?? 0)));
       if (item.quantity >= maxStock) {
-        this.focusBarcodeInput();
+        this.notifyNoStock(product);
         return;
       }
       item.quantity++;
@@ -2339,6 +2386,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!animal) {
       item.farmAnimalId = null;
       item.farmAnimalSerial = '';
+      item.farmRecordedWeightKg = null;
+      item.farmAnimalWeightKg = null;
+      item.price = 0;
       return;
     }
     if (
@@ -2356,9 +2406,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     item.farmAnimalId = animal._id;
     item.farmAnimalSerial = animal.serial;
     item.quantity = Number(animal.remainingShare) || 1;
-    item.farmAnimalWeightKg =
+    // Recorded weight is only a hint — cashier must enter the current sale weight
+    // because animals often gain/lose weight after purchase.
+    item.farmRecordedWeightKg =
       Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || null;
+    item.farmAnimalWeightKg = null;
+    item.price = 0;
     this.onFarmPricingChange(item);
+    this.focusFarmWeightInput(item);
   }
 
   private addScannedFarmAnimal(animal: FarmAnimal): void {
@@ -2385,17 +2440,21 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       saleUnit: 'head',
       farmAnimalId: animal._id,
       farmAnimalSerial: animal.serial,
-      farmAnimalWeightKg:
+      farmRecordedWeightKg:
         Number(animal.currentWeightKg) || Number(animal.purchaseWeightKg) || null,
+      // Cashier must type the live weight at sale (may differ from purchase weight).
+      farmAnimalWeightKg: null,
       farmPricePerKg: Math.round((Number(product.price) || 0) * 100) / 100,
       price: 0,
       isApplyDiscount: false,
       availableFarmAnimals: [animal],
     };
     this.onFarmPricingChange(line);
+    this.ensureOrderLineProductImage(line, product);
     this.orderItems.push(line);
     this.barcode = '';
     this.refreshExchangePaymentDefaults();
+    this.focusFarmWeightInput(line);
   }
 
   private tryScanFarmAnimal(code: string): boolean {
@@ -2506,7 +2565,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.isWeightLine(item) || this.isFarmLine(item)) return;
     const maxStock = Math.max(0, Math.floor(Number(item.stock ?? 0)));
     if (item.quantity >= maxStock) {
-      this.focusBarcodeInput();
+      this.notifyNoStock(item);
       return;
     }
     item.quantity++;
@@ -2624,12 +2683,23 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!item || !this.isFarmLine(item)) return;
     const weight = Math.max(0, Number(item.farmAnimalWeightKg) || 0);
     const rate = Math.max(0, Number(item.farmPricePerKg) || 0);
-    item.farmAnimalWeightKg = weight;
+    item.farmAnimalWeightKg = weight || null;
     item.farmPricePerKg = rate;
     item.price = Math.round(weight * rate * 100) / 100;
     item.isApplyDiscount = false;
     item.priceOverridden = true;
     this.refreshExchangePaymentDefaults();
+  }
+
+  /** After picking an animal, put focus on weight so cashier enters the live kg. */
+  private focusFarmWeightInput(item: any): void {
+    setTimeout(() => {
+      const el = document.querySelector(
+        `input[data-farm-weight-for="${item?.farmAnimalId || item?.productId || ''}"]`
+      ) as HTMLInputElement | null;
+      el?.focus();
+      el?.select();
+    }, 0);
   }
 
   /** Product card price after discount% (visual only; cards don't toggle discount). */

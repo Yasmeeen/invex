@@ -4,6 +4,7 @@ import Order from '../../DB/models/order.model.js';
 import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
 import EcommerceChannelReservation from '../../DB/models/ecommerceChannelReservation.model.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
 import {
   getIntegrationConfig,
   notifyProductChanged,
@@ -19,13 +20,17 @@ import {
   recalcProductBookingTotals,
   emitBookingCreatedNotification,
 } from '../product_bookings_module/service.js';
+import {
+  computeSellableUnits,
+  isCutFromSourceEnabled,
+  loadSourceProductsById,
+  sourceProductIdOf,
+  stockBearerOf,
+} from '../../utils/cut-from-source.js';
+import { resolveCutSaleUnitCost } from '../../utils/slaughter-cost.util.js';
 
 function sellable(product) {
-  const stock = Number(product.stock) || 0;
-  const transfer = Number(product.transferReservedQuantity) || 0;
-  const booked = Number(product.bookedQuantity) || 0;
-  const ecom = Number(product.ecommerceReservedQuantity) || 0;
-  return Math.max(0, stock - transfer - booked - ecom);
+  return computeSellableUnits(product);
 }
 
 /**
@@ -72,6 +77,9 @@ export async function reserveFromEcommerce(req, res) {
 
     const created = [];
     const bookings = [];
+    const settings = await StoreSettings.findOne().sort({ updatedAt: -1 }).session(session).lean();
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settings);
+
     for (const line of items) {
       const productId = line.invexProductId;
       const qty = Math.max(1, Number(line.quantity) || 1);
@@ -80,12 +88,25 @@ export async function reserveFromEcommerce(req, res) {
       }
       const product = await Product.findById(productId).session(session);
       if (!product) throw new Error(`Product not found: ${productId}`);
-      if (sellable(product) < qty) {
+      const sourceById = await loadSourceProductsById([product], {
+        enabled: cutFromSourceEnabled,
+        session,
+      });
+      const stockProduct = stockBearerOf(product, sourceById, cutFromSourceEnabled);
+      if (
+        cutFromSourceEnabled &&
+        sourceProductIdOf(product) &&
+        (!stockProduct || String(stockProduct._id) === String(product._id))
+      ) {
+        throw new Error(`Source stock missing for ${product.name} (${product.code})`);
+      }
+      if (sellable(stockProduct) < qty) {
         throw new Error(`Not enough stock for ${product.name} (${product.code})`);
       }
 
       const booking = await createBookingFromEcommerceOrder({
-        product,
+        product: stockProduct,
+        displayProduct: product,
         quantity: qty,
         customer,
         unitPrice: Number(line.unitPrice ?? product.price) || 0,
@@ -117,14 +138,19 @@ export async function reserveFromEcommerce(req, res) {
         { session }
       );
       created.push(row);
-      if (booking) bookings.push({ booking, product, qty });
+      if (booking) {
+        bookings.push({ booking, stockProduct, displayProduct: product, qty });
+      }
     }
 
     await session.commitTransaction();
-    for (const { booking, product, qty } of bookings) {
-      await recalcProductBookingTotals(product._id);
-      await emitBookingCreatedNotification(booking, product, qty, booking.createdBy);
-      notifyProductChanged(product._id);
+    for (const { booking, stockProduct, displayProduct, qty } of bookings) {
+      await recalcProductBookingTotals(stockProduct._id);
+      await emitBookingCreatedNotification(booking, displayProduct, qty, booking.createdBy);
+      notifyProductChanged(stockProduct._id);
+      if (String(displayProduct._id) !== String(stockProduct._id)) {
+        notifyProductChanged(displayProduct._id);
+      }
     }
     res.status(201).json({ ok: true, reservations: created.map((r) => r._id) });
   } catch (err) {
@@ -153,14 +179,23 @@ export async function cancelReservationFromEcommerce(req, res) {
     }).session(session);
 
     const productIds = [];
+    const settings = await StoreSettings.findOne().sort({ updatedAt: -1 }).session(session).lean();
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settings);
     for (const row of rows) {
       const product = await Product.findById(row.product).session(session);
       if (product) {
-        product.ecommerceReservedQuantity = Math.max(
-          0,
-          (Number(product.ecommerceReservedQuantity) || 0) - row.quantity
-        );
-        await product.save({ session });
+        const sourceId = cutFromSourceEnabled ? sourceProductIdOf(product) : null;
+        const stockProduct = sourceId
+          ? await Product.findById(sourceId).session(session)
+          : product;
+        if (stockProduct) {
+          stockProduct.ecommerceReservedQuantity = Math.max(
+            0,
+            (Number(stockProduct.ecommerceReservedQuantity) || 0) - row.quantity
+          );
+          await stockProduct.save({ session });
+          productIds.push(stockProduct._id);
+        }
         productIds.push(product._id);
       }
       row.status = 'cancelled';
@@ -294,34 +329,46 @@ export async function confirmOrderFromEcommerce(req, res) {
     let numberOfProducts = 0;
     const orderProducts = [];
     const touchedProductIds = [];
+    const settings = await StoreSettings.findOne().sort({ updatedAt: -1 }).session(session).lean();
+    const cutFromSourceEnabled = isCutFromSourceEnabled(settings);
 
     for (const row of rows) {
       const product = await Product.findById(row.product).session(session);
       if (!product) throw new Error(`Product missing: ${row.product}`);
 
       const qty = row.quantity;
-      const reserved = Number(product.ecommerceReservedQuantity) || 0;
+      const sourceId = cutFromSourceEnabled ? sourceProductIdOf(product) : null;
+      const stockProduct = sourceId
+        ? await Product.findById(sourceId).session(session)
+        : product;
+      if (!stockProduct) throw new Error(`Source stock missing for ${product.code}`);
+
+      const reserved = Number(stockProduct.ecommerceReservedQuantity) || 0;
       if (reserved >= qty) {
-        product.ecommerceReservedQuantity = reserved - qty;
+        stockProduct.ecommerceReservedQuantity = reserved - qty;
       }
-      if ((Number(product.stock) || 0) < qty) {
+      if ((Number(stockProduct.stock) || 0) < qty) {
         throw new Error(`Not enough stock to confirm ${product.code}`);
       }
 
-      product.stock = (Number(product.stock) || 0) - qty;
-      if (Number(product.stock) <= 0) {
-        const cat = await Category.findById(product.category)
+      stockProduct.stock = (Number(stockProduct.stock) || 0) - qty;
+      if (Number(stockProduct.stock) <= 0) {
+        const cat = await Category.findById(stockProduct.category)
           .session(session)
           .select('deleteProductWhenOutOfStock')
           .lean();
         if (cat?.deleteProductWhenOutOfStock) {
-          product.removedWhenOutOfStock = true;
+          stockProduct.removedWhenOutOfStock = true;
         }
       }
-      await product.save({ session });
-      touchedProductIds.push(product._id);
+      await stockProduct.save({ session });
+      touchedProductIds.push(stockProduct._id);
+      if (sourceId) touchedProductIds.push(product._id);
 
       const unitPrice = Number(row.unitPrice) || Number(product.price) || 0;
+      const unitCost = sourceId
+        ? resolveCutSaleUnitCost(stockProduct.netPrice, product.processingExtraCost)
+        : Number(product.netPrice) || 0;
       totalPrice += unitPrice * qty;
       numberOfProducts += qty;
       orderProducts.push({
@@ -330,9 +377,10 @@ export async function confirmOrderFromEcommerce(req, res) {
         code: product.code,
         quantity: qty,
         price: unitPrice,
-        cost: Number(product.netPrice) || 0,
+        cost: unitCost,
         isApplyDiscount: false,
         showProductCodeOnInvoice: true,
+        ...(sourceId ? { sourceProductId: stockProduct._id } : {}),
       });
 
       row.status = 'converted';

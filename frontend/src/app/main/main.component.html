@@ -38,6 +38,7 @@
   <app-sidebar #appSidebar (collapsedChange)="onSidebarCollapsed($event)"></app-sidebar>
   <div class="main-column">
     <div class="main-top">
+      <app-online-orders-banner *ngIf="!isCashierRoute"></app-online-orders-banner>
       <div class="sys-opening-banner" *ngIf="showOpeningBanner">
         <div class="sys-opening-banner__marquee">
           <div class="sys-opening-banner__track">

@@ -81,18 +81,37 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let row of closes">
-            <td>{{ periodLabel(row) }}</td>
-            <td>{{ row.branch?.name || '—' }}</td>
-            <td>{{ row.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td>{{ row.actualCashCounted | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td>{{ (row.retainedCash ?? 0) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td>{{ (row.depositedCash ?? row.actualCashCounted) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td>{{ row.variance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
-            <td class="drawer-close-history__notes">{{ row.shortageReason || '—' }}</td>
-            <td>{{ row.closedBy?.name || row.closedBy?.email || '—' }}</td>
-            <td>{{ row.createdAt | date : 'short' }}</td>
-          </tr>
+          <ng-container *ngFor="let row of closes">
+            <tr>
+              <td>{{ periodLabel(row) }}</td>
+              <td>{{ row.branch?.name || '—' }}</td>
+              <td>{{ row.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+              <td>{{ row.actualCashCounted | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+              <td>{{ (row.retainedCash ?? 0) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+              <td>{{ (row.depositedCash ?? row.actualCashCounted) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+              <td>{{ row.variance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+              <td class="drawer-close-history__notes">{{ row.shortageReason || '—' }}</td>
+              <td>{{ row.closedBy?.name || row.closedBy?.email || '—' }}</td>
+              <td>{{ row.createdAt | date : 'short' }}</td>
+            </tr>
+            <tr class="drawer-close-history__sold-row">
+              <td colspan="10">
+                <div class="drawer-close-history__sold">
+                  <span class="drawer-close-history__sold-title">{{
+                    'tr_drawer_close_sold_products' | translate
+                  }}</span>
+                  <div class="drawer-close-history__sold-list" *ngIf="soldProducts(row).length > 0">
+                    <span class="drawer-close-history__sold-item" *ngFor="let p of soldProducts(row)">
+                      {{ formatSoldQty(p) }} {{ soldUnitLabel(p) }} {{ p.name }}
+                    </span>
+                  </div>
+                  <span class="drawer-close-history__sold-empty" *ngIf="soldProducts(row).length === 0">{{
+                    'tr_drawer_close_none' | translate
+                  }}</span>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>

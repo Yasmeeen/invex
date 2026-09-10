@@ -1,0 +1,120 @@
+:host {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.sys-online-orders-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.7rem 1rem;
+  border: 0;
+  cursor: pointer;
+  text-align: start;
+  background: linear-gradient(90deg, #0f766e 0%, #0d9488 55%, #f59e0b 140%);
+  color: #fff;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  animation: sys-online-orders-pulse 2.4s ease-in-out infinite;
+}
+
+.sys-online-orders-banner:hover,
+.sys-online-orders-banner:focus {
+  filter: brightness(1.05);
+  outline: none;
+}
+
+.sys-online-orders-banner__badge {
+  flex-shrink: 0;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #0f766e;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.sys-online-orders-banner__icon {
+  flex-shrink: 0;
+  font-size: 1.05rem;
+}
+
+.sys-online-orders-banner__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.sys-online-orders-banner__cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #115e59;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+body[dir='ltr'] .sys-online-orders-banner__cta .fa-angle-left {
+  transform: scaleX(-1);
+}
+
+.sys-online-orders-banner--cashier {
+  flex-shrink: 0;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.92rem;
+  z-index: 2;
+}
+
+.sys-online-orders-banner--overdue {
+  background: linear-gradient(90deg, #b45309 0%, #dc2626 45%, #ea580c 100%);
+  animation-name: sys-online-orders-pulse-overdue;
+  animation-duration: 1.6s;
+
+  .sys-online-orders-banner__badge {
+    color: #991b1b;
+  }
+
+  .sys-online-orders-banner__cta {
+    color: #7f1d1d;
+  }
+}
+
+@keyframes sys-online-orders-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+  50% {
+    box-shadow:
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+      0 0 0 3px rgba(13, 148, 136, 0.22);
+  }
+}
+
+@keyframes sys-online-orders-pulse-overdue {
+  0%,
+  100% {
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+  50% {
+    box-shadow:
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+      0 0 0 4px rgba(220, 38, 38, 0.28);
+  }
+}

@@ -1,16 +1,82 @@
-.farm-animals-page {
-  padding: 1.25rem;
+.farm-animals-hint {
+  margin: -0.5rem 0 0.75rem;
 }
 
-.farm-animals-filters {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto;
-  gap: 0.75rem;
-  margin: 1rem 0;
+.farm-animals-list {
+  td,
+  th {
+    &:nth-child(1) {
+      width: 3rem;
+    }
+
+    &:nth-child(2) {
+      width: 9rem;
+    }
+
+    &:nth-child(3) {
+      width: 14rem;
+    }
+
+    &:nth-child(4),
+    &:nth-child(5) {
+      width: 7rem;
+    }
+
+    &:nth-child(6) {
+      width: 9rem;
+    }
+
+    &:nth-child(7) {
+      width: 10rem;
+    }
+  }
 }
 
-@media (max-width: 720px) {
-  .farm-animals-filters {
-    grid-template-columns: 1fr;
+.location-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.location-badge--warehouse {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.status-pill {
+  background: #edf2f7;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  text-align: center;
+  white-space: nowrap;
+
+  &[data-status='available'] {
+    background: #e3f8ee;
+    color: #16724a;
+  }
+
+  &[data-status='reserved'] {
+    background: #fff7d6;
+    color: #8a6200;
+  }
+
+  &[data-status='sold'] {
+    background: #e6f0ff;
+    color: #2156a5;
+  }
+
+  &[data-status='slaughtered'] {
+    background: #edf2f7;
+    color: #4a5568;
+  }
+
+  &[data-status='removed'] {
+    background: #fee2e2;
+    color: #991b1b;
   }
 }

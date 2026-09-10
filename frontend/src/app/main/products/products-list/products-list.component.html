@@ -386,6 +386,13 @@
                       </span>
                     </span>
                     <span class="products-list__name-text">{{ product.name }}</span>
+                    <span
+                      class="location-badge"
+                      [class.location-badge--warehouse]="locationIsWarehouse(product)"
+                      [class.location-badge--branch]="!locationIsWarehouse(product)"
+                    >
+                      {{ locationLabel(product) }}
+                    </span>
                     <p class="products-list__pickup-hint m-0" *ngIf="remotePickupHint(product) as hint">
                       {{ hint }}
                     </p>
@@ -397,10 +404,13 @@
                 <span *ngIf="!productSourceName(product)" class="text-muted">—</span>
               </td>
               <td>
-                <span *ngIf="product.inWarehouse" class="location-badge location-badge--warehouse">{{
-                  "tr_warehouse" | translate
-                }}</span>
-                <span *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
+                <span
+                  class="location-badge"
+                  [class.location-badge--warehouse]="locationIsWarehouse(product)"
+                  [class.location-badge--branch]="!locationIsWarehouse(product)"
+                >
+                  {{ locationLabel(product) }}
+                </span>
               </td>
               <td>{{ product.code }}</td>
               <td>{{ product.category?.name }}</td>
@@ -532,6 +542,13 @@
                   }}
                 </span>
                 {{ product.name }}
+                <span
+                  class="location-badge"
+                  [class.location-badge--warehouse]="locationIsWarehouse(product)"
+                  [class.location-badge--branch]="!locationIsWarehouse(product)"
+                >
+                  {{ locationLabel(product) }}
+                </span>
               </div>
               <p class="products-list__pickup-hint m-0 mt-1" *ngIf="remotePickupHint(product) as hint">
                 {{ hint }}
@@ -623,8 +640,13 @@
           </div>
 
           <div class="product-card__row">
-            <span class="badge" *ngIf="product.inWarehouse">{{ "tr_warehouse" | translate }}</span>
-            <span class="muted" *ngIf="!product.inWarehouse">{{ product.branch?.name }}</span>
+            <span
+              class="location-badge"
+              [class.location-badge--warehouse]="locationIsWarehouse(product)"
+              [class.location-badge--branch]="!locationIsWarehouse(product)"
+            >
+              {{ locationLabel(product) }}
+            </span>
           </div>
 
           <div class="product-card__prices">

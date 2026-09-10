@@ -12,6 +12,7 @@ import {
   CashDisposition,
   DrawerClosePreview,
   DrawerCloseService,
+  DrawerSoldProduct,
 } from '@shared/services/drawer-close.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
@@ -183,6 +184,35 @@ export class DrawerCloseDialogComponent implements OnInit {
     return Object.entries(obj || {})
       .filter(([, v]) => round2(Number(v)) !== 0)
       .sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  soldProductsList(): DrawerSoldProduct[] {
+    return Array.isArray(this.preview?.soldProducts) ? this.preview!.soldProducts : [];
+  }
+
+  formatSoldQty(row: DrawerSoldProduct): string {
+    const q = Number(row?.quantity || 0);
+    if (!Number.isFinite(q)) return '0';
+    if (String(row?.saleUnit || '').toLowerCase() === 'weight') {
+      const rounded = Math.round(q * 1000) / 1000;
+      return String(rounded);
+    }
+    if (Number.isInteger(q)) return String(q);
+    return String(Math.round(q * 1000) / 1000);
+  }
+
+  soldUnitLabel(row: DrawerSoldProduct): string {
+    const unit = String(row?.saleUnit || 'piece').toLowerCase();
+    if (unit === 'weight') {
+      const wu = String(row?.weightUnit || 'kg').toLowerCase() === 'g' ? 'g' : 'kg';
+      return this.translate.instant(
+        wu === 'g' ? 'tr_drawer_close_sold_unit_g' : 'tr_drawer_close_sold_unit_kg'
+      );
+    }
+    if (unit === 'head') {
+      return this.translate.instant('tr_drawer_close_sold_unit_head');
+    }
+    return this.translate.instant('tr_drawer_close_sold_unit_piece');
   }
 
   payMethodLabel(method: string): string {

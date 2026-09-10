@@ -9,6 +9,7 @@ import { BranchesServce } from '@shared/services/branches.service';
 import {
   DrawerCloseRecord,
   DrawerCloseService,
+  DrawerSoldProduct,
 } from '@shared/services/drawer-close.service';
 import { Subscription } from 'rxjs';
 import { canPickBranchRole } from '@core/utils/role-utils';
@@ -90,6 +91,36 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     const end = row.periodEndDate || row.businessDate;
     if (start === end) return end;
     return `${start} → ${end}`;
+  }
+
+  soldProducts(row: DrawerCloseRecord): DrawerSoldProduct[] {
+    if (Array.isArray(row?.soldProducts)) return row.soldProducts;
+    if (Array.isArray(row?.snapshot?.soldProducts)) return row.snapshot!.soldProducts!;
+    return [];
+  }
+
+  formatSoldQty(row: DrawerSoldProduct): string {
+    const q = Number(row?.quantity || 0);
+    if (!Number.isFinite(q)) return '0';
+    if (String(row?.saleUnit || '').toLowerCase() === 'weight') {
+      return String(Math.round(q * 1000) / 1000);
+    }
+    if (Number.isInteger(q)) return String(q);
+    return String(Math.round(q * 1000) / 1000);
+  }
+
+  soldUnitLabel(row: DrawerSoldProduct): string {
+    const unit = String(row?.saleUnit || 'piece').toLowerCase();
+    if (unit === 'weight') {
+      const wu = String(row?.weightUnit || 'kg').toLowerCase() === 'g' ? 'g' : 'kg';
+      return this.translate.instant(
+        wu === 'g' ? 'tr_drawer_close_sold_unit_g' : 'tr_drawer_close_sold_unit_kg'
+      );
+    }
+    if (unit === 'head') {
+      return this.translate.instant('tr_drawer_close_sold_unit_head');
+    }
+    return this.translate.instant('tr_drawer_close_sold_unit_piece');
   }
 
   applyFilters(): void {

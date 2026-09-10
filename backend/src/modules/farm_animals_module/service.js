@@ -102,7 +102,7 @@ export async function listFarmAnimals(req, res) {
     if (search) filter.serial = { $regex: search, $options: 'i' };
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
     const animals = await FarmAnimal.find(filter)
-      .populate('product', 'name code price productType category branch inWarehouse factory')
+      .populate('product', 'name code price productType category branch inWarehouse factory imageUrl')
       .populate('branch', 'name')
       .populate('factory', 'name')
       .sort({ serialNumber: 1 })
@@ -118,7 +118,10 @@ export async function lookupFarmAnimal(req, res) {
   try {
     const serial = String(req.params.serial || '').trim().toUpperCase();
     const animal = await FarmAnimal.findOne({ serial })
-      .populate('product', 'name code price netPrice stock productType category branch inWarehouse factory')
+      .populate(
+        'product',
+        'name code price netPrice stock productType category branch inWarehouse factory imageUrl'
+      )
       .populate('branch', 'name')
       .populate('factory', 'name')
       .lean();
@@ -145,7 +148,7 @@ export async function updateFarmAnimal(req, res) {
     }
     if (req.body.notes != null) update.notes = String(req.body.notes || '').trim();
     const animal = await FarmAnimal.findByIdAndUpdate(id, { $set: update }, { new: true })
-      .populate('product', 'name code price productType')
+      .populate('product', 'name code price productType imageUrl')
       .lean();
     if (!animal) return res.status(404).json({ error: 'Farm animal not found' });
     return res.json({ animal });

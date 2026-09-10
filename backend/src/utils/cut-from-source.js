@@ -13,6 +13,68 @@ export function sourceProductIdOf(product) {
   return String(raw);
 }
 
+/** Free units on a stock document (own stock minus holds). */
+export function computeSellableUnits(product) {
+  return Math.max(
+    0,
+    (Number(product?.stock) || 0) -
+      (Number(product?.transferReservedQuantity) || 0) -
+      (Number(product?.bookedQuantity) || 0) -
+      (Number(product?.ecommerceReservedQuantity) || 0)
+  );
+}
+
+/**
+ * Product whose stock is consumed when selling `product`.
+ * Cut SKUs keep stock at 0 and draw from sourceProductId when the feature is on.
+ */
+export function stockBearerId(product, cutFromSourceEnabled) {
+  if (!product) return null;
+  if (cutFromSourceEnabled) {
+    const sourceId = sourceProductIdOf(product);
+    if (sourceId) return sourceId;
+  }
+  return product._id ? String(product._id) : null;
+}
+
+export function stockBearerOf(product, sourceById, cutFromSourceEnabled) {
+  const bearerId = stockBearerId(product, cutFromSourceEnabled);
+  if (!bearerId) return product;
+  if (product?._id && String(product._id) === bearerId) return product;
+  return sourceById?.get(bearerId) || product;
+}
+
+export function effectiveSellableUnits(product, sourceById, cutFromSourceEnabled) {
+  return computeSellableUnits(stockBearerOf(product, sourceById, cutFromSourceEnabled));
+}
+
+/** Load fridge/source docs for cut SKUs into a Map keyed by id string. */
+export async function loadSourceProductsById(
+  products,
+  { enabled, session, select } = {}
+) {
+  const map = new Map();
+  if (!enabled || !Array.isArray(products) || !products.length) return map;
+  const ids = [
+    ...new Set(
+      products
+        .map((p) => sourceProductIdOf(p))
+        .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+    ),
+  ];
+  if (!ids.length) return map;
+  const fields =
+    select ||
+    'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity netPrice branch inWarehouse removedWhenOutOfStock category price sourceProductId productType processingExtraCost';
+  const query = Product.find({ _id: { $in: ids } }).select(fields);
+  if (session) query.session(session);
+  const sources = await query;
+  for (const src of sources) {
+    map.set(String(src._id), src);
+  }
+  return map;
+}
+
 /**
  * Parse optional sourceProductId from a product create/update body.
  * When the feature is off, the field is ignored so other stores are unchanged.

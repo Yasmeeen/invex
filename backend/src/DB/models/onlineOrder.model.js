@@ -53,6 +53,13 @@ const onlineOrderSchema = new mongoose.Schema(
     paymentMethod: { type: String, default: '', trim: true },
     deliveryMethod: { type: String, default: '', trim: true },
     deliveryAddress: { type: String, default: '', trim: true },
+    /** Where the online order originated: CRM (e.g. Novexa) or website storefront. */
+    channel: {
+      type: String,
+      enum: ['crm', 'website'],
+      default: 'crm',
+      index: true,
+    },
     createdBySnapshot: {
       id: { type: String, default: '', trim: true },
       name: { type: String, default: '', trim: true },
@@ -73,7 +80,7 @@ const onlineOrderSchema = new mongoose.Schema(
         changedAt: { type: Date, default: Date.now, required: true },
         actorId: { type: String, default: '', trim: true },
         actorName: { type: String, default: '', trim: true },
-        source: { type: String, enum: ['crm', 'invex'], required: true },
+        source: { type: String, enum: ['crm', 'invex', 'website'], required: true },
         note: { type: String, default: '', trim: true },
       },
     ],
@@ -87,5 +94,6 @@ const onlineOrderSchema = new mongoose.Schema(
 
 onlineOrderSchema.index({ status: 1, createdAt: -1 });
 onlineOrderSchema.index({ branch: 1, createdAt: -1 });
+onlineOrderSchema.index({ channel: 1, createdAt: -1 });
 
 export default mongoose.model('OnlineOrder', onlineOrderSchema);

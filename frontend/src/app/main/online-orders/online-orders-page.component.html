@@ -1,133 +1,404 @@
-<section class="online-orders">
-  <header class="online-orders__header">
-    <div>
-      <h1>{{ 'tr_online_orders' | translate }}</h1>
-      <p>{{ 'tr_online_orders_hint' | translate }}</p>
+<section class="oo" [class.oo--detail-open]="!!selectedOrder">
+  <header class="oo__header">
+    <div class="oo__title-block">
+      <span class="oo__title-icon" aria-hidden="true">
+        <i class="fa fa-shopping-bag"></i>
+      </span>
+      <div>
+        <h1>{{ 'tr_online_orders' | translate }}</h1>
+        <p>{{ 'tr_online_orders_hint' | translate }}</p>
+      </div>
     </div>
-    <select class="s-control online-orders__filter" [(ngModel)]="status" (change)="page = 1; load()">
-      <option value="">{{ 'tr_online_orders_all_statuses' | translate }}</option>
-      <option value="pending">{{ 'tr_online_order_pending' | translate }}</option>
-      <option value="preparing">{{ 'tr_online_order_preparing' | translate }}</option>
-      <option value="ready">{{ 'tr_online_order_ready' | translate }}</option>
-      <option value="completed">{{ 'tr_online_order_completed' | translate }}</option>
-      <option value="cancelled">{{ 'tr_online_order_cancelled' | translate }}</option>
-    </select>
+
+    <div class="oo__search">
+      <i class="fa fa-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        [(ngModel)]="search"
+        (keyup.enter)="onSearch()"
+        [placeholder]="'tr_online_orders_search_ph' | translate"
+      />
+      <button type="button" class="oo__search-btn" (click)="onSearch()">
+        {{ 'tr_search' | translate }}
+      </button>
+    </div>
   </header>
 
-  <div class="online-orders__layout">
-    <div class="online-orders__list content-shadow bg-white">
-      <div class="online-orders__empty" *ngIf="loading">{{ 'tr_loading' | translate }}</div>
-      <div class="online-orders__empty" *ngIf="!loading && !orders.length">
+  <div class="oo__channels">
+    <button
+      type="button"
+      class="oo-channel"
+      *ngFor="let tab of channelTabs"
+      [class.oo-channel--active]="channel === tab.id"
+      [attr.data-channel]="tab.id || 'all'"
+      (click)="setChannel(tab.id)"
+    >
+      <span>{{ tab.labelKey | translate }}</span>
+      <strong>{{ channelCount(tab.id) }}</strong>
+    </button>
+  </div>
+
+  <div class="oo__toolbar">
+    <div class="oo__toolbar-start">
+      <div class="oo-filter-wrap">
+        <button type="button" class="oo-chip" (click)="toggleStatusFilter()">
+          <i class="fa fa-filter" aria-hidden="true"></i>
+          {{ 'tr_online_orders_filter' | translate }}
+          <span class="oo-chip__badge" *ngIf="status">1</span>
+        </button>
+        <div class="oo-filter-menu" *ngIf="showStatusFilter">
+          <button type="button" [class.active]="!status" (click)="setStatus('')">
+            {{ 'tr_online_orders_all_statuses' | translate }}
+          </button>
+          <button type="button" [class.active]="status === 'pending'" (click)="setStatus('pending')">
+            {{ 'tr_online_order_pending' | translate }}
+          </button>
+          <button
+            type="button"
+            [class.active]="status === 'preparing'"
+            (click)="setStatus('preparing')"
+          >
+            {{ 'tr_online_order_preparing' | translate }}
+          </button>
+          <button type="button" [class.active]="status === 'ready'" (click)="setStatus('ready')">
+            {{ 'tr_online_order_ready' | translate }}
+          </button>
+          <button
+            type="button"
+            [class.active]="status === 'completed'"
+            (click)="setStatus('completed')"
+          >
+            {{ 'tr_online_order_completed' | translate }}
+          </button>
+          <button
+            type="button"
+            [class.active]="status === 'cancelled'"
+            (click)="setStatus('cancelled')"
+          >
+            {{ 'tr_online_order_cancelled' | translate }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="oo__body">
+    <div class="oo-table-card">
+      <div class="oo-table__head">
+        <label class="oo-check">
+          <input type="checkbox" [checked]="allSelected()" (change)="toggleSelectAll($event)" />
+        </label>
+        <span>{{ 'tr_status' | translate }}</span>
+        <span>{{ 'tr_online_orders_col_time' | translate }}</span>
+        <span>{{ 'tr_online_orders_col_value' | translate }}</span>
+        <span>{{ 'tr_online_orders_col_customer' | translate }}</span>
+        <span>{{ 'tr_online_orders_col_source' | translate }}</span>
+        <span>{{ 'tr_order_number' | translate }}</span>
+        <span></span>
+      </div>
+
+      <div class="oo-table__empty" *ngIf="loading">{{ 'tr_loading' | translate }}</div>
+      <div class="oo-table__empty" *ngIf="!loading && !orders.length">
         {{ 'tr_online_orders_empty' | translate }}
       </div>
 
       <button
         type="button"
-        class="order-row"
-        *ngFor="let order of orders"
-        [class.order-row--selected]="selectedOrder?._id === order._id"
+        class="oo-row"
+        *ngFor="let order of orders; trackBy: trackById"
+        [class.oo-row--selected]="selectedOrder?._id === order._id"
         (click)="select(order)"
       >
-        <span class="order-row__number">#{{ order.crmOrderNumber }}</span>
-        <span class="order-row__customer">
+        <label class="oo-check" (click)="$event.stopPropagation()">
+          <input
+            type="checkbox"
+            [checked]="isSelected(order)"
+            (change)="toggleSelect(order, $event)"
+          />
+        </label>
+
+        <span class="oo-status" [attr.data-status]="order.status">
+          {{ ('tr_online_order_' + order.status) | translate }}
+        </span>
+
+        <span class="oo-time">
+          <strong>{{ age(order.createdAt) }}</strong>
+          <small>{{ formatTime(order.createdAt) }}</small>
+        </span>
+
+        <span class="oo-value">
+          {{ order.total | currency: 'EGP' : 'symbol' : '1.2-2' : 'en-EG' }}
+        </span>
+
+        <span class="oo-customer">
           <strong>{{ order.customer?.name }}</strong>
           <small>{{ order.customer?.phone }}</small>
         </span>
-        <span>{{ order.branch?.name || order.branchSnapshot?.name }}</span>
-        <span>{{ order.total | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
-        <span>{{ age(order.createdAt) }}</span>
-        <span class="status-pill" [attr.data-status]="order.status">
-          {{ ('tr_online_order_' + order.status) | translate }}
+
+        <span class="oo-source" [attr.data-channel]="orderChannel(order)">
+          <i
+            class="fa"
+            [class.fa-headset]="orderChannel(order) === 'crm'"
+            [class.fa-globe]="orderChannel(order) === 'website'"
+            aria-hidden="true"
+          ></i>
+          {{
+            (orderChannel(order) === 'website'
+              ? 'tr_online_orders_channel_website'
+              : 'tr_online_orders_channel_crm'
+            ) | translate
+          }}
+        </span>
+
+        <span class="oo-number">
+          <strong>#{{ order.crmOrderNumber }}</strong>
+          <small *ngIf="order.crmOrderId !== order.crmOrderNumber">{{ order.crmOrderId }}</small>
+        </span>
+
+        <span class="oo-row__chevron" aria-hidden="true">
+          <i class="fa fa-chevron-left"></i>
         </span>
       </button>
 
-      <footer class="online-orders__pagination" *ngIf="totalPages > 1">
-        <button class="s-btn btn-secondary" (click)="setPage(page - 1)" [disabled]="page === 1">
-          ‹
-        </button>
-        <span>{{ page }} / {{ totalPages }}</span>
-        <button
-          class="s-btn btn-secondary"
-          (click)="setPage(page + 1)"
-          [disabled]="page === totalPages"
-        >
-          ›
-        </button>
+      <footer class="oo-pagination" *ngIf="total > 0">
+        <div class="oo-pagination__pages">
+          <button
+            type="button"
+            class="oo-page"
+            (click)="setPage(page - 1)"
+            [disabled]="page === 1"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            class="oo-page"
+            *ngFor="let p of pageNumbers()"
+            [class.oo-page--active]="p === page"
+            (click)="setPage(p)"
+          >
+            {{ p }}
+          </button>
+          <button
+            type="button"
+            class="oo-page"
+            (click)="setPage(page + 1)"
+            [disabled]="page === totalPages"
+          >
+            ›
+          </button>
+        </div>
+        <span class="oo-pagination__range">{{ rangeLabel() }}</span>
       </footer>
     </div>
 
-    <aside class="order-detail content-shadow bg-white" *ngIf="selectedOrder">
-      <div class="order-detail__title">
-        <div>
-          <h2>#{{ selectedOrder.crmOrderNumber }}</h2>
-          <span class="status-pill" [attr.data-status]="selectedOrder.status">
-            {{ ('tr_online_order_' + selectedOrder.status) | translate }}
+    <aside class="oo-detail" *ngIf="selectedOrder">
+      <header class="oo-detail__head">
+        <div class="oo-detail__head-main">
+          <div class="oo-detail__id-row">
+            <h2>#{{ selectedOrder.crmOrderNumber }}</h2>
+            <span class="oo-status" [attr.data-status]="selectedOrder.status">
+              {{ ('tr_online_order_' + selectedOrder.status) | translate }}
+            </span>
+          </div>
+          <p class="oo-detail__meta">
+            <span *ngIf="selectedOrder.crmOrderId">{{ selectedOrder.crmOrderId }}</span>
+            <span>{{ formatDateTime(selectedOrder.createdAt) }}</span>
+          </p>
+        </div>
+        <button type="button" class="oo-detail__close" (click)="closeDetail()" aria-label="Close">
+          <i class="fa fa-times" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div class="oo-detail__cards">
+        <div class="oo-info-card oo-info-card--source" [attr.data-channel]="orderChannel(selectedOrder)">
+          <i
+            class="fa"
+            [class.fa-headset]="orderChannel(selectedOrder) === 'crm'"
+            [class.fa-globe]="orderChannel(selectedOrder) === 'website'"
+            aria-hidden="true"
+          ></i>
+          <div>
+            <small>{{ 'tr_online_orders_col_source' | translate }}</small>
+            <strong>
+              {{
+                (orderChannel(selectedOrder) === 'website'
+                  ? 'tr_online_orders_channel_website'
+                  : 'tr_online_orders_channel_crm'
+                ) | translate
+              }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="oo-info-card oo-info-card--customer">
+          <div class="oo-info-card__avatar" aria-hidden="true">
+            {{ (selectedOrder.customer?.name || '?').charAt(0) }}
+          </div>
+          <div class="oo-info-card__body">
+            <strong>{{ selectedOrder.customer?.name }}</strong>
+            <button
+              type="button"
+              class="oo-info-card__phone"
+              (click)="copyPhone(selectedOrder.customer?.phone, $event)"
+              [title]="'tr_online_orders_copy_phone' | translate"
+            >
+              {{ selectedOrder.customer?.phone }}
+              <i class="fa fa-copy" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <nav class="oo-detail__tabs">
+        <button
+          type="button"
+          [class.active]="detailTab === 'details'"
+          (click)="detailTab = 'details'"
+        >
+          {{ 'tr_online_orders_tab_details' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="detailTab === 'customer'"
+          (click)="detailTab = 'customer'"
+        >
+          {{ 'tr_online_orders_tab_customer' | translate }}
+        </button>
+        <button
+          type="button"
+          [class.active]="detailTab === 'history'"
+          (click)="detailTab = 'history'"
+        >
+          {{ 'tr_online_orders_tab_history' | translate }}
+        </button>
+      </nav>
+
+      <div class="oo-detail__scroll" *ngIf="detailTab === 'details'">
+        <div class="oo-item" *ngFor="let item of selectedOrder.items">
+          <div class="oo-item__thumb">
+            <img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.name" />
+            <i *ngIf="!item.imageUrl" class="fa fa-image" aria-hidden="true"></i>
+          </div>
+          <div class="oo-item__info">
+            <strong>{{ item.name }}</strong>
+            <small>{{ itemQtyLabel(item) }}</small>
+          </div>
+          <span class="oo-item__price">
+            {{ item.lineTotal | currency: 'EGP' : 'symbol' : '1.2-2' : 'en-EG' }}
           </span>
         </div>
-        <button type="button" class="order-detail__close" (click)="selectedOrder = null">×</button>
-      </div>
 
-      <dl class="order-detail__customer">
-        <div><dt>{{ 'tr_client_name' | translate }}</dt><dd>{{ selectedOrder.customer?.name }}</dd></div>
-        <div><dt>{{ 'tr_phone_number' | translate }}</dt><dd>{{ selectedOrder.customer?.phone }}</dd></div>
-        <div><dt>{{ 'tr_address' | translate }}</dt><dd>{{ selectedOrder.deliveryAddress || selectedOrder.customer?.address || '—' }}</dd></div>
-        <div><dt>{{ 'tr_branches' | translate }}</dt><dd>{{ selectedOrder.branch?.name || selectedOrder.branchSnapshot?.name }}</dd></div>
-      </dl>
-
-      <div class="cart-line" *ngFor="let item of selectedOrder.items">
-        <div>
-          <strong>{{ item.name }}</strong>
-          <small>{{ item.code }}</small>
+        <div class="oo-summary">
+          <div class="oo-summary__total">
+            <span>{{ 'tr_total' | translate }}</span>
+            <strong>
+              {{ selectedOrder.total | currency: 'EGP' : 'symbol' : '1.2-2' : 'en-EG' }}
+            </strong>
+          </div>
+          <div class="oo-summary__meta">
+            <span>{{ itemsCount(selectedOrder) }} {{ 'tr_items' | translate }}</span>
+            <span *ngIf="totalWeight(selectedOrder)">{{ totalWeight(selectedOrder) }}</span>
+          </div>
         </div>
-        <span>{{ item.quantity }} <small>{{ item.saleUnit === 'weight' ? item.weightUnit : '' }}</small></span>
-        <span>{{ item.unitPrice | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</span>
-        <strong>{{ item.lineTotal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+
+        <div class="oo-notes" *ngIf="selectedOrder.notes">
+          <h3>{{ 'tr_notes' | translate }}</h3>
+          <p>{{ selectedOrder.notes }}</p>
+        </div>
+
+        <div class="oo-payment-note" *ngIf="selectedOrder.status === 'completed'">
+          {{ 'tr_online_order_unpaid_hint' | translate }}
+        </div>
       </div>
 
-      <div class="order-detail__total">
-        <span>{{ 'tr_total_amount' | translate }}</span>
-        <strong>{{ selectedOrder.total | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      <div class="oo-detail__scroll" *ngIf="detailTab === 'customer'">
+        <dl class="oo-customer-dl">
+          <div>
+            <dt>{{ 'tr_client_name' | translate }}</dt>
+            <dd>{{ selectedOrder.customer?.name || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'tr_phone_number' | translate }}</dt>
+            <dd>{{ selectedOrder.customer?.phone || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'tr_address' | translate }}</dt>
+            <dd>
+              {{
+                selectedOrder.deliveryAddress || selectedOrder.customer?.address || '—'
+              }}
+            </dd>
+          </div>
+          <div>
+            <dt>{{ 'tr_branches' | translate }}</dt>
+            <dd>{{ selectedOrder.branch?.name || selectedOrder.branchSnapshot?.name || '—' }}</dd>
+          </div>
+        </dl>
       </div>
-      <p class="order-detail__notes" *ngIf="selectedOrder.notes">{{ selectedOrder.notes }}</p>
 
-      <div class="order-detail__payment-note" *ngIf="selectedOrder.status === 'completed'">
-        {{ 'tr_online_order_unpaid_hint' | translate }}
+      <div class="oo-detail__scroll" *ngIf="detailTab === 'history'">
+        <ul class="oo-history" *ngIf="selectedOrder.statusHistory?.length; else noHistory">
+          <li *ngFor="let entry of selectedOrder.statusHistory">
+            <span class="oo-status" [attr.data-status]="entry.status">
+              {{ ('tr_online_order_' + entry.status) | translate }}
+            </span>
+            <div>
+              <strong>{{ entry.actorName || entry.source || '—' }}</strong>
+              <small>{{ formatDateTime(entry.changedAt) }}</small>
+            </div>
+          </li>
+        </ul>
+        <ng-template #noHistory>
+          <div class="oo-table__empty">{{ 'tr_online_orders_no_history' | translate }}</div>
+        </ng-template>
       </div>
 
-      <div class="order-detail__actions">
+      <footer class="oo-detail__actions">
         <button
-          class="s-btn btn-primary"
           type="button"
+          class="oo-btn oo-btn--ghost"
+          *ngIf="selectedOrder.status === 'pending' || selectedOrder.status === 'preparing' || selectedOrder.status === 'ready'"
+          [disabled]="actionLoading"
+          (click)="cancel(selectedOrder)"
+          [title]="'tr_cancel' | translate"
+        >
+          <i class="fa fa-ellipsis-h" aria-hidden="true"></i>
+        </button>
+
+        <button
+          type="button"
+          class="oo-btn oo-btn--confirm"
           *ngIf="nextStatus(selectedOrder)"
           [disabled]="actionLoading"
           (click)="advance(selectedOrder)"
         >
-          {{
-            (selectedOrder.status === 'ready'
-              ? 'tr_online_order_create_invoice'
-              : selectedOrder.status === 'pending'
-              ? 'tr_online_order_start_preparing'
-              : 'tr_online_order_mark_ready') | translate
-          }}
+          <i class="fa fa-check" aria-hidden="true"></i>
+          {{ primaryActionLabel(selectedOrder) | translate }}
         </button>
+
         <button
-          class="s-btn btn-secondary"
           type="button"
+          class="oo-btn oo-btn--edit"
           *ngIf="selectedOrder.status === 'completed'"
           (click)="openInvoice(selectedOrder)"
         >
+          <i class="fa fa-file-text-o" aria-hidden="true"></i>
           {{ 'tr_online_order_open_invoice' | translate }}
         </button>
+
         <button
-          class="s-btn btn-danger"
           type="button"
-          *ngIf="selectedOrder.status === 'pending' || selectedOrder.status === 'preparing' || selectedOrder.status === 'ready'"
-          [disabled]="actionLoading"
-          (click)="cancel(selectedOrder)"
+          class="oo-btn oo-btn--edit"
+          *ngIf="selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled'"
+          disabled
+          [title]="'tr_online_orders_edit_soon' | translate"
         >
-          {{ 'tr_cancel' | translate }}
+          <i class="fa fa-pencil" aria-hidden="true"></i>
+          {{ 'tr_edit' | translate }}
         </button>
-      </div>
+      </footer>
     </aside>
   </div>
 </section>

@@ -3,3 +3,50 @@
   word-break: break-word;
   white-space: normal;
 }
+
+.drawer-close-history__sold-row {
+  td {
+    background: rgba(15, 23, 42, 0.03);
+    border-top: none;
+    padding-top: 0.35rem;
+    padding-bottom: 0.85rem;
+  }
+}
+
+.drawer-close-history__sold {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+}
+
+.drawer-close-history__sold-title {
+  flex: 0 0 auto;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.drawer-close-history__sold-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.drawer-close-history__sold-item {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: rgba(15, 23, 42, 0.88);
+}
+
+.drawer-close-history__sold-empty {
+  font-size: 0.84rem;
+  color: rgba(15, 23, 42, 0.45);
+}

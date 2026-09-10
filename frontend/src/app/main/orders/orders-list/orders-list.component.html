@@ -235,6 +235,50 @@
       </div>
       <div class="col-md-3">
         <div class="form-group mb-0">
+          <label>{{ 'tr_payment_status' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="paymentStatusOptions"
+              bindValue="id"
+              [clearable]="true"
+              [(ngModel)]="selectedPaymentStatus"
+              name="orderPaymentStatusFilter"
+              placeholder="{{ 'tr_all_payment_statuses' | translate }}"
+              (change)="onPaymentStatusFilterChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">
+                <span *ngIf="item">{{ item.labelKey | translate }}</span>
+              </ng-template>
+              <ng-template ng-option-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_delivery_person_name' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="deliveryPersonOptions"
+              [clearable]="true"
+              [searchable]="true"
+              [(ngModel)]="selectedDeliveryPersonName"
+              name="orderDeliveryPersonFilter"
+              placeholder="{{ 'tr_all_delivery_persons' | translate }}"
+              (change)="onDeliveryPersonFilterChange()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
           <label>{{ 'tr_installment_plan_months' | translate }}</label>
           <div class="input-with-icon bg-white width-100">
             <ng-select
@@ -382,6 +426,12 @@
               </td>
               <td>
                 <div>{{ paymentMethodLabel(order.paymentMethod) }}</div>
+                <div class="order-installment-meta" *ngIf="order.isDelivery">
+                  <span class="invoice-delivery-chip">{{ 'tr_invoice_delivery_badge' | translate }}</span>
+                  <span *ngIf="order.deliveryPersonName">
+                    · {{ order.deliveryPersonName }}
+                  </span>
+                </div>
                 <div class="order-installment-meta" *ngIf="isInstallmentOrder(order)">
                   <div *ngIf="installmentPlanName(order)">
                     {{ 'tr_installment_plan_select' | translate }}:
@@ -436,7 +486,12 @@
                       *ngIf="canPayOrder(order)"
                       (click)="openPayDialog(order)"
                     >
-                      {{ "tr_add_payment" | translate }}
+                      {{
+                        (isOnlineCollectionDue(order)
+                          ? 'tr_record_collection'
+                          : 'tr_add_payment'
+                        ) | translate
+                      }}
                     </div>
                     <div
                       class="single-option"
@@ -491,6 +546,11 @@
                 <span *ngIf="order.clientPhoneNumber">{{ order.clientPhoneNumber }}</span>
                 <span class="dot" *ngIf="order.clientPhoneNumber && createdAtCairo(order)">•</span>
                 <span *ngIf="createdAtCairo(order)">{{ createdAtCairo(order) }}</span>
+                <ng-container *ngIf="order.isDelivery">
+                  <span class="dot">•</span>
+                  <span class="invoice-delivery-chip">{{ 'tr_invoice_delivery_badge' | translate }}</span>
+                  <span *ngIf="order.deliveryPersonName"> — {{ order.deliveryPersonName }}</span>
+                </ng-container>
               </div>
             </div>
             <span class="options-menu" *ngIf="showOrderActions(order)">
@@ -508,7 +568,12 @@
                   *ngIf="canPayOrder(order)"
                   (click)="openPayDialog(order)"
                 >
-                  {{ "tr_add_payment" | translate }}
+                  {{
+                    (isOnlineCollectionDue(order)
+                      ? 'tr_record_collection'
+                      : 'tr_add_payment'
+                    ) | translate
+                  }}
                 </div>
                 <div
                   class="single-option"

@@ -133,6 +133,20 @@
       padding-right: 0.25rem;
     }
 
+    td.order-line-qty--farm {
+      width: 7.25rem;
+      min-width: 7.25rem;
+      max-width: 8rem;
+      white-space: normal;
+      vertical-align: middle;
+    }
+
+    tr.order-line--farm > td {
+      vertical-align: middle;
+      padding-top: 0.65rem;
+      padding-bottom: 0.65rem;
+    }
+
     th:nth-child(4),
     td:nth-child(4){
       width: 7.5rem;
@@ -900,6 +914,29 @@
         flex-wrap: wrap;
       }
 
+      .order-line-product--farm {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+        width: 100%;
+        min-width: 10rem;
+      }
+
+      .order-line-product__main {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        justify-content: flex-start;
+        min-width: 0;
+      }
+
+      tr.order-line--farm .order-line-product__text {
+        align-items: flex-start;
+        text-align: start;
+        min-width: 0;
+      }
+
       .order-line-product__text {
         display: flex;
         flex-direction: column;
@@ -952,6 +989,13 @@
         background: #fff;
         flex-shrink: 0;
 
+        &--farm {
+          width: 52px;
+          height: 52px;
+          object-fit: cover;
+          border-radius: 6px;
+        }
+
         &--placeholder {
           display: inline-flex;
           align-items: center;
@@ -959,6 +1003,10 @@
           color: #95a5a6;
           font-size: 0.95rem;
           background: #f0f0f0;
+        }
+
+        &--farm.order-line-thumb--placeholder {
+          font-size: 1.25rem;
         }
 
         &--clickable {
@@ -1187,18 +1235,29 @@
   border-radius: 6px;
   background: #fff;
   overflow: hidden;
+  vertical-align: middle;
+
+  &--weight {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12);
+  }
 
   &__input {
-    width: 4.5rem;
-    min-width: 3.5rem;
+    width: 4.25rem;
+    min-width: 3.25rem;
     border: none !important;
     box-shadow: none !important;
-    padding: 0.28rem 0.35rem;
+    padding: 0.28rem 0.3rem;
     text-align: center;
     background: transparent;
 
     &--price {
-      width: 5rem;
+      width: 4.5rem;
+    }
+
+    &::placeholder {
+      font-size: 0.7rem;
+      color: #9ca3af;
     }
 
     &:focus {
@@ -1219,7 +1278,33 @@
 }
 
 .farm-animal-select {
-  min-width: 9rem;
-  margin-bottom: 0.35rem;
+  width: 100%;
+  min-width: 8.5rem;
+  max-width: 12rem;
+  margin-top: 0.35rem;
   text-align: start;
+
+  ::ng-deep .ng-select-container {
+    min-height: 2rem;
+  }
+
+  ::ng-deep .ng-value,
+  ::ng-deep .ng-placeholder {
+    font-size: 0.78rem;
+  }
+
+  &__value {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+}
+
+.farm-sale-meta {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: #6b7280;
+  white-space: normal;
+  max-width: 12rem;
 }

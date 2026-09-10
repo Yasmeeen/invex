@@ -309,9 +309,13 @@ async function resolvePickupBranch({ pickupBranchId, pickupLocation, session }) 
 /**
  * Website paid order → same ProductBooking as cashier booking (customer name/phone/address).
  * Holds stock via bookedQuantity (do not also increment ecommerceReservedQuantity).
+ *
+ * `product` is the stock-hold SKU (fridge/source for cut-from-source sales).
+ * Optional `displayProduct` is the sellable cut shown to the customer (name/code/price).
  */
 export async function createBookingFromEcommerceOrder({
   product,
+  displayProduct = null,
   quantity,
   customer,
   unitPrice,
@@ -350,7 +354,8 @@ export async function createBookingFromEcommerceOrder({
     throw new Error('No Invex user available to own the website booking');
   }
 
-  const branchOid = (isPickup && pickupBranch?._id) || product.branch || null;
+  const snap = displayProduct || product;
+  const branchOid = (isPickup && pickupBranch?._id) || snap.branch || product.branch || null;
   const client = await findOrCreateClient({
     name,
     phone,
@@ -360,16 +365,16 @@ export async function createBookingFromEcommerceOrder({
     fromEcommerce: true,
   });
 
-  const unit = Math.round((Number(unitPrice) || Number(product.price) || 0) * 100) / 100;
+  const unit = Math.round((Number(unitPrice) || Number(snap.price) || Number(product.price) || 0) * 100) / 100;
   const lineTotal = Math.round(unit * qty * 100) / 100;
   const dep = paidOnline ? lineTotal : 0;
   const [booking] = await ProductBooking.create(
     [
       {
         product: product._id,
-        branch: product.branch || null,
+        branch: snap.branch || product.branch || null,
         pickupBranch: isPickup && pickupBranch?._id ? pickupBranch._id : null,
-        productInWarehouse: !!product.inWarehouse,
+        productInWarehouse: !!(snap.inWarehouse ?? product.inWarehouse),
         client: client._id,
         customerName: name,
         customerPhone: canonicalPhoneForStorage(phone),
@@ -379,8 +384,8 @@ export async function createBookingFromEcommerceOrder({
         depositAmount: dep,
         depositPayments: paidOnline && dep > 0 ? [{ method: 'online', amount: dep }] : [],
         productUnitPrice: unit,
-        productNameSnapshot: String(product.name || '').trim(),
-        productCodeSnapshot: String(product.code || '').trim(),
+        productNameSnapshot: String(snap.name || product.name || '').trim(),
+        productCodeSnapshot: String(snap.code || product.code || '').trim(),
         bookingDate: new Date(),
         status: 'active',
         confirmed: true,
@@ -395,7 +400,7 @@ export async function createBookingFromEcommerceOrder({
 
   if (!session) {
     await recalcProductBookingTotals(product._id);
-    await emitBookingCreatedNotification(booking, product, qty, userId);
+    await emitBookingCreatedNotification(booking, snap, qty, userId);
   }
   return booking;
 }

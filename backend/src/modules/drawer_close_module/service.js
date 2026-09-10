@@ -24,6 +24,7 @@ import {
   sumCashTransferNet,
   sumLedgerNet,
 } from '../../utils/treasury-ledger.js';
+import { isWeightSaleUnit, roundWeight } from '../../utils/sale-quantity.util.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 /** Business day boundaries for drawer close (store operations). */
@@ -485,6 +486,99 @@ async function invoiceCountForDay(branchOid, start, end) {
   });
 }
 
+/**
+ * Net sold quantities per product for the branch period (completed invoices,
+ * minus returnedQuantity). Units come from line saleUnit / weightUnit.
+ */
+async function soldProductsForPeriod(branchOid, start, end) {
+  const rows = await Order.aggregate([
+    {
+      $match: {
+        branch: branchOid,
+        status: 'completed',
+        createdAt: { $gte: start, $lte: end },
+      },
+    },
+    { $unwind: '$products' },
+    {
+      $addFields: {
+        _saleUnit: {
+          $toLower: { $ifNull: ['$products.saleUnit', 'piece'] },
+        },
+        _netQty: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                { $ifNull: ['$products.quantity', 0] },
+                { $ifNull: ['$products.returnedQuantity', 0] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { _netQty: { $gt: 0 } } },
+    {
+      $addFields: {
+        _weightUnit: {
+          $cond: [
+            { $eq: ['$_saleUnit', 'weight'] },
+            {
+              $cond: [
+                { $eq: [{ $toLower: { $ifNull: ['$products.weightUnit', 'kg'] } }, 'g'] },
+                'g',
+                'kg',
+              ],
+            },
+            null,
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          productId: '$products.productId',
+          saleUnit: '$_saleUnit',
+          weightUnit: '$_weightUnit',
+        },
+        name: { $first: '$products.name' },
+        code: { $first: '$products.code' },
+        quantity: { $sum: '$_netQty' },
+      },
+    },
+    { $sort: { name: 1 } },
+  ]);
+
+  return rows
+    .map((r) => {
+      const saleUnitRaw = String(r?._id?.saleUnit || 'piece').trim().toLowerCase();
+      const saleUnit =
+        saleUnitRaw === 'weight' || saleUnitRaw === 'head' ? saleUnitRaw : 'piece';
+      const weightUnit =
+        saleUnit === 'weight'
+          ? String(r?._id?.weightUnit || 'kg').trim().toLowerCase() === 'g'
+            ? 'g'
+            : 'kg'
+          : null;
+      const rawQty = Number(r?.quantity || 0);
+      const quantity = isWeightSaleUnit(saleUnit)
+        ? roundWeight(rawQty)
+        : Math.round(rawQty * 1000) / 1000;
+      if (!(quantity > 0)) return null;
+      return {
+        productId: r?._id?.productId ? String(r._id.productId) : null,
+        name: String(r?.name || '').trim() || '—',
+        code: String(r?.code || '').trim(),
+        quantity,
+        saleUnit,
+        ...(weightUnit ? { weightUnit } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
 /** Daily expenses: only cash-treasury portions reduce expected drawer cash. */
 async function sumDailyExpensesCashDrawer(branchOid, start, end) {
   const rows = await DailyExpense.find({
@@ -566,6 +660,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     refundInfo,
     salesTreasuryRefunds,
     invoices,
+    soldProducts,
     expenseTotal,
     deskInfo,
     vendorCashInfo,
@@ -578,6 +673,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     refundsByMethod(branchOid, start, end),
     salesReturnRefundsByTreasury(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
+    soldProductsForPeriod(branchOid, start, end),
     sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
@@ -619,6 +715,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     salesReturnRefundsByTreasury: salesTreasuryRefunds,
     restoredInvoiceCount: refundInfo.count,
     invoiceCount: invoices,
+    /** Net sold lines for the branch period (qty after returns), with saleUnit. */
+    soldProducts,
     dailyExpenseTotal: expenseTotal,
     /** @deprecated use deskPurchaseCashDrawerTotal — kept as alias (cash drawer portion only). */
     deskPurchaseCashOutTotal: deskCashFromDrawer,
@@ -690,6 +788,7 @@ export const previewDrawerClose = async (req, res) => {
         salesReturnRefundsByTreasury: [],
         restoredInvoiceCount: 0,
         invoiceCount: 0,
+        soldProducts: [],
         dailyExpenseTotal: 0,
         deskPurchaseCashOutTotal: 0,
         deskPurchaseCashDrawerTotal: 0,
@@ -1016,10 +1115,31 @@ export const listDrawerCloses = async (req, res) => {
       DrawerClose.countDocuments(query),
     ]);
 
+    const closes = await Promise.all(
+      rows.map(async (row) => {
+        const normalized = normalizeDrawerCloseRow(row);
+        const snapSold = normalized?.snapshot?.soldProducts;
+        if (Array.isArray(snapSold)) {
+          return { ...normalized, soldProducts: snapSold };
+        }
+
+        const startStr = normalized.periodStartDate || normalized.businessDate;
+        const endStr = normalized.periodEndDate || normalized.businessDate;
+        const bounds = parseBusinessPeriod(startStr, endStr);
+        const branchOid = row.branch?._id || row.branch;
+        if (!bounds || !branchOid) {
+          return { ...normalized, soldProducts: [] };
+        }
+
+        const soldProducts = await soldProductsForPeriod(branchOid, bounds.start, bounds.end);
+        return { ...normalized, soldProducts };
+      })
+    );
+
     const totalPages = Math.ceil(total / Number(limit)) || 1;
 
     res.json({
-      closes: rows.map(normalizeDrawerCloseRow),
+      closes,
       meta: {
         currentPage: Number(page),
         totalCount: total,

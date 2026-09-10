@@ -1,64 +1,113 @@
-<div class="farm-animals-page">
-  <div class="s-header">
-    <div>
-      <h2>{{ 'tr_farm_animals_registry' | translate }}</h2>
-      <p class="text-muted">{{ 'tr_farm_animals_registry_hint' | translate }}</p>
+<div class="content-shadow bg-white mb-5">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_farm_animals_registry' | translate }}</span>
+    <div class="btn-group">
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        (click)="isFilterOpen = !isFilterOpen"
+      >
+        <i class="fa fa-filter text-primary" aria-hidden="true"></i>
+      </button>
+    </div>
+  </h2>
+
+  <p class="plr-4 text-muted size-caption farm-animals-hint">
+    {{ 'tr_farm_animals_registry_hint' | translate }}
+  </p>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_farm_animal_serial' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <input
+              class="s-control"
+              [(ngModel)]="search"
+              (keyup.enter)="load()"
+              [placeholder]="'tr_search' | translate"
+            />
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_status' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <select class="s-control" [(ngModel)]="status" (ngModelChange)="load()">
+              <option value="">{{ 'tr_all' | translate }}</option>
+              <option value="available">{{ 'tr_farm_animal_status_available' | translate }}</option>
+              <option value="reserved">{{ 'tr_farm_animal_status_reserved' | translate }}</option>
+              <option value="sold">{{ 'tr_farm_animal_status_sold' | translate }}</option>
+              <option value="slaughtered">{{ 'tr_farm_animal_status_slaughtered' | translate }}</option>
+              <option value="removed">{{ 'tr_farm_animal_status_removed' | translate }}</option>
+            </select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 flex flex-bottom pb-2">
+        <button class="s-btn btn-primary" type="button" (click)="load()">
+          {{ 'tr_search' | translate }}
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="farm-animals-filters">
-    <input
-      class="s-control"
-      [(ngModel)]="search"
-      (keyup.enter)="load()"
-      [placeholder]="'tr_farm_animal_serial' | translate"
-    />
-    <select class="s-control" [(ngModel)]="status" (ngModelChange)="load()">
-      <option value="">{{ 'tr_all' | translate }}</option>
-      <option value="available">{{ 'tr_farm_animal_status_available' | translate }}</option>
-      <option value="reserved">{{ 'tr_farm_animal_status_reserved' | translate }}</option>
-      <option value="sold">{{ 'tr_farm_animal_status_sold' | translate }}</option>
-      <option value="slaughtered">{{ 'tr_farm_animal_status_slaughtered' | translate }}</option>
-    </select>
-    <button class="s-btn btn-primary" type="button" (click)="load()">
-      {{ 'tr_search' | translate }}
-    </button>
+  <div class="plr-4 mt-4" *ngIf="!loading">
+    <div
+      class="table-container farm-animals-list"
+      id="table-container"
+      *ngIf="animals.length > 0"
+    >
+      <table class="s-table table layout-fixed farm-animals-list">
+        <thead>
+          <tr>
+            <th></th>
+            <th>{{ 'tr_farm_animal_serial' | translate }}</th>
+            <th>{{ 'tr_product_name' | translate }}</th>
+            <th>{{ 'tr_weight' | translate }}</th>
+            <th>{{ 'tr_slaughter_share' | translate }}</th>
+            <th>{{ 'tr_status' | translate }}</th>
+            <th>{{ 'tr_location' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let animal of animals; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td>
+              <strong>{{ animal.serial }}</strong>
+            </td>
+            <td>{{ productName(animal) }}</td>
+            <td>{{ animal.currentWeightKg || animal.purchaseWeightKg || '—' }}</td>
+            <td>{{ animal.remainingShare }}</td>
+            <td>
+              <span class="status-pill" [attr.data-status]="animal.status">
+                {{ ('tr_farm_animal_status_' + animal.status) | translate }}
+              </span>
+            </td>
+            <td>
+              <span
+                *ngIf="animal.inWarehouse; else otherLocation"
+                class="location-badge location-badge--warehouse"
+              >
+                {{ 'tr_warehouse' | translate }}
+              </span>
+              <ng-template #otherLocation>{{ locationName(animal) }}</ng-template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state-here text-center ptb-8" *ngIf="animals.length === 0">
+      <i class="fas fa-box-open empty-icon"></i>
+      <p>{{ 'tr_no_items_found' | translate }}</p>
+    </div>
   </div>
 
-  <div class="table-container" *ngIf="!loading && animals.length">
-    <table class="s-table table">
-      <thead>
-        <tr>
-          <th>{{ 'tr_farm_animal_serial' | translate }}</th>
-          <th>{{ 'tr_product_name' | translate }}</th>
-          <th>{{ 'tr_weight' | translate }}</th>
-          <th>{{ 'tr_slaughter_share' | translate }}</th>
-          <th>{{ 'tr_status' | translate }}</th>
-          <th>{{ 'tr_location' | translate }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let animal of animals">
-          <td><strong>{{ animal.serial }}</strong></td>
-          <td>{{ productName(animal) }}</td>
-          <td>{{ animal.currentWeightKg || animal.purchaseWeightKg || '—' }}</td>
-          <td>{{ animal.remainingShare }}</td>
-          <td>{{ ('tr_farm_animal_status_' + animal.status) | translate }}</td>
-          <td>
-            <ng-container *ngIf="animal.inWarehouse; else otherLocation">
-              {{ 'tr_warehouse' | translate }}
-            </ng-container>
-            <ng-template #otherLocation>{{ locationName(animal) }}</ng-template>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="text-center text-muted ptb-5" *ngIf="loading">
-    {{ 'tr_loading' | translate }}
-  </div>
-  <div class="text-center text-muted ptb-5" *ngIf="!loading && !animals.length">
-    {{ 'tr_no_items_found' | translate }}
+  <div *ngIf="loading">
+    <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
   </div>
 </div>

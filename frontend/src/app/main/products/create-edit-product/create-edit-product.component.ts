@@ -110,7 +110,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   listedOnEcommerce = false;
   /** Fridge/carcass product this cut deducts from (butcher). */
   selectedSourceProductId: string | null = null;
+  /** Keep currently selected source visible while the list reloads. */
+  private selectedSourceProductSnapshot: Product | null = null;
   sourceStockCandidates: Product[] = [];
+  sourceStockLoading = false;
+  private sourceStockRequestId = 0;
   productType: 'good' | 'service' | 'farm' = 'good';
   /** Extra cost on top of fridge source (manufactured goods) — butcher/farm only. */
   processingExtraCost: number | '' = 0;
@@ -440,6 +444,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   /** Butcher/farm: cost may be left empty (null). General: auto-filled from sell − discount. */
   get netPriceTrulyOptional(): boolean {
     return this.storeSettings.butcherFeaturesEnabled;
+  }
+
+  /** General retail: code must start with category prefix. Butcher/farm: free codes (scale PLUs). */
+  get requireProductCodeCategoryPrefix(): boolean {
+    return !this.storeSettings.butcherFeaturesEnabled;
   }
 
   get netPriceOptionalHintKey(): string {
@@ -916,7 +925,6 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (!cat || !this.hasCategoryCode(cat)) {
       return;
     }
-    const prefix = String(cat.code || '').trim();
     let v = String(this.multiUnitCodes[index] ?? '').trim();
     if (!v) {
       if (index === 0) {
@@ -924,10 +932,13 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       }
       return;
     }
-    const pu = prefix.toUpperCase();
-    if (!v.toUpperCase().startsWith(pu)) {
-      const join = prefix.endsWith('-') ? '' : '-';
-      v = `${prefix}${join}${v}`.replace(/-+/g, '-');
+    if (this.requireProductCodeCategoryPrefix) {
+      const prefix = String(cat.code || '').trim();
+      const pu = prefix.toUpperCase();
+      if (!v.toUpperCase().startsWith(pu)) {
+        const join = prefix.endsWith('-') ? '' : '-';
+        v = `${prefix}${join}${v}`.replace(/-+/g, '-');
+      }
     }
     this.multiUnitCodes[index] = v;
     if (index === 0) {
@@ -965,14 +976,16 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       );
       return null;
     }
-    const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
-    for (const c of units) {
-      if (!c.toUpperCase().startsWith(prefixU)) {
-        this.appNotificationService.push(
-          this.translateService.instant('tr_product_code_prefix_mismatch'),
-          'error'
-        );
-        return null;
+    if (this.requireProductCodeCategoryPrefix) {
+      const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
+      for (const c of units) {
+        if (!c.toUpperCase().startsWith(prefixU)) {
+          this.appNotificationService.push(
+            this.translateService.instant('tr_product_code_prefix_mismatch'),
+            'error'
+          );
+          return null;
+        }
       }
     }
     return units;
@@ -1236,17 +1249,42 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   onSourceProductChange(id: string | null) {
     this.selectedSourceProductId = id || null;
-    if (this.selectedSourceProductId && this.basicInfoForm?.form) {
-      this.basicInfoForm.form.patchValue({ stock: 0 });
+    if (this.selectedSourceProductId) {
+      this.selectedSourceProductSnapshot =
+        this.sourceStockCandidates.find(
+          (p) => String(p._id) === String(this.selectedSourceProductId)
+        ) || this.selectedSourceProductSnapshot;
+      if (this.basicInfoForm?.form) {
+        this.basicInfoForm.form.patchValue({ stock: 0 });
+      }
+    } else {
+      this.selectedSourceProductSnapshot = null;
     }
   }
 
+  /** Load all same-category products as fridge-source options (setup may happen before stock). */
   loadSourceStockCandidates() {
     if (!this.cutFromSourceEnabled) {
       this.sourceStockCandidates = [];
+      this.sourceStockLoading = false;
       return;
     }
-    const params: any = { page: 1, limit: 300 };
+    const categoryId = this.selectedCategory?._id
+      ? String(this.selectedCategory._id)
+      : null;
+    if (!categoryId) {
+      this.sourceStockCandidates = [];
+      this.sourceStockLoading = false;
+      return;
+    }
+
+    const params: Record<string, string | number | boolean> = {
+      page: 1,
+      limit: 1000,
+      categoryId,
+      // Soft-removed / zero-stock rows still needed while wiring cut-from-source settings.
+      includeRemoved: true,
+    };
     if (this.storeInWarehouse) {
       params.warehouseOnly = true;
     } else {
@@ -1256,21 +1294,57 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         params.branchId = String(bid);
       }
     }
+
+    const requestId = ++this.sourceStockRequestId;
+    this.sourceStockLoading = true;
     this.productsSerivce.getProducts(params).subscribe({
       next: (res: any) => {
-        const rows = (res?.products || []) as Product[];
-        this.sourceStockCandidates = rows.filter((p) => {
-          if (this.productId && String(p._id) === String(this.productId)) return false;
-          const sid = (p as any).sourceProductId;
-          if (!sid) return true;
-          if (typeof sid === 'object') return false;
-          return false;
-        });
+        if (requestId !== this.sourceStockRequestId) {
+          return;
+        }
+        const rows = ((res?.products || []) as Product[]).filter((p) =>
+          this.isFridgeSourceCandidate(p)
+        );
+        this.sourceStockCandidates = this.ensureSelectedSourceInList(rows);
+        this.sourceStockLoading = false;
       },
       error: () => {
-        this.sourceStockCandidates = [];
+        if (requestId !== this.sourceStockRequestId) {
+          return;
+        }
+        this.sourceStockCandidates = this.ensureSelectedSourceInList([]);
+        this.sourceStockLoading = false;
       },
     });
+  }
+
+  private ensureSelectedSourceInList(list: Product[]): Product[] {
+    if (!this.selectedSourceProductId) {
+      return list;
+    }
+    if (list.some((p) => String(p._id) === String(this.selectedSourceProductId))) {
+      return list;
+    }
+    if (
+      this.selectedSourceProductSnapshot &&
+      String(this.selectedSourceProductSnapshot._id) ===
+        String(this.selectedSourceProductId)
+    ) {
+      return [this.selectedSourceProductSnapshot, ...list];
+    }
+    return list;
+  }
+
+  /** Same category candidates: exclude self / services / farm animals only. */
+  private isFridgeSourceCandidate(p: Product): boolean {
+    if (this.productId && String(p._id) === String(this.productId)) {
+      return false;
+    }
+    const t = String((p as any).productType || 'good').toLowerCase();
+    if (t === 'service' || t === 'farm') {
+      return false;
+    }
+    return true;
   }
 
   getCategories() {
@@ -1341,6 +1415,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       const srcRaw = response.sourceProductId;
       this.selectedSourceProductId =
         srcRaw && typeof srcRaw === 'object' ? String(srcRaw._id) : srcRaw ? String(srcRaw) : null;
+      this.selectedSourceProductSnapshot =
+        srcRaw && typeof srcRaw === 'object'
+          ? ({
+              _id: String(srcRaw._id),
+              name: srcRaw.name,
+              code: srcRaw.code,
+              stock: srcRaw.stock,
+            } as Product)
+          : null;
       this.loadSourceStockCandidates();
       this.listedOnEcommerce = Boolean(response.listedOnEcommerce);
       this.ecommerceDescription = String(response.ecommerceDescription || '');
@@ -1715,6 +1798,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   onProductCategoryChange(cat: Category | null): void {
     this.selectedCategory = cat;
     this.setCategoryAttributeDefsFromSelected();
+    this.selectedSourceProductId = null;
+    this.selectedSourceProductSnapshot = null;
+    this.loadSourceStockCandidates();
     if (!cat) {
       if (!this.isEdit) {
         this.codeValue = '';
@@ -1784,6 +1870,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   enforceProductCodePrefix(): void {
+    if (!this.requireProductCodeCategoryPrefix) {
+      return;
+    }
     const cat = this.selectedCategory;
     if (!cat || !this.hasCategoryCode(cat)) {
       return;
@@ -1980,7 +2069,6 @@ private submitDeskPurchaseRequest(): void {
     );
     return;
   }
-  const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
   let deskMultiUnits: string[] | null = null;
   let deskUnitDetails:
     | Array<{
@@ -2004,7 +2092,8 @@ private submitDeskPurchaseRequest(): void {
     if (!deskMultiUnits) {
       return;
     }
-  } else {
+  } else if (this.requireProductCodeCategoryPrefix) {
+    const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
     const codeTrim = String(this.codeValue || '').trim();
     if (!codeTrim.toUpperCase().startsWith(prefixU)) {
       this.appNotificationService.push(
@@ -2218,7 +2307,6 @@ createProduct() {
     );
     return;
   }
-  const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
   let createMultiUnits: string[] | null = null;
   let createUnitDetails:
     | Array<{
@@ -2242,7 +2330,8 @@ createProduct() {
     if (!createMultiUnits) {
       return;
     }
-  } else {
+  } else if (this.requireProductCodeCategoryPrefix) {
+    const prefixU = String(this.selectedCategory.code || '').trim().toUpperCase();
     const codeTrim = String(this.codeValue || '').trim();
     if (!codeTrim.toUpperCase().startsWith(prefixU)) {
       this.appNotificationService.push(
@@ -2409,14 +2498,16 @@ updateProduct() {
     );
     return;
   }
-  const codeTrim = String(this.codeValue || '').trim();
-  const prefix = String(this.selectedCategory.code || '').trim();
-  if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
-    this.appNotificationService.push(
-      this.translateService.instant('tr_product_code_prefix_mismatch'),
-      'error'
-    );
-    return;
+  if (this.requireProductCodeCategoryPrefix) {
+    const codeTrim = String(this.codeValue || '').trim();
+    const prefix = String(this.selectedCategory.code || '').trim();
+    if (!codeTrim.toUpperCase().startsWith(prefix.toUpperCase())) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_code_prefix_mismatch'),
+        'error'
+      );
+      return;
+    }
   }
   if (!this.storeInWarehouse && !this.basicInfoForm.value.branch?._id) {
     this.appNotificationService.push(
@@ -2593,7 +2684,11 @@ updateProduct() {
       return;
     }
 
-    if (this.selectedCategory && this.hasCategoryCode(this.selectedCategory)) {
+    if (
+      this.requireProductCodeCategoryPrefix &&
+      this.selectedCategory &&
+      this.hasCategoryCode(this.selectedCategory)
+    ) {
       const p = String(this.selectedCategory.code).trim();
       if (!code.toUpperCase().startsWith(p.toUpperCase())) {
         this.appNotificationService.push(

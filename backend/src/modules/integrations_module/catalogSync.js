@@ -4,15 +4,20 @@ import Branch from '../../DB/models/branch.model.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import { isEcommerceIntegrationFeatureAvailable } from './feature.js';
 import { ensureOnlineBranch, ONLINE_BRANCH_NAME } from './onlineBranch.js';
+import {
+  computeSellableUnits,
+  effectiveSellableUnits,
+  isCutFromSourceEnabled,
+  loadSourceProductsById,
+} from '../../utils/cut-from-source.js';
 
 const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
 
-function sellableStock(product) {
-  const stock = Number(product.stock) || 0;
-  const transfer = Number(product.transferReservedQuantity) || 0;
-  const booked = Number(product.bookedQuantity) || 0;
-  const ecom = Number(product.ecommerceReservedQuantity) || 0;
-  return Math.max(0, stock - transfer - booked - ecom);
+function sellableStock(product, sourceById = null, cutFromSourceEnabled = false) {
+  if (sourceById && cutFromSourceEnabled) {
+    return effectiveSellableUnits(product, sourceById, cutFromSourceEnabled);
+  }
+  return computeSellableUnits(product);
 }
 
 function mapCategory(cat) {
@@ -33,7 +38,7 @@ function mapBranch(branch) {
   };
 }
 
-function mapProduct(product, categoryIdOnEcomHint) {
+function mapProduct(product, categoryIdOnEcomHint, sourceById = null, cutFromSourceEnabled = false) {
   const price = Number(product.price) || 0;
   const discount = Number(product.discount) || 0;
   const offerPrice =
@@ -53,7 +58,7 @@ function mapProduct(product, categoryIdOnEcomHint) {
     code: product.code || '',
     price,
     offerPrice,
-    stock: sellableStock(product),
+    stock: sellableStock(product, sourceById, cutFromSourceEnabled),
     imageUrl: product.imageUrl || '',
     description,
     ecommerceDescription: description,
@@ -113,9 +118,17 @@ export async function buildCatalogPayload() {
     };
   }
 
-  const products = (
-    await Product.find(productQuery).populate('category').populate('branch').lean()
-  ).filter((p) => sellableStock(p) > 0);
+  const productsRaw = await Product.find(productQuery)
+    .populate('category')
+    .populate('branch')
+    .lean();
+  const cutFromSourceEnabled = isCutFromSourceEnabled(cfg.settings);
+  const sourceById = await loadSourceProductsById(productsRaw, {
+    enabled: cutFromSourceEnabled,
+  });
+  const products = productsRaw.filter(
+    (p) => sellableStock(p, sourceById, cutFromSourceEnabled) > 0
+  );
   const branches = await Branch.find({ name: { $ne: ONLINE_BRANCH_NAME } })
     .select('name storeAddress')
     .lean();
@@ -134,7 +147,7 @@ export async function buildCatalogPayload() {
     ok: true,
     catalogMode: cfg.catalogMode,
     categories: categories.map(mapCategory),
-    products: products.map((p) => mapProduct(p)),
+    products: products.map((p) => mapProduct(p, null, sourceById, cutFromSourceEnabled)),
     branches: branches.map(mapBranch),
   };
 }
@@ -227,13 +240,13 @@ export async function pushFullCatalog() {
   };
 }
 
-function shouldDeleteFromStorefront(product) {
+async function shouldDeleteFromStorefront(product, sourceById, cutFromSourceEnabled) {
   if (product.removedWhenOutOfStock) return true;
   const cat = product.category;
   const deleteWhenOos = Boolean(
     cat && typeof cat === 'object' && cat.deleteProductWhenOutOfStock
   );
-  return sellableStock(product) <= 0 && deleteWhenOos;
+  return sellableStock(product, sourceById, cutFromSourceEnabled) <= 0 && deleteWhenOos;
 }
 
 export async function pushProductUpsert(productId) {
@@ -247,7 +260,12 @@ export async function pushProductUpsert(productId) {
     });
   }
 
-  if (shouldDeleteFromStorefront(product)) {
+  const cutFromSourceEnabled = isCutFromSourceEnabled(cfg.settings);
+  const sourceById = await loadSourceProductsById([product], {
+    enabled: cutFromSourceEnabled,
+  });
+
+  if (shouldDeleteFromStorefront(product, sourceById, cutFromSourceEnabled)) {
     return postToEcommerce('/api/integration/invex/catalog/product-delete', {
       invexProductId: String(product._id),
     });
@@ -267,7 +285,7 @@ export async function pushProductUpsert(productId) {
   }
 
   const cat = product.category;
-  const mapped = mapProduct(product);
+  const mapped = mapProduct(product, null, sourceById, cutFromSourceEnabled);
   return postToEcommerce('/api/integration/invex/catalog/product-upsert', {
     category: cat ? mapCategory(cat) : null,
     product: mapped,
@@ -307,10 +325,23 @@ export async function pushCategoryDelete(categoryId) {
 /** Fire-and-forget helper for product module hooks. */
 export function notifyProductChanged(productId) {
   if (!productId) return;
+  const id = String(productId);
   setImmediate(() => {
-    pushProductUpsert(productId).catch((err) =>
+    pushProductUpsert(id).catch((err) =>
       console.error('[catalog sync] product upsert', err.message)
     );
+    // Fridge/source stock changes must refresh cut SKUs that draw from it.
+    Product.find({ sourceProductId: id })
+      .select('_id')
+      .lean()
+      .then((cuts) => {
+        for (const cut of cuts) {
+          pushProductUpsert(cut._id).catch((err) =>
+            console.error('[catalog sync] cut upsert', err.message)
+          );
+        }
+      })
+      .catch((err) => console.error('[catalog sync] cut fan-out', err.message));
   });
 }
 

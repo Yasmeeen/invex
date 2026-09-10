@@ -254,6 +254,22 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return this.translateService.instant('tr_booking_needs_transfer_many', { branches });
   }
 
+  /** Branch / warehouse label — same SKU code can exist at multiple locations. */
+  locationLabel(product: Product): string {
+    if (product?.inWarehouse) {
+      return this.translateService.instant('tr_warehouse');
+    }
+    const branch = product?.branch;
+    if (branch && typeof branch === 'object' && (branch as Branch).name) {
+      return String((branch as Branch).name);
+    }
+    return '—';
+  }
+
+  locationIsWarehouse(product: Product): boolean {
+    return !!product?.inWarehouse;
+  }
+
   /** Branch Manager may edit/delete only products belonging to their branch (not warehouse / other branches). */
   canBranchManagerModifyProduct(product: Product): boolean {
     if (isModerator(this.globals.currentUser?.role)) {

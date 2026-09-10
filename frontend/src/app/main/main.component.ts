@@ -5,6 +5,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { isWarehouse } from '@core/utils/role-utils';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { OpeningCelebrationService } from '@shared/services/opening-celebration.service';
+import { OnlineOrdersAlertService } from '@shared/services/online-orders-alert.service';
 import { openingCelebrationStorageKey } from '@core/utils/opening-celebration';
 import { Branch } from '@core/models/products.model';
 import { Subscription } from 'rxjs';
@@ -35,13 +36,16 @@ export class MainComponent implements OnInit, OnDestroy {
   hasActiveOpening = false;
   celebratingBranch: Branch | null = null;
   bannerCopies = [0, 1];
+  /** Cashier embeds its own banner (fullscreen overlay covers the global one). */
+  isCashierRoute = false;
   private celebrationSub?: Subscription;
 
   constructor(
       private router:Router,
       private translate: TranslateService,
       private storeSettingsService: StoreSettingsService,
-      private openingCelebration: OpeningCelebrationService
+      private openingCelebration: OpeningCelebrationService,
+      private onlineOrdersAlert: OnlineOrdersAlertService
   ) {
       document.body.classList.add('admin_theme');
   }
@@ -53,6 +57,8 @@ export class MainComponent implements OnInit, OnDestroy {
       this.syncOpeningCelebration(this.openingCelebration.snapshot);
       this.openingCelebration.load();
       this.storeSettingsService.load();
+      this.onlineOrdersAlert.start();
+      this.syncCashierRoute(this.router.url);
     // Hide Vixa for warehouse (and legacy Operation Manager) and cashier.
     try {
       const u: any = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -71,19 +77,25 @@ export class MainComponent implements OnInit, OnDestroy {
   // Shows and hides the loading spinner during RouterEvent changes
   navigationInterceptor(event: RouterEvent): void {
     if (event instanceof NavigationEnd) {
+          const url = String(event.urlAfterRedirects || event.url || '');
           this.showFloatingVixa =
             !this.hideVixaForRole &&
-            !String(event.urlAfterRedirects || event.url || '').startsWith('/vixa');
+            !url.startsWith('/vixa');
+          this.syncCashierRoute(url);
           document.body.classList.remove('sidebar-active')
           let activeRouterMenus = document.querySelectorAll('.anchor-container');
           for (let i = 0; i < activeRouterMenus.length; i++) {
               activeRouterMenus[i].classList.remove('children-active');
+          }
+          if (url.startsWith('/online-orders')) {
+            this.onlineOrdersAlert.refresh();
           }
       }
   }
 
   ngOnDestroy(): void {
     this.celebrationSub?.unsubscribe();
+    this.onlineOrdersAlert.stop();
   }
 
   get celebrationStoreName(): string {
@@ -96,6 +108,10 @@ export class MainComponent implements OnInit, OnDestroy {
 
   onSidebarCollapsed(collapsed: boolean): void {
     this.sidebarCollapsed = collapsed;
+  }
+
+  private syncCashierRoute(url: string): void {
+    this.isCashierRoute = String(url || '').split('?')[0].startsWith('/cashier');
   }
 
   dismissOpeningBanner(): void {

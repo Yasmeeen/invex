@@ -104,6 +104,18 @@
     margin-inline-start: 0.25rem;
   }
 
+  &__sold-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  &__sold-qty {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
   &__note {
     font-size: 0.8rem;
     color: rgba(15, 23, 42, 0.5);

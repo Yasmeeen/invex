@@ -1,0 +1,34 @@
+.complete-oo-dialog {
+  min-width: min(420px, 92vw);
+  padding: 0.25rem 0.15rem 0.5rem;
+}
+
+.complete-oo-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.complete-oo-dialog__body {
+  padding-top: 0.25rem;
+}
+
+.complete-oo-dialog__message {
+  margin: 0 0 1rem;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.complete-oo-dialog__hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.complete-oo-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding: 0;
+}

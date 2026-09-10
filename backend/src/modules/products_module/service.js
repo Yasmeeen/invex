@@ -285,7 +285,8 @@ const escapeHtml = (s) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-/** Ensures product code uses the category prefix; category must have a non-empty code. */
+/** Ensures product code uses the category prefix; category must have a non-empty code.
+ * Butcher/farm: free codes (e.g. scale PLUs) — prefix match is not required. */
 export async function validateProductCodeForCategory(categoryId, productCode) {
   const cat = await Category.findById(categoryId).lean();
   if (!cat) {
@@ -302,6 +303,13 @@ export async function validateProductCodeForCategory(categoryId, productCode) {
   const c = String(productCode ?? '').trim();
   if (!c) {
     return { ok: false, error: 'Product code is required' };
+  }
+  const settings = await StoreSettings.findOne()
+    .sort({ updatedAt: -1 })
+    .select('businessActivityType')
+    .lean();
+  if (butcherFeaturesEnabled(settings)) {
+    return { ok: true };
   }
   if (!c.toUpperCase().startsWith(prefix.toUpperCase())) {
     return {

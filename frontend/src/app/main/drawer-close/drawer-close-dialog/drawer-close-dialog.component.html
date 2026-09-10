@@ -83,6 +83,17 @@
           <strong>{{ preview.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
         </div>
 
+        <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_sold_products' | translate }}</h4>
+        <div class="drawer-close-dialog__row" *ngFor="let row of soldProductsList()">
+          <span class="drawer-close-dialog__sold-name">{{ row.name }}</span>
+          <strong class="drawer-close-dialog__sold-qty"
+            >{{ formatSoldQty(row) }} {{ soldUnitLabel(row) }}</strong
+          >
+        </div>
+        <div class="drawer-close-dialog__muted" *ngIf="soldProductsList().length === 0">
+          {{ 'tr_drawer_close_none' | translate }}
+        </div>
+
         <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_payments_in' | translate }}</h4>
         <div class="drawer-close-dialog__row" *ngFor="let row of methodEntries(preview.paymentsReceivedByMethod)">
           <span>{{ payMethodLabel(row[0]) }}</span>

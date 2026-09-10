@@ -292,7 +292,8 @@ async function runOrderPostCreateSideEffects({
   });
 
   for (const item of orderProducts) {
-    if (item?.productId) notifyProductChanged(item.productId);
+    if (item?.sourceProductId) notifyProductChanged(item.sourceProductId);
+    else if (item?.productId) notifyProductChanged(item.productId);
   }
 
   for (const removed of autoDeletedProducts) {
@@ -364,6 +365,9 @@ export const getOrders = async (req, res) => {
       searchBranch = '',
       status,
       paymentMethod,
+      paymentStatus,
+      deliveryPersonName,
+      isDelivery,
       installmentPlanMonths,
       from,
       to,
@@ -394,6 +398,23 @@ export const getOrders = async (req, res) => {
     // ✅ 1b. Optional payment method filter (cash, visa, valu, installment, …)
     if (paymentMethod && String(paymentMethod).trim() !== '') {
       query.paymentMethod = String(paymentMethod).trim();
+    }
+
+    // ✅ 1b2. Payment / collection status (unpaid | partial | paid | uncollected)
+    const paymentStatusRaw = String(paymentStatus || '').trim().toLowerCase();
+    if (paymentStatusRaw === 'uncollected') {
+      query.paymentStatus = { $in: ['unpaid', 'partial'] };
+    } else if (['unpaid', 'partial', 'paid'].includes(paymentStatusRaw)) {
+      query.paymentStatus = paymentStatusRaw;
+    }
+
+    // ✅ 1b3. Delivery person / delivery invoices
+    const deliveryName = String(deliveryPersonName || '').trim();
+    if (deliveryName) {
+      query.deliveryPersonName = { $regex: deliveryName, $options: 'i' };
+      query.isDelivery = true;
+    } else if (String(isDelivery || '').trim() === 'true' || String(isDelivery || '').trim() === '1') {
+      query.isDelivery = true;
     }
 
     // ✅ 1c. Filter installment invoices by plan months (6 / 12 / 24 …)

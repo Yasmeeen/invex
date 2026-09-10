@@ -508,6 +508,22 @@ body[dir=rtl] {
   overflow: visible !important;
 }
 
+.cdk-overlay-backdrop.complete-online-order-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.complete-online-order-dialog-panel {
+  box-shadow: none;
+}
+
+.complete-online-order-dialog-panel .mat-dialog-container,
+.complete-online-order-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
 .cdk-overlay-backdrop.payment-splits-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

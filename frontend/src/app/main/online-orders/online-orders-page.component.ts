@@ -278,6 +278,8 @@ export class OnlineOrdersPageComponent implements OnInit {
         .open(CompleteOnlineOrderDialogComponent, {
           width: '460px',
           disableClose: true,
+          panelClass: 'complete-online-order-dialog-panel',
+          backdropClass: 'complete-online-order-dialog-backdrop',
           data: { order },
         })
         .afterClosed()

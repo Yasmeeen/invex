@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import User from '../DB/models/user.model.js';
 
-const TOKEN_TTL_SECONDS = 12 * 60 * 60;
+// Long-lived sessions: only clear when the user explicitly logs out.
+const TOKEN_TTL_SECONDS = 100 * 365 * 24 * 60 * 60; // ~100 years
 
 function authSecret() {
   const configured = String(process.env.AUTH_TOKEN_SECRET || '').trim();

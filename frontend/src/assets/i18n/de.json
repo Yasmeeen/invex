@@ -143,6 +143,7 @@
   "tr_cut_from_source_enabled": "Abzug vom Schlachtkörper / Kühlbestand",
   "tr_cut_from_source_enabled_hint": "Für Metzgereien: Verkauf einer Teilstück-SKU zieht kg vom Schlachtkörper ab. Für andere Läden ausgeschaltet lassen.",
   "tr_cut_source_product": "Abziehen von (Kühlbestand)",
+  "tr_cut_source_short": "Abziehen von",
   "tr_cut_source_product_hint": "Optional. Verkauf dieser SKU zieht das Gewicht vom gewählten Stück ab.",
   "tr_cut_source_none": "Kein — eigener Bestand",
   "tr_cut_source_stock_hint": "Bestand liegt auf der Quelle. Menge hier 0 lassen.",

@@ -143,6 +143,7 @@
   "tr_cut_from_source_enabled": "Déduire depuis la carcasse / stock frigo",
   "tr_cut_from_source_enabled_hint": "Pour la boucherie : vendre une découpe déduit les kg de la pièce en frigo. Laisser désactivé pour les autres magasins.",
   "tr_cut_source_product": "Déduire depuis (stock frigo)",
+  "tr_cut_source_short": "Déduire de",
   "tr_cut_source_product_hint": "Optionnel. La vente de cet article déduit le poids de la pièce choisie.",
   "tr_cut_source_none": "Aucun — stock de cet article",
   "tr_cut_source_stock_hint": "Le stock est sur la source. Laisser la quantité à 0.",

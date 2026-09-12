@@ -396,6 +396,15 @@
                     <p class="products-list__pickup-hint m-0" *ngIf="remotePickupHint(product) as hint">
                       {{ hint }}
                     </p>
+                    <span
+                      class="cut-source-badge cut-source-badge--compact"
+                      *ngIf="cutSourceProductName(product) as cutSrc"
+                      [attr.title]="'tr_cut_source_product' | translate"
+                    >
+                      <i class="fa fa-snowflake-o cut-source-badge__icon" aria-hidden="true"></i>
+                      <span class="cut-source-badge__label">{{ 'tr_cut_source_short' | translate }}</span>
+                      <span class="cut-source-badge__name">{{ cutSrc }}</span>
+                    </span>
                   </span>
                 </span>
               </td>
@@ -653,6 +662,14 @@
             <div><b>{{ 'tr_sell_price' | translate }}:</b> {{ product.price }}</div>
             <div *ngIf="productHasNetPrice(product)"><b>{{ 'tr_net_price' | translate }}:</b> {{ product.netPrice }}</div>
             <div><b>{{ 'tr_discount' | translate }}:</b> {{ product.discount }}</div>
+          </div>
+
+          <div class="product-card__cut-source" *ngIf="cutSourceProductName(product) as cutSrc">
+            <span class="cut-source-badge" [attr.title]="'tr_cut_source_product' | translate">
+              <i class="fa fa-snowflake-o cut-source-badge__icon" aria-hidden="true"></i>
+              <span class="cut-source-badge__label">{{ 'tr_cut_source_short' | translate }}</span>
+              <span class="cut-source-badge__name">{{ cutSrc }}</span>
+            </span>
           </div>
 
           <div class="product-card__attrs" *ngIf="productAttributesPairs(product).length">

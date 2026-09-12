@@ -261,6 +261,53 @@
   font-size: 0.85rem;
 }
 
+.product-card__source {
+  margin-top: 0.2rem;
+}
+
+.product-card__cut-source {
+  margin-top: 0.55rem;
+}
+
+.cut-source-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #0e7490;
+  background: #ecfeff;
+  color: #155e75;
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+.cut-source-badge--compact {
+  margin-top: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.cut-source-badge__icon {
+  flex-shrink: 0;
+  font-size: 0.9em;
+  color: #0891b2;
+}
+
+.cut-source-badge__label {
+  font-weight: 700;
+  color: #0e7490;
+  white-space: nowrap;
+}
+
+.cut-source-badge__name {
+  font-weight: 900;
+  color: #164e63;
+  word-break: break-word;
+}
+
 .muted { color: #6b7280; }
 .dot { margin: 0 0.25rem; color: #9ca3af; }
 

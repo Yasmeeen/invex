@@ -472,6 +472,21 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return String(product.acquiredFrom?.displayName || '').trim();
   }
 
+  /** Fridge / carcass SKU this cut deducts from (cut-from-source). */
+  cutSourceProductName(product: Product): string {
+    if (!this.storeSettings.butcherFeaturesEnabled) return '';
+    if (!this.storeSettings.snapshot.cutFromSourceEnabled) return '';
+    const populated = product?.sourceProduct;
+    if (populated && typeof populated === 'object' && populated.name) {
+      return String(populated.name).trim();
+    }
+    const sid = product?.sourceProductId;
+    if (sid && typeof sid === 'object' && (sid as { name?: string }).name) {
+      return String((sid as { name?: string }).name).trim();
+    }
+    return '';
+  }
+
   availableToBook(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const reserved = this.transferReservedQty(product);

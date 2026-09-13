@@ -33,6 +33,7 @@ import {
 } from '@shared/services/product-purchase-requests.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { resolveSellByWeight } from '@shared/utils/sale-quantity.util';
+import { compareFridgeFirst } from '@shared/utils/fridge-source-sort.util';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 // import { BrowserMultiFormatReader } from '@zxing/browser';
@@ -1302,9 +1303,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
         if (requestId !== this.sourceStockRequestId) {
           return;
         }
-        const rows = ((res?.products || []) as Product[]).filter((p) =>
-          this.isFridgeSourceCandidate(p)
-        );
+        const rows = ((res?.products || []) as Product[])
+          .filter((p) => this.isFridgeSourceCandidate(p))
+          .sort(compareFridgeFirst);
         this.sourceStockCandidates = this.ensureSelectedSourceInList(rows);
         this.sourceStockLoading = false;
       },

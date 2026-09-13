@@ -1169,9 +1169,24 @@ export const createOrder = async (req, res) => {
     const payments = [];
     let resolvedPaymentMethod = String(paymentMethod || 'cash').trim() || 'cash';
 
+    const isDelivery = Boolean(isDeliveryRaw);
+    const deliveryPersonName = isDelivery
+      ? String(deliveryPersonNameRaw || '').trim()
+      : '';
+    /** Cashier delivery (or explicit): create unpaid invoice for later التحصيل. */
+    const deferCollection =
+      String(paymentMethod || '').trim().toLowerCase() === 'uncollected' ||
+      (isDelivery &&
+        (!Array.isArray(paymentSplitsRaw) || paymentSplitsRaw.length === 0) &&
+        String(paymentMethod || '').trim().toLowerCase() !== 'credit' &&
+        String(paymentMethod || '').trim().toLowerCase() !== 'installment');
+
     const useSplits = Array.isArray(paymentSplitsRaw) && paymentSplitsRaw.length > 0;
 
-    if (useSplits) {
+    if (deferCollection) {
+      paidAmount = 0;
+      resolvedPaymentMethod = 'uncollected';
+    } else if (useSplits) {
       const splits = paymentSplitsRaw
         .map((s) => ({
           method: String(s?.method ?? '').trim().toLowerCase(),
@@ -1273,12 +1288,13 @@ export const createOrder = async (req, res) => {
     let installmentFields = null;
     const onAccount = creditOnAccountAmount(amountDueForPayment, paidAmount);
     const wantsInstallment =
-      String(resolvedPaymentMethod || '').toLowerCase() === 'installment' ||
-      (Array.isArray(paymentSplitsRaw) &&
-        paymentSplitsRaw.some(
-          (s) => String(s?.method || '').trim().toLowerCase() === 'installment'
-        )) ||
-      Boolean(installmentPlanIdRaw);
+      !deferCollection &&
+      (String(resolvedPaymentMethod || '').toLowerCase() === 'installment' ||
+        (Array.isArray(paymentSplitsRaw) &&
+          paymentSplitsRaw.some(
+            (s) => String(s?.method || '').trim().toLowerCase() === 'installment'
+          )) ||
+        Boolean(installmentPlanIdRaw));
 
     if (wantsInstallment && onAccount > 0.001) {
       if (!installmentPlanIdRaw || !mongoose.Types.ObjectId.isValid(String(installmentPlanIdRaw))) {
@@ -1359,7 +1375,7 @@ export const createOrder = async (req, res) => {
         installments: schedule.installments,
       };
       resolvedPaymentMethod = 'installment';
-    } else if (onAccount > 0.001) {
+    } else if (onAccount > 0.001 && resolvedPaymentMethod !== 'uncollected') {
       const catalog = normalizePaymentMethodsCatalog({
         paymentMethodsCatalog: settingsDoc?.paymentMethodsCatalog,
         paymentAppFeePercents: settingsDoc?.paymentAppFeePercents,
@@ -1389,11 +1405,6 @@ export const createOrder = async (req, res) => {
       const sellerUser = await q(User.findById(userId).select('name')).lean();
       resolvedSellerName = String(sellerUser?.name || '').trim();
     }
-
-    const isDelivery = Boolean(isDeliveryRaw);
-    const deliveryPersonName = isDelivery
-      ? String(deliveryPersonNameRaw || '').trim()
-      : '';
 
     // Inherit client collector onto installment invoices (can be reassigned later per invoice).
     let inheritedCollectorId = null;

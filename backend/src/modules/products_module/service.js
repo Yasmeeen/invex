@@ -1519,25 +1519,64 @@ export const getProducts = async (req, res) => {
       },
       { cutFromSourceEnabled }
     );
-    const sortSpec =
-      String(sort || '') === 'priceUpdatedAt' ? { priceUpdatedAt: -1, _id: -1 } : undefined;
+    const sortByPriceUpdated = String(sort || '') === 'priceUpdatedAt';
+    /** Fridge / carcass sources (ثلاجة / *_fridge) first, then Arabic name. */
+    const fridgeFirstPipeline = [
+      { $match: query },
+      {
+        $addFields: {
+          _sortFridge: {
+            $cond: [
+              {
+                $or: [
+                  {
+                    $regexMatch: {
+                      input: { $ifNull: ['$catalogKey', ''] },
+                      regex: '_fridge$',
+                      options: 'i',
+                    },
+                  },
+                  {
+                    $regexMatch: {
+                      input: { $ifNull: ['$name', ''] },
+                      regex: 'ثلاجة',
+                    },
+                  },
+                ],
+              },
+              0,
+              1,
+            ],
+          },
+        },
+      },
+      {
+        $sort: sortByPriceUpdated
+          ? { priceUpdatedAt: -1, _id: -1 }
+          : { _sortFridge: 1, name: 1, _id: 1 },
+      },
+      { $skip: skip },
+      { $limit: Number(limit) },
+      { $project: { ecommerceDescription: 0, _sortFridge: 0 } },
+    ];
 
-    const findQ = Product.find(query)
-        .select('-ecommerceDescription')
-        .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
-        .populate('branch', 'name')
-        .populate('sourceProductId', 'name code stock');
-    if (sortSpec) {
-      findQ.sort(sortSpec);
-    }
-
-    const [products, total, lastPriceRow] = await Promise.all([
-      findQ.skip(skip).limit(Number(limit)).lean(),
+    const [productsRaw, total, lastPriceRow] = await Promise.all([
+      Product.aggregate(fridgeFirstPipeline),
       Product.countDocuments(query),
       Product.findOne(lastPriceQuery)
         .sort({ priceUpdatedAt: -1 })
         .select('priceUpdatedAt')
         .lean(),
+    ]);
+
+    const products = await Product.populate(productsRaw, [
+      {
+        path: 'category',
+        select:
+          'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit',
+      },
+      { path: 'branch', select: 'name' },
+      { path: 'sourceProductId', select: 'name code stock' },
     ]);
 
     if (isCutFromSourceEnabled(settingsDoc)) {

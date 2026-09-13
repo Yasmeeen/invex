@@ -2851,6 +2851,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    if (this.isDeliveryOrder) {
+      this.checkoutDeliveryWithoutPayment();
+      return;
+    }
+
     if (!this.isClientInfoOpen) {
       this.performCheckout(this.buildDefaultCashPayment());
       return;
@@ -2879,6 +2884,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   /** After trade-in intake: collect due payment and/or record store payout treasury. */
   private continueExchangeCheckout(): void {
+    if (this.isDeliveryOrder) {
+      this.checkoutDeliveryWithoutPayment();
+      return;
+    }
+
     if (!this.isClientInfoOpen) {
       if (!this.isCheckoutFullyPrepaid()) {
         this.openPaymentSplitsDialog(true);
@@ -2907,6 +2917,37 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.openPaymentSplitsDialog(true);
+  }
+
+  /**
+   * Delivery sale: skip payment methods — invoice stays uncollected until
+   * «تسجيل التحصيل» on the invoices list (same as online orders).
+   */
+  private checkoutDeliveryWithoutPayment(): void {
+    if (this.isClientInfoOpen) {
+      this.clientForm.markAllAsTouched();
+      if (!this.clientForm.valid) {
+        this.translate.get('tr_invalid_cashier_client').subscribe((msg) =>
+          this.appNotificationService.push(msg, 'error')
+        );
+        return;
+      }
+    }
+
+    if (this.branchDeliveryStaff.length && !this.selectedDeliveryPersonName) {
+      this.appNotificationService.push(
+        this.translate.instant('tr_cashier_delivery_person_required'),
+        'error'
+      );
+      return;
+    }
+
+    if (this.isCheckoutFullyPrepaid()) {
+      this.performCheckout(this.buildDefaultCashPayment());
+      return;
+    }
+
+    this.performCheckout(this.buildDeferredDeliveryPayment());
   }
 
   private openExchangeSettlementTreasuryDialog(
@@ -2960,6 +3001,15 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const total = this.effectiveCheckoutTotal();
     return buildPaymentSplitsResult(
       [{ method: 'cash', amount: total }],
+      [],
+      this.storeSettings.snapshot.paymentAppFeePercents
+    );
+  }
+
+  /** Delivery checkout: no payment at register — collect later from invoices. */
+  private buildDeferredDeliveryPayment(): PaymentSplitsResult {
+    return buildPaymentSplitsResult(
+      [],
       [],
       this.storeSettings.snapshot.paymentAppFeePercents
     );
@@ -3052,6 +3102,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       orderData.isDelivery = true;
       if (this.selectedDeliveryPersonName) {
         orderData.deliveryPersonName = this.selectedDeliveryPersonName;
+      }
+      // Unpaid until collection (like online COD invoices)
+      if (!paymentSplits.length) {
+        orderData.paymentMethod = 'uncollected';
       }
     }
 

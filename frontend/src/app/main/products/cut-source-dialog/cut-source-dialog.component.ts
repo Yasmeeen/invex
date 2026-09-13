@@ -4,6 +4,7 @@ import { Product } from '@core/models/products.model';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { ProductsSerivce } from '@shared/services/products.service';
+import { compareFridgeFirst } from '@shared/utils/fridge-source-sort.util';
 
 export interface CutSourceDialogData {
   product: Product;
@@ -89,9 +90,7 @@ export class CutSourceDialogComponent implements OnInit {
       next: (res: { products?: Product[] }) => {
         const rows = (res?.products || [])
           .filter((p) => this.isCandidate(p))
-          .sort((a, b) =>
-            String(a?.name || '').localeCompare(String(b?.name || ''), 'ar')
-          );
+          .sort(compareFridgeFirst);
         this.candidates = this.ensureSelectedInList(rows);
         this.loading = false;
       },

@@ -9,22 +9,33 @@ export function isPayLaterMethod(method: string | null | undefined): boolean {
   return m === 'credit' || m === 'installment';
 }
 
-/** Online/COD invoice created before the delivery payment is collected. */
+/**
+ * Invoice created before payment is collected (online COD, or cashier delivery).
+ * Shown with «تسجيل التحصيل» until fully paid.
+ */
 export function isDeferredCollectionOrder(
   order:
     | {
         source?: string | null;
         ecommerceOrderId?: string | null;
         paymentStatus?: string | null;
+        paymentMethod?: string | null;
+        isDelivery?: boolean | null;
       }
     | null
     | undefined
 ): boolean {
   if (!order) return false;
+  if (order.paymentStatus === 'paid') return false;
+  const method = String(order.paymentMethod || '')
+    .trim()
+    .toLowerCase();
+  if (method === 'uncollected') return true;
   const isOnline =
     String(order.source || '').trim().toLowerCase() === 'ecommerce' ||
     !!String(order.ecommerceOrderId || '').trim();
-  return isOnline && order.paymentStatus !== 'paid';
+  if (isOnline) return true;
+  return Boolean(order.isDelivery) && (order.paymentStatus === 'unpaid' || order.paymentStatus === 'partial');
 }
 
 /** Sale has an installment schedule (even if paymentMethod is mixed historically). */

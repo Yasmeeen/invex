@@ -87,6 +87,9 @@ function defaultLabelForMethod(
   if (m === 'installment') {
     return translate.instant('tr_pay_installment');
   }
+  if (m === 'uncollected') {
+    return translate.instant('tr_invoices_filter_uncollected');
+  }
   return m.replace(/_/g, ' ');
 }
 

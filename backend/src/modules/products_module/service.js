@@ -1520,7 +1520,10 @@ export const getProducts = async (req, res) => {
       { cutFromSourceEnabled }
     );
     const sortByPriceUpdated = String(sort || '') === 'priceUpdatedAt';
-    /** Fridge / carcass sources (ثلاجة / *_fridge) first, then Arabic name. */
+    /**
+     * Within each category: fridge / carcass source first, then Arabic name.
+     * Do NOT lift all fridges above every other product globally.
+     */
     const fridgeFirstPipeline = [
       { $match: query },
       {
@@ -1553,7 +1556,7 @@ export const getProducts = async (req, res) => {
       {
         $sort: sortByPriceUpdated
           ? { priceUpdatedAt: -1, _id: -1 }
-          : { _sortFridge: 1, name: 1, _id: 1 },
+          : { category: 1, _sortFridge: 1, name: 1, _id: 1 },
       },
       { $skip: skip },
       { $limit: Number(limit) },

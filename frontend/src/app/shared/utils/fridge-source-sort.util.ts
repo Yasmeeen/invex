@@ -1,4 +1,4 @@
-/** Sort fridge / carcass source SKUs before other products (Arabic name tie-break). */
+/** Detect fridge / carcass source SKUs (ثلاجة / *_fridge). */
 export function isFridgeSourceProduct(p: {
   name?: string | null;
   catalogKey?: string | null;
@@ -12,6 +12,10 @@ export function isFridgeSourceProduct(p: {
   return code.includes('-fridge') || code.endsWith('_fridge');
 }
 
+/**
+ * Within one category (or a source-picker list): fridge first, then Arabic name.
+ * Product list API sorts by category then this rule — not all fridges globally first.
+ */
 export function compareFridgeFirst(
   a: { name?: string | null; catalogKey?: string | null; code?: string | null },
   b: { name?: string | null; catalogKey?: string | null; code?: string | null }

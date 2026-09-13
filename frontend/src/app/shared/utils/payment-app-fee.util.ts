@@ -39,6 +39,8 @@ export interface PaymentSplitsResult {
   installmentStartDate?: string;
   /** Cashier override for monthly installment amount. */
   installmentMonthlyAmount?: number;
+  /** Collector assigned to the installment invoice at checkout. */
+  collectorId?: string;
 }
 
 export function round2(n: number): number {

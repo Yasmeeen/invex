@@ -123,6 +123,34 @@
               name="installmentStartDate"
             />
           </div>
+          <div class="form-group mb-2">
+            <label>{{ 'tr_collector' | translate }}</label>
+            <div class="input-with-icon">
+              <ng-select
+                class="s-control s-select"
+                [items]="collectors"
+                bindValue="_id"
+                [clearable]="false"
+                [searchable]="true"
+                appendTo="body"
+                placeholder="{{ 'tr_collector' | translate }}"
+                [(ngModel)]="selectedCollectorId"
+                [ngModelOptions]="{ standalone: true }"
+                name="installmentCollectorId"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ collectorOptionLabel($any(item)) }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ collectorOptionLabel($any(item)) }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+            <p class="text-muted size-small mt-1 mb-0">
+              {{ 'tr_assign_collector_workload_hint' | translate }}
+            </p>
+          </div>
           <div
             class="size-small text-muted"
             *ngIf="paymentRemaining() > 0.005"

@@ -264,6 +264,13 @@ async function main() {
 
   const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean();
   let nextOrderNumber = Number(lastOrder?.orderNumber || 0) + 1;
+  const lastInstallmentSale = await Order.findOne({
+    installmentSaleNumber: { $exists: true, $ne: null },
+  })
+    .sort({ installmentSaleNumber: -1 })
+    .lean();
+  let nextInstallmentSaleNumber =
+    Number(lastInstallmentSale?.installmentSaleNumber || 0) + 1;
 
   /**
    * Scenario packs per collector so dashboard performance badges vary:
@@ -451,11 +458,12 @@ async function main() {
         ],
         status: "completed",
         orderNumber: nextOrderNumber++,
+        installmentSaleNumber: nextInstallmentSaleNumber++,
       });
 
       createdOrders += 1;
       console.log(
-        `🧾 #${order.orderNumber} ${client.name} | ${plan.name} | ${scenario.label} | محصّل ${collector.name}`
+        `🧾 تقسيط #${order.installmentSaleNumber} · فاتورة #${order.orderNumber} ${client.name} | ${plan.name} | ${scenario.label} | محصّل ${collector.name}`
       );
     }
   }

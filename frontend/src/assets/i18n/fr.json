@@ -954,6 +954,8 @@
   "tr_suppliers": "Fournisseurs",
   "tr_clients": "Clients",
   "tr_filter_last_installment_amount": "Montant de la mensualité de la dernière facture",
+  "tr_installment_sale_number": "Numéro de vente à tempérament",
+  "tr_search_installment_sale_number": "Rechercher par numéro de vente",
   "tr_balance_filter": "Solde",
   "tr_balance_filter_all": "Tous",
   "tr_balance_filter_debit": "Débiteur",

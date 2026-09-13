@@ -9,6 +9,13 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
+/** Roles allowed as installment collectors (محصّل assignment pickers). */
+export const ASSIGNABLE_COLLECTOR_ROLES = ["Collector", "Co Admin", "Super Admin"];
+
+export function isAssignableCollectorRole(role) {
+  return ASSIGNABLE_COLLECTOR_ROLES.includes(String(role || "").trim());
+}
+
 function installmentRemaining(row) {
   if (!row || row.paid) return 0;
   return Math.max(0, round2((Number(row.amount) || 0) - (Number(row.paidAmount) || 0)));
@@ -201,7 +208,7 @@ export const listCollectionsDue = async (req, res) => {
 
     const orders = await Order.find(orderQuery)
       .select(
-        "orderNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
+        "orderNumber installmentSaleNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
       )
       .populate("branch", "name")
       .populate("collectorId", "name role")
@@ -299,6 +306,7 @@ export const listCollectionsDue = async (req, res) => {
         items.push({
           orderId: order._id,
           orderNumber: order.orderNumber,
+          installmentSaleNumber: order.installmentSaleNumber ?? null,
           clientId: order.clientId,
           clientName: order.clientName || client?.name || "",
           clientPhoneNumber: order.clientPhoneNumber || client?.phoneNumber || "",
@@ -366,7 +374,7 @@ export const listCollectionsDue = async (req, res) => {
 };
 
 /**
- * GET collectors (users with role Collector) for assign pickers.
+ * GET collectors for assign pickers (Collector, Co Admin, Super Admin).
  * Query: withWorkload=1 → include openOrdersCount / openClientsCount
  */
 export const listCollectors = async (req, res) => {
@@ -375,7 +383,7 @@ export const listCollectors = async (req, res) => {
       String(req.query.withWorkload || "").trim() === "1" ||
       String(req.query.withWorkload || "").toLowerCase() === "true";
 
-    const users = await User.find({ role: "Collector" })
+    const users = await User.find({ role: { $in: ASSIGNABLE_COLLECTOR_ROLES } })
       .select("name email role branch")
       .populate("branch", "name")
       .sort({ name: 1 })
@@ -439,8 +447,10 @@ export const assignOrderCollector = async (req, res) => {
       return res.status(400).json({ error: "Invalid collector id" });
     } else {
       const user = await User.findById(String(raw)).select("name role").lean();
-      if (!user || user.role !== "Collector") {
-        return res.status(400).json({ error: "User is not a collector" });
+      if (!user || !isAssignableCollectorRole(user.role)) {
+        return res.status(400).json({
+          error: "User must be a Collector, Co Admin, or Super Admin",
+        });
       }
       order.collectorId = user._id;
     }
@@ -532,7 +542,7 @@ export const getCollectionsDashboard = async (req, res) => {
 
     const orders = await Order.find(orderQuery)
       .select(
-        "orderNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
+        "orderNumber installmentSaleNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
       )
       .populate("branch", "name")
       .populate("collectorId", "name role")
@@ -541,7 +551,9 @@ export const getCollectionsDashboard = async (req, res) => {
     const clientById = await loadClientsForOrders(orders);
     const workload = await computeCollectorWorkload();
 
-    const allCollectors = await User.find({ role: "Collector" })
+    const allCollectors = await User.find({
+      role: { $in: ASSIGNABLE_COLLECTOR_ROLES },
+    })
       .select("name")
       .sort({ name: 1 })
       .lean();
@@ -703,6 +715,7 @@ export const getCollectionsDashboard = async (req, res) => {
             promisesTodayItems.push({
               orderId: order._id,
               orderNumber: order.orderNumber,
+              installmentSaleNumber: order.installmentSaleNumber ?? null,
               clientId: order.clientId,
               clientName: order.clientName || client?.name || "",
               collectorId: colId || null,
@@ -727,6 +740,7 @@ export const getCollectionsDashboard = async (req, res) => {
             overdueItems.push({
               orderId: order._id,
               orderNumber: order.orderNumber,
+              installmentSaleNumber: order.installmentSaleNumber ?? null,
               clientId: order.clientId,
               clientName: order.clientName || client?.name || "",
               clientPhoneNumber: order.clientPhoneNumber || client?.phoneNumber || "",

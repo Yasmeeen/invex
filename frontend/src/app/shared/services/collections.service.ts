@@ -6,6 +6,7 @@ import { COLLECTIONS_URL } from '@core/base/urls';
 export interface CollectionDueItem {
   orderId: string;
   orderNumber?: number;
+  installmentSaleNumber?: number | null;
   clientId?: string;
   clientName?: string;
   clientPhoneNumber?: string;

@@ -201,6 +201,18 @@
   color: #111827;
 }
 
+.installment-order-head__sale-no {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #92400e;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
 .installment-order-head__plan {
   display: inline-flex;
   align-items: center;

@@ -49,6 +49,14 @@ export class Client{
   balanceSide?: 'debit' | 'credit' | 'even' | 'none';
   netBalanceMessage?: { who: 'client' | 'store' | 'even'; amount: number } | null;
   clientPayableDeferred?: number;
+  /** Open installment principal still due across installment sales. */
+  installmentRemainingAmount?: number;
+  totalInstallmentsCount?: number;
+  paidInstallmentsCount?: number;
+  unpaidInstallmentsCount?: number;
+  hasOpenInstallments?: boolean;
+  /** Sequential installment-sale numbers for this client's installment invoices. */
+  installmentSaleNumbers?: number[];
   /** Client originated / ordered via e-commerce storefront. */
   source?: 'store' | 'ecommerce';
   isEcommerceOnline?: boolean;
@@ -67,6 +75,7 @@ export interface ClientSettlementPreview {
 export interface ClientHistoryOrderRow {
   _id?: string;
   orderNumber?: number;
+  installmentSaleNumber?: number;
   totalPrice?: number;
   amountPaid?: number;
   paymentMethod?: string;

@@ -98,6 +98,23 @@
             </div>
           </div>
         </div>
+        <div class="col-md-3">
+          <div class="form-group mb-0">
+            <label>{{ 'tr_installment_sale_number' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <input
+                class="s-control"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="{{ 'tr_search_installment_sale_number' | translate }}"
+                [(ngModel)]="installmentSaleNumberTerm"
+                (keyup)="filterByInstallmentSaleNumber($event)"
+                (change)="filterByInstallmentSaleNumber($event)"
+              />
+            </div>
+          </div>
+        </div>
         <div class="col-md-3 mt-2">
           <div class="form-group mb-0">
             <label>{{ 'tr_balance_filter' | translate }}</label>
@@ -161,6 +178,44 @@
                 >
                   {{ 'tr_client_online_ecommerce' | translate }}
                 </span>
+                <div class="table-installment-hint" *ngIf="clientHasOpenInstallments(client)">
+                  <span class="table-installment-hint__badge">
+                    {{ 'tr_client_has_installments' | translate }}
+                  </span>
+                  <span
+                    class="table-installment-hint__sale-no"
+                    *ngIf="clientInstallmentSaleNumbers(client).length"
+                  >
+                    {{ 'tr_installment_sale_number' | translate }}:
+                    <ng-container *ngFor="let n of clientInstallmentSaleNumbers(client); let last = last">
+                      #{{ n }}<span *ngIf="!last">، </span>
+                    </ng-container>
+                  </span>
+                  <span class="table-installment-hint__meta">
+                    {{ 'tr_remaining' | translate }}:
+                    {{ (client.installmentRemainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                    ·
+                    {{
+                      'tr_installments_progress'
+                        | translate
+                          : {
+                              paid: client.paidInstallmentsCount || 0,
+                              total: client.totalInstallmentsCount || 0
+                            }
+                    }}
+                  </span>
+                </div>
+                <div
+                  class="table-installment-hint"
+                  *ngIf="!clientHasOpenInstallments(client) && clientInstallmentSaleNumbers(client).length"
+                >
+                  <span class="table-installment-hint__sale-no">
+                    {{ 'tr_installment_sale_number' | translate }}:
+                    <ng-container *ngFor="let n of clientInstallmentSaleNumbers(client); let last = last">
+                      #{{ n }}<span *ngIf="!last">، </span>
+                    </ng-container>
+                  </span>
+                </div>
               </td>
               <td>{{ client.address }}</td>
               <td><div *ngFor="let branch of  client.branches ">
@@ -203,10 +258,19 @@
       </div>
 
       <div class="clients-cards" *ngIf="clientsList.length > 0 && viewMode === 'cards'">
-        <div class="client-card" *ngFor="let client of clientsList">
+        <div
+          class="client-card"
+          *ngFor="let client of clientsList"
+          [class.client-card--installment]="clientHasOpenInstallments(client)"
+        >
           <div class="client-card__top">
-            <div class="client-card__icon">
-              <i class="fa fa-user" aria-hidden="true"></i>
+            <div class="client-card__icon" [class.client-card__icon--installment]="clientHasOpenInstallments(client)">
+              <i
+                class="fa"
+                [class.fa-user]="!clientHasOpenInstallments(client)"
+                [class.fa-calendar-check-o]="clientHasOpenInstallments(client)"
+                aria-hidden="true"
+              ></i>
             </div>
             <div class="client-card__title">
               <div class="client-card__name">
@@ -240,6 +304,57 @@
                 </div>
               </div>
             </span>
+          </div>
+
+          <div
+            class="client-card__installment"
+            *ngIf="clientHasOpenInstallments(client) || clientInstallmentSaleNumbers(client).length"
+          >
+            <div class="installment-banner">
+              <span class="installment-banner__badge" *ngIf="clientHasOpenInstallments(client)">
+                <i class="fa fa-money" aria-hidden="true"></i>
+                {{ 'tr_client_has_installments' | translate }}
+              </span>
+              <span
+                class="installment-banner__sale-no"
+                *ngIf="clientInstallmentSaleNumbers(client).length"
+              >
+                <i class="fa fa-hashtag" aria-hidden="true"></i>
+                {{ 'tr_installment_sale_number' | translate }}:
+                <strong *ngFor="let n of clientInstallmentSaleNumbers(client); let last = last">
+                  {{ n }}<span *ngIf="!last">، </span>
+                </strong>
+              </span>
+            </div>
+            <div class="installment-stats" *ngIf="clientHasOpenInstallments(client)">
+              <div class="installment-stat installment-stat--remaining">
+                <div class="installment-stat__label">
+                  {{ 'tr_installments_remaining_amount' | translate }}
+                </div>
+                <div class="installment-stat__value">
+                  {{ (client.installmentRemainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                </div>
+              </div>
+              <div class="installment-stat installment-stat--progress">
+                <div class="installment-stat__label">
+                  {{ 'tr_installments_completed_count' | translate }}
+                </div>
+                <div class="installment-stat__value">
+                  {{
+                    'tr_installments_progress'
+                      | translate
+                        : {
+                            paid: client.paidInstallmentsCount || 0,
+                            total: client.totalInstallmentsCount || 0
+                          }
+                  }}
+                </div>
+                <div class="installment-stat__hint muted">
+                  {{ 'tr_unpaid_installments_count' | translate }}:
+                  {{ client.unpaidInstallmentsCount || 0 }}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="client-card__balances">

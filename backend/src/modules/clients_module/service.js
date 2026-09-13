@@ -168,6 +168,7 @@ export const getClientByPhone = async (req, res) => {
  *  - balanceSide=debit|credit — net مدين (client) or دائن (store owes client)
  *  - lastInstallmentPlanId / lastInstallmentPlanMonths — نظام تقسيط آخر فاتورة
  *  - lastInstallmentAmount — قيمة القسط الشهري لآخر فاتورة
+ *  - installmentSaleNumber — رقم بيع التقسيط المتسلسل
  */
 export const getClients = async (req, res) => {
   try {
@@ -182,6 +183,7 @@ export const getClients = async (req, res) => {
       lastInstallmentPlanId = "",
       lastInstallmentPlanMonths = "",
       lastInstallmentAmount = "",
+      installmentSaleNumber = "",
     } = req.query;
     const limit = Number(limitQ || perPage || 10) || 10;
     const skip = (Number(page) - 1) * limit;
@@ -207,6 +209,11 @@ export const getClients = async (req, res) => {
     const amountFilter = hasAmountFilter ? round2(amountParsed) : null;
     const needsLastInvoiceFilter =
       !!planIdFilter || hasPlanMonthsFilter || hasAmountFilter;
+    const installmentSaleNumberParsed = Math.floor(Number(installmentSaleNumber));
+    const hasInstallmentSaleNumberFilter =
+      String(installmentSaleNumber || "").trim() !== "" &&
+      Number.isFinite(installmentSaleNumberParsed) &&
+      installmentSaleNumberParsed > 0;
 
     const matchStage = {};
     if (nameFilter) {
@@ -224,6 +231,15 @@ export const getClients = async (req, res) => {
       } else {
         matchStage.$or = phoneOr;
       }
+    }
+    if (hasInstallmentSaleNumberFilter) {
+      const clientIdsFromSale = await Order.distinct("clientId", {
+        installmentSaleNumber: installmentSaleNumberParsed,
+        paymentMethod: "installment",
+        status: { $ne: "restored" },
+        clientId: { $exists: true, $ne: null },
+      });
+      matchStage._id = { $in: clientIdsFromSale };
     }
     if (branch_id && mongoose.Types.ObjectId.isValid(String(branch_id))) {
       const branchOid = new mongoose.Types.ObjectId(String(branch_id));
@@ -260,11 +276,14 @@ export const getClients = async (req, res) => {
               paymentMethod: 1,
               paymentStatus: 1,
               amountPaid: 1,
+              installmentSaleNumber: 1,
               installmentPlanId: 1,
               installmentPlanSnapshot: 1,
               installmentPrincipal: 1,
               installmentInterestAmount: 1,
               "installments.amount": 1,
+              "installments.paid": 1,
+              "installments.paidAmount": 1,
             },
           },
         ],
@@ -356,11 +375,161 @@ export const getClients = async (req, res) => {
           },
           prepaidBalance: { $ifNull: ["$creditBalance", 0] },
           openingDebit: { $ifNull: ["$openingDebitBalance", 0] },
+          _installmentOrders: {
+            $filter: {
+              input: "$orders",
+              as: "o",
+              cond: {
+                $and: [
+                  {
+                    $eq: [
+                      { $toLower: { $ifNull: ["$$o.paymentMethod", ""] } },
+                      "installment",
+                    ],
+                  },
+                  { $ne: ["$$o.status", "restored"] },
+                  {
+                    $in: [
+                      { $ifNull: ["$$o.partyType", "client"] },
+                      ["client"],
+                    ],
+                  },
+                ],
+              },
+            },
+          },
         },
       },
 
       {
         $addFields: {
+          installmentRemainingAmount: {
+            $round: [
+              {
+                $reduce: {
+                  input: "$_installmentOrders",
+                  initialValue: 0,
+                  in: {
+                    $add: [
+                      "$$value",
+                      {
+                        $reduce: {
+                          input: { $ifNull: ["$$this.installments", []] },
+                          initialValue: 0,
+                          in: {
+                            $add: [
+                              "$$value",
+                              {
+                                $cond: [
+                                  { $eq: ["$$this.paid", true] },
+                                  0,
+                                  {
+                                    $max: [
+                                      0,
+                                      {
+                                        $subtract: [
+                                          { $ifNull: ["$$this.amount", 0] },
+                                          {
+                                            $ifNull: ["$$this.paidAmount", 0],
+                                          },
+                                        ],
+                                      },
+                                    ],
+                                  },
+                                ],
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+              2,
+            ],
+          },
+          totalInstallmentsCount: {
+            $reduce: {
+              input: "$_installmentOrders",
+              initialValue: 0,
+              in: {
+                $add: [
+                  "$$value",
+                  { $size: { $ifNull: ["$$this.installments", []] } },
+                ],
+              },
+            },
+          },
+          paidInstallmentsCount: {
+            $reduce: {
+              input: "$_installmentOrders",
+              initialValue: 0,
+              in: {
+                $add: [
+                  "$$value",
+                  {
+                    $size: {
+                      $filter: {
+                        input: { $ifNull: ["$$this.installments", []] },
+                        as: "inst",
+                        cond: {
+                          $or: [
+                            { $eq: ["$$inst.paid", true] },
+                            {
+                              $lte: [
+                                {
+                                  $subtract: [
+                                    { $ifNull: ["$$inst.amount", 0] },
+                                    { $ifNull: ["$$inst.paidAmount", 0] },
+                                  ],
+                                },
+                                0.001,
+                              ],
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+
+      {
+        $addFields: {
+          unpaidInstallmentsCount: {
+            $max: [
+              0,
+              {
+                $subtract: [
+                  "$totalInstallmentsCount",
+                  "$paidInstallmentsCount",
+                ],
+              },
+            ],
+          },
+          hasOpenInstallments: {
+            $gt: ["$installmentRemainingAmount", 0.001],
+          },
+          installmentSaleNumbers: {
+            $filter: {
+              input: {
+                $map: {
+                  input: "$_installmentOrders",
+                  as: "o",
+                  in: "$$o.installmentSaleNumber",
+                },
+              },
+              as: "n",
+              cond: {
+                $and: [{ $ne: ["$$n", null] }, { $gt: ["$$n", 0] }],
+              },
+            },
+          },
           _lastEligibleOrderAt: { $max: "$_eligibleClientOrders.createdAt" },
         },
       },
@@ -517,6 +686,12 @@ export const getClients = async (req, res) => {
         lastOrderDate: 1,
         clientOwesUs: 1,
         prepaidBalance: 1,
+        installmentRemainingAmount: 1,
+        totalInstallmentsCount: 1,
+        paidInstallmentsCount: 1,
+        unpaidInstallmentsCount: 1,
+        hasOpenInstallments: 1,
+        installmentSaleNumbers: 1,
       },
     });
 
@@ -854,7 +1029,7 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments"
+        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments"
       )
       .populate("branch", "name")
       .sort({ createdAt: -1 })

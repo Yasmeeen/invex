@@ -291,7 +291,15 @@
       <div class="mb-4 installment-order-block" *ngFor="let o of installmentOrdersRows">
         <div class="installment-order-head">
           <div class="installment-order-head__meta">
-            <strong class="installment-order-head__invoice">#{{ o.orderNumber }}</strong>
+            <strong
+              class="installment-order-head__sale-no"
+              *ngIf="o.installmentSaleNumber != null"
+            >
+              {{ 'tr_installment_sale_number' | translate }} #{{ o.installmentSaleNumber }}
+            </strong>
+            <strong class="installment-order-head__invoice">
+              {{ 'tr_invoice_number' | translate }} #{{ o.orderNumber }}
+            </strong>
             <span class="installment-order-head__plan" *ngIf="installmentPlanName(o)">
               {{ installmentPlanName(o) }}
             </span>

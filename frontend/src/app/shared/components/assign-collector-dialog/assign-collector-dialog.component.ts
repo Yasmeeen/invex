@@ -32,9 +32,11 @@ export class AssignCollectorDialogComponent {
 
   collectorLabel(c: CollectorUser): string {
     const name = c?.name || '—';
+    const role = String(c?.role || '').trim();
+    const base = role ? `${name} — ${role}` : name;
     const n = Number(c?.openOrdersCount);
-    if (!Number.isFinite(n)) return name;
-    return `${name} (${n})`;
+    if (!Number.isFinite(n)) return base;
+    return `${base} (${n})`;
   }
 
   cancel(): void {

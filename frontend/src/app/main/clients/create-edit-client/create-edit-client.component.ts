@@ -56,13 +56,17 @@ export class CreateEditClientComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.collections.listCollectors({ withWorkload: true }).subscribe({
         next: (res) => {
-          this.collectors = (res?.collectors || []).map((c) => ({
-            ...c,
-            name:
-              Number.isFinite(Number(c.openOrdersCount))
-                ? `${c.name || '—'} (${c.openOrdersCount})`
-                : c.name,
-          }));
+          this.collectors = (res?.collectors || []).map((c) => {
+            const name = c.name || '—';
+            const role = String(c.role || '').trim();
+            const base = role ? `${name} — ${role}` : name;
+            return {
+              ...c,
+              name: Number.isFinite(Number(c.openOrdersCount))
+                ? `${base} (${c.openOrdersCount})`
+                : base,
+            };
+          });
         },
       })
     );

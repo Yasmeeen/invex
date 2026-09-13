@@ -438,7 +438,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
+          'orderNumber installmentSaleNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
         .sort({ createdAt: -1 })
@@ -515,6 +515,7 @@ export const createOrder = async (req, res) => {
     installmentPlanId: installmentPlanIdRaw,
     installmentStartDate: installmentStartDateRaw,
     installmentMonthlyAmount: installmentMonthlyAmountRaw,
+    collectorId: collectorIdRaw,
   } = req.body;
 
   const partyType =
@@ -1262,13 +1263,48 @@ export const createOrder = async (req, res) => {
       ? String(deliveryPersonNameRaw || '').trim()
       : '';
 
-    // Inherit client collector onto installment invoices (can be reassigned later per invoice).
+    // Explicit checkout collector, else inherit from client (can be reassigned later per invoice).
     let inheritedCollectorId = null;
-    if (installmentFields && finalClientId) {
-      const clientForCollector = await q(Client.findById(finalClientId).select('collectorId')).lean();
-      if (clientForCollector?.collectorId) {
-        inheritedCollectorId = clientForCollector.collectorId;
+    if (installmentFields) {
+      const explicitCollectorId =
+        collectorIdRaw && mongoose.Types.ObjectId.isValid(String(collectorIdRaw))
+          ? String(collectorIdRaw)
+          : null;
+      if (explicitCollectorId) {
+        const collectorUser = await q(
+          User.findById(explicitCollectorId).select('name role')
+        ).lean();
+        const role = String(collectorUser?.role || '').trim();
+        if (
+          collectorUser &&
+          (role === 'Collector' || role === 'Co Admin' || role === 'Super Admin')
+        ) {
+          inheritedCollectorId = collectorUser._id;
+        } else {
+          await rollbackOrderSession(session);
+          return res.status(400).json({
+            error: 'Collector must be a Collector, Co Admin, or Super Admin',
+          });
+        }
+      } else if (finalClientId) {
+        const clientForCollector = await q(
+          Client.findById(finalClientId).select('collectorId')
+        ).lean();
+        if (clientForCollector?.collectorId) {
+          inheritedCollectorId = clientForCollector.collectorId;
+        }
       }
+    }
+
+    // Sequential number for installment sales only (separate from orderNumber).
+    if (installmentFields) {
+      const lastInstallmentSale = await q(
+        Order.findOne({ installmentSaleNumber: { $exists: true, $ne: null } })
+          .sort({ installmentSaleNumber: -1 })
+          .select('installmentSaleNumber')
+      ).lean();
+      installmentFields.installmentSaleNumber =
+        Number(lastInstallmentSale?.installmentSaleNumber || 0) + 1;
     }
 
     // ======================

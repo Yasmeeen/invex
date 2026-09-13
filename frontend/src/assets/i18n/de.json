@@ -954,6 +954,8 @@
   "tr_suppliers": "Lieferanten",
   "tr_clients": "Kunden",
   "tr_filter_last_installment_amount": "Ratenbetrag der letzten Rechnung",
+  "tr_installment_sale_number": "Ratenverkaufsnummer",
+  "tr_search_installment_sale_number": "Nach Verkaufsnummer suchen",
   "tr_balance_filter": "Saldo",
   "tr_balance_filter_all": "Alle",
   "tr_balance_filter_debit": "Schuldner",

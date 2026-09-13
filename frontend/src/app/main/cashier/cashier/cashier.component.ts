@@ -344,6 +344,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
               forMethod: f.forMethod,
               paidVia: f.paidVia === f.forMethod ? 'same' : f.paidVia,
             })),
+            collectorId: this.confirmedPayment!.collectorId || undefined,
           }
         : undefined,
     };
@@ -2694,6 +2695,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       orderData.installmentStartDate = payment.installmentStartDate || undefined;
       if (payment.installmentMonthlyAmount && payment.installmentMonthlyAmount > 0) {
         orderData.installmentMonthlyAmount = payment.installmentMonthlyAmount;
+      }
+      if (payment.collectorId) {
+        orderData.collectorId = payment.collectorId;
       }
     }
 

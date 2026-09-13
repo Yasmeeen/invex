@@ -31,6 +31,7 @@ export class ClientListComponent implements OnInit {
   nameSearchTerm: string = '';
   phoneSearchTerm: string = '';
   lastInstallmentAmountTerm: string = '';
+  installmentSaleNumberTerm: string = '';
   selectedInstallmentPlanId: string | null = null;
   installmentPlans: InstallmentPlan[] = [];
   balanceSideFilter: 'all' | 'debit' | 'credit' = 'all';
@@ -46,6 +47,7 @@ export class ClientListComponent implements OnInit {
   private nameSearchTimeout: any;
   private phoneSearchTimeout: any;
   private amountTimeout: any;
+  private installmentSaleNumberTimeout: any;
   private subscriptions: Subscription[] = [];
 
   constructor(
@@ -188,6 +190,41 @@ export class ClientListComponent implements OnInit {
       this.params.page = 1;
       this.getClients();
     }, 500);
+  }
+
+  filterByInstallmentSaleNumber(event: any): void {
+    clearTimeout(this.installmentSaleNumberTimeout);
+    this.installmentSaleNumberTimeout = setTimeout(() => {
+      const raw = (event?.target?.value ?? this.installmentSaleNumberTerm ?? '')
+        .toString()
+        .trim();
+      if (raw === '') {
+        delete this.params.installmentSaleNumber;
+      } else {
+        const n = Math.floor(Number(raw));
+        if (!Number.isFinite(n) || n <= 0) {
+          return;
+        }
+        this.params.installmentSaleNumber = n;
+      }
+      this.params.page = 1;
+      this.getClients();
+    }, 500);
+  }
+
+  clientInstallmentSaleNumbers(client: Client): number[] {
+    const nums = client?.installmentSaleNumbers;
+    if (!Array.isArray(nums) || !nums.length) return [];
+    return nums
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+  }
+
+  clientHasOpenInstallments(client: Client): boolean {
+    if (!client) return false;
+    if (client.hasOpenInstallments === true) return true;
+    return (Number(client.installmentRemainingAmount) || 0) > 0.001;
   }
 
   clientNetBalanceText(client: Client): string {

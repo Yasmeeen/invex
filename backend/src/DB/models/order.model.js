@@ -331,6 +331,18 @@ const orderSchema = new mongoose.Schema(
 
     orderNumber: { type: Number, unique: true, required: true },
 
+    /**
+     * Sequential counter for installment sales only (1, 2, 3…).
+     * Independent of orderNumber so collectors can look up a تقسيط contract easily.
+     */
+    installmentSaleNumber: {
+      type: Number,
+      required: false,
+      sparse: true,
+      unique: true,
+      min: 1,
+    },
+
     /** pos = cashier; ecommerce = confirmed online store order (invoice source). */
     source: {
       type: String,

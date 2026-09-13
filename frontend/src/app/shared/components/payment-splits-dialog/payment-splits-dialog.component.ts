@@ -27,6 +27,10 @@ import {
   InstallmentPlan,
   InstallmentPlansService,
 } from '@shared/services/installment-plans.service';
+import {
+  CollectionsService,
+  CollectorUser,
+} from '@shared/services/collections.service';
 import { Subscription } from 'rxjs';
 
 export type PaymentSplitsDialogMode = 'checkout' | 'installment' | 'deposit';
@@ -35,6 +39,7 @@ export interface PaymentSplitsDialogInitialState {
   selectedPayMethods?: string[];
   payAmounts?: Record<string, number>;
   feeSources?: PaymentFeeSource[];
+  collectorId?: string;
 }
 
 export interface PaymentSplitsDialogData {
@@ -71,11 +76,15 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   installmentMonthlyOverride: number | null = null;
   private installmentMonthlyManual = false;
 
+  collectors: CollectorUser[] = [];
+  selectedCollectorId = '';
+
   readonly invoiceNetTotal: number;
   readonly mode: PaymentSplitsDialogMode;
 
   private settingsSub?: Subscription;
   private plansSub?: Subscription;
+  private collectorsSub?: Subscription;
 
   constructor(
     private dialogRef: MatDialogRef<PaymentSplitsDialogComponent, PaymentSplitsResult | null>,
@@ -83,7 +92,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     private storeSettings: StoreSettingsService,
     private translate: TranslateService,
     private notify: AppNotificationService,
-    private installmentPlansService: InstallmentPlansService
+    private installmentPlansService: InstallmentPlansService,
+    private collectionsService: CollectionsService
   ) {
     this.invoiceNetTotal = round2(Number(data.invoiceNetTotal) || 0);
     this.mode =
@@ -98,6 +108,9 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       this.selectedPayMethods = [...init.selectedPayMethods];
       this.payAmounts = { ...(init.payAmounts || {}) };
       this.feeSources = init.feeSources?.length ? [...init.feeSources] : [];
+    }
+    if (init?.collectorId) {
+      this.selectedCollectorId = String(init.collectorId);
     }
   }
 
@@ -120,12 +133,38 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
           this.installmentPlans = [];
         },
       });
+      this.collectorsSub = this.collectionsService
+        .listCollectors({ withWorkload: true })
+        .subscribe({
+          next: (res) => {
+            this.collectors = res?.collectors || [];
+          },
+          error: () => {
+            this.collectors = [];
+          },
+        });
     }
   }
 
   ngOnDestroy(): void {
     this.settingsSub?.unsubscribe();
     this.plansSub?.unsubscribe();
+    this.collectorsSub?.unsubscribe();
+  }
+
+  collectorOptionLabel(c: CollectorUser): string {
+    const name = String(c?.name || '').trim() || '—';
+    const role = String(c?.role || '').trim();
+    const workload = Number(c?.openOrdersCount);
+    const parts = [name];
+    if (role) {
+      parts.push(role);
+    }
+    let label = parts.join(' — ');
+    if (Number.isFinite(workload)) {
+      label = `${label} (${workload})`;
+    }
+    return label;
   }
 
   private defaultInstallmentStartDate(): string {
@@ -713,6 +752,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
         this.notify.push(this.translate.instant('tr_installment_monthly_amount_required'), 'error');
         return;
       }
+      if (!String(this.selectedCollectorId || '').trim()) {
+        this.notify.push(this.translate.instant('tr_collector_required'), 'error');
+        return;
+      }
     }
 
     const feeSources = this.feeSources.length
@@ -747,6 +790,10 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       const monthly = this.installmentMonthlyAmount();
       if (monthly > 0) {
         result.installmentMonthlyAmount = monthly;
+      }
+      const collectorId = String(this.selectedCollectorId || '').trim();
+      if (collectorId) {
+        result.collectorId = collectorId;
       }
     }
 

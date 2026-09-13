@@ -207,6 +207,9 @@
               </td>
               <td>
                 <button type="button" class="cdash-invoice" (click)="openPay(item)">
+                  <span *ngIf="item.installmentSaleNumber != null">
+                    {{ 'tr_installment_sale_number' | translate }} #{{ item.installmentSaleNumber }} ·
+                  </span>
                   #{{ item.orderNumber }}
                 </button>
               </td>

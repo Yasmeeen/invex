@@ -118,25 +118,31 @@
     }
   }
   .products-table-casheier{
+    table-layout: fixed;
+    width: 100%;
+
     td{
       font-size: 14px;
+    }
+
+    /* Product gets most of the row so Arabic names stay horizontal */
+    th:nth-child(1),
+    td:nth-child(1){
+      width: 38%;
+      text-align: start;
+      vertical-align: middle;
     }
 
     /* Qty: compact — weight lines use an inline unit suffix inside the same control */
     th:nth-child(2),
     td:nth-child(2){
-      width: 6.5rem;
-      min-width: 6.5rem;
-      max-width: 7rem;
+      width: 16%;
       white-space: nowrap;
       padding-left: 0.25rem;
       padding-right: 0.25rem;
     }
 
     td.order-line-qty--farm {
-      width: 7.25rem;
-      min-width: 7.25rem;
-      max-width: 8rem;
       white-space: normal;
       vertical-align: middle;
     }
@@ -147,10 +153,21 @@
       padding-bottom: 0.65rem;
     }
 
+    th:nth-child(3),
+    td:nth-child(3){
+      width: 20%;
+      white-space: nowrap;
+    }
+
     th:nth-child(4),
     td:nth-child(4){
-      width: 7.5rem;
-      min-width: 7.5rem;
+      width: 18%;
+      white-space: nowrap;
+    }
+
+    th:nth-child(5),
+    td:nth-child(5){
+      width: 8%;
       white-space: nowrap;
     }
   }
@@ -861,10 +878,21 @@
       display: flex;
       gap: 0.5rem;
       flex-wrap: wrap;
+      align-items: stretch;
 
       .cashier-desk-actions__btn {
-        flex: 1 1 140px;
-        min-width: 0;
+        flex: 1 1 10rem;
+        min-width: 9.5rem;
+        height: auto;
+        min-height: 2.375rem;
+        white-space: normal;
+        line-height: 1.35;
+        text-align: center;
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: none;
+        padding-top: 0.45rem;
+        padding-bottom: 0.45rem;
       }
     }
 
@@ -907,11 +935,13 @@
       }
 
       .order-line-product {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        width: 100%;
+        min-width: 0;
       }
 
       .order-line-product--farm {
@@ -920,34 +950,41 @@
         align-items: stretch;
         gap: 0.35rem;
         width: 100%;
-        min-width: 10rem;
+        min-width: 0;
       }
 
       .order-line-product__main {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 0.5rem;
         justify-content: flex-start;
+        width: 100%;
         min-width: 0;
       }
 
       tr.order-line--farm .order-line-product__text {
         align-items: flex-start;
         text-align: start;
-        min-width: 0;
       }
 
       .order-line-product__text {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        text-align: center;
+        align-items: flex-start;
+        text-align: start;
         gap: 2px;
+        flex: 1 1 auto;
         min-width: 0;
       }
 
       .order-line-product__name {
+        display: block;
         font-weight: 600;
+        line-height: 1.25;
+        white-space: normal;
+        overflow-wrap: break-word;
+        word-break: normal;
+        max-width: 100%;
 
         &--clickable {
           cursor: pointer;
@@ -966,8 +1003,10 @@
         font-size: 0.72rem;
         color: #5d6d7e;
         font-weight: 600;
-        word-break: break-all;
+        overflow-wrap: break-word;
+        word-break: normal;
         line-height: 1.2;
+        max-width: 100%;
       }
 
       .order-line-product__name--reserved {
@@ -1019,7 +1058,7 @@
       }
 
       .order-line-price-cell {
-        min-width: 7rem;
+        min-width: 0;
       }
 
       .order-line-price-btn {

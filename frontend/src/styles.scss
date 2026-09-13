@@ -251,6 +251,21 @@ body[dir=rtl] {
   z-index: 10050 !important;
 }
 
+/* Cut-source dialog: white panel + ng-select above overlay */
+.cdk-overlay-pane.cut-source-dialog-panel {
+  max-width: 96vw !important;
+}
+
+.cut-source-dialog-panel .mat-dialog-container,
+.cut-source-dialog-panel .mat-mdc-dialog-container {
+  overflow: visible !important;
+  padding: 0;
+}
+
+.cut-source-dialog-panel .ng-dropdown-panel {
+  z-index: 10050 !important;
+}
+
 .cdk-overlay-backdrop.drawer-close-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }

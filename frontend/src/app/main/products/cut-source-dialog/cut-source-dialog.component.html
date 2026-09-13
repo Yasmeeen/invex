@@ -1,0 +1,59 @@
+<div class="cut-source-dialog" id="cut-source-dialog-root">
+  <h2 mat-dialog-title class="cut-source-dialog__title">
+    {{ 'tr_cut_source_dialog_title' | translate }}
+  </h2>
+
+  <div mat-dialog-content class="cut-source-dialog__body">
+    <div class="cut-source-dialog__product">
+      <div class="cut-source-dialog__product-name">{{ product?.name }}</div>
+      <div class="cut-source-dialog__product-meta text-muted">
+        <span *ngIf="product?.code">{{ product.code }}</span>
+        <span *ngIf="categoryName"> · {{ categoryName }}</span>
+      </div>
+    </div>
+
+    <p class="text-muted size-small mb-3">{{ 'tr_cut_source_dialog_hint' | translate }}</p>
+
+    <div class="form-group">
+      <label>{{ 'tr_cut_source_product' | translate }}</label>
+      <div class="input-with-icon bg-white">
+        <ng-select
+          class="s-control s-select"
+          [items]="candidates"
+          bindLabel="name"
+          bindValue="_id"
+          [(ngModel)]="selectedSourceProductId"
+          [loading]="loading"
+          appendTo="#cut-source-dialog-root"
+          [clearable]="true"
+          [searchable]="true"
+          [placeholder]="'tr_cut_source_none' | translate"
+          notFoundText="{{ 'tr_no_items_found' | translate }}"
+        >
+          <ng-template ng-option-tmp let-item="item">
+            <div class="weight-medium">{{ item.name }}</div>
+            <div class="size-small text-muted">
+              <span *ngIf="item.code">{{ item.code }} · </span>{{ stockLabel(item) }}
+            </div>
+          </ng-template>
+        </ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+      <p class="text-muted size-small m-0 mt-1" *ngIf="!loading && !candidates.length">
+        {{ 'tr_cut_source_no_candidates' | translate }}
+      </p>
+      <p class="text-muted size-small m-0 mt-1" *ngIf="selectedSourceProductId">
+        {{ 'tr_cut_source_stock_hint' | translate }}
+      </p>
+    </div>
+  </div>
+
+  <div mat-dialog-actions class="cut-source-dialog__actions" align="end">
+    <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving || loading">
+      {{ saving ? ('tr_loading' | translate) : ('tr_save' | translate) }}
+    </button>
+  </div>
+</div>

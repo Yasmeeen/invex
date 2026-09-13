@@ -2524,6 +2524,101 @@ export const updateProduct = async (req, res) => {
   }
 };
 
+/**
+ * Fast cut-from-source link update (sourceProductId only).
+ * Used from the products list card/menu so users need not open full edit.
+ */
+export const updateProductSource = async (req, res) => {
+  try {
+    const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
+    if (!isCutFromSourceEnabled(settingsDoc)) {
+      return res.status(400).json({ error: 'Cut-from-source is not enabled' });
+    }
+
+    const existing = await Product.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const productType = normalizeProductType(existing.productType);
+    if (productType === 'service' || productType === 'farm') {
+      return res.status(400).json({ error: 'Cannot set cut source on this product type' });
+    }
+
+    const isWarehouse = !!existing.inWarehouse;
+    const sourceFields = await resolveCutSourceFields(req.body, {
+      productId: req.params.id,
+      branchOid: isWarehouse ? null : existing.branch,
+      isWarehouse,
+      enabled: true,
+    });
+    if (sourceFields.skip) {
+      return res.status(400).json({
+        error: 'sourceProductId is required (send null to clear)',
+      });
+    }
+    if (sourceFields.error) {
+      return res.status(400).json({ error: sourceFields.error });
+    }
+
+    if (sourceFields.sourceProductId && existing.category) {
+      const src = await Product.findById(sourceFields.sourceProductId)
+        .select('category')
+        .lean();
+      if (src?.category && String(src.category) !== String(existing.category)) {
+        return res.status(400).json({ error: 'Source product must be in the same category' });
+      }
+    }
+
+    const setDoc = {
+      sourceProductId: sourceFields.sourceProductId,
+    };
+    if (sourceFields.sourceProductId) {
+      setDoc.stock = 0;
+    }
+
+    const before = {
+      code: existing.code,
+      name: existing.name,
+      sourceProductId: existing.sourceProductId || null,
+      stock: existing.stock,
+    };
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { $set: setDoc },
+      { new: true, runValidators: true }
+    )
+      .populate('category', 'name code')
+      .populate('branch', 'name')
+      .populate('sourceProductId', 'name code stock');
+
+    await auditLog(req, {
+      action: 'update',
+      module: 'products',
+      entityType: 'Product',
+      entityId: product?._id,
+      message: `Product cut source updated ${product?.code || ''}`.trim(),
+      before,
+      after: {
+        code: product?.code,
+        name: product?.name,
+        sourceProductId: product?.sourceProductId || null,
+        stock: product?.stock,
+      },
+    });
+
+    notifyProductChanged(product?._id);
+    res.json({ message: '✅ Product source updated', product });
+  } catch (error) {
+    console.error('❌ Error updating product source:', error.message);
+    if (error.name === 'ValidationError' || error.name === 'CastError') {
+      return res.status(400).json({ error: error.message || 'Invalid product data' });
+    }
+    res.status(500).json({ error: 'Failed to update product source' });
+  }
+};
+
 /** Fast selling-price update for the price list screen (does not change netPrice/discount). */
 export const updateProductPrice = async (req, res) => {
   try {

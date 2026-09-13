@@ -6,6 +6,7 @@ import {
     createProduct,
     updateProduct,
     updateProductPrice,
+    updateProductSource,
     deleteProduct,
     transferProductStock,
     getProductStats,
@@ -45,6 +46,7 @@ router.post('/createProduct', createProduct);           // POST create
 router.post('/import-excel', importProductsFromExcelRows);
 router.put('/:id', updateProduct);         // PUT update
 router.patch('/:id/price', updateProductPrice);
+router.patch('/:id/source-product', updateProductSource);
 router.delete('/deleteProduct/:id', deleteProduct);      // DELETE product
 
 

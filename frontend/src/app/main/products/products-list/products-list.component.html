@@ -452,6 +452,13 @@
                     >
                       {{ "tr_trim" | translate }}
                     </div>
+                    <div
+                      class="single-option"
+                      *ngIf="canSetCutSource(product)"
+                      (click)="openCutSource(product)"
+                    >
+                      {{ "tr_cut_source_action" | translate }}
+                    </div>
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
                         class="single-option"
@@ -676,10 +683,20 @@
             <span class="chip" *ngFor="let a of productAttributesPairs(product)">{{ a.key }}: {{ a.value }}</span>
           </div>
 
-          <div class="product-card__actions" *ngIf="canTrim(product)">
+          <div class="product-card__actions" *ngIf="showCardProductActions(product)">
             <button
               type="button"
-              class="s-btn btn-secondary product-card__trim-btn"
+              class="s-btn btn-secondary product-card__action-btn"
+              *ngIf="canSetCutSource(product)"
+              (click)="openCutSource(product)"
+            >
+              <i class="fa fa-snowflake-o" aria-hidden="true"></i>
+              {{ 'tr_cut_source_action' | translate }}
+            </button>
+            <button
+              type="button"
+              class="s-btn btn-secondary product-card__action-btn"
+              *ngIf="canTrim(product)"
               (click)="openTrim(product)"
             >
               <i class="fa fa-scissors" aria-hidden="true"></i>

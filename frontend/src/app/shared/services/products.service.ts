@@ -187,6 +187,17 @@ updateProductPrice(productId: string, price: number): Observable<{ message: stri
   );
 }
 
+/** Link / clear cut-from-source fridge product without a full product edit. */
+updateProductSource(
+  productId: string,
+  sourceProductId: string | null
+): Observable<{ message: string; product: Product }> {
+  return this.http.patch<{ message: string; product: Product }>(
+    `${PRODUCTS_URL}/${productId}/source-product`,
+    { sourceProductId }
+  );
+}
+
 deleteProduct(productId: string, userId?: string) {
   const params: Record<string, string> = {};
   if (userId) params.userId = String(userId);

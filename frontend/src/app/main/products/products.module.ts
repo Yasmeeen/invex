@@ -19,6 +19,7 @@ import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-
 import { SerialTrackComponent } from './serial-track/serial-track.component';
 import { AddQuantityDialogComponent } from './add-quantity-dialog/add-quantity-dialog.component';
 import { TrimDialogComponent } from './trim-dialog/trim-dialog.component';
+import { CutSourceDialogComponent } from './cut-source-dialog/cut-source-dialog.component';
 import { PurchaseQuantityDialogModule } from './purchase-quantity-dialog/purchase-quantity-dialog.module';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 import { FarmAnimalsListComponent } from './farm-animals-list/farm-animals-list.component';
@@ -38,6 +39,7 @@ import { FarmAnimalsListComponent } from './farm-animals-list/farm-animals-list.
     SerialTrackComponent,
     AddQuantityDialogComponent,
     TrimDialogComponent,
+    CutSourceDialogComponent,
     FarmAnimalsListComponent,
   ],
   imports: [

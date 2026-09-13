@@ -96,8 +96,17 @@ async function seedBranch(branch, categoryByCode) {
     }
   }
 
+  let unlinked = 0;
   for (const row of createdRows) {
-    if (row.def.isSource || !row.def.sourceKey) continue;
+    if (row.def.isSource || !row.def.sourceKey) {
+      // Own-stock SKUs (e.g. مصنعات اللحوم): clear any leftover cut-from-source link
+      if (row.product.sourceProductId) {
+        await Product.updateOne({ _id: row.product._id }, { $unset: { sourceProductId: 1 } });
+        row.product.sourceProductId = undefined;
+        unlinked += 1;
+      }
+      continue;
+    }
     const src = sourceByKey.get(row.def.sourceKey);
     if (!src) continue;
     if (String(row.product.sourceProductId || '') !== String(src._id)) {
@@ -108,7 +117,7 @@ async function seedBranch(branch, categoryByCode) {
     }
   }
 
-  return { created, linked };
+  return { created, linked, unlinked };
 }
 
 async function seedTemplates() {
@@ -164,8 +173,10 @@ async function main() {
   }
 
   for (const branch of branches) {
-    const { created, linked } = await seedBranch(branch, categoryByCode);
-    console.log(`Branch ${branch.name}: +${created} products, ${linked} cut links`);
+    const { created, linked, unlinked } = await seedBranch(branch, categoryByCode);
+    console.log(
+      `Branch ${branch.name}: +${created} products, ${linked} cut links, ${unlinked} unlinked`
+    );
   }
 
   const templates = await seedTemplates();

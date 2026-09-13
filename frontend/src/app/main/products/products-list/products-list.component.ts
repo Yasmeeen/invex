@@ -34,6 +34,7 @@ import { ProductHistoryDialogComponent } from '../product-history-dialog/product
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
 import { AddQuantityDialogComponent } from '../add-quantity-dialog/add-quantity-dialog.component';
 import { TrimDialogComponent } from '../trim-dialog/trim-dialog.component';
+import { CutSourceDialogComponent } from '../cut-source-dialog/cut-source-dialog.component';
 import { PurchaseQuantityDialogComponent } from '../purchase-quantity-dialog/purchase-quantity-dialog.component';
 import { Router } from '@angular/router';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
@@ -342,6 +343,22 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return Number(product.stock || 0) > 0;
   }
 
+  /** Cut-from-source: pick fridge/carcass product this SKU deducts from. */
+  canSetCutSource(product: Product): boolean {
+    if (!this.storeSettings.butcherFeaturesEnabled) return false;
+    if (!this.storeSettings.snapshot.cutFromSourceEnabled) return false;
+    if (!product || !this.canBranchManagerModifyProduct(product)) return false;
+    if (!product.category) return false;
+    if (!product.inWarehouse && !product.branch) return false;
+    const t = String(product.productType || 'good').toLowerCase();
+    if (t === 'service' || t === 'farm') return false;
+    return true;
+  }
+
+  showCardProductActions(product: Product): boolean {
+    return this.canTrim(product) || this.canSetCutSource(product);
+  }
+
   /** Purchase quantity from toolbar: category + product + branch/warehouse destination. */
   get canPurchaseQuantity(): boolean {
     if (isModerator(this.globals.currentUser?.role)) return false;
@@ -383,6 +400,20 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       maxWidth: '96vw',
       autoFocus: false,
       panelClass: 'trim-dialog-panel',
+      data: { product },
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.getproducts();
+    });
+  }
+
+  openCutSource(product: Product): void {
+    if (!this.canSetCutSource(product)) return;
+    const ref = this.dialog.open(CutSourceDialogComponent, {
+      width: '480px',
+      maxWidth: '96vw',
+      autoFocus: false,
+      panelClass: 'cut-source-dialog-panel',
       data: { product },
     });
     ref.afterClosed().subscribe((ok) => {

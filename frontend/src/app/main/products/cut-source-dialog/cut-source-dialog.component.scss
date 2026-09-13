@@ -1,0 +1,76 @@
+:host {
+  display: block;
+}
+
+.cut-source-dialog {
+  display: flex;
+  flex-direction: column;
+  min-width: min(420px, 92vw);
+  max-height: min(90vh, 560px);
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+  overflow: visible;
+  position: relative;
+
+  /* Global `.s-select` forces `position: static` — breaks dropdown placement. */
+  ::ng-deep ng-select.ng-select {
+    position: relative;
+    z-index: 5;
+  }
+
+  ::ng-deep ng-select.ng-select .ng-select-container {
+    position: relative !important;
+  }
+
+  ::ng-deep ng-select.ng-select .ng-dropdown-panel {
+    z-index: 10050 !important;
+  }
+}
+
+.cut-source-dialog__title {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 0 10px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.cut-source-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 12px;
+  overflow: visible;
+}
+
+.cut-source-dialog__product {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cut-source-dialog__product-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.cut-source-dialog__product-meta {
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+}
+
+.cut-source-dialog__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}

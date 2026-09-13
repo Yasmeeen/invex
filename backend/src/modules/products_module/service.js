@@ -55,6 +55,19 @@ function parseListedOnEcommerce(body) {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
+/** Plain product for JSON — works for mongoose docs and lean objects (Map attributes). */
+function toPlainProduct(p) {
+  if (!p) return p;
+  if (typeof p.toObject === 'function') {
+    return p.toObject({ virtuals: true, flattenMaps: true });
+  }
+  const plain = { ...p };
+  if (plain.attributes instanceof Map) {
+    plain.attributes = Object.fromEntries(plain.attributes);
+  }
+  return plain;
+}
+
 function normalizeEcommerceDescription(raw) {
   if (raw == null) return '';
   return String(raw).trim().slice(0, 50000);
@@ -1392,9 +1405,7 @@ export const getProducts = async (req, res) => {
 
     const totalPages = Math.ceil(total / limit);
     // flattenMaps so attributes Map serializes (otherwise JSON → {})
-    const productsOut = await attachRemotePickupTransfers(
-      products.map((p) => p.toObject({ virtuals: true, flattenMaps: true }))
-    );
+    const productsOut = await attachRemotePickupTransfers(products.map(toPlainProduct));
     const hideCost = await viewerCannotSeeCostPrice(req);
 
     res.json({
@@ -1426,9 +1437,7 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const [out] = await attachRemotePickupTransfers([
-      product.toObject({ virtuals: true, flattenMaps: true }),
-    ]);
+    const [out] = await attachRemotePickupTransfers([toPlainProduct(product)]);
     if (await viewerCannotSeeCostPrice(req)) {
       return res.json(stripCostFieldsFromProduct(out));
     }

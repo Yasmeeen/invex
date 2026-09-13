@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
 import { PaymentReceiptData } from '@shared/components/payment-receipt-print/payment-receipt-print.component';
+import { DrawerCloseReceiptData } from '@shared/components/drawer-close-receipt-print/drawer-close-receipt-print.component';
 
-export type InvoiceReprintMode = 'sale' | 'purchase' | 'payment';
+export type InvoiceReprintMode = 'sale' | 'purchase' | 'payment' | 'drawerClose';
 
 export interface InvoiceReprintRequest {
   mode: InvoiceReprintMode;
@@ -10,7 +11,7 @@ export interface InvoiceReprintRequest {
   printDate: Date;
 }
 
-/** Sale / purchase / installment payment reprints (booking uses BookingReprintService). */
+/** Sale / purchase / installment payment / drawer-close reprints (booking uses BookingReprintService). */
 @Injectable({ providedIn: 'root' })
 export class InvoiceReprintService {
   private readonly requests$ = new Subject<InvoiceReprintRequest>();
@@ -43,6 +44,15 @@ export class InvoiceReprintService {
       mode: 'payment',
       data: receipt,
       printDate: this.resolvePrintDate(printDate ?? receipt.paidAt),
+    });
+  }
+
+  printDrawerClose(receipt: DrawerCloseReceiptData, printDate?: Date | string | null): void {
+    if (!receipt) return;
+    this.requests$.next({
+      mode: 'drawerClose',
+      data: receipt,
+      printDate: this.resolvePrintDate(printDate),
     });
   }
 

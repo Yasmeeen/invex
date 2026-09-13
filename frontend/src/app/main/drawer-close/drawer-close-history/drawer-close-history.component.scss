@@ -27,6 +27,14 @@
   color: rgba(15, 23, 42, 0.72);
 }
 
+.drawer-close-history__print-btn {
+  flex: 0 0 auto;
+
+  .fa {
+    margin-inline-end: 0.3rem;
+  }
+}
+
 .drawer-close-history__sold-list {
   display: flex;
   flex-wrap: wrap;

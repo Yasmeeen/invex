@@ -83,11 +83,39 @@
           <strong>{{ preview.expectedCashInDrawer | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
         </div>
 
-        <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_sold_products' | translate }}</h4>
+        <ng-container *ngIf="uncollectedDeliveryCount() > 0">
+          <div class="drawer-close-dialog__row drawer-close-dialog__row--highlight drawer-close-dialog__row--warn">
+            <span>{{ 'tr_drawer_close_uncollected_delivery' | translate }}</span>
+            <strong>{{ uncollectedDeliveryCount() }}</strong>
+          </div>
+          <p class="drawer-close-dialog__note drawer-close-dialog__note--warn">
+            {{ 'tr_drawer_close_note_uncollected_delivery' | translate }}
+          </p>
+        </ng-container>
+
+        <h4 class="drawer-close-dialog__section drawer-close-dialog__section--with-action">
+          <span>{{ 'tr_drawer_close_sold_products' | translate }}</span>
+          <button
+            type="button"
+            class="s-btn btn-secondary size-small drawer-close-dialog__print-btn"
+            (click)="printReceipt()"
+            [disabled]="previewLoading || !preview"
+          >
+            <i class="fa fa-print" aria-hidden="true"></i>
+            {{ 'tr_drawer_close_print_receipt' | translate }}
+          </button>
+        </h4>
         <div class="drawer-close-dialog__row" *ngFor="let row of soldProductsList()">
           <span class="drawer-close-dialog__sold-name">{{ row.name }}</span>
           <strong class="drawer-close-dialog__sold-qty"
-            >{{ formatSoldQty(row) }} {{ soldUnitLabel(row) }}</strong
+            >{{ formatSoldQty(row) }} {{ soldUnitLabel(row) }}
+            <span class="drawer-close-dialog__sold-amount" *ngIf="row.totalAmount != null"
+              >· {{ row.totalAmount | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span
+            ><span
+              class="drawer-close-dialog__sold-share"
+              *ngIf="soldProductSalesShare(row) as share"
+              >({{ share }}%)</span
+            ></strong
           >
         </div>
         <div class="drawer-close-dialog__muted" *ngIf="soldProductsList().length === 0">
@@ -350,6 +378,15 @@
   </div>
 
   <div mat-dialog-actions align="end" class="drawer-close-dialog__actions">
+    <button
+      type="button"
+      class="s-btn btn-secondary"
+      (click)="printReceipt()"
+      [disabled]="previewLoading || !preview || saving"
+    >
+      <i class="fa fa-print" aria-hidden="true"></i>
+      {{ 'tr_print' | translate }}
+    </button>
     <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
       {{ 'tr_action.cancel' | translate }}
     </button>

@@ -4,6 +4,7 @@
    - sale     → #print-sale-receipt (orders reprint)
    - purchase → #print-purchase-receipt (orders reprint)
    - payment  → #print-payment-receipt (installment settlement)
+   - drawerClose → #print-drawer-close-receipt
    - booking  → #print-booking-receipt
 */
 
@@ -12,6 +13,7 @@
   body[data-receipt-print='sale'] *,
   body[data-receipt-print='purchase'] *,
   body[data-receipt-print='payment'] *,
+  body[data-receipt-print='drawerClose'] *,
   body[data-receipt-print='booking'] * {
     visibility: hidden;
   }
@@ -48,6 +50,14 @@
   body[data-receipt-print='payment'] .vixa,
   body[data-receipt-print='payment'] .vixa__panel,
   body[data-receipt-print='payment'] .vixa__fab,
+  body[data-receipt-print='drawerClose'] .app-notification,
+  body[data-receipt-print='drawerClose'] #app-notifications-container,
+  body[data-receipt-print='drawerClose'] #main-sidebar,
+  body[data-receipt-print='drawerClose'] .app-sidebar,
+  body[data-receipt-print='drawerClose'] app-vixa-chat,
+  body[data-receipt-print='drawerClose'] .vixa,
+  body[data-receipt-print='drawerClose'] .vixa__panel,
+  body[data-receipt-print='drawerClose'] .vixa__fab,
   body[data-receipt-print='booking'] .app-notification,
   body[data-receipt-print='booking'] #app-notifications-container,
   body[data-receipt-print='booking'] #main-sidebar,
@@ -83,7 +93,9 @@
   body[data-receipt-print='cashier'] #print-sale-receipt,
   body[data-receipt-print='cashier'] #print-sale-receipt *,
   body[data-receipt-print='cashier'] #print-payment-receipt,
-  body[data-receipt-print='cashier'] #print-payment-receipt * {
+  body[data-receipt-print='cashier'] #print-payment-receipt *,
+  body[data-receipt-print='cashier'] #print-drawer-close-receipt,
+  body[data-receipt-print='cashier'] #print-drawer-close-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -111,7 +123,9 @@
   body[data-receipt-print='sale'] #print-purchase-receipt,
   body[data-receipt-print='sale'] #print-purchase-receipt *,
   body[data-receipt-print='sale'] #print-payment-receipt,
-  body[data-receipt-print='sale'] #print-payment-receipt * {
+  body[data-receipt-print='sale'] #print-payment-receipt *,
+  body[data-receipt-print='sale'] #print-drawer-close-receipt,
+  body[data-receipt-print='sale'] #print-drawer-close-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -139,7 +153,9 @@
   body[data-receipt-print='purchase'] #print-sale-receipt,
   body[data-receipt-print='purchase'] #print-sale-receipt *,
   body[data-receipt-print='purchase'] #print-payment-receipt,
-  body[data-receipt-print='purchase'] #print-payment-receipt * {
+  body[data-receipt-print='purchase'] #print-payment-receipt *,
+  body[data-receipt-print='purchase'] #print-drawer-close-receipt,
+  body[data-receipt-print='purchase'] #print-drawer-close-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -167,7 +183,39 @@
   body[data-receipt-print='payment'] #print-sale-receipt,
   body[data-receipt-print='payment'] #print-sale-receipt *,
   body[data-receipt-print='payment'] #print-purchase-receipt,
-  body[data-receipt-print='payment'] #print-purchase-receipt * {
+  body[data-receipt-print='payment'] #print-purchase-receipt *,
+  body[data-receipt-print='payment'] #print-drawer-close-receipt,
+  body[data-receipt-print='payment'] #print-drawer-close-receipt * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* --- drawer close receipt --- */
+  body[data-receipt-print='drawerClose'] #print-drawer-close-receipt,
+  body[data-receipt-print='drawerClose'] #print-drawer-close-receipt * {
+    visibility: visible !important;
+  }
+
+  body[data-receipt-print='drawerClose'] #print-drawer-close-receipt {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    height: auto;
+    overflow: visible;
+  }
+
+  body[data-receipt-print='drawerClose'] #print-container,
+  body[data-receipt-print='drawerClose'] #print-container *,
+  body[data-receipt-print='drawerClose'] #print-booking-receipt,
+  body[data-receipt-print='drawerClose'] #print-booking-receipt *,
+  body[data-receipt-print='drawerClose'] #print-sale-receipt,
+  body[data-receipt-print='drawerClose'] #print-sale-receipt *,
+  body[data-receipt-print='drawerClose'] #print-purchase-receipt,
+  body[data-receipt-print='drawerClose'] #print-purchase-receipt *,
+  body[data-receipt-print='drawerClose'] #print-payment-receipt,
+  body[data-receipt-print='drawerClose'] #print-payment-receipt * {
     display: none !important;
     visibility: hidden !important;
   }
@@ -195,7 +243,9 @@
   body[data-receipt-print='booking'] #print-purchase-receipt,
   body[data-receipt-print='booking'] #print-purchase-receipt *,
   body[data-receipt-print='booking'] #print-payment-receipt,
-  body[data-receipt-print='booking'] #print-payment-receipt * {
+  body[data-receipt-print='booking'] #print-payment-receipt *,
+  body[data-receipt-print='booking'] #print-drawer-close-receipt,
+  body[data-receipt-print='booking'] #print-drawer-close-receipt * {
     display: none !important;
     visibility: hidden !important;
   }

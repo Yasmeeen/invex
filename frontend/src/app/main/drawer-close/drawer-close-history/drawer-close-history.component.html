@@ -100,14 +100,32 @@
                   <span class="drawer-close-history__sold-title">{{
                     'tr_drawer_close_sold_products' | translate
                   }}</span>
-                  <div class="drawer-close-history__sold-list" *ngIf="soldProducts(row).length > 0">
-                    <span class="drawer-close-history__sold-item" *ngFor="let p of soldProducts(row)">
-                      {{ formatSoldQty(p) }} {{ soldUnitLabel(p) }} {{ p.name }}
-                    </span>
+                  <button
+                    type="button"
+                    class="s-btn btn-secondary size-small drawer-close-history__print-btn"
+                    (click)="printReceipt(row)"
+                    [attr.aria-label]="'tr_drawer_close_print_receipt' | translate"
+                    [title]="'tr_drawer_close_print_receipt' | translate"
+                  >
+                    <i class="fa fa-print" aria-hidden="true"></i>
+                    {{ 'tr_print' | translate }}
+                  </button>
+                  <div class="drawer-close-history__sold-list" *ngIf="soldProducts(row) as soldList">
+                    <ng-container *ngIf="soldList.length > 0">
+                      <span class="drawer-close-history__sold-item" *ngFor="let p of soldList">
+                        {{ formatSoldQty(p) }} {{ soldUnitLabel(p) }} {{ p.name
+                        }}<ng-container *ngIf="p.totalAmount != null">
+                          · {{ p.totalAmount | currency : 'EGP ' : 'symbol' : '1.2-2'
+                          }}<ng-container *ngIf="soldProductSalesShare(p, soldList) as share">
+                            ({{ share }}%)</ng-container
+                          ></ng-container
+                        >
+                      </span>
+                    </ng-container>
+                    <span class="drawer-close-history__sold-empty" *ngIf="soldList.length === 0">{{
+                      'tr_drawer_close_none' | translate
+                    }}</span>
                   </div>
-                  <span class="drawer-close-history__sold-empty" *ngIf="soldProducts(row).length === 0">{{
-                    'tr_drawer_close_none' | translate
-                  }}</span>
                 </div>
               </td>
             </tr>

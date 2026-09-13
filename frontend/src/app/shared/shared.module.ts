@@ -24,6 +24,7 @@ import { PurchaseReceiptPrintComponent } from './components/purchase-receipt-pri
 import { SaleReceiptPrintComponent } from './components/sale-receipt-print/sale-receipt-print.component';
 import { BookingReceiptPrintComponent } from './components/booking-receipt-print/booking-receipt-print.component';
 import { PaymentReceiptPrintComponent } from './components/payment-receipt-print/payment-receipt-print.component';
+import { DrawerCloseReceiptPrintComponent } from './components/drawer-close-receipt-print/drawer-close-receipt-print.component';
 import { InvoiceReprintHostComponent } from './components/invoice-reprint-host/invoice-reprint-host.component';
 import { BookingReprintHostComponent } from './components/booking-reprint-host/booking-reprint-host.component';
 import { RichTextEditorComponent } from './components/rich-text-editor/rich-text-editor.component';
@@ -47,6 +48,7 @@ import { OnlineOrdersBannerComponent } from './components/online-orders-banner/o
     SaleReceiptPrintComponent,
     BookingReceiptPrintComponent,
     PaymentReceiptPrintComponent,
+    DrawerCloseReceiptPrintComponent,
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
     RichTextEditorComponent,
@@ -86,6 +88,7 @@ import { OnlineOrdersBannerComponent } from './components/online-orders-banner/o
     SaleReceiptPrintComponent,
     BookingReceiptPrintComponent,
     PaymentReceiptPrintComponent,
+    DrawerCloseReceiptPrintComponent,
     InvoiceReprintHostComponent,
     BookingReprintHostComponent,
     RichTextEditorComponent,

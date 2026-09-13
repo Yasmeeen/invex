@@ -68,6 +68,7 @@ export class InvoiceReprintHostComponent implements OnDestroy {
     if (this.mode === 'sale') return 'print-sale-receipt';
     if (this.mode === 'purchase') return 'print-purchase-receipt';
     if (this.mode === 'payment') return 'print-payment-receipt';
+    if (this.mode === 'drawerClose') return 'print-drawer-close-receipt';
     return null;
   }
 
@@ -182,7 +183,7 @@ export class InvoiceReprintHostComponent implements OnDestroy {
   private clearBodyPrintMode(): void {
     if (typeof document === 'undefined') return;
     const cur = document.body.getAttribute('data-receipt-print');
-    if (cur === 'sale' || cur === 'purchase' || cur === 'payment') {
+    if (cur === 'sale' || cur === 'purchase' || cur === 'payment' || cur === 'drawerClose') {
       document.body.removeAttribute('data-receipt-print');
     }
   }

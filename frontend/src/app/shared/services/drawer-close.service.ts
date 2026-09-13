@@ -26,6 +26,8 @@ export interface DrawerSoldProduct {
   name: string;
   code?: string;
   quantity: number;
+  /** Net sold amount (qty − returns) × unit price. */
+  totalAmount?: number;
   saleUnit: 'piece' | 'weight' | 'head';
   weightUnit?: 'kg' | 'g';
 }
@@ -44,8 +46,10 @@ export interface DrawerClosePreview {
   salesReturnRefundsByTreasury?: DeskPurchaseTreasuryLine[];
   restoredInvoiceCount: number;
   invoiceCount: number;
-  /** Net sold products for the branch period (after returns). */
+  /** Net sold products for the close period (after returns). */
   soldProducts?: DrawerSoldProduct[];
+  /** Delivery / uncollected invoices still awaiting collection (not in drawer cash). */
+  uncollectedDeliveryInvoiceCount?: number;
   dailyExpenseTotal: number;
   /** Cash paid from physical drawer for desk purchases only (legacy alias). */
   deskPurchaseCashOutTotal: number;

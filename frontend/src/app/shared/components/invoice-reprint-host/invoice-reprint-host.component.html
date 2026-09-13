@@ -15,3 +15,9 @@
   [receipt]="data"
   [printDate]="printDate"
 ></app-payment-receipt-print>
+
+<app-drawer-close-receipt-print
+  *ngIf="mode === 'drawerClose' && data"
+  [receipt]="data"
+  [printDate]="printDate"
+></app-drawer-close-receipt-print>

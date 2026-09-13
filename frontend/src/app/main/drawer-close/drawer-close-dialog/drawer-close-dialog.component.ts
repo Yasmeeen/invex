@@ -15,7 +15,9 @@ import {
   DrawerSoldProduct,
 } from '@shared/services/drawer-close.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
+import { DrawerCloseReceiptData } from '@shared/components/drawer-close-receipt-print/drawer-close-receipt-print.component';
 
 export interface DrawerCloseDialogData {
   userId: string;
@@ -61,7 +63,8 @@ export class DrawerCloseDialogComponent implements OnInit {
     private branchesService: BranchesServce,
     private notify: AppNotificationService,
     private translate: TranslateService,
-    private storeSettings: StoreSettingsService
+    private storeSettings: StoreSettingsService,
+    private invoiceReprint: InvoiceReprintService
   ) {
     const actor = this.auth.getUserFromLocalStorage();
     const forced = data.forcedBranchId ? String(data.forcedBranchId).trim() : '';
@@ -188,6 +191,48 @@ export class DrawerCloseDialogComponent implements OnInit {
 
   soldProductsList(): DrawerSoldProduct[] {
     return Array.isArray(this.preview?.soldProducts) ? this.preview!.soldProducts : [];
+  }
+
+  uncollectedDeliveryCount(): number {
+    return Math.max(0, Math.floor(Number(this.preview?.uncollectedDeliveryInvoiceCount || 0)));
+  }
+
+  branchNameForReceipt(): string {
+    const id = this.effectiveBranchId();
+    const fromList = this.branches.find((b) => String(b._id) === id)?.name;
+    if (fromList) return String(fromList);
+    return '';
+  }
+
+  printReceipt(): void {
+    if (!this.preview) return;
+    const data: DrawerCloseReceiptData = {
+      businessDate: this.preview.businessDate,
+      periodStartDate: this.preview.periodStartDate,
+      periodEndDate: this.preview.periodEndDate,
+      branchName: this.branchNameForReceipt() || undefined,
+      invoiceCount: this.preview.invoiceCount,
+      expectedCashInDrawer: this.preview.expectedCashInDrawer,
+      actualCashCounted: this.step === 2 ? this.actualCounted() : null,
+      variance: this.step === 2 ? this.variance() : null,
+      soldProducts: this.soldProductsList(),
+      uncollectedDeliveryInvoiceCount: this.uncollectedDeliveryCount(),
+    };
+    this.invoiceReprint.printDrawerClose(data);
+  }
+
+  soldProductsSalesTotal(list: DrawerSoldProduct[] = this.soldProductsList()): number {
+    return round2(
+      list.reduce((sum, row) => sum + Number(row?.totalAmount || 0), 0)
+    );
+  }
+
+  /** Share of this product's amount of net sold products total (0–100). */
+  soldProductSalesShare(row: DrawerSoldProduct, list?: DrawerSoldProduct[]): number | null {
+    if (row?.totalAmount == null) return null;
+    const total = this.soldProductsSalesTotal(list ?? this.soldProductsList());
+    if (!(total > 0)) return null;
+    return Math.round((Number(row.totalAmount) / total) * 1000) / 10;
   }
 
   formatSoldQty(row: DrawerSoldProduct): string {

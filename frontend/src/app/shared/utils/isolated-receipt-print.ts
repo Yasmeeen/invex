@@ -156,9 +156,24 @@ export const RECEIPT_ISOLATED_PRINT_CSS = `
   }
   .payment-receipt-products .products-table__col-name { width: 78%; }
   .payment-receipt-products .products-table__col-qty { width: 22%; }
+  .drawer-close-receipt-products { table-layout: fixed; }
+  .drawer-close-receipt-products__col-name { width: 34%; }
+  .drawer-close-receipt-products__col-qty { width: 18%; }
+  .drawer-close-receipt-products__col-amount { width: 28%; }
+  .drawer-close-receipt-products__col-share { width: 20%; }
+  .drawer-close-receipt-products td:nth-child(2),
+  .drawer-close-receipt-products td:nth-child(3),
+  .drawer-close-receipt-products td:nth-child(4) {
+    text-align: right;
+    white-space: nowrap;
+    font-size: 11px;
+  }
   [dir="rtl"] .invoice-table td { text-align: right; }
   [dir="rtl"] .products-table td:nth-child(3),
   [dir="rtl"] .products-table td:nth-child(4) { text-align: left; }
+  [dir="rtl"] .drawer-close-receipt-products td:nth-child(2),
+  [dir="rtl"] .drawer-close-receipt-products td:nth-child(3),
+  [dir="rtl"] .drawer-close-receipt-products td:nth-child(4) { text-align: left; }
 `;
 
 export type IsolatedReceiptPrintHandle = {

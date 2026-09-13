@@ -487,6 +487,24 @@ async function invoiceCountForDay(branchOid, start, end) {
 }
 
 /**
+ * Delivery invoices still awaiting collection (do not increase drawer cash yet).
+ * Count only — keeps drawer-close preview light.
+ */
+async function uncollectedDeliveryForPeriod(branchOid, start, end) {
+  const count = await Order.countDocuments({
+    branch: branchOid,
+    status: 'completed',
+    createdAt: { $gte: start, $lte: end },
+    paymentStatus: { $in: ['unpaid', 'partial'] },
+    $or: [{ isDelivery: true }, { paymentMethod: 'uncollected' }],
+  });
+
+  return {
+    uncollectedDeliveryInvoiceCount: count,
+  };
+}
+
+/**
  * Net sold quantities per product for the branch period (completed invoices,
  * minus returnedQuantity). Units come from line saleUnit / weightUnit.
  */
@@ -537,6 +555,13 @@ async function soldProductsForPeriod(branchOid, start, end) {
       },
     },
     {
+      $addFields: {
+        _lineTotal: {
+          $multiply: ['$_netQty', { $ifNull: ['$products.price', 0] }],
+        },
+      },
+    },
+    {
       $group: {
         _id: {
           productId: '$products.productId',
@@ -546,6 +571,7 @@ async function soldProductsForPeriod(branchOid, start, end) {
         name: { $first: '$products.name' },
         code: { $first: '$products.code' },
         quantity: { $sum: '$_netQty' },
+        totalAmount: { $sum: '$_lineTotal' },
       },
     },
     { $sort: { name: 1 } },
@@ -572,6 +598,7 @@ async function soldProductsForPeriod(branchOid, start, end) {
         name: String(r?.name || '').trim() || '—',
         code: String(r?.code || '').trim(),
         quantity,
+        totalAmount: round2(Number(r?.totalAmount || 0)),
         saleUnit,
         ...(weightUnit ? { weightUnit } : {}),
       };
@@ -661,6 +688,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     salesTreasuryRefunds,
     invoices,
     soldProducts,
+    uncollectedDelivery,
     expenseTotal,
     deskInfo,
     vendorCashInfo,
@@ -674,6 +702,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     salesReturnRefundsByTreasury(branchOid, start, end),
     invoiceCountForDay(branchOid, start, end),
     soldProductsForPeriod(branchOid, start, end),
+    uncollectedDeliveryForPeriod(branchOid, start, end),
     sumDailyExpensesCashDrawer(branchOid, start, end),
     deskPurchaseTreasuryBreakdown(branchOid, start, end),
     sumVendorCashDrawerOutflows(branchOid, start, end),
@@ -717,6 +746,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     invoiceCount: invoices,
     /** Net sold lines for the branch period (qty after returns), with saleUnit. */
     soldProducts,
+    uncollectedDeliveryInvoiceCount: uncollectedDelivery.uncollectedDeliveryInvoiceCount,
     dailyExpenseTotal: expenseTotal,
     /** @deprecated use deskPurchaseCashDrawerTotal — kept as alias (cash drawer portion only). */
     deskPurchaseCashOutTotal: deskCashFromDrawer,
@@ -789,6 +819,7 @@ export const previewDrawerClose = async (req, res) => {
         restoredInvoiceCount: 0,
         invoiceCount: 0,
         soldProducts: [],
+        uncollectedDeliveryInvoiceCount: 0,
         dailyExpenseTotal: 0,
         deskPurchaseCashOutTotal: 0,
         deskPurchaseCashDrawerTotal: 0,

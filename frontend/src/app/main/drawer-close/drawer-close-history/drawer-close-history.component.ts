@@ -11,6 +11,8 @@ import {
   DrawerCloseService,
   DrawerSoldProduct,
 } from '@shared/services/drawer-close.service';
+import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
+import { DrawerCloseReceiptData } from '@shared/components/drawer-close-receipt-print/drawer-close-receipt-print.component';
 import { Subscription } from 'rxjs';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import {
@@ -55,6 +57,7 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     private branchesService: BranchesServce,
     private notify: AppNotificationService,
     private translate: TranslateService,
+    private invoiceReprint: InvoiceReprintService,
     public globals: Globals
   ) {}
 
@@ -97,6 +100,36 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     if (Array.isArray(row?.soldProducts)) return row.soldProducts;
     if (Array.isArray(row?.snapshot?.soldProducts)) return row.snapshot!.soldProducts!;
     return [];
+  }
+
+  soldProductsSalesTotal(list: DrawerSoldProduct[]): number {
+    return Math.round(list.reduce((sum, row) => sum + Number(row?.totalAmount || 0), 0) * 100) / 100;
+  }
+
+  /** Share of this product's amount of net sold products total (0–100). */
+  soldProductSalesShare(row: DrawerSoldProduct, list: DrawerSoldProduct[]): number | null {
+    if (row?.totalAmount == null) return null;
+    const total = this.soldProductsSalesTotal(list);
+    if (!(total > 0)) return null;
+    return Math.round((Number(row.totalAmount) / total) * 1000) / 10;
+  }
+
+  printReceipt(row: DrawerCloseRecord): void {
+    if (!row) return;
+    const snap = row.snapshot;
+    const data: DrawerCloseReceiptData = {
+      businessDate: row.businessDate,
+      periodStartDate: row.periodStartDate || snap?.periodStartDate || row.businessDate,
+      periodEndDate: row.periodEndDate || snap?.periodEndDate || row.businessDate,
+      branchName: row.branch?.name,
+      invoiceCount: snap?.invoiceCount,
+      expectedCashInDrawer: row.expectedCashInDrawer,
+      actualCashCounted: row.actualCashCounted,
+      variance: row.variance,
+      soldProducts: this.soldProducts(row),
+      uncollectedDeliveryInvoiceCount: snap?.uncollectedDeliveryInvoiceCount,
+    };
+    this.invoiceReprint.printDrawerClose(data, row.createdAt);
   }
 
   formatSoldQty(row: DrawerSoldProduct): string {

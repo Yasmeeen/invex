@@ -64,6 +64,22 @@
     margin: 1rem 0 0.35rem;
     color: rgba(15, 23, 42, 0.75);
     font-weight: 600;
+
+    &--with-action {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+  }
+
+  &__print-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+
+    .fa {
+      margin-inline-end: 0.35rem;
+    }
   }
 
   &__row {
@@ -89,6 +105,10 @@
       padding-left: 0.5rem;
       font-size: 0.85rem;
       color: rgba(15, 23, 42, 0.82);
+    }
+
+    &--warn {
+      color: #9a5b00;
     }
   }
 
@@ -116,12 +136,29 @@
     font-variant-numeric: tabular-nums;
   }
 
+  &__sold-amount {
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.72);
+  }
+
+  &__sold-share {
+    margin-inline-start: 0.25rem;
+    font-weight: 500;
+    color: rgba(15, 23, 42, 0.55);
+  }
+
   &__note {
     font-size: 0.8rem;
     color: rgba(15, 23, 42, 0.5);
     margin-top: 1rem;
     margin-bottom: 0;
     line-height: 1.4;
+
+    &--warn {
+      margin-top: 0.25rem;
+      margin-bottom: 0.35rem;
+      color: #9a5b00;
+    }
   }
 
   &__alert {

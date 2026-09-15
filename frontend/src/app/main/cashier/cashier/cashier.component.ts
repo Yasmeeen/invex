@@ -345,6 +345,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
               paidVia: f.paidVia === f.forMethod ? 'same' : f.paidVia,
             })),
             collectorId: this.confirmedPayment!.collectorId || undefined,
+            installmentSaleNumber:
+              this.confirmedPayment!.installmentSaleNumber || undefined,
           }
         : undefined,
     };
@@ -2699,6 +2701,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       if (payment.collectorId) {
         orderData.collectorId = payment.collectorId;
       }
+      if (
+        payment.installmentSaleNumber != null &&
+        Number(payment.installmentSaleNumber) >= 1
+      ) {
+        orderData.installmentSaleNumber = Math.floor(
+          Number(payment.installmentSaleNumber)
+        );
+      }
     }
 
     const settlement = this.pendingExchangeSettlement;
@@ -2770,10 +2780,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
             ? this.translate.instant('tr_product_serial_already_exists')
             : apiCode === 'PRODUCT_CODE_ALREADY_EXISTS'
               ? this.translate.instant('tr_product_code_already_exists')
-              : error?.error?.details ||
-                error?.error?.error ||
-                error?.error?.message ||
-                this.translate.instant('tr_unexpected_error_message');
+              : apiCode === 'INSTALLMENT_SALE_NUMBER_TAKEN'
+                ? this.translate.instant('tr_installment_sale_number_taken')
+                : apiCode === 'INVALID_INSTALLMENT_SALE_NUMBER'
+                  ? this.translate.instant('tr_installment_sale_number_required')
+                  : error?.error?.details ||
+                    error?.error?.error ||
+                    error?.error?.message ||
+                    this.translate.instant('tr_unexpected_error_message');
       this.appNotificationService.push(msg, 'error');
     });
   }

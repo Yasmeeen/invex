@@ -98,6 +98,22 @@
       <ng-container *ngIf="mode !== 'deposit' && hasInstallmentPayMethodSelected()">
         <div class="payment-splits-dialog__installment mt-2">
           <div class="form-group mb-2">
+            <label>{{ 'tr_installment_sale_number' | translate }}</label>
+            <input
+              type="number"
+              class="s-control"
+              min="1"
+              step="1"
+              [(ngModel)]="installmentSaleNumber"
+              [ngModelOptions]="{ standalone: true }"
+              name="installmentSaleNumber"
+              placeholder="{{ 'tr_installment_sale_number' | translate }}"
+            />
+            <p class="text-muted size-small mt-1 mb-0">
+              {{ 'tr_installment_sale_number_hint' | translate }}
+            </p>
+          </div>
+          <div class="form-group mb-2">
             <label>{{ 'tr_installment_plan_select' | translate }}</label>
             <select
               class="s-control"

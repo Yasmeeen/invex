@@ -3,6 +3,7 @@ const router = express.Router();
 import {
     getOrders,
     getOrderById,
+    getNextInstallmentSaleNumber,
     createOrder,
     addOrderPayment,
     setInstallmentPromise,
@@ -12,6 +13,7 @@ import {
   } from './service.js';
 
 router.get('/', getOrders);              // GET all with pagination/search
+router.get('/next-installment-sale-number', getNextInstallmentSaleNumber);
 router.get('/:id', getOrderById);        // GET one by ID
 router.post('/createOrder', createOrder);           // POST create
 router.post('/:orderId/payments', addOrderPayment);

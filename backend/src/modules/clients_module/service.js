@@ -169,6 +169,8 @@ export const getClientByPhone = async (req, res) => {
  *  - lastInstallmentPlanId / lastInstallmentPlanMonths — نظام تقسيط آخر فاتورة
  *  - lastInstallmentAmount — قيمة القسط الشهري لآخر فاتورة
  *  - installmentSaleNumber — رقم بيع التقسيط المتسلسل
+ *  - installmentStatus=open|settled — أقساط قائمة / مسددة بالكامل
+ *  - installmentDueFrom / installmentDueTo — أي قسط غير مدفوع بتاريخ استحقاق في المدى
  */
 export const getClients = async (req, res) => {
   try {
@@ -184,6 +186,9 @@ export const getClients = async (req, res) => {
       lastInstallmentPlanMonths = "",
       lastInstallmentAmount = "",
       installmentSaleNumber = "",
+      installmentStatus = "",
+      installmentDueFrom = "",
+      installmentDueTo = "",
     } = req.query;
     const limit = Number(limitQ || perPage || 10) || 10;
     const skip = (Number(page) - 1) * limit;
@@ -214,6 +219,24 @@ export const getClients = async (req, res) => {
       String(installmentSaleNumber || "").trim() !== "" &&
       Number.isFinite(installmentSaleNumberParsed) &&
       installmentSaleNumberParsed > 0;
+    const installmentStatusFilter = String(installmentStatus || "")
+      .trim()
+      .toLowerCase();
+    const hasInstallmentStatusFilter =
+      installmentStatusFilter === "open" ||
+      installmentStatusFilter === "settled";
+    const parseDueDay = (raw, endOfDay) => {
+      const s = String(raw || "").trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (Number.isNaN(d.getTime())) return null;
+      if (endOfDay) d.setHours(23, 59, 59, 999);
+      else d.setHours(0, 0, 0, 0);
+      return d;
+    };
+    const dueFromDate = parseDueDay(installmentDueFrom, false);
+    const dueToDate = parseDueDay(installmentDueTo, true);
+    const hasDueDateFilter = !!(dueFromDate || dueToDate);
 
     const matchStage = {};
     if (nameFilter) {
@@ -284,6 +307,7 @@ export const getClients = async (req, res) => {
               "installments.amount": 1,
               "installments.paid": 1,
               "installments.paidAmount": 1,
+              "installments.dueDate": 1,
             },
           },
         ],
@@ -293,6 +317,8 @@ export const getClients = async (req, res) => {
 
     const paginateBeforeOrders =
       !needsLastInvoiceFilter &&
+      !hasInstallmentStatusFilter &&
+      !hasDueDateFilter &&
       sideFilter !== "debit" &&
       sideFilter !== "credit";
 
@@ -530,6 +556,103 @@ export const getClients = async (req, res) => {
               },
             },
           },
+          /** Per installment sale (invoice) — not aggregated across sales. */
+          installmentSales: {
+            $map: {
+              input: "$_installmentOrders",
+              as: "o",
+              in: {
+                $let: {
+                  vars: {
+                    totalCount: {
+                      $size: { $ifNull: ["$$o.installments", []] },
+                    },
+                    paidCount: {
+                      $size: {
+                        $filter: {
+                          input: { $ifNull: ["$$o.installments", []] },
+                          as: "inst",
+                          cond: {
+                            $or: [
+                              { $eq: ["$$inst.paid", true] },
+                              {
+                                $lte: [
+                                  {
+                                    $subtract: [
+                                      { $ifNull: ["$$inst.amount", 0] },
+                                      {
+                                        $ifNull: ["$$inst.paidAmount", 0],
+                                      },
+                                    ],
+                                  },
+                                  0.001,
+                                ],
+                              },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                    remainingAmount: {
+                      $round: [
+                        {
+                          $reduce: {
+                            input: { $ifNull: ["$$o.installments", []] },
+                            initialValue: 0,
+                            in: {
+                              $add: [
+                                "$$value",
+                                {
+                                  $cond: [
+                                    { $eq: ["$$this.paid", true] },
+                                    0,
+                                    {
+                                      $max: [
+                                        0,
+                                        {
+                                          $subtract: [
+                                            {
+                                              $ifNull: ["$$this.amount", 0],
+                                            },
+                                            {
+                                              $ifNull: [
+                                                "$$this.paidAmount",
+                                                0,
+                                              ],
+                                            },
+                                          ],
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                              ],
+                            },
+                          },
+                        },
+                        2,
+                      ],
+                    },
+                  },
+                  in: {
+                    orderId: "$$o._id",
+                    orderNumber: "$$o.orderNumber",
+                    installmentSaleNumber: "$$o.installmentSaleNumber",
+                    remainingAmount: "$$remainingAmount",
+                    totalInstallmentsCount: "$$totalCount",
+                    paidInstallmentsCount: "$$paidCount",
+                    unpaidInstallmentsCount: {
+                      $max: [
+                        0,
+                        { $subtract: ["$$totalCount", "$$paidCount"] },
+                      ],
+                    },
+                    hasOpen: { $gt: ["$$remainingAmount", 0.001] },
+                  },
+                },
+              },
+            },
+          },
           _lastEligibleOrderAt: { $max: "$_eligibleClientOrders.createdAt" },
         },
       },
@@ -671,6 +794,75 @@ export const getClients = async (req, res) => {
       pipeline.push({ $match: { $and: lastInvoiceAnd } });
     }
 
+    if (hasInstallmentStatusFilter) {
+      if (installmentStatusFilter === "open") {
+        pipeline.push({
+          $match: { hasOpenInstallments: true },
+        });
+      } else {
+        // Settled: had installment sales and nothing remaining
+        pipeline.push({
+          $match: {
+            hasOpenInstallments: false,
+            totalInstallmentsCount: { $gt: 0 },
+          },
+        });
+      }
+    }
+
+    if (hasDueDateFilter) {
+      const unpaidDueConds = [
+        { $ne: ["$$inst.paid", true] },
+        {
+          $gt: [
+            {
+              $subtract: [
+                { $ifNull: ["$$inst.amount", 0] },
+                { $ifNull: ["$$inst.paidAmount", 0] },
+              ],
+            },
+            0.001,
+          ],
+        },
+        { $ne: ["$$inst.dueDate", null] },
+      ];
+      if (dueFromDate) {
+        unpaidDueConds.push({ $gte: ["$$inst.dueDate", dueFromDate] });
+      }
+      if (dueToDate) {
+        unpaidDueConds.push({ $lte: ["$$inst.dueDate", dueToDate] });
+      }
+      pipeline.push({
+        $match: {
+          $expr: {
+            $gt: [
+              {
+                $size: {
+                  $filter: {
+                    input: {
+                      $reduce: {
+                        input: { $ifNull: ["$_installmentOrders", []] },
+                        initialValue: [],
+                        in: {
+                          $concatArrays: [
+                            "$$value",
+                            { $ifNull: ["$$this.installments", []] },
+                          ],
+                        },
+                      },
+                    },
+                    as: "inst",
+                    cond: { $and: unpaidDueConds },
+                  },
+                },
+              },
+              0,
+            ],
+          },
+        },
+      });
+    }
+
     pipeline.push({
       $project: {
         name: 1,
@@ -692,6 +884,7 @@ export const getClients = async (req, res) => {
         unpaidInstallmentsCount: 1,
         hasOpenInstallments: 1,
         installmentSaleNumbers: 1,
+        installmentSales: 1,
       },
     });
 
@@ -1029,7 +1222,7 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments"
+        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
       )
       .populate("branch", "name")
       .sort({ createdAt: -1 })

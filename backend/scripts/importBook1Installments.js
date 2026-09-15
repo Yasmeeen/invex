@@ -53,22 +53,23 @@ function addMonths(base, months) {
   return d;
 }
 
+/**
+ * Parse sheet due dates as calendar Y-M-D at local noon.
+ * Prefer Excel serial / DD/MM/YYYY — never trust xlsx `cellDates` Date objects
+ * (they shift back one day under Africa/Cairo).
+ */
 function parseDueDate(raw) {
   if (raw == null || raw === "") return null;
-  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
-    const d = new Date(raw);
-    d.setHours(12, 0, 0, 0);
-    return d;
-  }
+
   if (typeof raw === "number" && Number.isFinite(raw)) {
-    // Excel serial date
     const parsed = XLSX.SSF.parse_date_code(raw);
     if (parsed) {
       return new Date(parsed.y, parsed.m - 1, parsed.d, 12, 0, 0, 0);
     }
   }
+
   const s = String(raw).trim();
-  // DD/MM/YYYY
+  // DD/MM/YYYY (Egypt) — day first, month second
   const m1 = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
   if (m1) {
     return new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]), 12, 0, 0, 0);
@@ -78,11 +79,29 @@ function parseDueDate(raw) {
   if (m2) {
     return new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]), 12, 0, 0, 0);
   }
-  const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) {
-    d.setHours(12, 0, 0, 0);
-    return d;
+
+  // Last resort: Date from xlsx cellDates — recover intended calendar day.
+  // Excel midnights often arrive as previous UTC evening (e.g. 20:59Z / 21:59Z).
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    const y = raw.getUTCFullYear();
+    const m = raw.getUTCMonth();
+    const d = raw.getUTCDate();
+    const h = raw.getUTCHours();
+    if (h >= 12) {
+      const utcNoonNext = new Date(Date.UTC(y, m, d + 1, 12, 0, 0));
+      return new Date(
+        utcNoonNext.getUTCFullYear(),
+        utcNoonNext.getUTCMonth(),
+        utcNoonNext.getUTCDate(),
+        12,
+        0,
+        0,
+        0
+      );
+    }
+    return new Date(y, m, d, 12, 0, 0, 0);
   }
+
   return null;
 }
 
@@ -112,7 +131,8 @@ function cleanProductName(name) {
 }
 
 function readSheetRows(xlsxPath) {
-  const wb = XLSX.readFile(xlsxPath, { cellDates: true });
+  // cellDates:false → keep Excel serials so parseDueDate uses SSF (no TZ day-shift)
+  const wb = XLSX.readFile(xlsxPath, { cellDates: false });
   const sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });

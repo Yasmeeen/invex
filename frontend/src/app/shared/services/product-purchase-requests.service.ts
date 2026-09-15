@@ -41,6 +41,7 @@ export interface DeskPurchaseProductPayload {
   ecommerceDescription?: string;
   ecommerceShortDescription?: string;
   ecommerceIsFeatured?: boolean;
+  ecommercePrice?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })

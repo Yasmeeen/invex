@@ -32,6 +32,12 @@ createOrder(params: any) {
   return this.http.post(ORDER_CREATE_URL, params);
 }
 
+getNextInstallmentSaleNumber(): Observable<{ nextInstallmentSaleNumber: number }> {
+  return this.http.get<{ nextInstallmentSaleNumber: number }>(
+    `${ORDERS_URL}/next-installment-sale-number`
+  );
+}
+
 addPayment(
   orderId: string,
   payload: {

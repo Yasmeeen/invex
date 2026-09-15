@@ -87,6 +87,29 @@ function parseEcommerceIsFeatured(body) {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
+/**
+ * Online-store selling price. null = inherit branch `price`.
+ * Returns undefined when the field was not sent (skip update).
+ */
+function parseEcommercePrice(body, branchPrice) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'ecommercePrice')) {
+    return undefined;
+  }
+  const v = body.ecommercePrice;
+  if (v === null || v === undefined || v === '') {
+    return null;
+  }
+  const n = Number(v);
+  if (Number.isNaN(n) || n < 0) {
+    return { error: 'Invalid ecommerce price' };
+  }
+  const branch = Number(branchPrice);
+  if (!Number.isNaN(branch) && n === branch) {
+    return null;
+  }
+  return n;
+}
+
 function pickActorUserId(req) {
   const body = req?.body || {};
   const query = req?.query || {};
@@ -440,6 +463,7 @@ async function createOrReviveProductRow({
   ecommerceDescription,
   ecommerceShortDescription,
   ecommerceIsFeatured,
+  ecommercePrice,
   acquiredFromFields = {},
   sourceProductId,
 }) {
@@ -473,6 +497,7 @@ async function createOrReviveProductRow({
       existing.ecommerceShortDescription = ecommerceShortDescription;
     }
     if (ecommerceIsFeatured !== undefined) existing.ecommerceIsFeatured = ecommerceIsFeatured;
+    if (ecommercePrice !== undefined) existing.ecommercePrice = ecommercePrice;
     Object.assign(existing, acquiredFromFields);
     if (sourceProductId !== undefined) {
       existing.sourceProductId = sourceProductId;
@@ -497,6 +522,7 @@ async function createOrReviveProductRow({
     ecommerceDescription,
     ecommerceShortDescription,
     ecommerceIsFeatured,
+    ...(ecommercePrice !== undefined ? { ecommercePrice } : {}),
     ...acquiredFromFields,
     ...(sourceProductId !== undefined ? { sourceProductId } : {}),
   });
@@ -1466,6 +1492,11 @@ export const createProduct = async (req, res) => {
 
     const categoryId = resolveCategoryId(category);
     const priceNum = Number(price);
+    const ecommercePriceParsed = parseEcommercePrice(req.body, priceNum);
+    if (ecommercePriceParsed && typeof ecommercePriceParsed === 'object' && ecommercePriceParsed.error) {
+      return res.status(400).json({ error: ecommercePriceParsed.error });
+    }
+    const ecommercePrice = ecommercePriceParsed;
     const stockNum = Number(stock);
     const discountNum =
       discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
@@ -1702,6 +1733,7 @@ export const createProduct = async (req, res) => {
             ecommerceDescription,
             ecommerceShortDescription,
             ecommerceIsFeatured,
+            ecommercePrice,
             ...acquiredFromFields,
           });
           if (!row.ok) {
@@ -1766,6 +1798,7 @@ export const createProduct = async (req, res) => {
           ecommerceDescription,
           ecommerceShortDescription,
           ecommerceIsFeatured,
+          ecommercePrice,
           ...acquiredFromFields,
         });
         if (!row.ok) {
@@ -1828,6 +1861,7 @@ export const createProduct = async (req, res) => {
         ecommerceDescription,
         ecommerceShortDescription,
         ecommerceIsFeatured,
+        ecommercePrice,
         ...acquiredFromFields,
         ...sourceCreateArg,
       });
@@ -1880,6 +1914,7 @@ export const createProduct = async (req, res) => {
       ecommerceDescription,
       ecommerceShortDescription,
       ecommerceIsFeatured,
+      ecommercePrice,
       ...acquiredFromFields,
       ...sourceCreateArg,
     });
@@ -1935,6 +1970,7 @@ export const updateProduct = async (req, res) => {
       'ecommerceShortDescription'
     );
     const hasEcommerceIsFeatured = Object.prototype.hasOwnProperty.call(req.body, 'ecommerceIsFeatured');
+    const hasEcommercePrice = Object.prototype.hasOwnProperty.call(req.body, 'ecommercePrice');
     const ecommerceDescriptionNorm = hasEcommerceDescription
       ? normalizeEcommerceDescription(req.body.ecommerceDescription)
       : undefined;
@@ -1947,6 +1983,10 @@ export const updateProduct = async (req, res) => {
 
     const categoryId = resolveCategoryId(category);
     const priceNum = Number(price);
+    const ecommercePriceParsed = hasEcommercePrice ? parseEcommercePrice(req.body, priceNum) : undefined;
+    if (ecommercePriceParsed && typeof ecommercePriceParsed === 'object' && ecommercePriceParsed.error) {
+      return res.status(400).json({ error: ecommercePriceParsed.error });
+    }
     const stockNum = Number(stock);
     const discountNum =
       discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
@@ -2124,6 +2164,9 @@ export const updateProduct = async (req, res) => {
       if (hasEcommerceIsFeatured) {
         updateDoc.ecommerceIsFeatured = parseEcommerceIsFeatured(req.body);
       }
+      if (hasEcommercePrice) {
+        updateDoc.ecommercePrice = ecommercePriceParsed;
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -2203,6 +2246,9 @@ export const updateProduct = async (req, res) => {
       }
       if (hasEcommerceIsFeatured) {
         updateDocBranch.ecommerceIsFeatured = parseEcommerceIsFeatured(req.body);
+      }
+      if (hasEcommercePrice) {
+        updateDocBranch.ecommercePrice = ecommercePriceParsed;
       }
 
     const updateOpBranch = acquiredFromUnset
@@ -2606,6 +2652,8 @@ export const approveBranchTransfer = async (req, res) => {
             ecommerceDescription: String(sourceProduct.ecommerceDescription || ''),
             ecommerceShortDescription: String(sourceProduct.ecommerceShortDescription || ''),
             ecommerceIsFeatured: Boolean(sourceProduct.ecommerceIsFeatured),
+            ecommercePrice:
+              sourceProduct.ecommercePrice != null ? Number(sourceProduct.ecommercePrice) : null,
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),
@@ -3225,6 +3273,8 @@ export const transferProductStock = async (req, res) => {
             ecommerceDescription: String(sourceProduct.ecommerceDescription || ''),
             ecommerceShortDescription: String(sourceProduct.ecommerceShortDescription || ''),
             ecommerceIsFeatured: Boolean(sourceProduct.ecommerceIsFeatured),
+            ecommercePrice:
+              sourceProduct.ecommercePrice != null ? Number(sourceProduct.ecommercePrice) : null,
             ...(sourceProduct.acquiredFrom
               ? { acquiredFrom: sourceProduct.acquiredFrom }
               : {}),

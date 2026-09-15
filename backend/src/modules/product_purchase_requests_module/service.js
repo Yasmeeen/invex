@@ -34,6 +34,15 @@ import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-
 import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
 
 function ecommerceCatalogFieldsFromSource(src) {
+  const ecommercePriceRaw = src?.ecommercePrice;
+  let ecommercePrice = null;
+  if (ecommercePriceRaw != null && ecommercePriceRaw !== '') {
+    const n = Number(ecommercePriceRaw);
+    if (!Number.isNaN(n) && n >= 0) {
+      const branchPrice = Number(src?.price);
+      ecommercePrice = !Number.isNaN(branchPrice) && n === branchPrice ? null : n;
+    }
+  }
   return {
     listedOnEcommerce: src?.listedOnEcommerce === true || src?.listedOnEcommerce === 'true',
     ecommerceDescription: String(src?.ecommerceDescription || '').trim().slice(0, 50000),
@@ -43,6 +52,7 @@ function ecommerceCatalogFieldsFromSource(src) {
       .trim()
       .slice(0, 160),
     ecommerceIsFeatured: src?.ecommerceIsFeatured === true || src?.ecommerceIsFeatured === 'true',
+    ecommercePrice,
   };
 }
 
@@ -143,6 +153,18 @@ function applyPurchaseRevive(existing, { name, payload, quantity, acquiredFromFi
   if (payload?.ecommerceIsFeatured !== undefined) {
     existing.ecommerceIsFeatured =
       payload.ecommerceIsFeatured === true || payload.ecommerceIsFeatured === 'true';
+  }
+  if (payload?.ecommercePrice !== undefined) {
+    const raw = payload.ecommercePrice;
+    if (raw === null || raw === '') {
+      existing.ecommercePrice = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isNaN(n) && n >= 0) {
+        const branchPrice = Number(payload?.price ?? existing.price);
+        existing.ecommercePrice = !Number.isNaN(branchPrice) && n === branchPrice ? null : n;
+      }
+    }
   }
   if (acquiredFromFields && typeof acquiredFromFields === 'object') {
     Object.assign(existing, acquiredFromFields);
@@ -802,13 +824,7 @@ export const createProductPurchaseRequest = async (req, res) => {
                 imageUrl: uf.imageUrl || payload.imageUrl || '',
                 attributes: uf.attributes,
                 ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
-                listedOnEcommerce:
-                  payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
-                ecommerceDescription: String(payload.ecommerceDescription || ''),
-            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
-            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
-                ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
-                ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
+                ...ecommerceCatalogFieldsFromSource(payload),
                 ...acquiredFromFields,
               },
             ],
@@ -979,11 +995,7 @@ export const createProductPurchaseRequest = async (req, res) => {
             imageUrl: payload.imageUrl,
             attributes: payload.attributes,
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
-            listedOnEcommerce:
-              payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
-            ecommerceDescription: String(payload.ecommerceDescription || ''),
-            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
-            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
+            ...ecommerceCatalogFieldsFromSource(payload),
             ...acquiredFromFields,
           },
         ],
@@ -1353,11 +1365,7 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
             imageUrl: uf.imageUrl || payload.imageUrl || '',
             attributes: uf.attributes,
             ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
-            listedOnEcommerce:
-              payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
-            ecommerceDescription: String(payload.ecommerceDescription || ''),
-            ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
-            ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
+            ...ecommerceCatalogFieldsFromSource(payload),
             ...acquiredFromFields,
           },
         ],
@@ -1405,11 +1413,7 @@ async function createProductsForLine(session, { linePayload, branchId, acquiredF
         imageUrl: payload.imageUrl,
         attributes: payload.attributes,
         ...(payload.addedBy ? { addedBy: payload.addedBy } : {}),
-        listedOnEcommerce:
-          payload.listedOnEcommerce === true || payload.listedOnEcommerce === 'true',
-        ecommerceDescription: String(payload.ecommerceDescription || ''),
-        ecommerceShortDescription: String(payload.ecommerceShortDescription || ''),
-        ecommerceIsFeatured: Boolean(payload.ecommerceIsFeatured),
+        ...ecommerceCatalogFieldsFromSource(payload),
         ...acquiredFromFields,
       },
     ],
@@ -1912,11 +1916,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
               imageUrl: uf.imageUrl || normalizeImageUrl(pp.imageUrl) || '',
               attributes: uf.attributes,
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
-              listedOnEcommerce:
-                pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
-              ecommerceDescription: String(pp.ecommerceDescription || ''),
-              ecommerceShortDescription: String(pp.ecommerceShortDescription || ''),
-              ecommerceIsFeatured: Boolean(pp.ecommerceIsFeatured),
+              ...ecommerceCatalogFieldsFromSource(pp),
               ...acquiredFromFields,
             },
           ],
@@ -1996,11 +1996,7 @@ export const approveProductPurchaseRequest = async (req, res) => {
               imageUrl: normalizeImageUrl(pp.imageUrl),
               attributes: attrsNorm,
               ...(pp.addedBy ? { addedBy: normalizeAddedBy(pp.addedBy) } : {}),
-              listedOnEcommerce:
-                pp.listedOnEcommerce === true || pp.listedOnEcommerce === 'true',
-              ecommerceDescription: String(pp.ecommerceDescription || ''),
-              ecommerceShortDescription: String(pp.ecommerceShortDescription || ''),
-              ecommerceIsFeatured: Boolean(pp.ecommerceIsFeatured),
+              ...ecommerceCatalogFieldsFromSource(pp),
               ...acquiredFromFields,
             },
           ],

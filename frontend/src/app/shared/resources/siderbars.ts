@@ -57,6 +57,16 @@ export const AdminSidebar = [
         icon: 'fa fa-list-alt icon',
       },
       {
+        name: 'tr_clients',
+        routerLink: '/clients',
+        icon: 'fa fa-user-circle-o icon',
+      },
+      {
+        name: 'tr_due_installments_title',
+        routerLink: '/collections/due',
+        icon: 'fa fa-calendar-check-o icon',
+      },
+      {
         name: 'tr_daily_expenses_menu',
         routerLink: '/expenses',
         icon: 'fa fa-money icon',
@@ -77,16 +87,6 @@ export const AdminSidebar = [
         name: 'tr_suppliers',
         routerLink: '/suppliers',
         icon: 'fa fa-truck icon',
-      },
-      {
-        name: 'tr_clients',
-        routerLink: '/clients',
-        icon: 'fa fa-user-circle-o icon',
-      },
-      {
-        name: 'tr_due_installments_title',
-        routerLink: '/collections/due',
-        icon: 'fa fa-calendar-check-o icon',
       },
       {
         name: 'tr_purchases',

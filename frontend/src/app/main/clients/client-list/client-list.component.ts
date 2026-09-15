@@ -40,6 +40,14 @@ export class ClientListComponent implements OnInit {
     { value: 'debit', labelKey: 'tr_balance_filter_debit' },
     { value: 'credit', labelKey: 'tr_balance_filter_credit' },
   ];
+  installmentStatusFilter: 'all' | 'open' | 'settled' = 'all';
+  installmentStatusOptions = [
+    { value: 'all', labelKey: 'tr_installment_status_filter_all' },
+    { value: 'open', labelKey: 'tr_installment_status_filter_open' },
+    { value: 'settled', labelKey: 'tr_installment_status_filter_settled' },
+  ];
+  installmentDueFrom = '';
+  installmentDueTo = '';
   paginationData: PaginationData;
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
@@ -154,6 +162,34 @@ export class ClientListComponent implements OnInit {
     this.getClients();
   }
 
+  onInstallmentStatusFilterChange(value: 'all' | 'open' | 'settled' | null): void {
+    this.installmentStatusFilter = value || 'all';
+    if (this.installmentStatusFilter === 'open' || this.installmentStatusFilter === 'settled') {
+      this.params.installmentStatus = this.installmentStatusFilter;
+    } else {
+      delete this.params.installmentStatus;
+    }
+    this.params.page = 1;
+    this.getClients();
+  }
+
+  onInstallmentDueDateFilterChange(): void {
+    const from = (this.installmentDueFrom || '').toString().trim();
+    const to = (this.installmentDueTo || '').toString().trim();
+    if (from) {
+      this.params.installmentDueFrom = from;
+    } else {
+      delete this.params.installmentDueFrom;
+    }
+    if (to) {
+      this.params.installmentDueTo = to;
+    } else {
+      delete this.params.installmentDueTo;
+    }
+    this.params.page = 1;
+    this.getClients();
+  }
+
   onInstallmentPlanFilterChange(planId: string | null): void {
     this.selectedInstallmentPlanId = planId || null;
     if (this.selectedInstallmentPlanId) {
@@ -221,9 +257,38 @@ export class ClientListComponent implements OnInit {
       .sort((a, b) => a - b);
   }
 
+  /** Per-sale installment rows for the card/table (open sales first, then by sale #). */
+  clientInstallmentSales(client: Client): NonNullable<Client['installmentSales']> {
+    const rows = client?.installmentSales;
+    if (!Array.isArray(rows) || !rows.length) return [];
+    return [...rows].sort((a, b) => {
+      const aOpen = a?.hasOpen ? 0 : 1;
+      const bOpen = b?.hasOpen ? 0 : 1;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+      const an = Number(a?.installmentSaleNumber) || 0;
+      const bn = Number(b?.installmentSaleNumber) || 0;
+      if (an && bn && an !== bn) return an - bn;
+      return (Number(a?.orderNumber) || 0) - (Number(b?.orderNumber) || 0);
+    });
+  }
+
+  clientOpenInstallmentSales(client: Client): NonNullable<Client['installmentSales']> {
+    return this.clientInstallmentSales(client).filter(
+      (s) => s?.hasOpen === true || (Number(s?.remainingAmount) || 0) > 0.001
+    );
+  }
+
+  trackInstallmentSale(
+    _index: number,
+    sale: NonNullable<Client['installmentSales']>[number]
+  ): string {
+    return String(sale?.orderId || sale?.installmentSaleNumber || sale?.orderNumber || _index);
+  }
+
   clientHasOpenInstallments(client: Client): boolean {
     if (!client) return false;
     if (client.hasOpenInstallments === true) return true;
+    if (this.clientOpenInstallmentSales(client).length) return true;
     return (Number(client.installmentRemainingAmount) || 0) > 0.001;
   }
 

@@ -288,37 +288,89 @@
     <div class="plr-4 ptb-3" *ngIf="activeTab === 'installments'" role="tabpanel">
       <p class="size-small text-muted mb-3">{{ 'tr_client_installments_hint' | translate }}</p>
       <div *ngIf="!installmentCount" class="text-muted">{{ 'tr_empty_state' | translate }}</div>
-      <div class="mb-4 installment-order-block" *ngFor="let o of installmentOrdersRows">
-        <div class="installment-order-head">
+      <div
+        class="mb-4 installment-order-block"
+        *ngFor="let o of installmentOrdersRows"
+        [class.installment-order-block--collapsed]="isInstallmentCollapsed(o)"
+      >
+        <div
+          class="installment-order-head"
+          role="button"
+          tabindex="0"
+          [attr.aria-expanded]="!isInstallmentCollapsed(o)"
+          (click)="toggleInstallmentCollapse(o, $event)"
+          (keydown.enter)="toggleInstallmentCollapse(o, $event)"
+          (keydown.space)="toggleInstallmentCollapse(o, $event); $event.preventDefault()"
+        >
+          <span class="installment-order-head__toggle" aria-hidden="true">
+            <i
+              class="fa"
+              [class.fa-chevron-down]="isInstallmentCollapsed(o)"
+              [class.fa-chevron-up]="!isInstallmentCollapsed(o)"
+            ></i>
+          </span>
           <div class="installment-order-head__meta">
-            <strong
-              class="installment-order-head__sale-no"
-              *ngIf="o.installmentSaleNumber != null"
-            >
-              {{ 'tr_installment_sale_number' | translate }} #{{ o.installmentSaleNumber }}
-            </strong>
-            <strong class="installment-order-head__invoice">
-              {{ 'tr_invoice_number' | translate }} #{{ o.orderNumber }}
-            </strong>
-            <span class="installment-order-head__plan" *ngIf="installmentPlanName(o)">
-              {{ installmentPlanName(o) }}
-            </span>
-            <span class="installment-order-head__meta-line" *ngIf="installmentMonthlyAmount(o) > 0">
-              {{ 'tr_invoice_installment_monthly' | translate }}:
-              {{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
-            </span>
-            <span class="installment-order-head__meta-line" *ngIf="o.installmentStartDate">
-              {{ 'tr_installment_start_date' | translate }}:
-              {{ o.installmentStartDate | date:'dd/MM/yyyy' }}
-            </span>
-            <span
-              class="settled-badge"
-              *ngIf="isCreditFullySettled(o)"
-            >
-              {{ payLaterSettledLabelKey(o) | translate }}
-            </span>
+            <div class="installment-order-head__badges">
+              <strong
+                class="installment-order-head__sale-no"
+                *ngIf="o.installmentSaleNumber != null"
+              >
+                {{ 'tr_installment_sale_number' | translate }} #{{ o.installmentSaleNumber }}
+              </strong>
+              <strong class="installment-order-head__invoice">
+                {{ 'tr_invoice_number' | translate }} #{{ o.orderNumber }}
+              </strong>
+              <span class="installment-order-head__plan" *ngIf="installmentPlanName(o)">
+                {{ installmentPlanName(o) }}
+              </span>
+              <span
+                class="installment-order-head__progress"
+                *ngIf="installmentTotalCount(o)"
+              >
+                {{ 'tr_installments_completed_count' | translate }}:
+                {{
+                  'tr_installments_progress'
+                    | translate
+                      : {
+                          paid: installmentPaidCount(o),
+                          total: installmentTotalCount(o)
+                        }
+                }}
+              </span>
+              <span
+                class="settled-badge"
+                *ngIf="isCreditFullySettled(o)"
+              >
+                {{ payLaterSettledLabelKey(o) | translate }}
+              </span>
+            </div>
+            <div class="installment-order-head__details">
+              <span class="installment-order-head__meta-line" *ngIf="clientNickname">
+                {{ 'tr_client_nickname' | translate }}:
+                <strong>{{ clientNickname }}</strong>
+              </span>
+              <span class="installment-order-head__meta-line" *ngIf="installmentMonthlyAmount(o) > 0">
+                {{ 'tr_invoice_installment_monthly' | translate }}:
+                <strong>{{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+              </span>
+              <span class="installment-order-head__meta-line" *ngIf="o.installmentStartDate">
+                {{ 'tr_installment_start_date' | translate }}:
+                <strong>{{ o.installmentStartDate | date:'dd/MM/yyyy' }}</strong>
+              </span>
+              <span class="installment-order-head__meta-line" *ngIf="installmentProductNames(o)">
+                {{ 'tr_product_name' | translate }}:
+                <strong>{{ installmentProductNames(o) }}</strong>
+              </span>
+              <span
+                class="installment-order-head__meta-line"
+                *ngIf="installmentTotalCount(o) && installmentUnpaidCount(o) > 0"
+              >
+                {{ 'tr_unpaid_installments_count' | translate }}:
+                <strong>{{ installmentUnpaidCount(o) }}</strong>
+              </span>
+            </div>
           </div>
-          <div class="installment-order-head__aside">
+          <div class="installment-order-head__aside" (click)="$event.stopPropagation()">
             <div class="remaining-pill" [class.remaining-pill--zero]="orderRemaining(o) <= 0.005">
               <span class="remaining-pill__label">{{ 'tr_remaining' | translate }}</span>
               <strong class="remaining-pill__value">
@@ -335,7 +387,7 @@
             </button>
           </div>
         </div>
-        <div class="table-container">
+        <div class="table-container" *ngIf="!isInstallmentCollapsed(o)">
           <table class="s-table table">
             <thead>
               <tr>

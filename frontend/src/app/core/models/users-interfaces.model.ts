@@ -19,6 +19,17 @@ export class User{
   local: string;
   branch?: Branch;
 }
+export interface ClientInstallmentSaleSummary {
+  orderId?: string;
+  orderNumber?: number;
+  installmentSaleNumber?: number | null;
+  remainingAmount?: number;
+  totalInstallmentsCount?: number;
+  paidInstallmentsCount?: number;
+  unpaidInstallmentsCount?: number;
+  hasOpen?: boolean;
+}
+
 export class Client{
   _id:string;
   name?:string;
@@ -57,6 +68,8 @@ export class Client{
   hasOpenInstallments?: boolean;
   /** Sequential installment-sale numbers for this client's installment invoices. */
   installmentSaleNumbers?: number[];
+  /** Per installment sale (not aggregated) — one entry per installment invoice. */
+  installmentSales?: ClientInstallmentSaleSummary[];
   /** Client originated / ordered via e-commerce storefront. */
   source?: 'store' | 'ecommerce';
   isEcommerceOnline?: boolean;
@@ -91,6 +104,12 @@ export interface ClientHistoryOrderRow {
   unpaidInstallmentsCount?: number;
   installmentPlanSnapshot?: { name?: string; months?: number; interestPercent?: number };
   installmentStartDate?: string;
+  /** Sold products on the installment invoice (snapshot). */
+  products?: Array<{
+    name?: string;
+    code?: string;
+    quantity?: number;
+  }>;
   installments?: Array<{
     _id?: string;
     sequence?: number;

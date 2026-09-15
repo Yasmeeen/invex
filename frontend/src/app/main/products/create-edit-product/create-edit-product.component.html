@@ -70,7 +70,7 @@
                     type="button"
                     class="product-form-tabs__btn"
                     [class.product-form-tabs__btn--active]="activeTab === 'ecommerce'"
-                    (click)="activeTab = 'ecommerce'"
+                    (click)="openEcommerceTab()"
                   >
                     {{ 'tr_product_tab_ecommerce' | translate }}
                   </button>
@@ -301,6 +301,7 @@
                         #price="ngModel"
                         ngModel
                         required
+                        (ngModelChange)="onBranchSellPriceChange($event)"
                       />
                       <span
                         class="text-error size-small validator"
@@ -1171,6 +1172,23 @@
                   </div>
                   <div class="col-md-12" *ngIf="!showOnlineListingOption">
                     <p class="text-muted size-small m-0 mb-3">{{ 'tr_product_ecommerce_online_branch_hint' | translate }}</p>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label>{{ 'tr_product_ecommerce_price' | translate }}</label>
+                      <input
+                        type="number"
+                        class="s-control"
+                        name="ecommercePrice"
+                        min="0"
+                        step="any"
+                        [(ngModel)]="ecommercePrice"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="onEcommercePriceInput()"
+                        [placeholder]="'tr_product_ecommerce_price_ph' | translate"
+                      />
+                      <p class="text-muted size-small m-0 mt-1">{{ 'tr_product_ecommerce_price_hint' | translate }}</p>
+                    </div>
                   </div>
                   <div class="col-md-12">
                     <label class="checkbox-row mb-3">

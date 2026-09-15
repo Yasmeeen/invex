@@ -33,8 +33,16 @@ function mapBranch(branch) {
   };
 }
 
+function resolveStorePrice(product) {
+  const override = product?.ecommercePrice;
+  if (override != null && override !== '' && !Number.isNaN(Number(override))) {
+    return Math.max(0, Number(override));
+  }
+  return Math.max(0, Number(product?.price) || 0);
+}
+
 function mapProduct(product, categoryIdOnEcomHint) {
-  const price = Number(product.price) || 0;
+  const price = resolveStorePrice(product);
   const discount = Number(product.discount) || 0;
   const offerPrice =
     discount > 0 ? Math.max(0, price - (price * discount) / 100) : undefined;

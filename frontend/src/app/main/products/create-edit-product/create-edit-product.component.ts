@@ -115,6 +115,10 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   ecommerceDescription = '';
   ecommerceShortDescription = '';
   ecommerceIsFeatured = false;
+  /** Selling price for the online store (defaults to branch selling price). */
+  ecommercePrice: number | null = null;
+  /** True when the user set a store price different from the branch price. */
+  private ecommercePriceLocked = false;
   /** Index of unit currently uploading an image, or null. */
   uploadingUnitImageIndex: number | null = null;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
@@ -232,6 +236,56 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       Boolean(s.ecommerceIntegrationFeatureAvailable) &&
       Boolean(s.ecommerceIntegrationEnabled)
     );
+  }
+
+  openEcommerceTab(): void {
+    this.syncEcommercePriceFromBranchIfUnlocked();
+    this.activeTab = 'ecommerce';
+  }
+
+  onEcommercePriceInput(): void {
+    this.ecommercePriceLocked = true;
+  }
+
+  onBranchSellPriceChange(value: unknown): void {
+    if (this.ecommercePriceLocked) {
+      return;
+    }
+    const n = Number(value);
+    this.ecommercePrice = Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  private syncEcommercePriceFromBranchIfUnlocked(): void {
+    if (this.ecommercePriceLocked) {
+      return;
+    }
+    const n = this.getBranchSellPriceFromForm();
+    this.ecommercePrice = n != null ? n : null;
+  }
+
+  private getBranchSellPriceFromForm(): number | null {
+    const raw = this.basicInfoForm?.value?.price;
+    if (raw === '' || raw == null) {
+      return null;
+    }
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+
+  /** null = inherit branch selling price on the store. */
+  private resolveEcommercePricePayload(): number | null {
+    if (!this.ecommercePriceLocked) {
+      return null;
+    }
+    const n = Number(this.ecommercePrice);
+    if (!Number.isFinite(n) || n < 0) {
+      return null;
+    }
+    const branch = this.getBranchSellPriceFromForm();
+    if (branch != null && n === branch) {
+      return null;
+    }
+    return n;
   }
 
   treasuryOptionLabel(key: string): string {
@@ -1318,6 +1372,14 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.ecommerceDescription = String(response.ecommerceDescription || '');
       this.ecommerceShortDescription = String(response.ecommerceShortDescription || '');
       this.ecommerceIsFeatured = Boolean(response.ecommerceIsFeatured);
+      const storedEcomPrice = response.ecommercePrice;
+      if (storedEcomPrice != null && storedEcomPrice !== '' && Number.isFinite(Number(storedEcomPrice))) {
+        this.ecommercePrice = Number(storedEcomPrice);
+        this.ecommercePriceLocked = true;
+      } else {
+        this.ecommercePrice = Number(response.price) || 0;
+        this.ecommercePriceLocked = false;
+      }
       this.refreshCategoryDropdownItems();
       this.patchSourcePartyFromProduct(response);
     });
@@ -2067,6 +2129,7 @@ private submitDeskPurchaseRequest(): void {
     deskProduct.ecommerceDescription = String(this.ecommerceDescription || '').trim();
     deskProduct.ecommerceShortDescription = String(this.ecommerceShortDescription || '').trim();
     deskProduct.ecommerceIsFeatured = Boolean(this.ecommerceIsFeatured);
+    deskProduct.ecommercePrice = this.resolveEcommercePricePayload();
   }
 
   const isExchangeTradeIn = !!this.data?.exchangeFlow;
@@ -2251,6 +2314,9 @@ createProduct() {
       : '',
     ecommerceIsFeatured: this.showEcommerceTab ? Boolean(this.ecommerceIsFeatured) : false,
   };
+  if (this.showEcommerceTab) {
+    payload.ecommercePrice = this.resolveEcommercePricePayload();
+  }
   if (createUnitDetails?.length) {
     payload.price = createUnitDetails[0].price;
     payload.netPrice = createUnitDetails[0].netPrice;
@@ -2408,6 +2474,9 @@ updateProduct() {
     ? String(this.ecommerceShortDescription || '').trim()
     : '';
   payload.ecommerceIsFeatured = this.showEcommerceTab ? Boolean(this.ecommerceIsFeatured) : false;
+  if (this.showEcommerceTab) {
+    payload.ecommercePrice = this.resolveEcommercePricePayload();
+  }
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {

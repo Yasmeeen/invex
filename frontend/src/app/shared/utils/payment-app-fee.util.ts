@@ -41,6 +41,8 @@ export interface PaymentSplitsResult {
   installmentMonthlyAmount?: number;
   /** Collector assigned to the installment invoice at checkout. */
   collectorId?: string;
+  /** Editable تقسيط sale number (system-suggested, unique). */
+  installmentSaleNumber?: number;
 }
 
 export function round2(n: number): number {

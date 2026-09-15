@@ -88,7 +88,11 @@ export async function reserveFromEcommerce(req, res) {
         product,
         quantity: qty,
         customer,
-        unitPrice: Number(line.unitPrice ?? product.price) || 0,
+        unitPrice:
+          Number(
+            line.unitPrice ??
+              (product.ecommercePrice != null ? product.ecommercePrice : product.price)
+          ) || 0,
         ecommerceOrderId: String(ecommerceOrderId),
         session,
         pickupType: bookingPickupType,
@@ -104,7 +108,11 @@ export async function reserveFromEcommerce(req, res) {
             ecommerceOrderNumber: String(ecommerceOrderNumber || ''),
             product: product._id,
             quantity: qty,
-            unitPrice: Number(line.unitPrice ?? product.price) || 0,
+            unitPrice:
+              Number(
+                line.unitPrice ??
+                  (product.ecommercePrice != null ? product.ecommercePrice : product.price)
+              ) || 0,
             productNameSnapshot: product.name,
             productCodeSnapshot: product.code,
             customerName: String(customer?.name || '').trim(),
@@ -321,7 +329,10 @@ export async function confirmOrderFromEcommerce(req, res) {
       await product.save({ session });
       touchedProductIds.push(product._id);
 
-      const unitPrice = Number(row.unitPrice) || Number(product.price) || 0;
+      const unitPrice =
+        Number(row.unitPrice) ||
+        Number(product.ecommercePrice != null ? product.ecommercePrice : product.price) ||
+        0;
       totalPrice += unitPrice * qty;
       numberOfProducts += qty;
       orderProducts.push({

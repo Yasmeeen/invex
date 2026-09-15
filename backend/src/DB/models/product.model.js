@@ -121,6 +121,15 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    /**
+     * Selling price shown on the online store.
+     * null/undefined = use branch `price` automatically; set only when the store price differs.
+     */
+    ecommercePrice: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

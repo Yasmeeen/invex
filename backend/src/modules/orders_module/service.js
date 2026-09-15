@@ -515,6 +515,7 @@ export const createOrder = async (req, res) => {
     installmentPlanId: installmentPlanIdRaw,
     installmentStartDate: installmentStartDateRaw,
     installmentMonthlyAmount: installmentMonthlyAmountRaw,
+    installmentSaleNumber: installmentSaleNumberRaw,
     collectorId: collectorIdRaw,
   } = req.body;
 
@@ -1296,15 +1297,39 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    // Sequential number for installment sales only (separate from orderNumber).
+    // Installment sale number: cashier may override the system suggestion.
     if (installmentFields) {
-      const lastInstallmentSale = await q(
-        Order.findOne({ installmentSaleNumber: { $exists: true, $ne: null } })
-          .sort({ installmentSaleNumber: -1 })
-          .select('installmentSaleNumber')
-      ).lean();
-      installmentFields.installmentSaleNumber =
-        Number(lastInstallmentSale?.installmentSaleNumber || 0) + 1;
+      const rawSaleNum = String(installmentSaleNumberRaw ?? '').trim();
+      const parsedSaleNum = Math.floor(Number(rawSaleNum));
+      if (rawSaleNum !== '') {
+        if (!Number.isFinite(parsedSaleNum) || parsedSaleNum < 1) {
+          await rollbackOrderSession(session);
+          return res.status(400).json({
+            error: 'installmentSaleNumber must be a positive integer',
+            code: 'INVALID_INSTALLMENT_SALE_NUMBER',
+          });
+        }
+        const taken = await q(
+          Order.findOne({ installmentSaleNumber: parsedSaleNum }).select('_id')
+        ).lean();
+        if (taken) {
+          await rollbackOrderSession(session);
+          return res.status(409).json({
+            error: 'Installment sale number already exists',
+            code: 'INSTALLMENT_SALE_NUMBER_TAKEN',
+            installmentSaleNumber: parsedSaleNum,
+          });
+        }
+        installmentFields.installmentSaleNumber = parsedSaleNum;
+      } else {
+        const lastInstallmentSale = await q(
+          Order.findOne({ installmentSaleNumber: { $exists: true, $ne: null } })
+            .sort({ installmentSaleNumber: -1 })
+            .select('installmentSaleNumber')
+        ).lean();
+        installmentFields.installmentSaleNumber =
+          Number(lastInstallmentSale?.installmentSaleNumber || 0) + 1;
+      }
     }
 
     // ======================
@@ -1463,7 +1488,31 @@ export const createOrder = async (req, res) => {
   } catch (err) {
     await rollbackOrderSession(session);
     console.error("❌ Error creating order:", err);
+    if (err?.code === 11000 && err?.keyPattern?.installmentSaleNumber) {
+      return res.status(409).json({
+        error: 'Installment sale number already exists',
+        code: 'INSTALLMENT_SALE_NUMBER_TAKEN',
+        installmentSaleNumber: err?.keyValue?.installmentSaleNumber,
+      });
+    }
     res.status(500).json({ error: "Server error", details: err.message });
+  }
+};
+
+/** Next sequential installmentSaleNumber for cashier prefill (editable override). */
+export const getNextInstallmentSaleNumber = async (req, res) => {
+  try {
+    const last = await Order.findOne({
+      installmentSaleNumber: { $exists: true, $ne: null },
+    })
+      .sort({ installmentSaleNumber: -1 })
+      .select('installmentSaleNumber')
+      .lean();
+    const nextInstallmentSaleNumber = Number(last?.installmentSaleNumber || 0) + 1;
+    return res.status(200).json({ nextInstallmentSaleNumber });
+  } catch (err) {
+    console.error('❌ next installment sale number:', err);
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 };
 

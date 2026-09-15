@@ -35,6 +35,11 @@ export interface Product {
   ecommerceDescription?: string;
   ecommerceShortDescription?: string;
   ecommerceIsFeatured?: boolean;
+  /**
+   * Selling price on the online store.
+   * null/undefined = use branch `price` automatically.
+   */
+  ecommercePrice?: number | null;
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */

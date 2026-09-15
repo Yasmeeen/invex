@@ -65,6 +65,9 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   purchasesPage = 1;
   ledgerPage = 1;
 
+  /** Collapsed installment sale blocks (key = order id). Missing key → collapsed if multiple sales. */
+  private installmentCollapseState: Record<string, boolean> = {};
+
   /** Branch for cash-drawer attribution (deposits / credit invoice payments). */
   paymentBranchId: string | null = null;
   showBranchPicker = false;
@@ -136,6 +139,27 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   get clientTitle(): string {
     const c = this.client || (this.history?.client as Client | undefined);
     return String(c?.name || c?.phoneNumber || '').trim();
+  }
+
+  /** Nickname / الدلع — parenthetical alias, or abu/um-style short name. */
+  get clientNickname(): string {
+    const name = this.clientTitle;
+    if (!name) return '';
+
+    const match = name.match(/\(([^)]+)\)/);
+    if (match) {
+      const nick = String(match[1] || '').trim();
+      // Skip referral notes like "طرف حسين الطيب"
+      if (nick && !/^طرف\b/i.test(nick)) {
+        return nick;
+      }
+    }
+
+    const base = name.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    if (/^(ابو|أبو|ام|أم)\b/.test(base)) {
+      return base;
+    }
+    return '';
   }
 
   get settlementPreview(): ClientSettlementPreview | null {
@@ -491,6 +515,59 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return orderInstallmentMonthlyAmount(order as any);
   }
 
+  installmentProductNames(order: ClientHistoryOrderRow): string {
+    const lines = Array.isArray(order?.products) ? order.products : [];
+    return lines
+      .map((p) => {
+        const name = String(p?.name || '').trim();
+        if (!name) return '';
+        const qty = Number(p?.quantity) || 0;
+        return qty > 1 ? `${name} ×${qty}` : name;
+      })
+      .filter(Boolean)
+      .join('، ');
+  }
+
+  installmentOrderKey(order: ClientHistoryOrderRow): string {
+    return (
+      normalizeMongoId(order?._id) ||
+      String(order?.installmentSaleNumber ?? order?.orderNumber ?? '')
+    );
+  }
+
+  installmentTotalCount(order: ClientHistoryOrderRow): number {
+    return Array.isArray(order?.installments) ? order.installments.length : 0;
+  }
+
+  installmentPaidCount(order: ClientHistoryOrderRow): number {
+    const rows = Array.isArray(order?.installments) ? order.installments : [];
+    return rows.filter((row) => this.installmentRowRemaining(row) <= 0.005).length;
+  }
+
+  installmentUnpaidCount(order: ClientHistoryOrderRow): number {
+    return Math.max(0, this.installmentTotalCount(order) - this.installmentPaidCount(order));
+  }
+
+  isInstallmentCollapsed(order: ClientHistoryOrderRow): boolean {
+    const key = this.installmentOrderKey(order);
+    if (!key) return false;
+    if (Object.prototype.hasOwnProperty.call(this.installmentCollapseState, key)) {
+      return !!this.installmentCollapseState[key];
+    }
+    // One sale → expanded; multiple → all collapsed by default.
+    return this.installmentCount > 1;
+  }
+
+  toggleInstallmentCollapse(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    const key = this.installmentOrderKey(order);
+    if (!key) return;
+    this.installmentCollapseState = {
+      ...this.installmentCollapseState,
+      [key]: !this.isInstallmentCollapsed(order),
+    };
+  }
+
   paymentStatusLabel(status?: string, order?: ClientHistoryOrderRow): string {
     if (order && this.isCreditFullySettled(order) && order.status !== 'restored') {
       return this.translate.instant(this.payLaterSettledLabelKey(order));
@@ -749,6 +826,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     this.ordersPage = 1;
     this.purchasesPage = 1;
     this.ledgerPage = 1;
+    this.installmentCollapseState = {};
   }
 
   private slicePage<T>(items: T[], page: number): T[] {

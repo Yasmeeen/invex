@@ -31,6 +31,7 @@ import {
   CollectionsService,
   CollectorUser,
 } from '@shared/services/collections.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
 import { Subscription } from 'rxjs';
 
 export type PaymentSplitsDialogMode = 'checkout' | 'installment' | 'deposit';
@@ -40,6 +41,7 @@ export interface PaymentSplitsDialogInitialState {
   payAmounts?: Record<string, number>;
   feeSources?: PaymentFeeSource[];
   collectorId?: string;
+  installmentSaleNumber?: number;
 }
 
 export interface PaymentSplitsDialogData {
@@ -79,12 +81,17 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   collectors: CollectorUser[] = [];
   selectedCollectorId = '';
 
+  /** Prefill from system; cashier may clear and type a custom unique number. */
+  installmentSaleNumber: number | null = null;
+  private suggestedInstallmentSaleNumber: number | null = null;
+
   readonly invoiceNetTotal: number;
   readonly mode: PaymentSplitsDialogMode;
 
   private settingsSub?: Subscription;
   private plansSub?: Subscription;
   private collectorsSub?: Subscription;
+  private nextSaleNumberSub?: Subscription;
 
   constructor(
     private dialogRef: MatDialogRef<PaymentSplitsDialogComponent, PaymentSplitsResult | null>,
@@ -93,7 +100,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private notify: AppNotificationService,
     private installmentPlansService: InstallmentPlansService,
-    private collectionsService: CollectionsService
+    private collectionsService: CollectionsService,
+    private ordersService: OrdersSerivce
   ) {
     this.invoiceNetTotal = round2(Number(data.invoiceNetTotal) || 0);
     this.mode =
@@ -111,6 +119,11 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     }
     if (init?.collectorId) {
       this.selectedCollectorId = String(init.collectorId);
+    }
+    const initSaleNum = Math.floor(Number(init?.installmentSaleNumber));
+    if (Number.isFinite(initSaleNum) && initSaleNum >= 1) {
+      // Keep cashier override; do not mark as system suggestion.
+      this.installmentSaleNumber = initSaleNum;
     }
   }
 
@@ -143,6 +156,9 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
             this.collectors = [];
           },
         });
+      if (this.hasInstallmentPayMethodSelected()) {
+        this.loadNextInstallmentSaleNumber();
+      }
     }
   }
 
@@ -150,6 +166,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     this.settingsSub?.unsubscribe();
     this.plansSub?.unsubscribe();
     this.collectorsSub?.unsubscribe();
+    this.nextSaleNumberSub?.unsubscribe();
   }
 
   collectorOptionLabel(c: CollectorUser): string {
@@ -165,6 +182,33 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       label = `${label} (${workload})`;
     }
     return label;
+  }
+
+  private loadNextInstallmentSaleNumber(): void {
+    this.nextSaleNumberSub?.unsubscribe();
+    this.nextSaleNumberSub = this.ordersService.getNextInstallmentSaleNumber().subscribe({
+      next: (res) => {
+        const next = Math.floor(Number(res?.nextInstallmentSaleNumber));
+        if (!Number.isFinite(next) || next < 1) {
+          return;
+        }
+        // Prefill only when empty or still showing the last system suggestion.
+        const stillOnSuggestion =
+          this.installmentSaleNumber == null ||
+          (this.suggestedInstallmentSaleNumber != null &&
+            this.installmentSaleNumber === this.suggestedInstallmentSaleNumber);
+        if (stillOnSuggestion) {
+          this.installmentSaleNumber = next;
+        }
+        this.suggestedInstallmentSaleNumber = next;
+      },
+      error: () => {
+        if (this.installmentSaleNumber == null) {
+          this.installmentSaleNumber = 1;
+          this.suggestedInstallmentSaleNumber = 1;
+        }
+      },
+    });
   }
 
   private defaultInstallmentStartDate(): string {
@@ -418,6 +462,12 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     this.ensureDefaultNetAmounts();
     this.syncFeeSources();
     this.syncInstallmentMonthlyOverride();
+    if (raw.some((id) => this.isInstallmentPayMethod(id))) {
+      this.loadNextInstallmentSaleNumber();
+    } else {
+      this.installmentSaleNumber = null;
+      this.suggestedInstallmentSaleNumber = null;
+    }
   }
 
   private reconcilePayAmountsKeys(ids: string[]): void {
@@ -756,6 +806,14 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
         this.notify.push(this.translate.instant('tr_collector_required'), 'error');
         return;
       }
+      const saleNum = Math.floor(Number(this.installmentSaleNumber));
+      if (!Number.isFinite(saleNum) || saleNum < 1) {
+        this.notify.push(
+          this.translate.instant('tr_installment_sale_number_required'),
+          'error'
+        );
+        return;
+      }
     }
 
     const feeSources = this.feeSources.length
@@ -795,6 +853,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
       if (collectorId) {
         result.collectorId = collectorId;
       }
+      result.installmentSaleNumber = Math.floor(Number(this.installmentSaleNumber));
     }
 
     this.dialogRef.close(result);

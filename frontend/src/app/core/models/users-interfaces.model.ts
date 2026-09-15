@@ -24,6 +24,10 @@ export interface ClientInstallmentSaleSummary {
   orderNumber?: number;
   installmentSaleNumber?: number | null;
   remainingAmount?: number;
+  /** Sold product names on this installment invoice. */
+  productNames?: string;
+  /** Typical monthly installment amount for this invoice. */
+  installmentAmount?: number;
   totalInstallmentsCount?: number;
   paidInstallmentsCount?: number;
   unpaidInstallmentsCount?: number;

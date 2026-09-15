@@ -37,7 +37,9 @@ const COLLECTOR_ALIASES = {
   "نور الدين": "نور الدين",
   زياد: "زياد الطيب",
   "زياد الطيب": "زياد الطيب",
-  // حسين الطيب — no account yet; left unassigned
+  // حسين الطيب → زياد الطيب (same collector account)
+  حسين: "زياد الطيب",
+  "حسين الطيب": "زياد الطيب",
 };
 
 function normalizeLabel(raw) {

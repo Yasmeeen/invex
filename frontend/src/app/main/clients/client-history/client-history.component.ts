@@ -141,27 +141,6 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return String(c?.name || c?.phoneNumber || '').trim();
   }
 
-  /** Nickname / الدلع — parenthetical alias, or abu/um-style short name. */
-  get clientNickname(): string {
-    const name = this.clientTitle;
-    if (!name) return '';
-
-    const match = name.match(/\(([^)]+)\)/);
-    if (match) {
-      const nick = String(match[1] || '').trim();
-      // Skip referral notes like "طرف حسين الطيب"
-      if (nick && !/^طرف\b/i.test(nick)) {
-        return nick;
-      }
-    }
-
-    const base = name.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
-    if (/^(ابو|أبو|ام|أم)\b/.test(base)) {
-      return base;
-    }
-    return '';
-  }
-
   get settlementPreview(): ClientSettlementPreview | null {
     return this.history?.settlementPreview || null;
   }

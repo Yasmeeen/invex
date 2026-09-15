@@ -52,6 +52,8 @@ export class ClientListComponent implements OnInit {
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
   params: any = { page: 1, perPage: this.paginationPerPage };
+  /** Expanded installment detail blocks on cards (key = client id). Missing → collapsed when multiple sales. */
+  private installmentCardExpanded: Record<string, boolean> = {};
   private nameSearchTimeout: any;
   private phoneSearchTimeout: any;
   private amountTimeout: any;
@@ -276,6 +278,46 @@ export class ClientListComponent implements OnInit {
     return this.clientInstallmentSales(client).filter(
       (s) => s?.hasOpen === true || (Number(s?.remainingAmount) || 0) > 0.001
     );
+  }
+
+  clientOpenInstallmentSalesCount(client: Client): number {
+    return this.clientOpenInstallmentSales(client).length;
+  }
+
+  clientOpenInstallmentRemainingTotal(client: Client): number {
+    const sales = this.clientOpenInstallmentSales(client);
+    if (!sales.length) {
+      return Math.round((Number(client?.installmentRemainingAmount) || 0) * 100) / 100;
+    }
+    const sum = sales.reduce((acc, s) => acc + (Number(s?.remainingAmount) || 0), 0);
+    return Math.round(sum * 100) / 100;
+  }
+
+  private clientCardKey(client: Client): string {
+    return String(client?._id || '').trim();
+  }
+
+  /** Multiple open installment sales → details collapsed by default. */
+  shouldCollapseInstallmentCard(client: Client): boolean {
+    return this.clientOpenInstallmentSalesCount(client) > 1;
+  }
+
+  isInstallmentCardExpanded(client: Client): boolean {
+    if (!this.shouldCollapseInstallmentCard(client)) return true;
+    const key = this.clientCardKey(client);
+    if (!key) return false;
+    return !!this.installmentCardExpanded[key];
+  }
+
+  toggleInstallmentCard(client: Client, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.shouldCollapseInstallmentCard(client)) return;
+    const key = this.clientCardKey(client);
+    if (!key) return;
+    this.installmentCardExpanded = {
+      ...this.installmentCardExpanded,
+      [key]: !this.isInstallmentCardExpanded(client),
+    };
   }
 
   trackInstallmentSale(

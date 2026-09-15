@@ -248,6 +248,14 @@
                       <span class="table-installment-hint__sale-no" *ngIf="!sale.installmentSaleNumber && sale.orderNumber">
                         {{ 'tr_invoice_number' | translate }} #{{ sale.orderNumber }}
                       </span>
+                      <span class="table-installment-hint__meta" *ngIf="sale.productNames">
+                        {{ 'tr_product_name' | translate }}:
+                        {{ sale.productNames }}
+                      </span>
+                      <span class="table-installment-hint__meta" *ngIf="sale.installmentAmount">
+                        {{ 'tr_invoice_installment_monthly' | translate }}:
+                        {{ sale.installmentAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                      </span>
                       <span class="table-installment-hint__meta">
                         {{ 'tr_remaining' | translate }}:
                         {{ (sale.remainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
@@ -392,8 +400,26 @@
           <div
             class="client-card__installment"
             *ngIf="clientHasOpenInstallments(client) || clientInstallmentSaleNumbers(client).length || clientInstallmentSales(client).length"
+            [class.client-card__installment--collapsed]="shouldCollapseInstallmentCard(client)"
+            [class.client-card__installment--collapsed-open]="isInstallmentCardExpanded(client)"
           >
-            <div class="installment-banner">
+            <div
+              class="installment-banner"
+              [class.installment-banner--toggle]="shouldCollapseInstallmentCard(client)"
+              [attr.role]="shouldCollapseInstallmentCard(client) ? 'button' : null"
+              [attr.tabindex]="shouldCollapseInstallmentCard(client) ? 0 : null"
+              [attr.aria-expanded]="shouldCollapseInstallmentCard(client) ? isInstallmentCardExpanded(client) : null"
+              (click)="toggleInstallmentCard(client, $event)"
+              (keydown.enter)="toggleInstallmentCard(client, $event)"
+              (keydown.space)="toggleInstallmentCard(client, $event); $event.preventDefault()"
+            >
+              <span class="installment-banner__toggle" *ngIf="shouldCollapseInstallmentCard(client)" aria-hidden="true">
+                <i
+                  class="fa"
+                  [class.fa-chevron-down]="!isInstallmentCardExpanded(client)"
+                  [class.fa-chevron-up]="isInstallmentCardExpanded(client)"
+                ></i>
+              </span>
               <span class="installment-banner__badge" *ngIf="clientHasOpenInstallments(client)">
                 <i class="fa fa-money" aria-hidden="true"></i>
                 {{ 'tr_client_has_installments' | translate }}
@@ -408,35 +434,91 @@
                   {{ n }}<span *ngIf="!last">، </span>
                 </strong>
               </span>
+              <span
+                class="installment-banner__summary"
+                *ngIf="shouldCollapseInstallmentCard(client)"
+              >
+                {{
+                  'tr_client_installment_sales_count'
+                    | translate: { count: clientOpenInstallmentSalesCount(client) }
+                }}
+                ·
+                {{ 'tr_remaining' | translate }}:
+                {{ clientOpenInstallmentRemainingTotal(client) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+              </span>
             </div>
 
-            <div
-              class="installment-sales"
-              *ngIf="clientOpenInstallmentSales(client).length; else cardAggFallback"
-            >
+            <ng-container *ngIf="isInstallmentCardExpanded(client)">
               <div
-                class="installment-sale"
-                *ngFor="let sale of clientOpenInstallmentSales(client); trackBy: trackInstallmentSale"
+                class="installment-sales"
+                *ngIf="clientOpenInstallmentSales(client).length; else cardAggFallback"
               >
-                <div class="installment-sale__head">
-                  <span class="installment-sale__badge" *ngIf="sale.installmentSaleNumber">
-                    <i class="fa fa-hashtag" aria-hidden="true"></i>
-                    {{ 'tr_installment_sale_number' | translate }}
-                    <strong>#{{ sale.installmentSaleNumber }}</strong>
-                  </span>
-                  <span class="installment-sale__badge" *ngIf="!sale.installmentSaleNumber && sale.orderNumber">
-                    <i class="fa fa-file-text-o" aria-hidden="true"></i>
-                    {{ 'tr_invoice_number' | translate }}
-                    <strong>#{{ sale.orderNumber }}</strong>
-                  </span>
+                <div
+                  class="installment-sale"
+                  *ngFor="let sale of clientOpenInstallmentSales(client); trackBy: trackInstallmentSale"
+                >
+                  <div class="installment-sale__head">
+                    <span class="installment-sale__badge" *ngIf="sale.installmentSaleNumber">
+                      <i class="fa fa-hashtag" aria-hidden="true"></i>
+                      {{ 'tr_installment_sale_number' | translate }}
+                      <strong>#{{ sale.installmentSaleNumber }}</strong>
+                    </span>
+                    <span class="installment-sale__badge" *ngIf="!sale.installmentSaleNumber && sale.orderNumber">
+                      <i class="fa fa-file-text-o" aria-hidden="true"></i>
+                      {{ 'tr_invoice_number' | translate }}
+                      <strong>#{{ sale.orderNumber }}</strong>
+                    </span>
+                  </div>
+                  <div class="installment-sale__meta" *ngIf="sale.productNames || sale.installmentAmount">
+                    <span *ngIf="sale.productNames">
+                      {{ 'tr_product_name' | translate }}:
+                      <strong>{{ sale.productNames }}</strong>
+                    </span>
+                    <span *ngIf="sale.installmentAmount">
+                      {{ 'tr_invoice_installment_monthly' | translate }}:
+                      <strong>{{ sale.installmentAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+                    </span>
+                  </div>
+                  <div class="installment-stats">
+                    <div class="installment-stat installment-stat--remaining">
+                      <div class="installment-stat__label">
+                        {{ 'tr_installments_remaining_amount' | translate }}
+                      </div>
+                      <div class="installment-stat__value">
+                        {{ (sale.remainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                      </div>
+                    </div>
+                    <div class="installment-stat installment-stat--progress">
+                      <div class="installment-stat__label">
+                        {{ 'tr_installments_completed_count' | translate }}
+                      </div>
+                      <div class="installment-stat__value">
+                        {{
+                          'tr_installments_progress'
+                            | translate
+                              : {
+                                  paid: sale.paidInstallmentsCount || 0,
+                                  total: sale.totalInstallmentsCount || 0
+                                }
+                        }}
+                      </div>
+                      <div class="installment-stat__hint muted">
+                        {{ 'tr_unpaid_installments_count' | translate }}:
+                        {{ sale.unpaidInstallmentsCount || 0 }}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="installment-stats">
+              </div>
+
+              <ng-template #cardAggFallback>
+                <div class="installment-stats" *ngIf="clientHasOpenInstallments(client)">
                   <div class="installment-stat installment-stat--remaining">
                     <div class="installment-stat__label">
                       {{ 'tr_installments_remaining_amount' | translate }}
                     </div>
                     <div class="installment-stat__value">
-                      {{ (sale.remainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                      {{ (client.installmentRemainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
                     </div>
                   </div>
                   <div class="installment-stat installment-stat--progress">
@@ -448,51 +530,19 @@
                         'tr_installments_progress'
                           | translate
                             : {
-                                paid: sale.paidInstallmentsCount || 0,
-                                total: sale.totalInstallmentsCount || 0
+                                paid: client.paidInstallmentsCount || 0,
+                                total: client.totalInstallmentsCount || 0
                               }
                       }}
                     </div>
                     <div class="installment-stat__hint muted">
                       {{ 'tr_unpaid_installments_count' | translate }}:
-                      {{ sale.unpaidInstallmentsCount || 0 }}
+                      {{ client.unpaidInstallmentsCount || 0 }}
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <ng-template #cardAggFallback>
-              <div class="installment-stats" *ngIf="clientHasOpenInstallments(client)">
-                <div class="installment-stat installment-stat--remaining">
-                  <div class="installment-stat__label">
-                    {{ 'tr_installments_remaining_amount' | translate }}
-                  </div>
-                  <div class="installment-stat__value">
-                    {{ (client.installmentRemainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
-                  </div>
-                </div>
-                <div class="installment-stat installment-stat--progress">
-                  <div class="installment-stat__label">
-                    {{ 'tr_installments_completed_count' | translate }}
-                  </div>
-                  <div class="installment-stat__value">
-                    {{
-                      'tr_installments_progress'
-                        | translate
-                          : {
-                              paid: client.paidInstallmentsCount || 0,
-                              total: client.totalInstallmentsCount || 0
-                            }
-                    }}
-                  </div>
-                  <div class="installment-stat__hint muted">
-                    {{ 'tr_unpaid_installments_count' | translate }}:
-                    {{ client.unpaidInstallmentsCount || 0 }}
-                  </div>
-                </div>
-              </div>
-            </ng-template>
+              </ng-template>
+            </ng-container>
           </div>
 
           <div class="client-card__balances">

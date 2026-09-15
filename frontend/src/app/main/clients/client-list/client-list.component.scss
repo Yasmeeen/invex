@@ -55,6 +55,48 @@
   gap: 0.4rem;
 }
 
+.installment-banner--toggle {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 10px;
+  padding: 0.35rem 0.4rem;
+  margin: -0.1rem -0.15rem 0.35rem;
+  transition: background 0.15s ease;
+
+  &:hover,
+  &:focus {
+    outline: none;
+    background: rgba(217, 119, 6, 0.08);
+  }
+}
+
+.installment-banner__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.installment-banner__summary {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  width: 100%;
+  margin-top: 0.1rem;
+  padding-inline-start: 1.5rem;
+}
+
+.client-card__installment--collapsed:not(.client-card__installment--collapsed-open) {
+  .installment-banner {
+    margin-bottom: 0;
+  }
+}
+
 .installment-banner__badge {
   display: inline-flex;
   align-items: center;
@@ -101,6 +143,21 @@
 
 .installment-sale__head {
   margin-bottom: 0.4rem;
+}
+
+.installment-sale__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  color: #4b5563;
+  font-weight: 600;
+
+  strong {
+    color: #0f172a;
+    font-weight: 800;
+  }
 }
 
 .installment-sale__badge {

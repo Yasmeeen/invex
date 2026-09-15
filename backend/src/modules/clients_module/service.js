@@ -292,6 +292,7 @@ export const getClients = async (req, res) => {
         pipeline: [
           {
             $project: {
+              orderNumber: 1,
               totalPrice: 1,
               createdAt: 1,
               status: 1,
@@ -308,6 +309,8 @@ export const getClients = async (req, res) => {
               "installments.paid": 1,
               "installments.paidAmount": 1,
               "installments.dueDate": 1,
+              "products.name": 1,
+              "products.quantity": 1,
             },
           },
         ],
@@ -633,12 +636,144 @@ export const getClients = async (req, res) => {
                         2,
                       ],
                     },
+                    firstInstallmentAmount: {
+                      $ifNull: [
+                        {
+                          $arrayElemAt: [
+                            {
+                              $map: {
+                                input: {
+                                  $ifNull: ["$$o.installments", []],
+                                },
+                                as: "inst",
+                                in: "$$inst.amount",
+                              },
+                            },
+                            0,
+                          ],
+                        },
+                        0,
+                      ],
+                    },
+                    planMonths: {
+                      $ifNull: [
+                        "$$o.installmentPlanSnapshot.months",
+                        0,
+                      ],
+                    },
+                    financedTotal: {
+                      $add: [
+                        {
+                          $ifNull: ["$$o.installmentPrincipal", 0],
+                        },
+                        {
+                          $ifNull: [
+                            "$$o.installmentInterestAmount",
+                            0,
+                          ],
+                        },
+                      ],
+                    },
+                    productNames: {
+                      $reduce: {
+                        input: { $ifNull: ["$$o.products", []] },
+                        initialValue: "",
+                        in: {
+                          $let: {
+                            vars: {
+                              name: {
+                                $trim: {
+                                  input: {
+                                    $ifNull: ["$$this.name", ""],
+                                  },
+                                },
+                              },
+                              qty: {
+                                $ifNull: ["$$this.quantity", 0],
+                              },
+                            },
+                            in: {
+                              $let: {
+                                vars: {
+                                  piece: {
+                                    $cond: [
+                                      { $eq: ["$$name", ""] },
+                                      "",
+                                      {
+                                        $cond: [
+                                          { $gt: ["$$qty", 1] },
+                                          {
+                                            $concat: [
+                                              "$$name",
+                                              " ×",
+                                              {
+                                                $toString: "$$qty",
+                                              },
+                                            ],
+                                          },
+                                          "$$name",
+                                        ],
+                                      },
+                                    ],
+                                  },
+                                },
+                                in: {
+                                  $cond: [
+                                    { $eq: ["$$piece", ""] },
+                                    "$$value",
+                                    {
+                                      $cond: [
+                                        { $eq: ["$$value", ""] },
+                                        "$$piece",
+                                        {
+                                          $concat: [
+                                            "$$value",
+                                            "، ",
+                                            "$$piece",
+                                          ],
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
                   },
                   in: {
                     orderId: "$$o._id",
                     orderNumber: "$$o.orderNumber",
                     installmentSaleNumber: "$$o.installmentSaleNumber",
                     remainingAmount: "$$remainingAmount",
+                    productNames: "$$productNames",
+                    installmentAmount: {
+                      $round: [
+                        {
+                          $cond: [
+                            {
+                              $gt: ["$$firstInstallmentAmount", 0],
+                            },
+                            "$$firstInstallmentAmount",
+                            {
+                              $cond: [
+                                { $gt: ["$$planMonths", 0] },
+                                {
+                                  $divide: [
+                                    "$$financedTotal",
+                                    "$$planMonths",
+                                  ],
+                                },
+                                0,
+                              ],
+                            },
+                          ],
+                        },
+                        2,
+                      ],
+                    },
                     totalInstallmentsCount: "$$totalCount",
                     paidInstallmentsCount: "$$paidCount",
                     unpaidInstallmentsCount: {

@@ -345,10 +345,6 @@
               </span>
             </div>
             <div class="installment-order-head__details">
-              <span class="installment-order-head__meta-line" *ngIf="clientNickname">
-                {{ 'tr_client_nickname' | translate }}:
-                <strong>{{ clientNickname }}</strong>
-              </span>
               <span class="installment-order-head__meta-line" *ngIf="installmentMonthlyAmount(o) > 0">
                 {{ 'tr_invoice_installment_monthly' | translate }}:
                 <strong>{{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>

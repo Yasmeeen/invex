@@ -2016,3 +2016,410 @@ export const deleteOrder = async (req, res) => {
 
   
 };
+
+function roundMoney2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function pickRequestUserId(req) {
+  return (
+    req?.body?.userId ||
+    req?.body?.user_id ||
+    req?.body?.actorUserId ||
+    req?.query?.userId ||
+    req?.headers?.['x-user-id'] ||
+    req?.user?._id ||
+    null
+  );
+}
+
+async function requireInstallmentAdminActor(req) {
+  const rawId = pickRequestUserId(req);
+  if (!rawId || !mongoose.Types.ObjectId.isValid(String(rawId))) {
+    return { status: 401, error: 'userId is required' };
+  }
+  const user = await User.findById(String(rawId)).select('name role branch').lean();
+  if (!user) {
+    return { status: 401, error: 'User not found' };
+  }
+  if (!['Super Admin', 'Co Admin'].includes(String(user.role || '').trim())) {
+    return { status: 403, error: 'Only Super Admin or Co Admin can perform this action' };
+  }
+  return { user };
+}
+
+function installmentSaleSnapshot(order) {
+  if (!order) return null;
+  return {
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    installmentSaleNumber: order.installmentSaleNumber,
+    clientId: order.clientId,
+    clientName: order.clientName,
+    clientPhoneNumber: order.clientPhoneNumber,
+    totalPrice: order.totalPrice,
+    amountPaid: order.amountPaid,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
+    branch: order.branch,
+    collectorId: order.collectorId,
+    installmentPlanSnapshot: order.installmentPlanSnapshot,
+    products: (order.products || []).map((p) => ({
+      productId: p.productId,
+      name: p.name,
+      code: p.code,
+      quantity: p.quantity,
+      price: p.price,
+    })),
+    installments: (order.installments || []).map((row) => ({
+      _id: row._id,
+      sequence: row.sequence,
+      dueDate: row.dueDate,
+      amount: row.amount,
+      paid: row.paid,
+      paidAmount: row.paidAmount,
+      paidAt: row.paidAt,
+    })),
+  };
+}
+
+/**
+ * POST /api/orders/:orderId/admin-delete
+ * Super Admin / Co Admin — delete installment sale with required reason (audited).
+ * Body: { userId, reason }
+ */
+export const adminDeleteInstallmentSale = async (req, res) => {
+  try {
+    const auth = await requireInstallmentAdminActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    if (reason.length < 3) {
+      return res.status(400).json({ error: 'Deletion reason is required (min 3 characters)' });
+    }
+
+    const { orderId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales can be deleted with this action' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot delete a restored invoice' });
+    }
+
+    const before = installmentSaleSnapshot(order);
+    const saleLabel =
+      order.installmentSaleNumber != null
+        ? `تقسيط #${order.installmentSaleNumber}`
+        : order.orderNumber != null
+          ? `فاتورة #${order.orderNumber}`
+          : String(order._id);
+
+    await Order.findByIdAndDelete(order._id);
+
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'delete',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: saleLabel,
+      message: `${auth.user.role} deleted installment sale ${saleLabel}: ${reason}`,
+      metadata: {
+        reason,
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        clientName: order.clientName,
+        clientPhoneNumber: order.clientPhoneNumber,
+        totalPrice: order.totalPrice,
+        amountPaid: order.amountPaid,
+        adminAction: 'delete_installment_sale',
+      },
+      before,
+    });
+
+    res.json({
+      message: '✅ Installment sale deleted',
+      deletedOrderId: order._id,
+      installmentSaleNumber: order.installmentSaleNumber,
+      orderNumber: order.orderNumber,
+      reason,
+    });
+  } catch (err) {
+    console.error('❌ adminDeleteInstallmentSale:', err.message);
+    res.status(500).json({ error: 'Failed to delete installment sale' });
+  }
+};
+
+/**
+ * PATCH /api/orders/:orderId/installments/:installmentId/admin
+ * Super Admin / Co Admin — edit dueDate and/or amount (optional reason, audited).
+ * Body: { userId, reason?, dueDate?, amount?, applyDueDateShiftToAll? }
+ * When applyDueDateShiftToAll is true, unpaid installments are rebuilt from this
+ * row's new dueDate using monthly sequence offsets (same day-of-month, clamped).
+ */
+export const adminUpdateInstallmentRow = async (req, res) => {
+  try {
+    const auth = await requireInstallmentAdminActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    const applyDueDateShiftToAll = !!req.body?.applyDueDateShiftToAll;
+
+    const hasDueDate = Object.prototype.hasOwnProperty.call(req.body || {}, 'dueDate');
+    const hasAmount = Object.prototype.hasOwnProperty.call(req.body || {}, 'amount');
+    if (!hasDueDate && !hasAmount) {
+      return res.status(400).json({ error: 'Provide dueDate and/or amount to update' });
+    }
+    if (applyDueDateShiftToAll && !hasDueDate) {
+      return res.status(400).json({
+        error: 'applyDueDateShiftToAll requires dueDate',
+      });
+    }
+
+    const { orderId, installmentId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales support this edit' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot edit a restored invoice' });
+    }
+    if (!Array.isArray(order.installments) || !order.installments.length) {
+      return res.status(400).json({ error: 'Order has no installments' });
+    }
+
+    const row =
+      order.installments.id(installmentId) ||
+      order.installments.find((r) => String(r._id) === String(installmentId));
+    if (!row) return res.status(404).json({ error: 'Installment not found' });
+
+    const isInstallmentPaidByClient = (inst) => {
+      if (!inst) return false;
+      if (inst.paid === true) return true;
+      const amt = roundMoney2(inst.amount);
+      const paidAmt = roundMoney2(inst.paidAmount);
+      if (paidAmt > 0.005 && paidAmt >= amt - 0.005) return true;
+      return false;
+    };
+
+    if (isInstallmentPaidByClient(row)) {
+      return res.status(400).json({
+        error: 'Cannot edit an installment that was already paid by the client',
+      });
+    }
+
+    const noonLocal = (value) => {
+      const d = value instanceof Date ? new Date(value) : new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(12, 0, 0, 0);
+      return d;
+    };
+
+    /** Parse YYYY-MM-DD as a local calendar date (avoids UTC midnight day-shift). */
+    const parseDueInput = (rawDue) => {
+      if (typeof rawDue === 'string') {
+        const m = rawDue.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+          return Number.isNaN(date.getTime()) ? null : date;
+        }
+      }
+      return noonLocal(rawDue);
+    };
+
+    /** Add calendar months keeping day-of-month (clamped to month length). */
+    const addCalendarMonths = (baseDate, monthDelta) => {
+      const y = baseDate.getFullYear();
+      const m = baseDate.getMonth();
+      const day = baseDate.getDate();
+      const total = y * 12 + m + monthDelta;
+      const ty = Math.floor(total / 12);
+      const tm = ((total % 12) + 12) % 12;
+      const lastDay = new Date(ty, tm + 1, 0).getDate();
+      return new Date(ty, tm, Math.min(day, lastDay), 12, 0, 0, 0);
+    };
+
+    const beforeInstallments = (order.installments || []).map((r) => ({
+      _id: r._id,
+      sequence: r.sequence,
+      dueDate: r.dueDate,
+      amount: r.amount,
+      paid: r.paid,
+      paidAmount: r.paidAmount,
+    }));
+    const beforeRow = beforeInstallments.find((r) => String(r._id) === String(row._id));
+    const beforeTotal = order.totalPrice;
+    const beforePaymentStatus = order.paymentStatus;
+    const beforeStartDate = order.installmentStartDate;
+
+    let appliedDayOfMonth = null;
+    let shiftedCount = 0;
+
+    if (hasDueDate) {
+      const rawDue = req.body.dueDate;
+      if (rawDue == null || rawDue === '') {
+        return res.status(400).json({ error: 'dueDate cannot be empty' });
+      }
+      const due = parseDueInput(rawDue);
+      if (!due) {
+        return res.status(400).json({ error: 'Invalid dueDate' });
+      }
+
+      if (applyDueDateShiftToAll) {
+        appliedDayOfMonth = due.getDate();
+        const anchorSeq = Number(row.sequence);
+        if (!Number.isFinite(anchorSeq)) {
+          return res.status(400).json({ error: 'Installment sequence is required to update all due dates' });
+        }
+        // Rebuild unpaid schedule from this installment (fixes rows corrupted by older shifts).
+        for (const inst of order.installments) {
+          if (isInstallmentPaidByClient(inst)) continue;
+          const seq = Number(inst.sequence);
+          if (!Number.isFinite(seq)) continue;
+          inst.dueDate = addCalendarMonths(due, seq - anchorSeq);
+          shiftedCount += 1;
+        }
+        const start = addCalendarMonths(due, 1 - anchorSeq);
+        order.installmentStartDate = start;
+        order.markModified('installments');
+      } else {
+        row.dueDate = due;
+        shiftedCount = 1;
+        order.markModified('installments');
+      }
+    }
+
+    if (hasAmount) {
+      const nextAmount = roundMoney2(req.body.amount);
+      if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+        return res.status(400).json({ error: 'amount must be a non-negative number' });
+      }
+      row.amount = nextAmount;
+      const paidAmt = roundMoney2(row.paidAmount);
+      if (paidAmt > nextAmount + 0.001) {
+        return res.status(400).json({
+          error: 'New amount cannot be less than already paid on this installment',
+        });
+      }
+      if (paidAmt > 0 && Math.abs(paidAmt - nextAmount) <= 0.005) {
+        row.paid = true;
+      } else if (paidAmt <= 0.005) {
+        row.paid = false;
+      } else {
+        row.paid = false;
+      }
+
+      const sumInstallments = roundMoney2(
+        (order.installments || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
+      );
+      order.totalPrice = sumInstallments;
+      const paid = roundMoney2(order.amountPaid);
+      if (paid >= sumInstallments - 0.005) {
+        order.paymentStatus = 'paid';
+        order.amountPaid = sumInstallments;
+      } else if (paid > 0) {
+        order.paymentStatus = 'partial';
+      } else {
+        order.paymentStatus = 'unpaid';
+      }
+    }
+
+    await order.save();
+
+    const afterInstallments = (order.installments || []).map((r) => ({
+      _id: r._id,
+      sequence: r.sequence,
+      dueDate: r.dueDate,
+      amount: r.amount,
+      paid: r.paid,
+      paidAmount: r.paidAmount,
+    }));
+    const afterRow = afterInstallments.find((r) => String(r._id) === String(row._id));
+
+    const saleLabel =
+      order.installmentSaleNumber != null
+        ? `تقسيط #${order.installmentSaleNumber}`
+        : order.orderNumber != null
+          ? `فاتورة #${order.orderNumber}`
+          : String(order._id);
+
+    const scopeLabel = applyDueDateShiftToAll
+      ? `all unpaid installments (${shiftedCount}) monthly from #${row.sequence} on day ${appliedDayOfMonth}`
+      : `installment #${row.sequence}`;
+
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'update',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: applyDueDateShiftToAll
+        ? `${saleLabel} · كل الأقساط`
+        : `${saleLabel} · قسط #${row.sequence}`,
+      message: reason
+        ? `${auth.user.role} edited ${scopeLabel} on ${saleLabel}: ${reason}`
+        : `${auth.user.role} edited ${scopeLabel} on ${saleLabel}`,
+      metadata: {
+        reason: reason || undefined,
+        adminAction: applyDueDateShiftToAll
+          ? 'edit_installment_due_day_all'
+          : 'edit_installment_row',
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        installmentId: row._id,
+        installmentSequence: row.sequence,
+        changedDueDate: hasDueDate,
+        changedAmount: hasAmount,
+        applyDueDateShiftToAll,
+        appliedDayOfMonth: applyDueDateShiftToAll ? appliedDayOfMonth : undefined,
+        shiftedInstallmentCount: applyDueDateShiftToAll ? shiftedCount : undefined,
+      },
+      before: {
+        installment: beforeRow,
+        installments: applyDueDateShiftToAll ? beforeInstallments : undefined,
+        installmentStartDate: beforeStartDate,
+        totalPrice: beforeTotal,
+        paymentStatus: beforePaymentStatus,
+      },
+      after: {
+        installment: afterRow,
+        installments: applyDueDateShiftToAll ? afterInstallments : undefined,
+        installmentStartDate: order.installmentStartDate,
+        totalPrice: order.totalPrice,
+        paymentStatus: order.paymentStatus,
+      },
+    });
+
+    res.json({
+      message: applyDueDateShiftToAll
+        ? '✅ Installment due dates updated'
+        : '✅ Installment updated',
+      orderId: order._id,
+      installment: afterRow,
+      installments: applyDueDateShiftToAll ? afterInstallments : undefined,
+      shiftedInstallmentCount: applyDueDateShiftToAll ? shiftedCount : undefined,
+      appliedDayOfMonth: applyDueDateShiftToAll ? appliedDayOfMonth : undefined,
+      totalPrice: order.totalPrice,
+      paymentStatus: order.paymentStatus,
+      reason,
+    });
+  } catch (err) {
+    console.error('❌ adminUpdateInstallmentRow:', err.message);
+    res.status(500).json({ error: 'Failed to update installment' });
+  }
+};

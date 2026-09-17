@@ -41,6 +41,14 @@ import {
   PromiseToPayDialogComponent,
   PromiseToPayDialogResult,
 } from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.component';
+import {
+  AdminDeleteSaleDialogComponent,
+  AdminDeleteSaleDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-delete-sale-dialog.component';
+import {
+  AdminEditInstallmentDialogComponent,
+  AdminEditInstallmentDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-edit-installment-dialog.component';
 import { Subscription } from 'rxjs';
 
 export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
@@ -73,6 +81,9 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   showBranchPicker = false;
   branches: Branch[] = [];
 
+  /** Super Admin / Co Admin can delete installment sales / edit installment rows. */
+  canAdminInstallments = false;
+
   private routeSub?: Subscription;
 
   constructor(
@@ -92,6 +103,8 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     const ctx = resolveActorBranchContext(actor, null);
     this.paymentBranchId = ctx.branchId;
     this.showBranchPicker = ctx.showBranchPicker;
+    const role = String(actor?.role || '');
+    this.canAdminInstallments = role === 'Super Admin' || role === 'Co Admin';
   }
 
   ngOnInit(): void {
@@ -692,6 +705,15 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return this.canPayOrder(order) && this.installmentRowRemaining(row) > 0.005;
   }
 
+  /** Admin may edit only unpaid installments (client-paid rows are locked). */
+  canAdminEditInstallmentRow(row: {
+    paid?: boolean;
+    amount?: number;
+    paidAmount?: number;
+  }): boolean {
+    return this.installmentRowRemaining(row) > 0.005;
+  }
+
   setInstallmentPromise(
     order: ClientHistoryOrderRow,
     row: {
@@ -741,6 +763,114 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
           this.notify.push(msg, 'error');
         },
       });
+    });
+  }
+
+  currentUserId(): string | null {
+    const u = this.auth.getUserFromLocalStorage();
+    return normalizeMongoId(u?._id || u?.id) || null;
+  }
+
+  adminDeleteInstallmentSale(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.canAdminInstallments) return;
+    const orderId = normalizeMongoId(order._id);
+    const userId = this.currentUserId();
+    if (!orderId || !userId) return;
+
+    const ref = this.dialog.open(AdminDeleteSaleDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        clientName: this.clientTitle,
+        totalPrice: order.totalPrice,
+        productNames: this.installmentProductNames(order),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminDeleteSaleDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders.adminDeleteInstallmentSale(orderId, { userId, reason: result.reason }).subscribe({
+        next: () => {
+          this.notify.push(this.translate.instant('tr_admin_delete_installment_sale_ok'), 'success');
+          this.afterBalanceChange();
+        },
+        error: (err) => {
+          const msg =
+            err?.error?.error || err?.error?.message || this.translate.instant('tr_unexpected_error_message');
+          this.notify.push(msg, 'error');
+        },
+      });
+    });
+  }
+
+  adminEditInstallmentRow(
+    order: ClientHistoryOrderRow,
+    row: {
+      _id?: string;
+      sequence?: number;
+      dueDate?: string;
+      amount?: number;
+      paidAmount?: number;
+      paid?: boolean;
+    }
+  ): void {
+    if (!this.canAdminInstallments) return;
+    if (!this.canAdminEditInstallmentRow(row)) {
+      this.notify.push(this.translate.instant('tr_admin_edit_paid_installment_blocked'), 'error');
+      return;
+    }
+    const orderId = normalizeMongoId(order._id);
+    const installmentId = normalizeMongoId(row._id);
+    const userId = this.currentUserId();
+    if (!orderId || !installmentId || !userId) return;
+
+    const ref = this.dialog.open(AdminEditInstallmentDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        sequence: row.sequence,
+        dueDate: row.dueDate,
+        amount: row.amount,
+        paidAmount: row.paidAmount,
+        installmentCount: Array.isArray(order.installments) ? order.installments.length : 0,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminEditInstallmentDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders
+        .adminUpdateInstallmentRow(orderId, installmentId, {
+          userId,
+          reason: result.reason,
+          dueDate: result.dueDate,
+          amount: result.amount,
+          applyDueDateShiftToAll: result.applyDueDateShiftToAll,
+        })
+        .subscribe({
+          next: () => {
+            const okKey = result.applyDueDateShiftToAll
+              ? 'tr_admin_edit_due_shift_all_ok'
+              : 'tr_admin_edit_installment_ok';
+            this.notify.push(this.translate.instant(okKey), 'success');
+            this.afterBalanceChange();
+          },
+          error: (err) => {
+            const msg =
+              err?.error?.error || err?.error?.message || this.translate.instant('tr_unexpected_error_message');
+            this.notify.push(msg, 'error');
+          },
+        });
     });
   }
 

@@ -76,6 +76,33 @@ setInstallmentPromise(
   );
 }
 
+/** Super Admin / Co Admin: delete installment sale with required reason (audited). */
+adminDeleteInstallmentSale(
+  orderId: string,
+  payload: { userId: string; reason: string }
+): Observable<any> {
+  return this.http.post(`${ORDERS_URL}/${orderId}/admin-delete`, payload);
+}
+
+/** Super Admin / Co Admin: edit installment dueDate/amount (optional reason, audited). */
+adminUpdateInstallmentRow(
+  orderId: string,
+  installmentId: string,
+  payload: {
+    userId: string;
+    reason?: string;
+    dueDate?: string;
+    amount?: number;
+    /** Rebuild unpaid installments monthly from this dueDate (same day of month). */
+    applyDueDateShiftToAll?: boolean;
+  }
+): Observable<any> {
+  return this.http.patch(
+    `${ORDERS_URL}/${orderId}/installments/${installmentId}/admin`,
+    payload
+  );
+}
+
 restoreOrder(
   orderId: string,
   payload: {

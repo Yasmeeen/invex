@@ -1,0 +1,99 @@
+.admin-inst-dialog {
+  display: block;
+  min-width: min(420px, 92vw);
+  max-width: 520px;
+  padding: 1.25rem 1.35rem 1.1rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+  color: #111827;
+}
+
+.admin-inst-dialog__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.admin-inst-dialog__confirm {
+  margin: 0 0 0.85rem;
+  color: #5c6570;
+  line-height: 1.45;
+}
+
+.admin-inst-dialog__details {
+  margin: 0 0 1rem;
+  padding-inline-start: 1.1rem;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.admin-inst-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+
+  span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  em {
+    color: #c0392b;
+    font-style: normal;
+  }
+
+  textarea.s-control {
+    resize: vertical;
+    min-height: 72px;
+  }
+}
+
+.admin-inst-dialog__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+
+  input {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+  }
+}
+
+.admin-inst-dialog__hint {
+  margin: 0 0 0.85rem;
+  padding-inline-start: 1.55rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #6b7280;
+}
+
+.admin-inst-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-danger {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+
+  &:disabled {
+    opacity: 0.55;
+  }
+}

@@ -1,0 +1,70 @@
+<div class="admin-inst-dialog">
+  <h2 class="admin-inst-dialog__title">{{ 'tr_admin_edit_installment' | translate }}</h2>
+
+  <p class="admin-inst-dialog__confirm">
+    {{ 'tr_admin_edit_installment_confirm' | translate }}
+  </p>
+
+  <ul class="admin-inst-dialog__details" *ngIf="data">
+    <li *ngIf="data.installmentSaleNumber != null">
+      {{ 'tr_installment_sale_number' | translate }}: <strong>#{{ data.installmentSaleNumber }}</strong>
+    </li>
+    <li *ngIf="data.sequence != null">
+      {{ 'tr_installments' | translate }}: <strong>#{{ data.sequence }}</strong>
+    </li>
+  </ul>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_installment_due_date' | translate }}</span>
+    <input type="date" class="s-control" name="dueDate" [(ngModel)]="dueDate" />
+  </label>
+
+  <label class="admin-inst-dialog__check" *ngIf="showApplyToAll">
+    <input
+      type="checkbox"
+      name="applyDueDateShiftToAll"
+      [(ngModel)]="applyDueDateShiftToAll"
+    />
+    <span>{{ 'tr_admin_edit_due_shift_all' | translate }}</span>
+  </label>
+  <p class="admin-inst-dialog__hint" *ngIf="showApplyToAll && applyDueDateShiftToAll">
+    {{ 'tr_admin_edit_due_shift_all_hint' | translate }}
+  </p>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_amount' | translate }}</span>
+    <input
+      type="number"
+      class="s-control"
+      name="amount"
+      min="0"
+      step="0.01"
+      [(ngModel)]="amount"
+    />
+  </label>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_admin_edit_reason' | translate }}</span>
+    <textarea
+      class="s-control"
+      rows="3"
+      name="reason"
+      [(ngModel)]="reason"
+      [placeholder]="'tr_admin_edit_reason_placeholder' | translate"
+    ></textarea>
+  </label>
+
+  <div class="admin-inst-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      [disabled]="!canSubmit"
+      (click)="submit()"
+    >
+      {{ 'tr_save' | translate }}
+    </button>
+  </div>
+</div>

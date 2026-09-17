@@ -81,7 +81,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   showBranchPicker = false;
   branches: Branch[] = [];
 
-  /** Super Admin / Co Admin can delete installment sales / edit installment rows. */
+  /** Super Admin can delete installment sales / edit installment rows. */
   canAdminInstallments = false;
 
   private routeSub?: Subscription;
@@ -104,7 +104,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     this.paymentBranchId = ctx.branchId;
     this.showBranchPicker = ctx.showBranchPicker;
     const role = String(actor?.role || '');
-    this.canAdminInstallments = role === 'Super Admin' || role === 'Co Admin';
+    this.canAdminInstallments = role === 'Super Admin';
   }
 
   ngOnInit(): void {

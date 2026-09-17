@@ -2042,8 +2042,8 @@ async function requireInstallmentAdminActor(req) {
   if (!user) {
     return { status: 401, error: 'User not found' };
   }
-  if (!['Super Admin', 'Co Admin'].includes(String(user.role || '').trim())) {
-    return { status: 403, error: 'Only Super Admin or Co Admin can perform this action' };
+  if (String(user.role || '').trim() !== 'Super Admin') {
+    return { status: 403, error: 'Only Super Admin can perform this action' };
   }
   return { user };
 }
@@ -2085,7 +2085,7 @@ function installmentSaleSnapshot(order) {
 
 /**
  * POST /api/orders/:orderId/admin-delete
- * Super Admin / Co Admin — delete installment sale with required reason (audited).
+ * Super Admin — delete installment sale with required reason (audited).
  * Body: { userId, reason }
  */
 export const adminDeleteInstallmentSale = async (req, res) => {
@@ -2160,7 +2160,7 @@ export const adminDeleteInstallmentSale = async (req, res) => {
 
 /**
  * PATCH /api/orders/:orderId/installments/:installmentId/admin
- * Super Admin / Co Admin — edit dueDate and/or amount (optional reason, audited).
+ * Super Admin — edit dueDate and/or amount (optional reason, audited).
  * Body: { userId, reason?, dueDate?, amount?, applyDueDateShiftToAll? }
  * When applyDueDateShiftToAll is true, unpaid installments are rebuilt from this
  * row's new dueDate using monthly sequence offsets (same day-of-month, clamped).

@@ -76,7 +76,7 @@ setInstallmentPromise(
   );
 }
 
-/** Super Admin / Co Admin: delete installment sale with required reason (audited). */
+/** Super Admin: delete installment sale with required reason (audited). */
 adminDeleteInstallmentSale(
   orderId: string,
   payload: { userId: string; reason: string }
@@ -84,7 +84,7 @@ adminDeleteInstallmentSale(
   return this.http.post(`${ORDERS_URL}/${orderId}/admin-delete`, payload);
 }
 
-/** Super Admin / Co Admin: edit installment dueDate/amount (optional reason, audited). */
+/** Super Admin: edit installment dueDate/amount (optional reason, audited). */
 adminUpdateInstallmentRow(
   orderId: string,
   installmentId: string,

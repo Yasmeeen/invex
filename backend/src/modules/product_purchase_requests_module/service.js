@@ -32,6 +32,7 @@ import {
 } from '../../utils/purchase-treasury-splits.js';
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
 import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import { parseBarcodeInstallmentPlans } from '../../utils/product-barcode-installments.js';
 
 function ecommerceCatalogFieldsFromSource(src) {
   const ecommercePriceRaw = src?.ecommercePrice;
@@ -43,6 +44,7 @@ function ecommerceCatalogFieldsFromSource(src) {
       ecommercePrice = !Number.isNaN(branchPrice) && n === branchPrice ? null : n;
     }
   }
+  const barcodeInstallmentPlans = parseBarcodeInstallmentPlans(src);
   return {
     listedOnEcommerce: src?.listedOnEcommerce === true || src?.listedOnEcommerce === 'true',
     ecommerceDescription: String(src?.ecommerceDescription || '').trim().slice(0, 50000),
@@ -53,6 +55,7 @@ function ecommerceCatalogFieldsFromSource(src) {
       .slice(0, 160),
     ecommerceIsFeatured: src?.ecommerceIsFeatured === true || src?.ecommerceIsFeatured === 'true',
     ecommercePrice,
+    ...(barcodeInstallmentPlans !== undefined ? { barcodeInstallmentPlans } : {}),
   };
 }
 
@@ -165,6 +168,9 @@ function applyPurchaseRevive(existing, { name, payload, quantity, acquiredFromFi
         existing.ecommercePrice = !Number.isNaN(branchPrice) && n === branchPrice ? null : n;
       }
     }
+  }
+  if (Object.prototype.hasOwnProperty.call(payload || {}, 'barcodeInstallmentPlans')) {
+    existing.barcodeInstallmentPlans = parseBarcodeInstallmentPlans(payload) ?? [];
   }
   if (acquiredFromFields && typeof acquiredFromFields === 'object') {
     Object.assign(existing, acquiredFromFields);

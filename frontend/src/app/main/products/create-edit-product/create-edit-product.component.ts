@@ -16,8 +16,13 @@ import { NgForm } from '@angular/forms';
 import { Branch, Category, OrderPartyType, Product, ProductAcquiredFrom } from '@core/models/products.model';
 import {
   productBarcodeAttributeValues,
+  productBarcodeInstallmentLines,
+  productInstallmentMonthlyAmount,
+  productInstallmentTotalAmount,
   ProductsSerivce,
 } from '@shared/services/products.service';
+import { InstallmentPlansService, InstallmentPlan } from '@shared/services/installment-plans.service';
+import { ProductBarcodeInstallmentPlan } from '@core/models/products.model';
 import { forkJoin, Observable, of, Subject, Subscription } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { CategoriesServce } from '@shared/services/categories.service';
@@ -44,7 +49,7 @@ import { VendorsSerivce } from '@shared/services/vendors.service';
   styleUrls: ['./create-edit-product.component.scss']
 })
 export class CreateEditProductComponent implements OnInit, OnDestroy {
-  activeTab: 'basic' | 'units' | 'payment' | 'extra' | 'ecommerce' = 'basic';
+  activeTab: 'basic' | 'units' | 'payment' | 'extra' | 'ecommerce' | 'installments' = 'basic';
   sourcePartyForm: FormGroup;
   sourcePartyType: OrderPartyType = 'client';
   isExistingSourceClient = false;
@@ -119,6 +124,21 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   ecommercePrice: number | null = null;
   /** True when the user set a store price different from the branch price. */
   private ecommercePriceLocked = false;
+  /** Available installment plans from settings (enabled). */
+  availableInstallmentPlans: InstallmentPlan[] = [];
+  /** Selected plan ids for this product (optional tab). */
+  selectedInstallmentPlanIds: string[] = [];
+  /**
+   * Rows for selected plans — kept in sync with selection; showOnBarcode is per-plan.
+   * Persisted as product.barcodeInstallmentPlans.
+   */
+  productInstallmentRows: Array<{
+    planId: string;
+    name: string;
+    months: number;
+    interestPercent: number;
+    showOnBarcode: boolean;
+  }> = [];
   /** Index of unit currently uploading an image, or null. */
   uploadingUnitImageIndex: number | null = null;
   /** Cashier desk: resolved branch name when branch selection is fixed by caller. */
@@ -150,7 +170,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     private storeSettings: StoreSettingsService,
     private fb: FormBuilder,
     private ordersSerivce: OrdersSerivce,
-    private vendorsSerivce: VendorsSerivce
+    private vendorsSerivce: VendorsSerivce,
+    private installmentPlansService: InstallmentPlansService
   ) {
     this.sourcePartyForm = this.fb.group({
       phone: [''],
@@ -447,6 +468,117 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     if (this.activeTab === 'ecommerce' && !this.showEcommerceTab) {
       this.activeTab = 'basic';
     }
+  }
+
+  /** Cash selling price used to preview installment amounts. */
+  get installmentPreviewCashPrice(): number {
+    const raw =
+      this.basicInfoForm?.form?.get('price')?.value ??
+      this.basicInfoForm?.value?.price ??
+      this.product?.price;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  installmentRowMonthly(row: { interestPercent: number; months: number }): number {
+    return productInstallmentMonthlyAmount(
+      this.installmentPreviewCashPrice,
+      row.interestPercent,
+      row.months
+    );
+  }
+
+  installmentRowTotal(row: { interestPercent: number }): number {
+    return productInstallmentTotalAmount(
+      this.installmentPreviewCashPrice,
+      row.interestPercent
+    );
+  }
+
+  onSelectedInstallmentPlansChange(ids: string[] | null): void {
+    const nextIds = Array.isArray(ids) ? ids.map((id) => String(id)).filter(Boolean) : [];
+    this.selectedInstallmentPlanIds = nextIds;
+    const prevById = new Map(this.productInstallmentRows.map((r) => [r.planId, r]));
+    this.productInstallmentRows = nextIds.map((planId) => {
+      const existing = prevById.get(planId);
+      if (existing) {
+        return existing;
+      }
+      const plan = this.availableInstallmentPlans.find((p) => String(p._id) === planId);
+      return {
+        planId,
+        name: String(plan?.name || '').trim(),
+        months: Math.max(1, Math.floor(Number(plan?.months) || 1)),
+        interestPercent: Math.max(0, Number(plan?.interestPercent) || 0),
+        showOnBarcode: true,
+      };
+    });
+  }
+
+  private buildBarcodeInstallmentPlansPayload(): ProductBarcodeInstallmentPlan[] {
+    return (this.productInstallmentRows || []).map((r) => ({
+      planId: r.planId,
+      showOnBarcode: r.showOnBarcode !== false,
+      name: r.name,
+      months: r.months,
+      interestPercent: r.interestPercent,
+    }));
+  }
+
+  private getBarcodeInstallmentLinesForPrint(
+    cashPrice?: number
+  ): Array<{ label: string; total: number; monthly: number }> {
+    const price =
+      cashPrice != null && Number.isFinite(cashPrice)
+        ? cashPrice
+        : this.getBarcodePrintPrice() ?? this.installmentPreviewCashPrice;
+    return productBarcodeInstallmentLines(this.buildBarcodeInstallmentPlansPayload(), price);
+  }
+
+  private hydrateInstallmentRowsFromProduct(response: any): void {
+    const saved = Array.isArray(response?.barcodeInstallmentPlans)
+      ? response.barcodeInstallmentPlans
+      : [];
+    const rows: Array<{
+      planId: string;
+      name: string;
+      months: number;
+      interestPercent: number;
+      showOnBarcode: boolean;
+    }> = [];
+    for (const row of saved) {
+      const planId = String(row?.planId?._id || row?.planId || '').trim();
+      if (!planId) continue;
+      const live = this.availableInstallmentPlans.find((p) => String(p._id) === planId);
+      rows.push({
+        planId,
+        name: String(live?.name || row?.name || '').trim(),
+        months: Math.max(1, Math.floor(Number(live?.months ?? row?.months) || 1)),
+        interestPercent: Math.max(
+          0,
+          Number(live?.interestPercent ?? row?.interestPercent) || 0
+        ),
+        showOnBarcode: row?.showOnBarcode !== false,
+      });
+    }
+    this.productInstallmentRows = rows;
+    this.selectedInstallmentPlanIds = rows.map((r) => r.planId);
+  }
+
+  private loadInstallmentPlans(): void {
+    this.subscriptions.push(
+      this.installmentPlansService.list(true).subscribe({
+        next: (res) => {
+          this.availableInstallmentPlans = res?.plans || [];
+          if (this.isEdit && this.product) {
+            this.hydrateInstallmentRowsFromProduct(this.product);
+          }
+        },
+        error: () => {
+          this.availableInstallmentPlans = [];
+        },
+      })
+    );
   }
 
   /** Popup title: desk purchase vs exchange trade-in vs default. */
@@ -1097,8 +1229,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       return;
     }
     const printPrice = price !== undefined ? price : this.getBarcodePrintPrice();
+    const installmentLines = this.getBarcodeInstallmentLinesForPrint(printPrice);
     const reqs: Observable<string>[] = cleanCodes.map((c) =>
-      this.productsSerivce.getBarcodeImage(c, productName, bv, printPrice) as Observable<string>
+      this.productsSerivce.getBarcodeImage(
+        c,
+        productName,
+        bv,
+        printPrice,
+        installmentLines
+      ) as Observable<string>
     );
     forkJoin(reqs).subscribe({
       next: (parts: string[]) => {
@@ -1129,11 +1268,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     const reqs: Observable<string>[] = clean.map((u) => {
       const bv = productBarcodeAttributeValues(this.selectedCategory!, u.attributes || {});
       const printPrice = this.showPriceOnBarcode ? u.price : undefined;
+      const installmentLines = this.getBarcodeInstallmentLinesForPrint(
+        Number.isFinite(Number(u.price)) ? Number(u.price) : undefined
+      );
       return this.productsSerivce.getBarcodeImage(
         String(u.code).trim(),
         productName,
         bv,
-        printPrice
+        printPrice,
+        installmentLines
       ) as Observable<string>;
     });
     forkJoin(reqs).subscribe({
@@ -1197,6 +1340,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     }
     this.getCategories();
     this.getBranches();
+    this.loadInstallmentPlans();
     if(this.isEdit){
     this.getProductData()
      
@@ -1382,6 +1526,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       }
       this.refreshCategoryDropdownItems();
       this.patchSourcePartyFromProduct(response);
+      this.hydrateInstallmentRowsFromProduct(response);
     });
   }
 
@@ -2131,6 +2276,7 @@ private submitDeskPurchaseRequest(): void {
     deskProduct.ecommerceIsFeatured = Boolean(this.ecommerceIsFeatured);
     deskProduct.ecommercePrice = this.resolveEcommercePricePayload();
   }
+  deskProduct.barcodeInstallmentPlans = this.buildBarcodeInstallmentPlansPayload();
 
   const isExchangeTradeIn = !!this.data?.exchangeFlow;
   const appendToPurchaseId = String(this.data?.appendToExchangePurchaseId || '').trim();
@@ -2190,7 +2336,8 @@ private submitDeskPurchaseRequest(): void {
           const deskPrintPrice = this.getBarcodePrintPrice(
             deskUnitDetails?.[0]?.price ?? priceNum
           );
-          this.productsSerivce.getBarcodeImage(single, nameStr, bv, deskPrintPrice).subscribe({
+          const deskIpLines = this.getBarcodeInstallmentLinesForPrint(deskPrintPrice);
+          this.productsSerivce.getBarcodeImage(single, nameStr, bv, deskPrintPrice, deskIpLines).subscribe({
             next: (html: any) => {
               this.printHtml(html);
               finish();
@@ -2317,6 +2464,7 @@ createProduct() {
   if (this.showEcommerceTab) {
     payload.ecommercePrice = this.resolveEcommercePricePayload();
   }
+  payload.barcodeInstallmentPlans = this.buildBarcodeInstallmentPlansPayload();
   if (createUnitDetails?.length) {
     payload.price = createUnitDetails[0].price;
     payload.netPrice = createUnitDetails[0].netPrice;
@@ -2365,10 +2513,11 @@ createProduct() {
           payload.attributes
         );
         const printPrice = this.getBarcodePrintPrice(payload.price);
+        const ipLines = this.getBarcodeInstallmentLinesForPrint(printPrice);
         if (codes.length > 1) {
           this.printBarcodeStickers(names, codes, bv, () => this.closeModal(), printPrice);
         } else if (codes.length === 1) {
-          this.productsSerivce.getBarcodeImage(codes[0], names, bv, printPrice).subscribe({
+          this.productsSerivce.getBarcodeImage(codes[0], names, bv, printPrice, ipLines).subscribe({
             next: (html: any) => {
               this.printHtml(html);
               this.closeModal();
@@ -2477,6 +2626,7 @@ updateProduct() {
   if (this.showEcommerceTab) {
     payload.ecommercePrice = this.resolveEcommercePricePayload();
   }
+  payload.barcodeInstallmentPlans = this.buildBarcodeInstallmentPlansPayload();
 
   this.productsSerivce.updateProduct(payload, this.productId).subscribe(
     (res: any) => {
@@ -2489,9 +2639,10 @@ updateProduct() {
       const names = String(payload.name || '').trim();
       const code = String(this.codeValue || payload.code || '').trim();
       const printPrice = this.getBarcodePrintPrice(payload.price);
+      const ipLines = this.getBarcodeInstallmentLinesForPrint(printPrice);
 
       if (code) {
-        this.productsSerivce.getBarcodeImage(code, names, bv, printPrice).subscribe({
+        this.productsSerivce.getBarcodeImage(code, names, bv, printPrice, ipLines).subscribe({
           next: (html: any) => {
             this.printHtml(html);
             this.closeModal(true);

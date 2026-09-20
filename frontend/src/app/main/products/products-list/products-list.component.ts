@@ -12,6 +12,7 @@ import { Branch, Category, Product } from '@core/models/products.model';
 import { CreateEditProductComponent } from '../create-edit-product/create-edit-product.component';
 import {
   productBarcodeAttributeValues,
+  productBarcodeInstallmentLines,
   ProductsSerivce,
 } from '@shared/services/products.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -776,8 +777,12 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       product.price != null && Number.isFinite(Number(product.price))
         ? Number(product.price)
         : undefined;
+    const installmentLines = productBarcodeInstallmentLines(
+      product.barcodeInstallmentPlans,
+      printPrice ?? 0
+    );
     this.productsService
-      .getBarcodeImage(product.code, product.name, bv, printPrice)
+      .getBarcodeImage(product.code, product.name, bv, printPrice, installmentLines)
       .subscribe((html: any) => {
         this.printHtml(html);
       });

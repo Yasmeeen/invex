@@ -42,6 +42,7 @@ export interface DeskPurchaseProductPayload {
   ecommerceShortDescription?: string;
   ecommerceIsFeatured?: boolean;
   ecommercePrice?: number | null;
+  barcodeInstallmentPlans?: import('@core/models/products.model').ProductBarcodeInstallmentPlan[];
 }
 
 @Injectable({ providedIn: 'root' })

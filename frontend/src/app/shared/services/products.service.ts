@@ -2,9 +2,10 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BASE_URL, PRODUCT_CREATE_PRODUCT_URL, PRODUCT_DELETE_PRODUCT_URL, PRODUCT_STATS, PRODUCT_UPDATE_PRODUCT_URL, PRODUCTS_IMPORT_EXCEL_URL, PRODUCTS_IMPORT_METADATA_URL, PRODUCTS_INVENTORY_AUDIT_URL, PRODUCTS_URL, PURCHASING_URL } from '@core/base/urls';
 import { AppNotificationService } from './app-notification.service';
-import { Category, Product, ProductHistoryResponse, ProductSerialTrackResponse } from '@core/models/products.model';
+import { Category, Product, ProductBarcodeInstallmentPlan, ProductHistoryResponse, ProductSerialTrackResponse } from '@core/models/products.model';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
+import { roundMoney } from '@shared/utils/credit-sale-markup.util';
 
 export type ProductsImportMetadata = {
   branches: Array<{ _id: string; name: string }>;
@@ -129,7 +130,17 @@ getProducts(params: any) {
     });
   }
 
-  getBarcodeImage(code: string, productName: string, barcodeValues?: string[], price?: number) {
+  getBarcodeImage(
+    code: string,
+    productName: string,
+    barcodeValues?: string[],
+    price?: number,
+    installmentLines?: Array<{
+      label: string;
+      total?: number | string;
+      monthly: number | string;
+    }>
+  ) {
     let params = new HttpParams().set('name', productName);
     const parts = (barcodeValues || [])
       .map((v) => String(v ?? '').trim())
@@ -141,6 +152,20 @@ getProducts(params: any) {
     }
     if (price != null && Number.isFinite(price)) {
       params = params.set('price', String(price));
+    }
+    const ipParts = (installmentLines || [])
+      .map((row) => {
+        const label = String(row?.label ?? '').trim().replace(/::/g, ' ').replace(/\|/g, ' ');
+        if (!label) return '';
+        const total = String(row?.total ?? '').trim();
+        const monthly = String(row?.monthly ?? '').trim();
+        if (!monthly) return '';
+        // name::deviceTotal::monthlyInstallment
+        return `${label}::${total || '0'}::${monthly}`;
+      })
+      .filter(Boolean);
+    if (ipParts.length) {
+      params = params.set('ip', ipParts.join('|'));
     }
     return this.http.get(`${PRODUCTS_URL}/barcode/${encodeURIComponent(code)}`, {
       params,
@@ -344,6 +369,65 @@ export function productBarcodeAttributeValues(
     if (v != null && String(v).trim() !== '') {
       out.push(String(v).trim());
     }
+  }
+  return out;
+}
+
+/** Monthly installment from cash price + plan interest (matches cashier schedule base). */
+export function productInstallmentMonthlyAmount(
+  cashPrice: number,
+  interestPercent: number,
+  months: number
+): number {
+  const price = roundMoney(cashPrice);
+  const monthsN = Math.max(1, Math.floor(Number(months) || 1));
+  const rate = Math.max(0, Number(interestPercent) || 0) / 100;
+  const totalDue = roundMoney(price * (1 + rate));
+  if (totalDue <= 0) {
+    return 0;
+  }
+  return Math.floor((totalDue / monthsN) * 100) / 100;
+}
+
+export function productInstallmentTotalAmount(
+  cashPrice: number,
+  interestPercent: number
+): number {
+  const price = roundMoney(cashPrice);
+  const rate = Math.max(0, Number(interestPercent) || 0) / 100;
+  return roundMoney(price * (1 + rate));
+}
+
+/** Lines for barcode `ip` query from saved product plans (showOnBarcode only). */
+export function productBarcodeInstallmentLines(
+  plans: ProductBarcodeInstallmentPlan[] | undefined | null,
+  cashPrice: number
+): Array<{ label: string; total: number; monthly: number }> {
+  if (!Array.isArray(plans) || !plans.length) {
+    return [];
+  }
+  const price = Number(cashPrice);
+  if (!Number.isFinite(price)) {
+    return [];
+  }
+  const out: Array<{ label: string; total: number; monthly: number }> = [];
+  for (const row of plans) {
+    if (row?.showOnBarcode === false) {
+      continue;
+    }
+    const months = Math.max(1, Math.floor(Number(row?.months) || 0));
+    if (months < 1) {
+      continue;
+    }
+    const interest = Number(row?.interestPercent) || 0;
+    const total = productInstallmentTotalAmount(price, interest);
+    const monthly = productInstallmentMonthlyAmount(price, interest, months);
+    if (monthly <= 0 || total <= 0) {
+      continue;
+    }
+    const name = String(row?.name || '').trim();
+    const label = name || `${months}ش`;
+    out.push({ label, total, monthly });
   }
   return out;
 }

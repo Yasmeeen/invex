@@ -65,6 +65,17 @@
                     <span class="text-muted size-small">({{ 'tr_optional' | translate }})</span>
                   </button>
                 </li>
+                <li>
+                  <button
+                    type="button"
+                    class="product-form-tabs__btn"
+                    [class.product-form-tabs__btn--active]="activeTab === 'installments'"
+                    (click)="activeTab = 'installments'"
+                  >
+                    {{ 'tr_product_tab_installments' | translate }}
+                    <span class="text-muted size-small">({{ 'tr_optional' | translate }})</span>
+                  </button>
+                </li>
                 <li *ngIf="showEcommerceTab">
                   <button
                     type="button"
@@ -1047,6 +1058,81 @@
                     </p>
                   </div>
 
+                </div>
+                <div class="row" [hidden]="activeTab !== 'installments'">
+                  <div class="col-md-12">
+                    <p class="text-muted size-small m-0 mb-3">
+                      {{ 'tr_product_installments_tab_hint' | translate }}
+                    </p>
+                    <div class="form-group">
+                      <label>{{ 'tr_product_installments_select' | translate }}</label>
+                      <div class="input-with-icon bg-white">
+                        <ng-select
+                          class="s-control s-select"
+                          [items]="availableInstallmentPlans"
+                          bindLabel="name"
+                          bindValue="_id"
+                          [multiple]="true"
+                          [closeOnSelect]="false"
+                          [clearable]="true"
+                          [searchable]="true"
+                          placeholder="{{ 'tr_product_installments_select_ph' | translate }}"
+                          [(ngModel)]="selectedInstallmentPlanIds"
+                          [ngModelOptions]="{ standalone: true }"
+                          name="productInstallmentPlans"
+                          appendTo="#create-edit-product-modal-root"
+                          (ngModelChange)="onSelectedInstallmentPlansChange($event)"
+                        >
+                          <ng-template ng-option-tmp let-item="item">
+                            <span>{{ item.name }}</span>
+                            <span class="text-muted">
+                              — {{ item.months }} {{ 'tr_months_short' | translate }}
+                              ({{ item.interestPercent }}%)
+                            </span>
+                          </ng-template>
+                        </ng-select>
+                        <i class="fa fa-caret-down input-icon"></i>
+                      </div>
+                      <p
+                        class="text-muted size-small m-0 mt-1"
+                        *ngIf="!availableInstallmentPlans?.length"
+                      >
+                        {{ 'tr_product_installments_none_configured' | translate }}
+                      </p>
+                    </div>
+
+                    <div
+                      class="product-installment-row"
+                      *ngFor="let row of productInstallmentRows"
+                    >
+                      <div class="product-installment-row__head">
+                        <strong>{{ row.name || ('tr_installment_plan_name' | translate) }}</strong>
+                        <span class="text-muted size-small">
+                          {{ row.months }} {{ 'tr_months_short' | translate }}
+                          · {{ row.interestPercent }}%
+                        </span>
+                      </div>
+                      <div class="product-installment-row__prices size-small">
+                        <span>
+                          {{ 'tr_product_installment_monthly' | translate }}:
+                          <strong>{{ installmentRowMonthly(row) | number:'1.0-2' }} EGP</strong>
+                        </span>
+                        <span>
+                          {{ 'tr_product_installment_total' | translate }}:
+                          <strong>{{ installmentRowTotal(row) | number:'1.0-2' }} EGP</strong>
+                        </span>
+                      </div>
+                      <label class="product-installment-row__barcode">
+                        <input
+                          type="checkbox"
+                          [(ngModel)]="row.showOnBarcode"
+                          [ngModelOptions]="{ standalone: true }"
+                          [name]="'showIpBarcode_' + row.planId"
+                        />
+                        <span>{{ 'tr_product_installment_show_on_barcode' | translate }}</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <div class="row" [hidden]="activeTab !== 'extra'">
                   <div class="col-md-12">

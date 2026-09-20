@@ -1,5 +1,14 @@
 
 
+/** Installment plan snapshot saved on a product for barcode stickers. */
+export interface ProductBarcodeInstallmentPlan {
+  planId: string;
+  showOnBarcode?: boolean;
+  name?: string;
+  months?: number;
+  interestPercent?: number;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -40,6 +49,11 @@ export interface Product {
    * null/undefined = use branch `price` automatically.
    */
   ecommercePrice?: number | null;
+  /**
+   * Optional installment plans saved on the product for barcode stickers.
+   * When printing from the list, entries with showOnBarcode are rendered.
+   */
+  barcodeInstallmentPlans?: ProductBarcodeInstallmentPlan[];
   /** @deprecated Use bookedQuantity + bookings API */
   activeBooking?: ProductActiveBooking | null;
   /** Product photo URL (e.g. Cloudinary https) */

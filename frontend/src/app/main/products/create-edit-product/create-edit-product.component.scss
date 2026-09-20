@@ -45,6 +45,38 @@
   border-bottom-color: var(--primary, #1976d2);
 }
 
+.product-installment-row {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  background: #fafafa;
+}
+
+.product-installment-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.product-installment-row__prices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.product-installment-row__barcode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
 .party-type-toggle label {
   font-weight: normal;
   cursor: pointer;

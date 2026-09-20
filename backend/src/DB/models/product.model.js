@@ -177,6 +177,26 @@ const productSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    /**
+     * Optional installment plans linked to this SKU for barcode stickers.
+     * Snapshot (name/months/interest) is stored so reprint works without reloading settings.
+     */
+    barcodeInstallmentPlans: {
+      type: [
+        {
+          planId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'InstallmentPlan',
+            required: true,
+          },
+          showOnBarcode: { type: Boolean, default: true },
+          name: { type: String, default: '', trim: true, maxlength: 120 },
+          months: { type: Number, min: 1, max: 120 },
+          interestPercent: { type: Number, min: 0, max: 500, default: 0 },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

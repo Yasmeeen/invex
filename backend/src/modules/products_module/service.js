@@ -42,6 +42,7 @@ import {
   movePickupBookingsWithTransfer,
   transferAvailableQty,
 } from '../../utils/branch-transfer-bookings.js';
+import { parseBarcodeInstallmentPlans } from '../../utils/product-barcode-installments.js';
 
 const TRANSFER_ADMIN_ROLES = ['Super Admin', 'Co Admin', 'Admin'];
 
@@ -464,6 +465,7 @@ async function createOrReviveProductRow({
   ecommerceShortDescription,
   ecommerceIsFeatured,
   ecommercePrice,
+  barcodeInstallmentPlans,
   acquiredFromFields = {},
   sourceProductId,
 }) {
@@ -498,6 +500,9 @@ async function createOrReviveProductRow({
     }
     if (ecommerceIsFeatured !== undefined) existing.ecommerceIsFeatured = ecommerceIsFeatured;
     if (ecommercePrice !== undefined) existing.ecommercePrice = ecommercePrice;
+    if (barcodeInstallmentPlans !== undefined) {
+      existing.barcodeInstallmentPlans = barcodeInstallmentPlans;
+    }
     Object.assign(existing, acquiredFromFields);
     if (sourceProductId !== undefined) {
       existing.sourceProductId = sourceProductId;
@@ -523,6 +528,9 @@ async function createOrReviveProductRow({
     ecommerceShortDescription,
     ecommerceIsFeatured,
     ...(ecommercePrice !== undefined ? { ecommercePrice } : {}),
+    ...(barcodeInstallmentPlans !== undefined
+      ? { barcodeInstallmentPlans }
+      : {}),
     ...acquiredFromFields,
     ...(sourceProductId !== undefined ? { sourceProductId } : {}),
   });
@@ -1092,6 +1100,56 @@ export const generateBarcodeImage = async (req, res) => {
       }
     }
 
+    /** Installment plan lines: `ip` — each "name::deviceTotal::monthly" (| -joined). */
+    const ipRaw = req.query.ip;
+    const planLines = [];
+    if (ipRaw != null) {
+      const rawParts = Array.isArray(ipRaw) ? ipRaw : [ipRaw];
+      for (const part of rawParts) {
+        for (const chunk of String(part ?? '').split('|')) {
+          const t = chunk.trim();
+          if (!t) continue;
+          const bits = t.split('::').map((s) => s.trim());
+          if (bits.length >= 3 && bits[0] && bits[2]) {
+            planLines.push({
+              name: bits[0],
+              total: bits[1] || '',
+              monthly: bits[2],
+            });
+          } else if (bits.length === 2 && bits[0] && bits[1]) {
+            // Legacy: name::monthly
+            planLines.push({ name: bits[0], total: '', monthly: bits[1] });
+          } else {
+            planLines.push({ name: t, total: '', monthly: '' });
+          }
+        }
+      }
+    }
+    const formatPlanAmount = (v) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return String(v || '').trim();
+      return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+    };
+    const barcodePlansHtml = planLines.length
+      ? `<div class="barcode-plans">${planLines
+          .map((p) => {
+            const name = escapeHtml(p.name || '');
+            const total = formatPlanAmount(p.total);
+            const monthly = formatPlanAmount(p.monthly);
+            if (!name) return '';
+            if (total && monthly) {
+              // اسم النظام / سعر الجهاز في النظام / سعر القسط
+              return `<div class="barcode-plan-line" dir="rtl"><span class="bp-name">${name}</span><span class="bp-nums" dir="ltr"> / ${escapeHtml(total)} / ${escapeHtml(monthly)}</span></div>`;
+            }
+            if (monthly) {
+              return `<div class="barcode-plan-line" dir="rtl"><span class="bp-name">${name}</span><span class="bp-nums" dir="ltr"> / ${escapeHtml(monthly)}</span></div>`;
+            }
+            return `<div class="barcode-plan-line" dir="rtl">${name}</div>`;
+          })
+          .filter(Boolean)
+          .join('')}</div>`
+      : '';
+
     bwipjs.toBuffer(
       {
         bcid: 'code128',
@@ -1208,6 +1266,35 @@ export const generateBarcodeImage = async (req, res) => {
         color: #000;
       }
 
+      .barcode-plans {
+        margin: 0 0 0.2mm;
+        max-width: 100%;
+        text-align: center;
+        color: #000;
+      }
+
+      .barcode-plan-line {
+        font-size: 6.5px;
+        font-weight: 700;
+        line-height: 1.1;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #000;
+        direction: rtl;
+        unicode-bidi: isolate;
+      }
+
+      .barcode-plan-line .bp-name {
+        unicode-bidi: isolate;
+      }
+
+      .barcode-plan-line .bp-nums {
+        unicode-bidi: isolate;
+        font-variant-numeric: tabular-nums;
+      }
+
 </style>
 
             </head>
@@ -1216,6 +1303,7 @@ export const generateBarcodeImage = async (req, res) => {
             <div class="sticker-name">
                <div class="product-name">${name || ''}</div>
                ${barcodePriceHtml}
+               ${barcodePlansHtml}
                ${barcodeAttrHtml}
                <img class="barcode-img" src="data:image/png;base64,${png.toString('base64')}" alt="${escapeHtml(code)}" />
                <div class="barcode-code">${escapeHtml(code)}</div>
@@ -1497,6 +1585,7 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({ error: ecommercePriceParsed.error });
     }
     const ecommercePrice = ecommercePriceParsed;
+    const barcodeInstallmentPlans = parseBarcodeInstallmentPlans(req.body) ?? [];
     const stockNum = Number(stock);
     const discountNum =
       discount === undefined || discount === null || discount === '' ? 0 : Number(discount);
@@ -1734,6 +1823,7 @@ export const createProduct = async (req, res) => {
             ecommerceShortDescription,
             ecommerceIsFeatured,
             ecommercePrice,
+            barcodeInstallmentPlans,
             ...acquiredFromFields,
           });
           if (!row.ok) {
@@ -1799,6 +1889,7 @@ export const createProduct = async (req, res) => {
           ecommerceShortDescription,
           ecommerceIsFeatured,
           ecommercePrice,
+          barcodeInstallmentPlans,
           ...acquiredFromFields,
         });
         if (!row.ok) {
@@ -1862,6 +1953,7 @@ export const createProduct = async (req, res) => {
         ecommerceShortDescription,
         ecommerceIsFeatured,
         ecommercePrice,
+        barcodeInstallmentPlans,
         ...acquiredFromFields,
         ...sourceCreateArg,
       });
@@ -1915,6 +2007,7 @@ export const createProduct = async (req, res) => {
       ecommerceShortDescription,
       ecommerceIsFeatured,
       ecommercePrice,
+      barcodeInstallmentPlans,
       ...acquiredFromFields,
       ...sourceCreateArg,
     });
@@ -1971,6 +2064,13 @@ export const updateProduct = async (req, res) => {
     );
     const hasEcommerceIsFeatured = Object.prototype.hasOwnProperty.call(req.body, 'ecommerceIsFeatured');
     const hasEcommercePrice = Object.prototype.hasOwnProperty.call(req.body, 'ecommercePrice');
+    const hasBarcodeInstallmentPlans = Object.prototype.hasOwnProperty.call(
+      req.body,
+      'barcodeInstallmentPlans'
+    );
+    const barcodeInstallmentPlans = hasBarcodeInstallmentPlans
+      ? parseBarcodeInstallmentPlans(req.body) ?? []
+      : undefined;
     const ecommerceDescriptionNorm = hasEcommerceDescription
       ? normalizeEcommerceDescription(req.body.ecommerceDescription)
       : undefined;
@@ -2167,6 +2267,9 @@ export const updateProduct = async (req, res) => {
       if (hasEcommercePrice) {
         updateDoc.ecommercePrice = ecommercePriceParsed;
       }
+      if (hasBarcodeInstallmentPlans) {
+        updateDoc.barcodeInstallmentPlans = barcodeInstallmentPlans;
+      }
 
       const updateOp = acquiredFromUnset
         ? { $set: updateDoc, $unset: { acquiredFrom: 1 } }
@@ -2249,6 +2352,9 @@ export const updateProduct = async (req, res) => {
       }
       if (hasEcommercePrice) {
         updateDocBranch.ecommercePrice = ecommercePriceParsed;
+      }
+      if (hasBarcodeInstallmentPlans) {
+        updateDocBranch.barcodeInstallmentPlans = barcodeInstallmentPlans;
       }
 
     const updateOpBranch = acquiredFromUnset

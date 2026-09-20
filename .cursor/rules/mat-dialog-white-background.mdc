@@ -1,0 +1,29 @@
+---
+description: MatDialog popups must have solid white content background
+alwaysApply: true
+---
+
+# Angular MatDialog background
+
+In this project, global styles set `.mat-dialog-container` to **transparent** (see `frontend/src/assets/style/_global_styles.scss`). New dialogs therefore look like floating text with no card unless you style them.
+
+## Required whenever you create or open a MatDialog
+
+1. **Inner root element** of the dialog template must have an opaque white surface, e.g.:
+   - `background: #fff;`
+   - `border-radius` (e.g. 16px)
+   - light border + soft box-shadow (match `promise-to-pay-dialog` / existing dialogs)
+2. Pass `panelClass` (and usually `backdropClass`) on `dialog.open(...)`.
+3. Register matching overlay styles in `frontend/src/styles.scss`:
+   - backdrop: `rgba(15, 23, 42, 0.22)` (or project standard)
+   - panel `.mat-dialog-container` / `.mat-mdc-dialog-container`: transparent, no padding/shadow (content card owns the look)
+
+## Do not
+
+- Rely on Material’s default white container — it is overridden globally.
+- Ship a dialog whose only styles are padding/typography without `background: #fff` on the content wrapper.
+
+## Reference
+
+- `frontend/src/app/shared/components/promise-to-pay-dialog/`
+- Overlay patterns already in `frontend/src/styles.scss` (e.g. `promise-to-pay-dialog-panel`, `admin-installment-dialog-panel`)

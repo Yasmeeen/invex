@@ -40,6 +40,11 @@ export class ClientListComponent implements OnInit {
     { value: 'debit', labelKey: 'tr_balance_filter_debit' },
     { value: 'credit', labelKey: 'tr_balance_filter_credit' },
   ];
+  sortDirFilter: 'desc' | 'asc' = 'desc';
+  sortDirOptions = [
+    { value: 'desc', labelKey: 'tr_clients_sort_newest' },
+    { value: 'asc', labelKey: 'tr_clients_sort_oldest' },
+  ];
   installmentStatusFilter: 'all' | 'open' | 'settled' = 'all';
   installmentStatusOptions = [
     { value: 'all', labelKey: 'tr_installment_status_filter_all' },
@@ -51,7 +56,7 @@ export class ClientListComponent implements OnInit {
   paginationData: PaginationData;
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
-  params: any = { page: 1, perPage: this.paginationPerPage };
+  params: any = { page: 1, perPage: this.paginationPerPage, sortDir: 'desc' };
   /** Expanded installment detail blocks on cards (key = client id). Missing → collapsed when multiple sales. */
   private installmentCardExpanded: Record<string, boolean> = {};
   private nameSearchTimeout: any;
@@ -160,6 +165,13 @@ export class ClientListComponent implements OnInit {
     } else {
       delete this.params.balanceSide;
     }
+    this.params.page = 1;
+    this.getClients();
+  }
+
+  onSortDirFilterChange(value: 'desc' | 'asc' | null): void {
+    this.sortDirFilter = value === 'asc' ? 'asc' : 'desc';
+    this.params.sortDir = this.sortDirFilter;
     this.params.page = 1;
     this.getClients();
   }

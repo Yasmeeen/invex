@@ -143,6 +143,32 @@
         </div>
         <div class="col-md-3 mt-2">
           <div class="form-group mb-0">
+            <label>{{ 'tr_clients_sort' | translate }}</label>
+            <div class="input-with-icon bg-white width-100">
+              <ng-select
+                class="s-control s-select"
+                [items]="sortDirOptions"
+                bindLabel="labelKey"
+                bindValue="value"
+                [clearable]="false"
+                [searchable]="false"
+                [(ngModel)]="sortDirFilter"
+                (ngModelChange)="onSortDirFilterChange($event)"
+                placeholder="{{ 'tr_clients_sort_newest' | translate }}"
+              >
+                <ng-template ng-label-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+                <ng-template ng-option-tmp let-item="item">
+                  {{ item.labelKey | translate }}
+                </ng-template>
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 mt-2">
+          <div class="form-group mb-0">
             <label>{{ 'tr_installment_status_filter' | translate }}</label>
             <div class="input-with-icon bg-white width-100">
               <ng-select

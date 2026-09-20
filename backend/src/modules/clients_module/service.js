@@ -171,6 +171,7 @@ export const getClientByPhone = async (req, res) => {
  *  - installmentSaleNumber — رقم بيع التقسيط المتسلسل
  *  - installmentStatus=open|settled — أقساط قائمة / مسددة بالكامل
  *  - installmentDueFrom / installmentDueTo — أي قسط غير مدفوع بتاريخ استحقاق في المدى
+ *  - sortDir=desc|asc — newest (desc) or oldest (asc) by client createdAt; default desc
  */
 export const getClients = async (req, res) => {
   try {
@@ -189,9 +190,14 @@ export const getClients = async (req, res) => {
       installmentStatus = "",
       installmentDueFrom = "",
       installmentDueTo = "",
+      sortDir = "",
     } = req.query;
     const limit = Number(limitQ || perPage || 10) || 10;
     const skip = (Number(page) - 1) * limit;
+    const sortDirNorm = String(sortDir || "")
+      .trim()
+      .toLowerCase();
+    const createdAtSort = sortDirNorm === "asc" ? 1 : -1;
     const sideFilter = String(balanceSide || "")
       .trim()
       .toLowerCase();
@@ -329,7 +335,7 @@ export const getClients = async (req, res) => {
     let totalOverride = null;
 
     if (paginateBeforeOrders) {
-      pipeline.push({ $sort: { createdAt: -1 } });
+      pipeline.push({ $sort: { createdAt: createdAtSort } });
       const countRows = await Client.aggregate([...pipeline, { $count: "n" }]);
       totalOverride = countRows[0]?.n || 0;
       pipeline.push({ $skip: skip }, { $limit: limit });
@@ -1049,6 +1055,14 @@ export const getClients = async (req, res) => {
 
     if (sideFilter === "debit" || sideFilter === "credit") {
       withBalances = withBalances.filter((c) => c.balanceSide === sideFilter);
+    }
+
+    if (totalOverride == null) {
+      withBalances.sort((a, b) => {
+        const ta = new Date(a?.createdAt || 0).getTime();
+        const tb = new Date(b?.createdAt || 0).getTime();
+        return createdAtSort === 1 ? ta - tb : tb - ta;
+      });
     }
 
     const total =

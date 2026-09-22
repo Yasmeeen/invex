@@ -995,6 +995,8 @@
   "tr_admin_edit_sale_number": "Modifier le numéro de vente",
   "tr_admin_edit_sale_number_confirm": "Modifiez le numéro de vente à tempérament. Le motif est facultatif et sera enregistré.",
   "tr_admin_edit_sale_number_ok": "Numéro de vente à tempérament mis à jour et enregistré",
+  "tr_admin_edit_sale_number_suggested": "Prochain numéro séquentiel suggéré : #{{n}}",
+  "tr_admin_edit_sale_number_use_suggested": "Utiliser la suggestion",
   "tr_search_installment_sale_number": "Rechercher par numéro de vente",
   "tr_balance_filter": "Solde",
   "tr_balance_filter_all": "Tous",

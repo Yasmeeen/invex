@@ -32,6 +32,26 @@
       [(ngModel)]="saleNumber"
       [placeholder]="'tr_installment_sale_number' | translate"
     />
+    <p class="admin-inst-dialog__hint" *ngIf="loadingSuggestion">
+      {{ 'tr_loading' | translate }}…
+    </p>
+    <p class="admin-inst-dialog__hint" *ngIf="!loadingSuggestion && suggestedSaleNumber != null">
+      {{
+        'tr_admin_edit_sale_number_suggested'
+          | translate : { n: suggestedSaleNumber }
+      }}
+      <button
+        type="button"
+        class="admin-inst-dialog__suggest-btn"
+        (click)="useSuggested()"
+        [disabled]="saleNumber === suggestedSaleNumber"
+      >
+        {{ 'tr_admin_edit_sale_number_use_suggested' | translate }}
+      </button>
+    </p>
+    <p class="admin-inst-dialog__hint" *ngIf="!loadingSuggestion">
+      {{ 'tr_installment_sale_number_hint' | translate }}
+    </p>
   </label>
 
   <label class="admin-inst-dialog__field">

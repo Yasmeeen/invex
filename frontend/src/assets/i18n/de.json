@@ -995,6 +995,8 @@
   "tr_admin_edit_sale_number": "Verkaufsnummer bearbeiten",
   "tr_admin_edit_sale_number_confirm": "Ändern Sie die Ratenverkaufsnummer. Der Grund ist optional und wird protokolliert.",
   "tr_admin_edit_sale_number_ok": "Ratenverkaufsnummer aktualisiert und protokolliert",
+  "tr_admin_edit_sale_number_suggested": "Nächste vorgeschlagene laufende Nummer: #{{n}}",
+  "tr_admin_edit_sale_number_use_suggested": "Vorschlag verwenden",
   "tr_search_installment_sale_number": "Nach Verkaufsnummer suchen",
   "tr_balance_filter": "Saldo",
   "tr_balance_filter_all": "Alle",

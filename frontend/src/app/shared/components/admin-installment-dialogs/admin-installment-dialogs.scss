@@ -79,6 +79,31 @@
   color: #6b7280;
 }
 
+.admin-inst-dialog__field .admin-inst-dialog__hint {
+  margin: 0.35rem 0 0;
+  padding-inline-start: 0;
+}
+
+.admin-inst-dialog__suggest-btn {
+  display: inline;
+  margin-inline-start: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+    text-decoration: none;
+  }
+}
+
 .admin-inst-dialog__actions {
   display: flex;
   justify-content: flex-end;

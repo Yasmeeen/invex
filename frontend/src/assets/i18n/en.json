@@ -1317,6 +1317,8 @@
   "tr_admin_edit_sale_number": "Edit sale number",
   "tr_admin_edit_sale_number_confirm": "Update the installment sale number. Reason is optional and will be logged.",
   "tr_admin_edit_sale_number_ok": "Installment sale number updated and logged",
+  "tr_admin_edit_sale_number_suggested": "Suggested next sequential number: #{{n}}",
+  "tr_admin_edit_sale_number_use_suggested": "Use suggestion",
   "tr_promise_to_pay_history": "Previous promises",
   "tr_promise_to_pay_kept": "Paid on promised day",
   "tr_promise_to_pay_missed": "Did not pay on promised day",

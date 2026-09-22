@@ -1182,6 +1182,8 @@
   "tr_admin_edit_sale_number": "تعديل رقم البيع",
   "tr_admin_edit_sale_number_confirm": "عدّل رقم بيع التقسيط. السبب اختياري ويُسجَّل في سجل العمليات.",
   "tr_admin_edit_sale_number_ok": "تم تعديل رقم بيع التقسيط وتسجيل العملية",
+  "tr_admin_edit_sale_number_suggested": "الرقم التسلسلي التالي المقترح: #{{n}}",
+  "tr_admin_edit_sale_number_use_suggested": "استخدم المقترح",
   "tr_promise_to_pay_history": "وعود سابقة",
   "tr_promise_to_pay_kept": "دفع في اليوم المحدد",
   "tr_promise_to_pay_missed": "لم يدفع في اليوم المحدد",

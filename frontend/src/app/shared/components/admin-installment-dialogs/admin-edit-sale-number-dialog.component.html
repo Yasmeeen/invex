@@ -1,0 +1,61 @@
+<div class="admin-inst-dialog">
+  <h2 class="admin-inst-dialog__title">{{ 'tr_admin_edit_sale_number' | translate }}</h2>
+
+  <p class="admin-inst-dialog__confirm">
+    {{ 'tr_admin_edit_sale_number_confirm' | translate }}
+  </p>
+
+  <ul class="admin-inst-dialog__details" *ngIf="data">
+    <li *ngIf="data.installmentSaleNumber != null">
+      {{ 'tr_installment_sale_number' | translate }}:
+      <strong>#{{ data.installmentSaleNumber }}</strong>
+    </li>
+    <li *ngIf="data.orderNumber != null">
+      {{ 'tr_invoice_number' | translate }}: <strong>#{{ data.orderNumber }}</strong>
+    </li>
+    <li *ngIf="data.clientName">
+      {{ 'tr_client_name' | translate }}: <strong>{{ data.clientName }}</strong>
+    </li>
+    <li *ngIf="data.productNames">
+      {{ 'tr_product_name' | translate }}: <strong>{{ data.productNames }}</strong>
+    </li>
+  </ul>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_installment_sale_number' | translate }} <em>*</em></span>
+    <input
+      type="number"
+      class="s-control"
+      name="saleNumber"
+      min="1"
+      step="1"
+      [(ngModel)]="saleNumber"
+      [placeholder]="'tr_installment_sale_number' | translate"
+    />
+  </label>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_admin_edit_reason' | translate }}</span>
+    <textarea
+      class="s-control"
+      rows="3"
+      name="reason"
+      [(ngModel)]="reason"
+      [placeholder]="'tr_admin_edit_reason_placeholder' | translate"
+    ></textarea>
+  </label>
+
+  <div class="admin-inst-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      [disabled]="!canSubmit"
+      (click)="submit()"
+    >
+      {{ 'tr_save' | translate }}
+    </button>
+  </div>
+</div>

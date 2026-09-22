@@ -205,6 +205,7 @@ export interface Order {
   _id?: string;
   partyType?: OrderPartyType;
   vendorId?: string;
+  clientId?: string | null;
   clientName: string;
   clientPhoneNumber: string;
   sellerName: string;
@@ -268,6 +269,8 @@ export interface Order {
   }>;
   products?: OrderProductLine[];
   orderNumber?: number;
+  /** Sequential installment sale number (رقم بيع التقسيط). */
+  installmentSaleNumber?: number | null;
   paymentMethod?: string;
   status?: string;
   createdAt?: string;

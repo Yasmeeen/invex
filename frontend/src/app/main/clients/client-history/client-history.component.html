@@ -383,6 +383,14 @@
             </button>
             <button
               type="button"
+              class="s-btn btn-secondary btn-sm installment-order-head__pay"
+              *ngIf="canEditInstallmentSaleNumber && o.status !== 'restored'"
+              (click)="adminEditSaleNumber(o, $event)"
+            >
+              {{ 'tr_admin_edit_sale_number' | translate }}
+            </button>
+            <button
+              type="button"
               class="s-btn btn-danger btn-sm installment-order-head__pay"
               *ngIf="canAdminInstallments && o.status !== 'restored'"
               (click)="adminDeleteInstallmentSale(o, $event)"

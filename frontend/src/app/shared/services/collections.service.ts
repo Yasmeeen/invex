@@ -145,6 +145,7 @@ export class CollectionsService {
     to?: string;
     promiseFrom?: string;
     promiseTo?: string;
+    installmentSaleNumber?: number;
     page?: number;
     limit?: number;
     sortBy?: string;

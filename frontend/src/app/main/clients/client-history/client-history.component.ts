@@ -49,6 +49,10 @@ import {
   AdminEditInstallmentDialogComponent,
   AdminEditInstallmentDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-edit-installment-dialog.component';
+import {
+  AdminEditSaleNumberDialogComponent,
+  AdminEditSaleNumberDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-edit-sale-number-dialog.component';
 import { Subscription } from 'rxjs';
 
 export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
@@ -83,6 +87,8 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   /** Super Admin can delete installment sales / edit installment rows. */
   canAdminInstallments = false;
+  /** Super Admin or Co Admin can edit installment sale number. */
+  canEditInstallmentSaleNumber = false;
 
   private routeSub?: Subscription;
 
@@ -105,6 +111,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     this.showBranchPicker = ctx.showBranchPicker;
     const role = String(actor?.role || '');
     this.canAdminInstallments = role === 'Super Admin';
+    this.canEditInstallmentSaleNumber = role === 'Super Admin' || role === 'Co Admin';
   }
 
   ngOnInit(): void {
@@ -806,6 +813,57 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
           this.notify.push(msg, 'error');
         },
       });
+    });
+  }
+
+  adminEditSaleNumber(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.canEditInstallmentSaleNumber) return;
+    if (order?.status === 'restored') return;
+    const orderId = normalizeMongoId(order._id);
+    const userId = this.currentUserId();
+    if (!orderId || !userId) return;
+
+    const ref = this.dialog.open(AdminEditSaleNumberDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        clientName: this.clientTitle,
+        productNames: this.installmentProductNames(order),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminEditSaleNumberDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders
+        .adminUpdateInstallmentSaleNumber(orderId, {
+          userId,
+          installmentSaleNumber: result.installmentSaleNumber,
+          reason: result.reason || undefined,
+        })
+        .subscribe({
+          next: () => {
+            this.notify.push(this.translate.instant('tr_admin_edit_sale_number_ok'), 'success');
+            this.afterBalanceChange();
+          },
+          error: (err) => {
+            const code = err?.error?.code;
+            const msg =
+              code === 'INSTALLMENT_SALE_NUMBER_TAKEN'
+                ? this.translate.instant('tr_installment_sale_number_taken')
+                : code === 'INVALID_INSTALLMENT_SALE_NUMBER'
+                  ? this.translate.instant('tr_installment_sale_number_required')
+                  : err?.error?.error ||
+                    err?.error?.message ||
+                    this.translate.instant('tr_unexpected_error_message');
+            this.notify.push(msg, 'error');
+          },
+        });
     });
   }
 

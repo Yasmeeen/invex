@@ -11,6 +11,7 @@ import {
     deleteOrder,
     restoreOrder,
     adminDeleteInstallmentSale,
+    adminUpdateInstallmentSaleNumber,
     adminUpdateInstallmentRow,
   } from './service.js';
 
@@ -21,6 +22,7 @@ router.post('/createOrder', createOrder);           // POST create
 router.post('/:orderId/payments', addOrderPayment);
 router.post('/:orderId/installments/:installmentId/promise', setInstallmentPromise);
 router.post('/:orderId/admin-delete', adminDeleteInstallmentSale);
+router.patch('/:orderId/admin-sale-number', adminUpdateInstallmentSaleNumber);
 router.patch('/:orderId/installments/:installmentId/admin', adminUpdateInstallmentRow);
 router.put('/:id', updateOrder);         // PUT update
 router.delete('/deleteOrder/:id', deleteOrder);      // DELETE product

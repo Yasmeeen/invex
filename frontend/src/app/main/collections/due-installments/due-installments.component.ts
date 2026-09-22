@@ -48,9 +48,13 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   toDate: Date | null = null;
   promiseFromDate: Date | null = null;
   promiseToDate: Date | null = null;
+  installmentSaleNumberTerm = '';
+  private installmentSaleNumberTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /** '' = date order; 'desc' = highest remaining first; 'asc' = lowest first */
   remainingSort: '' | 'asc' | 'desc' = '';
+  /** '' = date order; 'desc' / 'asc' by installment sale number */
+  saleNumberSort: '' | 'asc' | 'desc' = '';
 
   isAdminView = false;
   isCollectorView = false;
@@ -142,6 +146,25 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
       ? this.selectedCollectorId || undefined
       : this.currentUserId || undefined;
 
+    const saleRaw = (this.installmentSaleNumberTerm ?? '').toString().trim();
+    let installmentSaleNumber: number | undefined;
+    if (saleRaw !== '') {
+      const n = Math.floor(Number(saleRaw));
+      if (Number.isFinite(n) && n > 0) {
+        installmentSaleNumber = n;
+      }
+    }
+
+    let sortBy: string | undefined;
+    let sortDir: 'asc' | 'desc' | undefined;
+    if (this.saleNumberSort) {
+      sortBy = 'saleNumber';
+      sortDir = this.saleNumberSort;
+    } else if (this.remainingSort) {
+      sortBy = 'remaining';
+      sortDir = this.remainingSort;
+    }
+
     this.subs.push(
       this.collections
         .listDue({
@@ -152,10 +175,11 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
           to: this.formatDate(this.toDate),
           promiseFrom: this.formatDate(this.promiseFromDate),
           promiseTo: this.formatDate(this.promiseToDate),
+          installmentSaleNumber,
           page: this.page,
           limit: this.perPage,
-          sortBy: this.remainingSort ? 'remaining' : undefined,
-          sortDir: this.remainingSort || undefined,
+          sortBy,
+          sortDir,
         })
         .subscribe({
           next: (res) => {
@@ -183,13 +207,57 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
     this.load(1);
   }
 
+  clearDateFilters(): void {
+    this.fromDate = null;
+    this.toDate = null;
+    this.promiseFromDate = null;
+    this.promiseToDate = null;
+    this.load(1);
+  }
+
+  filterByInstallmentSaleNumber(event?: Event): void {
+    if (this.installmentSaleNumberTimeout) {
+      clearTimeout(this.installmentSaleNumberTimeout);
+    }
+    this.installmentSaleNumberTimeout = setTimeout(() => {
+      const raw = (
+        (event?.target as HTMLInputElement | null)?.value ??
+        this.installmentSaleNumberTerm ??
+        ''
+      )
+        .toString()
+        .trim();
+      this.installmentSaleNumberTerm = raw;
+      if (raw !== '') {
+        const n = Math.floor(Number(raw));
+        if (!Number.isFinite(n) || n <= 0) {
+          return;
+        }
+      }
+      this.load(1);
+    }, 500);
+  }
+
   toggleRemainingSort(): void {
+    this.saleNumberSort = '';
     if (this.remainingSort === '') {
       this.remainingSort = 'desc';
     } else if (this.remainingSort === 'desc') {
       this.remainingSort = 'asc';
     } else {
       this.remainingSort = '';
+    }
+    this.load(1);
+  }
+
+  toggleSaleNumberSort(): void {
+    this.remainingSort = '';
+    if (this.saleNumberSort === '') {
+      this.saleNumberSort = 'desc';
+    } else if (this.saleNumberSort === 'desc') {
+      this.saleNumberSort = 'asc';
+    } else {
+      this.saleNumberSort = '';
     }
     this.load(1);
   }
@@ -337,6 +405,9 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.installmentSaleNumberTimeout) {
+      clearTimeout(this.installmentSaleNumberTimeout);
+    }
     this.subs.forEach((s) => s && s.unsubscribe());
   }
 }

@@ -364,6 +364,8 @@ export const getOrders = async (req, res) => {
       installmentPlanMonths,
       from,
       to,
+      sortBy = '',
+      sortDir = 'desc',
     } = req.query;
     const pageLimit = Math.max(1, Number(limit) || Number(perPage) || 10);
     const skip = (Number(page) - 1) * pageLimit;
@@ -402,7 +404,7 @@ export const getOrders = async (req, res) => {
       }
     }
 
-    // ✅ 2. Search by order number, client name, or phone number
+    // ✅ 2. Search by order number, installment sale number, client name, or phone
     if (search) {
       const isNumber = !isNaN(search);
       query.$or = [
@@ -410,7 +412,9 @@ export const getOrders = async (req, res) => {
         { clientPhoneNumber: { $regex: search, $options: 'i' } },
       ];
       if (isNumber) {
-        query.$or.push({ orderNumber: Number(search) });
+        const n = Number(search);
+        query.$or.push({ orderNumber: n });
+        query.$or.push({ installmentSaleNumber: n });
       }
     }
 
@@ -434,14 +438,36 @@ export const getOrders = async (req, res) => {
       }
     }
 
+    const sortKey = String(sortBy || '')
+      .trim()
+      .toLowerCase();
+    const dir =
+      String(sortDir || 'desc')
+        .trim()
+        .toLowerCase() === 'asc'
+        ? 1
+        : -1;
+    const sortBySaleNumber =
+      sortKey === 'salenumber' || sortKey === 'installmentsalenumber';
+
+    // Sorting by sale number only applies to installment sales (hide cash/etc.).
+    if (sortBySaleNumber) {
+      query.paymentMethod = 'installment';
+      query.installmentSaleNumber = { $exists: true, $ne: null, $gte: 1 };
+    }
+
+    const sortSpec = sortBySaleNumber
+      ? { installmentSaleNumber: dir, createdAt: -1 }
+      : { createdAt: -1 };
+
     // ✅ 4. Fetch orders (with branch populated)
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber installmentSaleNumber partyType vendorId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
+          'orderNumber installmentSaleNumber partyType vendorId clientId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
-        .sort({ createdAt: -1 })
+        .sort(sortSpec)
         .skip(skip)
         .limit(pageLimit)
         .lean(),
@@ -2048,6 +2074,26 @@ async function requireInstallmentAdminActor(req) {
   return { user };
 }
 
+/** Super Admin or Co Admin — edit installment sale number only. */
+async function requireInstallmentSaleNumberEditorActor(req) {
+  const rawId = pickRequestUserId(req);
+  if (!rawId || !mongoose.Types.ObjectId.isValid(String(rawId))) {
+    return { status: 401, error: 'userId is required' };
+  }
+  const user = await User.findById(String(rawId)).select('name role branch').lean();
+  if (!user) {
+    return { status: 401, error: 'User not found' };
+  }
+  const role = String(user.role || '').trim();
+  if (role !== 'Super Admin' && role !== 'Co Admin') {
+    return {
+      status: 403,
+      error: 'Only Super Admin or Co Admin can perform this action',
+    };
+  }
+  return { user };
+}
+
 function installmentSaleSnapshot(order) {
   if (!order) return null;
   return {
@@ -2155,6 +2201,121 @@ export const adminDeleteInstallmentSale = async (req, res) => {
   } catch (err) {
     console.error('❌ adminDeleteInstallmentSale:', err.message);
     res.status(500).json({ error: 'Failed to delete installment sale' });
+  }
+};
+
+/**
+ * PATCH /api/orders/:orderId/admin-sale-number
+ * Super Admin / Co Admin — change installmentSaleNumber (optional reason, audited).
+ * Body: { userId, installmentSaleNumber, reason? }
+ */
+export const adminUpdateInstallmentSaleNumber = async (req, res) => {
+  try {
+    const auth = await requireInstallmentSaleNumberEditorActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    const rawSaleNum = String(req.body?.installmentSaleNumber ?? '').trim();
+    const parsedSaleNum = Math.floor(Number(rawSaleNum));
+    if (!rawSaleNum || !Number.isFinite(parsedSaleNum) || parsedSaleNum < 1) {
+      return res.status(400).json({
+        error: 'installmentSaleNumber must be a positive integer',
+        code: 'INVALID_INSTALLMENT_SALE_NUMBER',
+      });
+    }
+
+    const { orderId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales support this edit' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot edit a restored invoice' });
+    }
+
+    const previousSaleNumber =
+      order.installmentSaleNumber != null && Number.isFinite(Number(order.installmentSaleNumber))
+        ? Number(order.installmentSaleNumber)
+        : null;
+
+    if (previousSaleNumber === parsedSaleNum) {
+      return res.json({
+        message: '✅ Installment sale number unchanged',
+        orderId: order._id,
+        installmentSaleNumber: previousSaleNumber,
+      });
+    }
+
+    const taken = await Order.findOne({
+      installmentSaleNumber: parsedSaleNum,
+      _id: { $ne: order._id },
+    })
+      .select('_id')
+      .lean();
+    if (taken) {
+      return res.status(409).json({
+        error: 'Installment sale number already exists',
+        code: 'INSTALLMENT_SALE_NUMBER_TAKEN',
+        installmentSaleNumber: parsedSaleNum,
+      });
+    }
+
+    const before = installmentSaleSnapshot(order);
+    order.installmentSaleNumber = parsedSaleNum;
+    await order.save();
+
+    const saleLabel = `تقسيط #${parsedSaleNum}`;
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'update',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: saleLabel,
+      message: reason
+        ? `${auth.user.role} changed installment sale number ${
+            previousSaleNumber != null ? `#${previousSaleNumber}` : '(none)'
+          } → #${parsedSaleNum}: ${reason}`
+        : `${auth.user.role} changed installment sale number ${
+            previousSaleNumber != null ? `#${previousSaleNumber}` : '(none)'
+          } → #${parsedSaleNum}`,
+      metadata: {
+        reason: reason || undefined,
+        adminAction: 'edit_installment_sale_number',
+        previousInstallmentSaleNumber: previousSaleNumber,
+        installmentSaleNumber: parsedSaleNum,
+        orderNumber: order.orderNumber,
+        clientName: order.clientName,
+        clientPhoneNumber: order.clientPhoneNumber,
+      },
+      before,
+      after: installmentSaleSnapshot(order),
+    });
+
+    res.json({
+      message: '✅ Installment sale number updated',
+      orderId: order._id,
+      previousInstallmentSaleNumber: previousSaleNumber,
+      installmentSaleNumber: parsedSaleNum,
+      reason: reason || undefined,
+    });
+  } catch (err) {
+    console.error('❌ adminUpdateInstallmentSaleNumber:', err.message);
+    if (err?.code === 11000 && err?.keyPattern?.installmentSaleNumber) {
+      return res.status(409).json({
+        error: 'Installment sale number already exists',
+        code: 'INSTALLMENT_SALE_NUMBER_TAKEN',
+        installmentSaleNumber: err?.keyValue?.installmentSaleNumber,
+      });
+    }
+    res.status(500).json({ error: 'Failed to update installment sale number' });
   }
 };
 

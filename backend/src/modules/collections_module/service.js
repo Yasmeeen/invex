@@ -164,7 +164,8 @@ async function computeCollectorWorkload() {
  * GET /api/collections/due
  * Query: collectorId (or "unassigned"), branchId, status=due|overdue|promised|all,
  *        from, to (dueDate), promiseFrom, promiseTo (promiseToPayAt),
- *        page, limit, sortBy=remaining|date, sortDir=asc|desc
+ *        installmentSaleNumber (exact),
+ *        page, limit, sortBy=remaining|saleNumber|date, sortDir=asc|desc
  */
 export const listCollectionsDue = async (req, res) => {
   try {
@@ -176,6 +177,7 @@ export const listCollectionsDue = async (req, res) => {
       to,
       promiseFrom,
       promiseTo,
+      installmentSaleNumber = "",
       page = 1,
       limit = 50,
       sortBy = "",
@@ -188,12 +190,20 @@ export const listCollectionsDue = async (req, res) => {
 
     const hasBranchFilter =
       branchId && mongoose.Types.ObjectId.isValid(String(branchId));
+    const installmentSaleNumberParsed = Math.floor(Number(installmentSaleNumber));
+    const hasInstallmentSaleNumberFilter =
+      String(installmentSaleNumber || "").trim() !== "" &&
+      Number.isFinite(installmentSaleNumberParsed) &&
+      installmentSaleNumberParsed > 0;
 
     const orderQuery = {
       ...OPEN_INSTALLMENT_ORDER_QUERY,
     };
     if (hasBranchFilter) {
       orderQuery.branch = new mongoose.Types.ObjectId(String(branchId));
+    }
+    if (hasInstallmentSaleNumberFilter) {
+      orderQuery.installmentSaleNumber = installmentSaleNumberParsed;
     }
 
     const collectorFilter = await applyCollectorToOrderQuery(orderQuery, collectorId);
@@ -281,10 +291,11 @@ export const listCollectionsDue = async (req, res) => {
 
         // When filtering by promise date, ignore due-date range so follow-ups
         // on older overdue installments still appear.
-        if (!hasPromiseDateFilter) {
+        // Same when filtering by exact sale number — find that sale regardless of default date window.
+        if (!hasPromiseDateFilter && !hasInstallmentSaleNumberFilter) {
           if (fromDate && (!due || !due.isValid() || due.isBefore(fromDate))) continue;
           if (toDate && (!due || !due.isValid() || due.isAfter(toDate))) continue;
-        } else {
+        } else if (hasPromiseDateFilter) {
           if (!promise || !promise.isValid()) continue;
           if (promiseFromDate && promise.isBefore(promiseFromDate)) continue;
           if (promiseToDate && promise.isAfter(promiseToDate)) continue;
@@ -341,6 +352,20 @@ export const listCollectionsDue = async (req, res) => {
       if (sortKey === "remaining") {
         const diff = (Number(a.remaining) || 0) - (Number(b.remaining) || 0);
         if (diff !== 0) return diff * dir;
+      } else if (sortKey === "salenumber" || sortKey === "installmentsalenumber") {
+        const na = Number(a.installmentSaleNumber);
+        const nb = Number(b.installmentSaleNumber);
+        const aMissing = !Number.isFinite(na) || na <= 0;
+        const bMissing = !Number.isFinite(nb) || nb <= 0;
+        if (aMissing && bMissing) {
+          /* fall through to date */
+        } else if (aMissing) {
+          return 1;
+        } else if (bMissing) {
+          return -1;
+        } else if (na !== nb) {
+          return (na - nb) * dir;
+        }
       }
       const da = new Date(a.promiseToPayAt || a.dueDate || 0).getTime();
       const db = new Date(b.promiseToPayAt || b.dueDate || 0).getTime();

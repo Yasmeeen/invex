@@ -103,6 +103,13 @@ export class OrdersListComponent implements OnInit {
   /** Filter installment invoices by plan months (null = all). */
   selectedInstallmentMonths: number | null = null;
   readonly installmentMonthsOptions = [6, 12, 18, 24, 36];
+  /** null = default (all ops, newest first); sale_desc / sale_asc = installment sales only */
+  sortFilter: 'date_desc' | 'sale_desc' | 'sale_asc' | null = null;
+  readonly sortOptions: { value: 'date_desc' | 'sale_desc' | 'sale_asc'; labelKey: string }[] = [
+    { value: 'date_desc', labelKey: 'tr_orders_sort_newest' },
+    { value: 'sale_desc', labelKey: 'tr_orders_sort_sale_desc' },
+    { value: 'sale_asc', labelKey: 'tr_orders_sort_sale_asc' },
+  ];
   viewMode: 'table' | 'cards' = 'cards';
 
   private subscriptions: Subscription[] = [];
@@ -139,6 +146,22 @@ export class OrdersListComponent implements OnInit {
     return this.orderPartyType(order) === 'supplier'
       ? this.translateService.instant('tr_party_supplier')
       : this.translateService.instant('tr_party_client');
+  }
+
+  orderClientId(order: Order): string | null {
+    if (this.orderPartyType(order) === 'supplier') return null;
+    const id = order?.clientId as any;
+    if (!id) return null;
+    if (typeof id === 'string') return id.trim() || null;
+    if (typeof id === 'object' && id._id) return String(id._id);
+    return String(id);
+  }
+
+  openClientHistory(order: Order, event?: Event): void {
+    event?.stopPropagation();
+    const clientId = this.orderClientId(order);
+    if (!clientId) return;
+    this.router.navigate(['/clients', clientId, 'history']);
   }
 
   /** بيع بالآجل (paymentMethod = credit) بدون تقسيط. */
@@ -331,6 +354,17 @@ export class OrdersListComponent implements OnInit {
       delete this.params.to;
     }
 
+    if (this.sortFilter === 'sale_desc') {
+      this.params.sortBy = 'saleNumber';
+      this.params.sortDir = 'desc';
+    } else if (this.sortFilter === 'sale_asc') {
+      this.params.sortBy = 'saleNumber';
+      this.params.sortDir = 'asc';
+    } else {
+      delete this.params.sortBy;
+      delete this.params.sortDir;
+    }
+
     this.ordersLoading = true;
     this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
       this.ordersList = response.orders
@@ -371,6 +405,11 @@ export class OrdersListComponent implements OnInit {
     if (this.selectedInstallmentMonths && this.selectedPaymentMethod !== 'installment') {
       this.selectedPaymentMethod = 'installment';
     }
+    this.params.page = 1;
+    this.getOrders();
+  }
+
+  onSortFilterChange(): void {
     this.params.page = 1;
     this.getOrders();
   }

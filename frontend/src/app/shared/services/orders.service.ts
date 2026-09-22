@@ -84,6 +84,14 @@ adminDeleteInstallmentSale(
   return this.http.post(`${ORDERS_URL}/${orderId}/admin-delete`, payload);
 }
 
+/** Super Admin: change installment sale number (optional reason, audited). Co Admin also allowed. */
+adminUpdateInstallmentSaleNumber(
+  orderId: string,
+  payload: { userId: string; installmentSaleNumber: number; reason?: string }
+): Observable<any> {
+  return this.http.patch(`${ORDERS_URL}/${orderId}/admin-sale-number`, payload);
+}
+
 /** Super Admin: edit installment dueDate/amount (optional reason, audited). */
 adminUpdateInstallmentRow(
   orderId: string,

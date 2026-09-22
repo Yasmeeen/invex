@@ -100,6 +100,9 @@
 .cdash-filters__actions {
   flex: 0 0 auto;
   padding-bottom: 0.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .cdash-filters__apply {
@@ -119,6 +122,27 @@
 
   &:hover:not(:disabled) {
     filter: brightness(1.05);
+  }
+}
+
+.cdash-filters__clear {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.55rem 1.2rem;
+  background: #fff;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #94a3b8;
   }
 }
 

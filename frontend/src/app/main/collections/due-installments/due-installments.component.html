@@ -106,9 +106,33 @@
       </select>
     </div>
 
+    <div class="cdash-filters__field">
+      <label class="cdash-filters__label">{{ 'tr_installment_sale_number' | translate }}</label>
+      <input
+        class="s-control"
+        type="number"
+        min="1"
+        step="1"
+        name="installmentSaleNumber"
+        [placeholder]="'tr_search_installment_sale_number' | translate"
+        [(ngModel)]="installmentSaleNumberTerm"
+        (keyup)="filterByInstallmentSaleNumber($event)"
+        (change)="filterByInstallmentSaleNumber($event)"
+      />
+    </div>
+
     <div class="cdash-filters__actions">
       <button type="button" class="cdash-filters__apply" (click)="applyFilters()" [disabled]="loading">
         {{ 'tr_apply' | translate }}
+      </button>
+      <button
+        type="button"
+        class="cdash-filters__clear"
+        (click)="clearDateFilters()"
+        [disabled]="loading"
+        [attr.title]="'tr_clear_due_dates_hint' | translate"
+      >
+        {{ 'tr_clear' | translate }}
       </button>
     </div>
   </section>
@@ -171,7 +195,24 @@
           <thead>
             <tr>
               <th>{{ 'tr_client_name' | translate }}</th>
-              <th>{{ 'tr_order_number' | translate }}</th>
+              <th>
+                <button
+                  type="button"
+                  class="cdash-sort-btn"
+                  (click)="toggleSaleNumberSort()"
+                  [attr.aria-label]="'tr_collections_sort_by_sale_number' | translate"
+                  [attr.title]="'tr_collections_sort_by_sale_number' | translate"
+                >
+                  {{ 'tr_installment_sale_number' | translate }}
+                  <i
+                    class="fa"
+                    [class.fa-sort]="!saleNumberSort"
+                    [class.fa-sort-amount-desc]="saleNumberSort === 'desc'"
+                    [class.fa-sort-amount-asc]="saleNumberSort === 'asc'"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              </th>
               <th *ngIf="isAdminView">{{ 'tr_collector' | translate }}</th>
               <th>{{ 'tr_installment_due_date' | translate }}</th>
               <th *ngIf="showDaysOverdue">{{ 'tr_collections_days_overdue' | translate }}</th>
@@ -207,10 +248,10 @@
               </td>
               <td>
                 <button type="button" class="cdash-invoice" (click)="openPay(item)">
-                  <span *ngIf="item.installmentSaleNumber != null">
-                    {{ 'tr_installment_sale_number' | translate }} #{{ item.installmentSaleNumber }} ·
-                  </span>
-                  #{{ item.orderNumber }}
+                  <ng-container *ngIf="item.installmentSaleNumber != null; else noSaleNumber">
+                    {{ 'tr_installment_sale_number' | translate }} #{{ item.installmentSaleNumber }}
+                  </ng-container>
+                  <ng-template #noSaleNumber>—</ng-template>
                 </button>
               </td>
               <td *ngIf="isAdminView">

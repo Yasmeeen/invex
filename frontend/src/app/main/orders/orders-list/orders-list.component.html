@@ -251,6 +251,33 @@
           </div>
         </div>
       </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_orders_sort' | translate }}</label>
+          <div class="input-with-icon bg-white width-100">
+            <ng-select
+              class="s-control s-select"
+              [items]="sortOptions"
+              bindLabel="labelKey"
+              bindValue="value"
+              [clearable]="true"
+              [searchable]="false"
+              [(ngModel)]="sortFilter"
+              name="orderSortFilter"
+              (ngModelChange)="onSortFilterChange()"
+              placeholder="{{ 'tr_orders_sort_placeholder' | translate }}"
+            >
+              <ng-template ng-label-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+              <ng-template ng-option-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="row mt-2">
       <div class="col-md-3">
@@ -343,7 +370,15 @@
               [class.order-row--installment]="isInstallmentOutstandingOrder(order)"
               [class.order-row--installment-settled]="isInstallmentSettledOrder(order)"
             >
-              <td>{{ order.orderNumber }}</td>
+              <td>
+                <div
+                  class="sale-number-badge sale-number-badge--inline"
+                  *ngIf="isInstallmentOrder(order) && order.installmentSaleNumber != null"
+                >
+                  {{ 'tr_installment_sale_number' | translate }} #{{ order.installmentSaleNumber }}
+                </div>
+                <div>{{ order.orderNumber }}</div>
+              </td>
               <td>
                 <span
                   class="party-badge"
@@ -352,7 +387,17 @@
                   {{ orderPartyTypeLabel(order) }}
                 </span>
               </td>
-              <td>{{ order.clientName }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="order-client-link"
+                  *ngIf="orderClientId(order)"
+                  (click)="openClientHistory(order, $event)"
+                >
+                  {{ order.clientName }}
+                </button>
+                <span *ngIf="!orderClientId(order)">{{ order.clientName }}</span>
+              </td>
               <td>{{ order.clientPhoneNumber}}</td>
               <td>{{ order.branch?.name }}</td>
               <td>{{ orderSubtotalForList(order) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
@@ -465,6 +510,12 @@
             </div>
             <div class="order-card__title">
               <div class="order-card__number">
+                <span
+                  class="sale-number-badge"
+                  *ngIf="isInstallmentOrder(order) && order.installmentSaleNumber != null"
+                >
+                  {{ 'tr_installment_sale_number' | translate }} #{{ order.installmentSaleNumber }}
+                </span>
                 #{{ order.orderNumber }}
                 <span
                   class="party-badge"
@@ -476,7 +527,17 @@
                   {{ payLaterSettledLabelKey(order) | translate }}
                 </span>
               </div>
-              <div class="order-card__client">{{ order.clientName }}</div>
+              <div class="order-card__client">
+                <button
+                  type="button"
+                  class="order-client-link"
+                  *ngIf="orderClientId(order)"
+                  (click)="openClientHistory(order, $event)"
+                >
+                  {{ order.clientName }}
+                </button>
+                <span *ngIf="!orderClientId(order)">{{ order.clientName }}</span>
+              </div>
               <div class="order-card__meta muted">
                 <span *ngIf="order.clientPhoneNumber">{{ order.clientPhoneNumber }}</span>
                 <span class="dot" *ngIf="order.clientPhoneNumber && createdAtCairo(order)">•</span>

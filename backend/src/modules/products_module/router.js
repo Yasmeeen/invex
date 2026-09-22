@@ -22,6 +22,12 @@ import {
     getProductHistory,
     getProductSerialTrack,
     getProductsInventoryAudit,
+    getEcommerceVariantGroup,
+    joinEcommerceVariantGroup,
+    leaveEcommerceVariantGroup,
+    setEcommerceVariantGroupMembers,
+    patchEcommerceVariantGroup,
+    reSuggestEcommerceVariantGroup,
   } from './service.js';
   
 
@@ -40,6 +46,12 @@ router.post('/branch-transfer/request', requestBranchTransfer);
 router.post('/branch-transfer/:id/approve', approveBranchTransfer);
 router.post('/branch-transfer/:id/reject', rejectBranchTransfer);
 router.get('/:id/history', getProductHistory);
+router.get('/:id/ecommerce-variant-group', getEcommerceVariantGroup);
+router.post('/:id/ecommerce-variant-group/join', joinEcommerceVariantGroup);
+router.post('/:id/ecommerce-variant-group/leave', leaveEcommerceVariantGroup);
+router.put('/:id/ecommerce-variant-group/members', setEcommerceVariantGroupMembers);
+router.patch('/:id/ecommerce-variant-group', patchEcommerceVariantGroup);
+router.post('/:id/ecommerce-variant-group/re-suggest', reSuggestEcommerceVariantGroup);
 router.get('/:id', getProductById);        // GET one by ID
 router.post('/createProduct', createProduct);           // POST create
 router.post('/import-excel', importProductsFromExcelRows);

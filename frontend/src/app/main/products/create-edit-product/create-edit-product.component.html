@@ -1314,6 +1314,183 @@
                       <p class="text-muted size-small m-0 mt-1">{{ 'tr_product_ecommerce_description_hint' | translate }}</p>
                     </div>
                   </div>
+
+                  <div class="col-md-12" *ngIf="showEcommerceTab">
+                    <div class="ecom-variant-card">
+                      <div class="ecom-variant-card__head">
+                        <div>
+                          <h5 class="ecom-variant-card__title m-0">
+                            {{ 'tr_product_variant_group_title' | translate }}
+                          </h5>
+                          <p class="text-muted size-small m-0 mt-1">
+                            {{ 'tr_product_variant_group_hint' | translate }}
+                          </p>
+                        </div>
+                        <span
+                          class="ecom-variant-badge"
+                          *ngIf="isEdit && variantGroup"
+                          [class.ecom-variant-badge--grouped]="variantGroup.isGrouped"
+                          [class.ecom-variant-badge--solo]="!variantGroup.isGrouped"
+                        >
+                          {{
+                            (variantGroup.isGrouped
+                              ? 'tr_product_variant_group_status_grouped'
+                              : 'tr_product_variant_group_status_solo'
+                            ) | translate
+                          }}
+                        </span>
+                      </div>
+
+                      <p class="text-muted size-small mb-2" *ngIf="!isEdit">
+                        {{ 'tr_product_variant_group_save_first' | translate }}
+                      </p>
+
+                      <div *ngIf="isEdit && variantGroupLoading" class="text-muted size-small py-2">
+                        {{ 'tr_loading' | translate }}…
+                      </div>
+
+                      <ng-container *ngIf="isEdit && variantGroup && !variantGroupLoading">
+                        <div class="form-group mb-3" *ngIf="variantGroup.isGrouped">
+                          <label>{{ 'tr_product_variant_listing_title' | translate }}</label>
+                          <div class="ecom-variant-title-row">
+                            <input
+                              type="text"
+                              class="s-control"
+                              [(ngModel)]="variantListingTitleDraft"
+                              [ngModelOptions]="{ standalone: true }"
+                              name="variantListingTitleDraft"
+                              [placeholder]="'tr_product_variant_listing_title_ph' | translate"
+                            />
+                            <button
+                              type="button"
+                              class="s-btn btn-secondary"
+                              [disabled]="variantGroupBusy"
+                              (click)="saveVariantListingTitle()"
+                            >
+                              {{ 'tr_save' | translate }}
+                            </button>
+                          </div>
+                          <p class="text-muted size-small m-0 mt-1">
+                            {{ 'tr_product_variant_listing_title_hint' | translate }}
+                          </p>
+                        </div>
+
+                        <div class="ecom-variant-source mb-2" *ngIf="variantGroup.source || variantGroup.locked">
+                          <span class="text-muted size-small" *ngIf="variantGroup.source === 'auto'">
+                            {{ 'tr_product_variant_source_auto' | translate }}
+                          </span>
+                          <span class="text-muted size-small" *ngIf="variantGroup.source === 'manual'">
+                            {{ 'tr_product_variant_source_manual' | translate }}
+                          </span>
+                        </div>
+
+                        <div class="ecom-variant-members" *ngIf="variantGroup.isGrouped">
+                          <div class="ecom-variant-member" *ngFor="let m of variantGroup.members">
+                            <div class="ecom-variant-member__main">
+                              <span class="ecom-variant-member__swatch" [attr.title]="m.variantLabel">{{ m.variantLabel }}</span>
+                              <div>
+                                <div class="ecom-variant-member__name">{{ m.name }}</div>
+                                <div class="text-muted size-small">{{ m.code }} · {{ m.stock }}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              class="s-btn btn-link text-danger ecom-variant-member__remove"
+                              *ngIf="m._id !== productId"
+                              [disabled]="variantGroupBusy"
+                              (click)="removeVariantMember(m._id)"
+                            >
+                              {{ 'tr_product_variant_remove' | translate }}
+                            </button>
+                            <span class="ecom-variant-you" *ngIf="m._id === productId">
+                              {{ 'tr_product_variant_this' | translate }}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div class="ecom-variant-actions mb-3" *ngIf="variantGroup.isGrouped">
+                          <button
+                            type="button"
+                            class="s-btn btn-secondary"
+                            [disabled]="variantGroupBusy"
+                            (click)="leaveVariantGroup()"
+                          >
+                            {{ 'tr_product_variant_show_alone' | translate }}
+                          </button>
+                          <button
+                            type="button"
+                            class="s-btn btn-link"
+                            [disabled]="variantGroupBusy"
+                            (click)="reSuggestVariantGroup()"
+                          >
+                            {{ 'tr_product_variant_re_suggest' | translate }}
+                          </button>
+                        </div>
+
+                        <div class="ecom-variant-suggestions" *ngIf="!variantGroup.isGrouped && variantGroup.suggestions?.length">
+                          <p class="ecom-variant-suggestions__label m-0 mb-2">
+                            {{ 'tr_product_variant_suggestions' | translate }}
+                          </p>
+                          <div class="ecom-variant-member" *ngFor="let s of variantGroup.suggestions">
+                            <div class="ecom-variant-member__main">
+                              <span class="ecom-variant-member__swatch">{{ s.variantLabel }}</span>
+                              <div>
+                                <div class="ecom-variant-member__name">{{ s.name }}</div>
+                                <div class="text-muted size-small">{{ s.code }}</div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              class="s-btn btn-secondary"
+                              [disabled]="variantGroupBusy"
+                              (click)="joinVariantSuggestion(s._id)"
+                            >
+                              {{ 'tr_product_variant_join' | translate }}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="form-group mt-3 mb-0">
+                          <label>{{ 'tr_product_variant_add_search' | translate }}</label>
+                          <input
+                            type="text"
+                            class="s-control"
+                            [ngModel]="variantJoinSearch"
+                            [ngModelOptions]="{ standalone: true }"
+                            name="variantJoinSearch"
+                            (ngModelChange)="onVariantJoinSearch($event)"
+                            [placeholder]="'tr_product_variant_add_search_ph' | translate"
+                          />
+                          <div class="ecom-variant-join-results" *ngIf="variantJoinResults.length">
+                            <button
+                              type="button"
+                              class="ecom-variant-join-item"
+                              *ngFor="let r of variantJoinResults"
+                              [disabled]="variantGroupBusy"
+                              (click)="joinVariantSuggestion(r._id)"
+                            >
+                              <span>{{ r.name }}</span>
+                              <span class="text-muted size-small">{{ r.code }}</span>
+                            </button>
+                          </div>
+                          <p class="text-muted size-small m-0 mt-1" *ngIf="variantJoinSearching">
+                            {{ 'tr_loading' | translate }}…
+                          </p>
+                        </div>
+
+                        <div class="ecom-variant-actions mt-3" *ngIf="!variantGroup.isGrouped">
+                          <button
+                            type="button"
+                            class="s-btn btn-link"
+                            [disabled]="variantGroupBusy"
+                            (click)="reSuggestVariantGroup()"
+                          >
+                            {{ 'tr_product_variant_re_suggest' | translate }}
+                          </button>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>

@@ -77,6 +77,172 @@
   cursor: pointer;
 }
 
+.ecom-variant-card {
+  margin-top: 0.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 48%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ecom-variant-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.ecom-variant-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ecom-variant-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.ecom-variant-badge--grouped {
+  color: #0f766e;
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
+.ecom-variant-badge--solo {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.ecom-variant-title-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ecom-variant-title-row .s-control {
+  flex: 1;
+}
+
+.ecom-variant-members,
+.ecom-variant-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ecom-variant-suggestions__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ecom-variant-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ecom-variant-member__main {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.ecom-variant-member__swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ecom-variant-member__name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
+
+.ecom-variant-member__remove {
+  padding: 0;
+  min-width: auto;
+  font-size: 0.8rem;
+}
+
+.ecom-variant-you {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.ecom-variant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.ecom-variant-join-results {
+  margin-top: 0.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ecom-variant-join-item {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ecom-variant-join-item:last-child {
+  border-bottom: 0;
+}
+
+.ecom-variant-join-item:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.ecom-variant-join-item:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .party-type-toggle label {
   font-weight: normal;
   cursor: pointer;

@@ -130,6 +130,46 @@ const productSchema = new mongoose.Schema(
       min: 0,
       default: null,
     },
+    /**
+     * Shared id for storefront variant grouping (same device, different colors).
+     * Null = listed alone on the e-commerce site.
+     */
+    ecommerceVariantGroupId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    /** When true, auto-grouping will not move this product between groups. */
+    ecommerceVariantGroupLocked: {
+      type: Boolean,
+      default: false,
+    },
+    /** How the current group membership was set. */
+    ecommerceVariantGroupSource: {
+      type: String,
+      enum: ['auto', 'manual'],
+      required: false,
+      default: undefined,
+    },
+    /** Shared storefront title for the variant group (optional). */
+    ecommerceListingTitle: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    /** Category attribute key used as the variant axis (e.g. color). */
+    ecommerceVariantAxisKey: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    /** Label shown for this SKU in the storefront variant picker. */
+    ecommerceVariantLabel: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     /** @deprecated Use bookedQuantity + ProductBooking list; kept for older documents. */
     activeBooking: {
       type: mongoose.Schema.Types.ObjectId,

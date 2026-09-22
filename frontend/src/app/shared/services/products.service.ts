@@ -31,6 +31,42 @@ export type ProductsImportResult = {
   errors: ProductsImportError[];
 };
 
+export type EcommerceVariantGroupMember = {
+  _id: string;
+  name: string;
+  code: string;
+  stock: number;
+  price?: number;
+  imageUrl?: string;
+  listedOnEcommerce?: boolean;
+  variantLabel: string;
+  locked?: boolean;
+  source?: string | null;
+};
+
+export type EcommerceVariantGroupSuggestion = {
+  _id: string;
+  name: string;
+  code: string;
+  stock: number;
+  listedOnEcommerce?: boolean;
+  variantLabel: string;
+  alreadyGrouped?: boolean;
+};
+
+export type EcommerceVariantGroupSnapshot = {
+  productId: string;
+  groupId: string | null;
+  locked: boolean;
+  source: string | null;
+  listingTitle: string;
+  axisKey: string;
+  axisLabel: string;
+  isGrouped: boolean;
+  members: EcommerceVariantGroupMember[];
+  suggestions: EcommerceVariantGroupSuggestion[];
+};
+
 export type ProductsInventoryAuditLocation = {
   inWarehouse: boolean;
   branchId?: string;
@@ -209,6 +245,56 @@ updateProductPrice(productId: string, price: number): Observable<{ message: stri
   return this.http.patch<{ message: string; product: Product }>(
     `${PRODUCTS_URL}/${productId}/price`,
     { price }
+  );
+}
+
+getEcommerceVariantGroup(productId: string): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.get<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group`
+  );
+}
+
+joinEcommerceVariantGroup(
+  productId: string,
+  otherProductId: string
+): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.post<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group/join`,
+    { otherProductId }
+  );
+}
+
+leaveEcommerceVariantGroup(productId: string): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.post<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group/leave`,
+    {}
+  );
+}
+
+setEcommerceVariantGroupMembers(
+  productId: string,
+  productIds: string[]
+): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.put<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group/members`,
+    { productIds }
+  );
+}
+
+patchEcommerceVariantGroup(
+  productId: string,
+  body: { listingTitle?: string; variantLabel?: string }
+): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.patch<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group`,
+    body
+  );
+}
+
+reSuggestEcommerceVariantGroup(productId: string): Observable<EcommerceVariantGroupSnapshot> {
+  return this.http.post<EcommerceVariantGroupSnapshot>(
+    `${PRODUCTS_URL}/${productId}/ecommerce-variant-group/re-suggest`,
+    {}
   );
 }
 

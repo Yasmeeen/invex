@@ -21,6 +21,7 @@ import {
   productInstallmentTotalAmount,
   ProductsSerivce,
 } from '@shared/services/products.service';
+import type { EcommerceVariantGroupSnapshot } from '@shared/services/products.service';
 import { InstallmentPlansService, InstallmentPlan } from '@shared/services/installment-plans.service';
 import { ProductBarcodeInstallmentPlan } from '@core/models/products.model';
 import { forkJoin, Observable, of, Subject, Subscription } from 'rxjs';
@@ -124,6 +125,15 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   ecommercePrice: number | null = null;
   /** True when the user set a store price different from the branch price. */
   private ecommercePriceLocked = false;
+  /** Variant group preview for the e-commerce tab (edit mode). */
+  variantGroup: EcommerceVariantGroupSnapshot | null = null;
+  variantGroupLoading = false;
+  variantGroupBusy = false;
+  variantListingTitleDraft = '';
+  variantJoinSearch = '';
+  variantJoinResults: Array<{ _id: string; name: string; code: string }> = [];
+  variantJoinSearching = false;
+  private variantJoinSearch$ = new Subject<string>();
   /** Available installment plans from settings (enabled). */
   availableInstallmentPlans: InstallmentPlan[] = [];
   /** Selected plan ids for this product (optional tab). */
@@ -262,6 +272,202 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   openEcommerceTab(): void {
     this.syncEcommercePriceFromBranchIfUnlocked();
     this.activeTab = 'ecommerce';
+    this.loadVariantGroup();
+  }
+
+  private loadVariantGroup(): void {
+    if (!this.isEdit || !this.productId || !this.showEcommerceTab) {
+      this.variantGroup = null;
+      return;
+    }
+    this.variantGroupLoading = true;
+    this.subscriptions.push(
+      this.productsSerivce.getEcommerceVariantGroup(this.productId).subscribe({
+        next: (snap) => {
+          this.variantGroup = snap;
+          this.variantListingTitleDraft = snap.listingTitle || '';
+          this.variantGroupLoading = false;
+        },
+        error: () => {
+          this.variantGroup = null;
+          this.variantGroupLoading = false;
+        },
+      })
+    );
+  }
+
+  onVariantJoinSearch(term: string): void {
+    this.variantJoinSearch = term;
+    this.variantJoinSearch$.next(term);
+  }
+
+  private initVariantJoinSearch(): void {
+    this.subscriptions.push(
+      this.variantJoinSearch$
+        .pipe(
+          debounceTime(280),
+          distinctUntilChanged(),
+          tap(() => (this.variantJoinSearching = true)),
+          switchMap((term) => {
+            const q = String(term || '').trim();
+            if (q.length < 2 || !this.productId) {
+              this.variantJoinSearching = false;
+              return of({ products: [] as any[] });
+            }
+            return this.productsSerivce
+              .getProducts({
+                search: q,
+                page: 1,
+                limit: 8,
+                categoryId: this.selectedCategory?._id || undefined,
+              })
+              .pipe(
+                catchError(() => of({ products: [] })),
+                tap(() => (this.variantJoinSearching = false))
+              );
+          })
+        )
+        .subscribe((res: any) => {
+          const rows = Array.isArray(res?.products)
+            ? res.products
+            : Array.isArray(res?.data)
+              ? res.data
+              : Array.isArray(res)
+                ? res
+                : [];
+          this.variantJoinResults = rows
+            .filter((p: any) => p && String(p._id) !== String(this.productId))
+            .map((p: any) => ({
+              _id: String(p._id),
+              name: p.name,
+              code: p.code,
+            }));
+        })
+    );
+  }
+
+  joinVariantSuggestion(otherId: string): void {
+    if (!this.productId || this.variantGroupBusy) return;
+    this.variantGroupBusy = true;
+    this.productsSerivce.joinEcommerceVariantGroup(this.productId, otherId).subscribe({
+      next: (snap) => {
+        this.variantGroup = snap;
+        this.variantListingTitleDraft = snap.listingTitle || '';
+        this.variantGroupBusy = false;
+        this.variantJoinResults = [];
+        this.variantJoinSearch = '';
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_variant_group_updated'),
+          'success'
+        );
+      },
+      error: (err) => {
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          err?.error?.error || this.translateService.instant('tr_product_variant_group_error'),
+          'error'
+        );
+      },
+    });
+  }
+
+  leaveVariantGroup(): void {
+    if (!this.productId || this.variantGroupBusy) return;
+    this.variantGroupBusy = true;
+    this.productsSerivce.leaveEcommerceVariantGroup(this.productId).subscribe({
+      next: (snap) => {
+        this.variantGroup = snap;
+        this.variantListingTitleDraft = snap.listingTitle || '';
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_variant_group_updated'),
+          'success'
+        );
+      },
+      error: (err) => {
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          err?.error?.error || this.translateService.instant('tr_product_variant_group_error'),
+          'error'
+        );
+      },
+    });
+  }
+
+  removeVariantMember(memberId: string): void {
+    if (!this.productId || !this.variantGroup || this.variantGroupBusy) return;
+    const remaining = (this.variantGroup.members || [])
+      .map((m) => m._id)
+      .filter((id) => id !== memberId);
+    this.variantGroupBusy = true;
+    this.productsSerivce.setEcommerceVariantGroupMembers(this.productId, remaining).subscribe({
+      next: (snap) => {
+        this.variantGroup = snap;
+        this.variantListingTitleDraft = snap.listingTitle || '';
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_variant_group_updated'),
+          'success'
+        );
+      },
+      error: (err) => {
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          err?.error?.error || this.translateService.instant('tr_product_variant_group_error'),
+          'error'
+        );
+      },
+    });
+  }
+
+  saveVariantListingTitle(): void {
+    if (!this.productId || this.variantGroupBusy) return;
+    this.variantGroupBusy = true;
+    this.productsSerivce
+      .patchEcommerceVariantGroup(this.productId, {
+        listingTitle: this.variantListingTitleDraft,
+      })
+      .subscribe({
+        next: (snap) => {
+          this.variantGroup = snap;
+          this.variantListingTitleDraft = snap.listingTitle || '';
+          this.variantGroupBusy = false;
+          this.appNotificationService.push(
+            this.translateService.instant('tr_product_variant_group_updated'),
+            'success'
+          );
+        },
+        error: (err) => {
+          this.variantGroupBusy = false;
+          this.appNotificationService.push(
+            err?.error?.error || this.translateService.instant('tr_product_variant_group_error'),
+            'error'
+          );
+        },
+      });
+  }
+
+  reSuggestVariantGroup(): void {
+    if (!this.productId || this.variantGroupBusy) return;
+    this.variantGroupBusy = true;
+    this.productsSerivce.reSuggestEcommerceVariantGroup(this.productId).subscribe({
+      next: (snap) => {
+        this.variantGroup = snap;
+        this.variantListingTitleDraft = snap.listingTitle || '';
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          this.translateService.instant('tr_product_variant_group_updated'),
+          'success'
+        );
+      },
+      error: (err) => {
+        this.variantGroupBusy = false;
+        this.appNotificationService.push(
+          err?.error?.error || this.translateService.instant('tr_product_variant_group_error'),
+          'error'
+        );
+      },
+    });
   }
 
   onEcommercePriceInput(): void {
@@ -1329,6 +1535,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.initSourcePartyPhoneLookup();
     this.initVendorTypeahead();
+    this.initVariantJoinSearch();
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
     if (this.cashDeskPurchase) {

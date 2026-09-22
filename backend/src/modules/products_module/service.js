@@ -37,6 +37,14 @@ import {
   notifyProductDeleted,
 } from '../integrations_module/catalogSync.js';
 import {
+  getVariantGroupSnapshot,
+  joinVariantGroup,
+  leaveVariantGroup,
+  setVariantGroupMembers,
+  updateVariantGroupMeta,
+  reSuggestVariantGroup,
+} from '../integrations_module/ecommerceVariantGroup.js';
+import {
   attachRemotePickupTransfers,
   bookedQuantityForPickupBranch,
   movePickupBookingsWithTransfer,
@@ -3662,5 +3670,89 @@ export const getProductSerialTrack = async (req, res) => {
   } catch (error) {
     console.error('getProductSerialTrack:', error);
     res.status(500).json({ error: 'Failed to track product serial' });
+  }
+};
+
+/** GET /api/products/:id/ecommerce-variant-group */
+export const getEcommerceVariantGroup = async (req, res) => {
+  try {
+    const snapshot = await getVariantGroupSnapshot(req.params.id);
+    if (!snapshot) return res.status(404).json({ error: 'Product not found' });
+    return res.json(snapshot);
+  } catch (error) {
+    console.error('getEcommerceVariantGroup:', error);
+    return res.status(500).json({ error: 'Failed to load variant group' });
+  }
+};
+
+/** POST /api/products/:id/ecommerce-variant-group/join  { otherProductId } */
+export const joinEcommerceVariantGroup = async (req, res) => {
+  try {
+    const otherId = req.body?.otherProductId || req.body?.productId;
+    if (!otherId) return res.status(400).json({ error: 'otherProductId is required' });
+    const result = await joinVariantGroup(req.params.id, otherId);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    notifyProductChanged(req.params.id);
+    if (otherId) notifyProductChanged(otherId);
+    return res.json(result.snapshot);
+  } catch (error) {
+    console.error('joinEcommerceVariantGroup:', error);
+    return res.status(500).json({ error: 'Failed to join variant group' });
+  }
+};
+
+/** POST /api/products/:id/ecommerce-variant-group/leave */
+export const leaveEcommerceVariantGroup = async (req, res) => {
+  try {
+    const result = await leaveVariantGroup(req.params.id);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    notifyProductChanged(req.params.id);
+    return res.json(result.snapshot);
+  } catch (error) {
+    console.error('leaveEcommerceVariantGroup:', error);
+    return res.status(500).json({ error: 'Failed to leave variant group' });
+  }
+};
+
+/** PUT /api/products/:id/ecommerce-variant-group/members  { productIds: [] } */
+export const setEcommerceVariantGroupMembers = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.productIds) ? req.body.productIds : [];
+    const result = await setVariantGroupMembers(req.params.id, ids);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    notifyProductChanged(req.params.id);
+    return res.json(result.snapshot);
+  } catch (error) {
+    console.error('setEcommerceVariantGroupMembers:', error);
+    return res.status(500).json({ error: 'Failed to update variant group members' });
+  }
+};
+
+/** PATCH /api/products/:id/ecommerce-variant-group  { listingTitle?, variantLabel? } */
+export const patchEcommerceVariantGroup = async (req, res) => {
+  try {
+    const result = await updateVariantGroupMeta(req.params.id, {
+      listingTitle: req.body?.listingTitle,
+      variantLabel: req.body?.variantLabel,
+    });
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    notifyProductChanged(req.params.id);
+    return res.json(result.snapshot);
+  } catch (error) {
+    console.error('patchEcommerceVariantGroup:', error);
+    return res.status(500).json({ error: 'Failed to update variant group' });
+  }
+};
+
+/** POST /api/products/:id/ecommerce-variant-group/re-suggest */
+export const reSuggestEcommerceVariantGroup = async (req, res) => {
+  try {
+    const result = await reSuggestVariantGroup(req.params.id);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    notifyProductChanged(req.params.id);
+    return res.json(result.snapshot);
+  } catch (error) {
+    console.error('reSuggestEcommerceVariantGroup:', error);
+    return res.status(500).json({ error: 'Failed to re-suggest variant group' });
   }
 };

@@ -4,6 +4,10 @@ import Branch from '../../DB/models/branch.model.js';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import { isEcommerceIntegrationFeatureAvailable } from './feature.js';
 import { ensureOnlineBranch, ONLINE_BRANCH_NAME } from './onlineBranch.js';
+import {
+  collapseProductsForCatalog,
+  ensureAutoGroupForProduct,
+} from './ecommerceVariantGroup.js';
 
 const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
 
@@ -74,6 +78,9 @@ function mapProduct(product, categoryIdOnEcomHint) {
     invexBranchName: product.inWarehouse ? '' : String(branchDoc?.name || ''),
     invexBranchAddress: product.inWarehouse ? '' : String(branchDoc?.storeAddress || ''),
     inWarehouse: Boolean(product.inWarehouse),
+    hasVariants: false,
+    attributes: [],
+    variants: [],
   };
 }
 
@@ -142,7 +149,7 @@ export async function buildCatalogPayload() {
     ok: true,
     catalogMode: cfg.catalogMode,
     categories: categories.map(mapCategory),
-    products: products.map((p) => mapProduct(p)),
+    products: collapseProductsForCatalog(products, (p) => mapProduct(p)),
     branches: branches.map(mapBranch),
   };
 }
@@ -244,6 +251,15 @@ function shouldDeleteFromStorefront(product) {
   return sellableStock(product) <= 0 && deleteWhenOos;
 }
 
+async function isProductInCatalog(product, cfg) {
+  if (!product || shouldDeleteFromStorefront(product)) return false;
+  if (cfg.catalogMode === 'online_only') {
+    const onlineId = String(cfg.onlineBranchId || (await ensureOnlineBranch())._id);
+    return String(product.branch || '') === onlineId && !product.inWarehouse;
+  }
+  return Boolean(product.listedOnEcommerce);
+}
+
 export async function pushProductUpsert(productId) {
   const cfg = await getIntegrationConfig();
   if (!cfg.enabled) return { ok: false, skipped: true, reason: cfg.reason };
@@ -255,20 +271,61 @@ export async function pushProductUpsert(productId) {
     });
   }
 
-  if (shouldDeleteFromStorefront(product)) {
-    return postToEcommerce('/api/integration/invex/catalog/product-delete', {
-      invexProductId: String(product._id),
+  const groupId = product.ecommerceVariantGroupId
+    ? String(product.ecommerceVariantGroupId)
+    : null;
+
+  // Variant group: push collapsed listing + remove stale flat member pages
+  if (groupId) {
+    const members = await Product.find({ ecommerceVariantGroupId: groupId })
+      .populate('category')
+      .populate('branch')
+      .lean();
+    const eligible = [];
+    for (const m of members) {
+      if (await isProductInCatalog(m, cfg)) eligible.push(m);
+    }
+
+    // Always delete flat keys for members (group uses vg:{id})
+    for (const m of members) {
+      await postToEcommerce('/api/integration/invex/catalog/product-delete', {
+        invexProductId: String(m._id),
+      });
+    }
+
+    if (eligible.length < 2) {
+      // Group collapsed — delete group page and upsert survivors as flat
+      await postToEcommerce('/api/integration/invex/catalog/product-delete', {
+        invexProductId: `vg:${groupId}`,
+      });
+      let last = { ok: true };
+      for (const m of eligible) {
+        const mapped = mapProduct(m);
+        last = await postToEcommerce('/api/integration/invex/catalog/product-upsert', {
+          category: m.category ? mapCategory(m.category) : null,
+          product: mapped,
+          branch:
+            mapped.invexBranchId && m.branch && typeof m.branch === 'object'
+              ? mapBranch(m.branch)
+              : null,
+        });
+      }
+      return last;
+    }
+
+    const [collapsed] = collapseProductsForCatalog(eligible, (p) => mapProduct(p));
+    const cat = eligible[0].category;
+    return postToEcommerce('/api/integration/invex/catalog/product-upsert', {
+      category: cat ? mapCategory(cat) : null,
+      product: collapsed,
+      branch:
+        collapsed.invexBranchId && eligible[0].branch && typeof eligible[0].branch === 'object'
+          ? mapBranch(eligible[0].branch)
+          : null,
     });
   }
 
-  if (cfg.catalogMode === 'online_only') {
-    const onlineId = String(cfg.onlineBranchId || (await ensureOnlineBranch())._id);
-    if (String(product.branch || '') !== onlineId || product.inWarehouse) {
-      return postToEcommerce('/api/integration/invex/catalog/product-delete', {
-        invexProductId: String(product._id),
-      });
-    }
-  } else if (!product.listedOnEcommerce) {
+  if (!(await isProductInCatalog(product, cfg))) {
     return postToEcommerce('/api/integration/invex/catalog/product-delete', {
       invexProductId: String(product._id),
     });
@@ -316,9 +373,18 @@ export async function pushCategoryDelete(categoryId) {
 export function notifyProductChanged(productId) {
   if (!productId) return;
   setImmediate(() => {
-    pushProductUpsert(productId).catch((err) =>
-      console.error('[catalog sync] product upsert', err.message)
-    );
+    (async () => {
+      try {
+        await ensureAutoGroupForProduct(productId);
+      } catch (err) {
+        console.error('[catalog sync] auto variant group', err.message);
+      }
+      try {
+        await pushProductUpsert(productId);
+      } catch (err) {
+        console.error('[catalog sync] product upsert', err.message);
+      }
+    })();
   });
 }
 

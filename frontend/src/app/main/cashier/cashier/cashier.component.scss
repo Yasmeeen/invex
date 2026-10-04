@@ -635,8 +635,12 @@
   
     .products-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      /* Pack cards from the inner edge (beside the order), not the far screen edge. */
+      direction: ltr;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 160px));
       grid-auto-rows: max-content;
+      justify-content: start;
+      justify-items: stretch;
       align-content: start;
       align-items: start;
       gap: 1rem;
@@ -655,6 +659,7 @@
     }
   
     .product-card {
+      direction: rtl;
       background: #fff;
       border-radius: 5px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -663,6 +668,9 @@
       padding:2rem 0.5rem 1rem 0.5rem;
       transition: transform 0.2s, box-shadow 0.2s;
       position: relative;
+      width: 100%;
+      height: auto;
+      align-self: start;
 
       .product-card__image-wrap {
         width: 100%;

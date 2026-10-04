@@ -41,22 +41,24 @@
       <div class="col-md-4" *ngIf="showBranchFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_branch' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="branches"
-            bindLabel="name"
-            bindValue="_id"
-            [multiple]="true"
-            [closeOnSelect]="false"
-            [searchable]="true"
-            [clearable]="true"
-            appendTo="body"
-            [(ngModel)]="selectedBranchIds"
-            name="moneyAccountBranchIds"
-            [placeholder]="'tr_money_accounts_all_branches' | translate"
-            (ngModelChange)="onBranchChanged()"
-          >
-          </ng-select>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="branches"
+              bindLabel="name"
+              bindValue="_id"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              [clearable]="true"
+              [(ngModel)]="selectedBranchIds"
+              name="moneyAccountBranchIds"
+              [placeholder]="'tr_money_accounts_all_branches' | translate"
+              (ngModelChange)="onBranchChanged()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
       <div class="col-md-4">

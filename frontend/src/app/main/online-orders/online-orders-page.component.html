@@ -148,6 +148,7 @@
               : 'tr_online_orders_channel_crm'
             ) | translate
           }}
+          <small *ngIf="order.isReservation">{{ 'tr_booking_source_crm' | translate }}</small>
         </span>
 
         <span class="oo-number">

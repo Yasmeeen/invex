@@ -1,0 +1,15 @@
+.vendor-payment-terms {
+  position: relative;
+
+  &:has(.ng-select-opened) {
+    z-index: 8;
+  }
+
+  ::ng-deep ng-select.ng-select-opened {
+    z-index: 60 !important;
+  }
+
+  ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
+  }
+}

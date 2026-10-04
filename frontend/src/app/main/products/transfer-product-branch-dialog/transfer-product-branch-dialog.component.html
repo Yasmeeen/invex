@@ -19,19 +19,22 @@
         <p class="size-small m-0 mb-3 pickup-transfer-note" *ngIf="pickupHintForSelected()">
           {{ pickupHintForSelected() }}
         </p>
-        <div class="form-group">
+        <div class="form-group transfer-branch-field">
           <label>{{ 'tr_branch_transfer_to_branch' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            formControlName="toBranchId"
-            [items]="branches"
-            bindLabel="name"
-            bindValue="_id"
-            [clearable]="false"
-            appendTo="body"
-            placeholder="{{ 'tr_select' | translate }}"
-          >
-          </ng-select>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select width-100"
+              formControlName="toBranchId"
+              [items]="branches"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="false"
+              [searchable]="true"
+              placeholder="{{ 'tr_select' | translate }}"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
         <div class="form-group mb-0">
           <label>{{ 'tr_branch_transfer_quantity' | translate }}</label>

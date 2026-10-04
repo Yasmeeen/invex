@@ -1,31 +1,19 @@
-/* ng-select inside dialog: append target must be .modal-content (not outer .complex-modal). */
-#purchasing-request-modal-root {
+.purchasing-select-field {
   position: relative;
-  overflow: visible;
-}
 
-.purchasing-request-modal {
-  .modal-body {
-    overflow: visible;
+  &:has(.ng-select-opened) {
+    z-index: 8;
   }
 
-  .input-with-icon {
-    ng-select.ng-select {
-      position: relative;
-      z-index: 3;
-    }
-
-    ng-select.ng-select .ng-select-container {
-      position: relative !important;
-    }
-
-    .input-icon {
-      pointer-events: none;
-    }
+  ::ng-deep ng-select.ng-select-opened {
+    z-index: 60 !important;
   }
-}
 
-/* Panel appended to #purchasing-request-modal-root */
-::ng-deep #purchasing-request-modal-root .ng-dropdown-panel {
-  z-index: 10050 !important;
+  ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
+  }
+
+  .input-icon {
+    pointer-events: none;
+  }
 }

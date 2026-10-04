@@ -541,6 +541,11 @@ body[dir=rtl] {
   overflow: visible !important;
 }
 
+.transfer-branch-dialog-panel .modal-wrapper .modal-body {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
 .cdk-overlay-pane.book-product-dialog-panel {
   max-height: 85vh !important;
 }

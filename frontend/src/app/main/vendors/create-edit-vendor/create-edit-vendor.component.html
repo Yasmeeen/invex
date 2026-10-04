@@ -58,7 +58,7 @@
 
                         <!-- Payment Terms -->
                         <div class="col-md-6">
-                            <div class="form-group" [class.has-error]="paymentTerms.invalid && vendorForm.submitted">
+                            <div class="form-group vendor-payment-terms" [class.has-error]="paymentTerms.invalid && vendorForm.submitted">
                               <label>{{ 'tr_payment_terms' | translate }}</label>
                               <div class="input-with-icon bg-white">
                                 <ng-select
@@ -72,7 +72,6 @@
                                   [multiple]="true"
                                   [closeOnSelect]="false"
                                   [placeholder]="'tr_select' | translate"
-                                  appendTo="body"
                                   required
                                 ></ng-select>
                                 <i class="fa fa-caret-down input-icon"></i>

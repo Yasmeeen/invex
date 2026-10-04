@@ -102,7 +102,6 @@
               [multiple]="true"
               [closeOnSelect]="false"
               [searchable]="true"
-              appendTo="body"
               [(ngModel)]="selectedCategories"
               name="categoryIds"
               [items]="categorys"
@@ -124,17 +123,19 @@
         <div class="form-group mb-0">
           <label>{{ 'tr_category_attributes' | translate }}</label>
           <div class="filters-grid__split">
-            <ng-select
-              class="s-control s-select width-100"
-              placeholder="{{ 'tr_select' | translate }}"
-              [items]="attributeKeyOptions"
-              [(ngModel)]="selectedAttributeKey"
-              name="attrKey"
-              [clearable]="true"
-              appendTo="body"
-              (change)="applyAttributeSearch()"
-            >
-            </ng-select>
+            <div class="input-with-icon bg-white">
+              <ng-select
+                class="s-control s-select width-100"
+                placeholder="{{ 'tr_select' | translate }}"
+                [items]="attributeKeyOptions"
+                [(ngModel)]="selectedAttributeKey"
+                name="attrKey"
+                [clearable]="true"
+                (change)="applyAttributeSearch()"
+              >
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
             <input
               class="s-control width-100"
               type="text"
@@ -149,81 +150,89 @@
       <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_location_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="locationFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="locationFilter"
-            name="locationFilter"
-            (ngModelChange)="onListFiltersChange()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="locationFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="locationFilter"
+              name="locationFilter"
+              (ngModelChange)="onListFiltersChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
       <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_products_stock_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="stockFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="stockFilter"
-            name="stockFilter"
-            (ngModelChange)="onStockFilterChange()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="stockFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="stockFilter"
+              name="stockFilter"
+              (ngModelChange)="onStockFilterChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
       <div class="filters-grid__item">
         <div class="form-group mb-0">
           <label>{{ 'tr_products_booking_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="bookingFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="bookingFilter"
-            name="bookingFilter"
-            (ngModelChange)="onListFiltersChange()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="bookingFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="bookingFilter"
+              name="bookingFilter"
+              (ngModelChange)="onListFiltersChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
       <div class="filters-grid__item" *ngIf="showOnlineListingUi">
         <div class="form-group mb-0">
           <label>{{ 'tr_product_online_filter' | translate }}</label>
-          <ng-select
-            class="s-control s-select width-100"
-            [items]="onlineFilterOptions"
-            bindLabel="labelKey"
-            bindValue="id"
-            [clearable]="false"
-            [searchable]="false"
-            appendTo="body"
-            [(ngModel)]="onlineFilter"
-            name="onlineFilter"
-            (ngModelChange)="onListFiltersChange()"
-          >
-            <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-            <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
-          </ng-select>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="onlineFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="onlineFilter"
+              name="onlineFilter"
+              (ngModelChange)="onListFiltersChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
       <div class="filters-grid__item" *ngIf="locationFilter !== 'warehouse'">
@@ -238,7 +247,6 @@
               [multiple]="true"
               [closeOnSelect]="false"
               [searchable]="true"
-              appendTo="body"
               [(ngModel)]="selectedBranches"
               name="branchIds"
               [items]="branches"
@@ -259,23 +267,23 @@
       <div class="filters-grid__item" *ngIf="showSupplierFilter">
         <div class="form-group mb-0">
           <label>{{ 'tr_search_supplier' | translate }}</label>
-          <ng-select
-            class="s-control s-select products-filter-ng-select width-100"
-            [items]="vendorSearchItems"
-            [typeahead]="vendorTypeahead$"
-            [loading]="vendorsLoading"
-            bindLabel="label"
-            bindValue="_id"
-            [(ngModel)]="selectedSupplierId"
-            (ngModelChange)="onSupplierIdChange($event)"
-            (open)="onVendorSelectOpen()"
-            name="supplierId"
-            [placeholder]="'tr_search_supplier_placeholder' | translate"
-            [clearable]="true"
-            [searchable]="true"
-            appendTo="body"
-            notFoundText="{{ 'tr_no_items_found' | translate }}"
-          >
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select products-filter-ng-select width-100"
+              [items]="vendorSearchItems"
+              [typeahead]="vendorTypeahead$"
+              [loading]="vendorsLoading"
+              bindLabel="label"
+              bindValue="_id"
+              [(ngModel)]="selectedSupplierId"
+              (ngModelChange)="onSupplierIdChange($event)"
+              (open)="onVendorSelectOpen()"
+              name="supplierId"
+              [placeholder]="'tr_search_supplier_placeholder' | translate"
+              [clearable]="true"
+              [searchable]="true"
+              notFoundText="{{ 'tr_no_items_found' | translate }}"
+            >
             <ng-template ng-option-tmp let-item="item">
               <div class="weight-medium">{{ item.nameOfcompany }}</div>
               <div class="size-small text-muted">
@@ -288,7 +296,9 @@
               <span *ngIf="item.name"> — {{ item.name }}</span>
               <span *ngIf="item.phone"> · {{ item.phone }}</span>
             </ng-template>
-          </ng-select>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
       </div>
     </div>

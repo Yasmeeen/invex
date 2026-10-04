@@ -50,6 +50,11 @@ const onlineOrderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true, min: 0 },
     total: { type: Number, required: true, min: 0 },
     notes: { type: String, default: '', trim: true },
+    /** CRM reservation: held like a product booking, with a collected deposit. */
+    isReservation: { type: Boolean, default: false, index: true },
+    depositAmount: { type: Number, default: 0, min: 0 },
+    depositPaymentMethod: { type: String, default: '', trim: true },
+    transferReferencePhone: { type: String, default: '', trim: true },
     paymentMethod: { type: String, default: '', trim: true },
     deliveryMethod: { type: String, default: '', trim: true },
     deliveryAddress: { type: String, default: '', trim: true },

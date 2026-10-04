@@ -148,7 +148,6 @@
                 bindValue="_id"
                 [clearable]="false"
                 [searchable]="true"
-                appendTo="body"
                 placeholder="{{ 'tr_collector' | translate }}"
                 [(ngModel)]="selectedCollectorId"
                 [ngModelOptions]="{ standalone: true }"
@@ -277,6 +276,7 @@
         </div>
         <div class="payment-splits-dialog__fee-row__source">
           <label class="size-small">{{ 'tr_payment_fee_source_label' | translate }}</label>
+          <div class="input-with-icon">
           <ng-select
             class="s-control s-select payment-splits-dialog__fee-select"
             [items]="feeSourceOptions(src.forMethod)"
@@ -284,7 +284,6 @@
             bindValue="id"
             [clearable]="false"
             [searchable]="true"
-            appendTo="body"
             [(ngModel)]="src.paidVia"
             [ngModelOptions]="{ standalone: true }"
             [name]="'feeSrc_' + src.forMethod"
@@ -312,6 +311,8 @@
               </span>
             </ng-template>
           </ng-select>
+          <i class="fa fa-caret-down input-icon"></i>
+          </div>
         </div>
         <div class="payment-splits-dialog__fee-row__gross size-small text-muted">
           {{ 'tr_payment_fee_gross_withdraw' | translate }}:

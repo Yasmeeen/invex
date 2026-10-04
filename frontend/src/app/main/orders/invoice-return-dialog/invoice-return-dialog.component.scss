@@ -20,6 +20,14 @@
       z-index: 3;
     }
 
+    ng-select.ng-select.ng-select-opened {
+      z-index: 60 !important;
+    }
+
+    ng-select.ng-select .ng-dropdown-panel {
+      z-index: 70 !important;
+    }
+
     ng-select.ng-select .ng-select-container {
       position: relative !important;
     }
@@ -27,6 +35,11 @@
     .input-icon {
       pointer-events: none;
     }
+  }
+
+  &__cash-choice:has(.ng-select-opened) {
+    position: relative;
+    z-index: 8;
   }
 
   &__title {

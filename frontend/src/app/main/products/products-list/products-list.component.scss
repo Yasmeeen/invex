@@ -400,6 +400,18 @@ img{
 }
 
 .filters-card {
+  position: relative;
+  z-index: 6;
+  overflow: visible;
+
+  ::ng-deep ng-select.ng-select-opened {
+    z-index: 60 !important;
+  }
+
+  ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
+  }
+
   .filters-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

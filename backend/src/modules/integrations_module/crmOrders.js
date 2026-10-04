@@ -32,8 +32,13 @@ import {
   stockBearerOf,
 } from '../../utils/cut-from-source.js';
 import { resolveCutSaleUnitCost } from '../../utils/slaughter-cost.util.js';
+import { normalizePaymentMethodsCatalog } from '../settings_module/paymentMethodsCatalog.js';
+import { isPhysicalCashMethod } from '../../utils/deposit-payment-splits.js';
+import { recordClientCashDrawerReceipt } from '../../utils/client-cash-drawer.js';
+import { postPaymentMethodInflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const ONLINE_BOOKING_SOURCES = ['ecommerce', 'crm'];
 const objectIdIs = (left, right) => String(left || '') === String(right || '');
 const reservationKeyFor = (crmOrderId) => `crm:${String(crmOrderId).trim()}`;
 
@@ -116,6 +121,58 @@ function sellableStock(product, sourceById = null, cutFromSourceEnabled = false)
   return computeSellableUnits(product);
 }
 
+async function salePaymentMethods(session) {
+  const settings = await latestSettings(session);
+  const catalog = normalizePaymentMethodsCatalog({
+    paymentMethodsCatalog: settings?.paymentMethodsCatalog,
+    paymentAppFeePercents: settings?.paymentAppFeePercents,
+  });
+  return catalog
+    .filter((row) => row.key !== 'credit' && (row.showIn === 'sale' || row.showIn === 'both'))
+    .map((row) => ({ key: row.key, label: row.label }));
+}
+
+function allocateDeposit(lineTotals, deposit) {
+  const total = roundMoney(lineTotals.reduce((sum, line) => sum + line, 0));
+  const capped = Math.min(roundMoney(deposit), total);
+  if (capped <= 0 || total <= 0) return lineTotals.map(() => 0);
+  let remaining = capped;
+  return lineTotals.map((line, index) => {
+    if (index === lineTotals.length - 1) return roundMoney(Math.max(0, remaining));
+    const share = roundMoney((capped * line) / total);
+    remaining = roundMoney(remaining - share);
+    return share;
+  });
+}
+
+function parseCrmReservation(body, orderTotal, allowedMethods) {
+  const raw = body?.reservation;
+  if (!raw || typeof raw !== 'object') return null;
+  const depositAmount = roundMoney(raw.depositAmount);
+  const paymentMethod = String(raw.paymentMethod || '').trim().toLowerCase();
+  const transferReferencePhone = String(raw.transferReferencePhone || '').trim();
+  const imageUrls = [
+    ...new Set(
+      (Array.isArray(raw.depositTransferImageUrls) ? raw.depositTransferImageUrls : [])
+        .map((url) => String(url || '').trim())
+        .filter((url) => /^https?:\/\//i.test(url))
+    ),
+  ].slice(0, 10);
+  if (!(depositAmount > 0)) throw new Error('Reservation deposit is required');
+  if (depositAmount - orderTotal > 0.009) throw new Error('Deposit cannot exceed the order total');
+  if (!paymentMethod || paymentMethod === 'credit' || paymentMethod === 'mixed') {
+    throw new Error('A deposit payment method is required');
+  }
+  if (allowedMethods?.size && !allowedMethods.has(paymentMethod)) {
+    throw new Error('Deposit payment method is not available');
+  }
+  const referenceDigits = transferReferencePhone.replace(/\D/g, '');
+  if (!isPhysicalCashMethod(paymentMethod) && referenceDigits.length < 10) {
+    throw new Error('Transfer reference phone is required');
+  }
+  return { depositAmount, paymentMethod, transferReferencePhone, imageUrls };
+}
+
 async function latestSettings(session) {
   const query = StoreSettings.findOne().sort({ updatedAt: -1 });
   if (session) query.session(session);
@@ -188,6 +245,7 @@ export async function getCrmCatalog(req, res) {
       .sort({ name: 1 })
       .lean();
 
+    const paymentMethods = await salePaymentMethods();
     if (!branchId) {
       return res.json({
         branches: branches.map((branch) => ({
@@ -201,6 +259,7 @@ export async function getCrmCatalog(req, res) {
           code: category.code || '',
           imageUrl: category.imageUrl || '',
         })),
+        paymentMethods,
         selectedBranchId: null,
         products: [],
       });
@@ -287,6 +346,7 @@ export async function getCrmCatalog(req, res) {
         code: category.code || '',
         imageUrl: category.imageUrl || '',
       })),
+      paymentMethods,
       selectedBranchId: branchId,
       products: products
         .map((product) => {
@@ -392,9 +452,7 @@ export async function createCrmOrder(req, res) {
       session,
     });
     const reservationKey = reservationKeyFor(crmOrderId);
-    const snapshots = [];
-    let subtotal = 0;
-
+    const prepared = [];
     for (const product of products) {
       if (!objectIdIs(product.branch, branch._id) || product.inWarehouse || product.factory) {
         throw new Error(`Product ${product.code} does not belong to the selected branch`);
@@ -425,6 +483,48 @@ export async function createCrmOrder(req, res) {
       }
 
       const prices = effectivePrice(product);
+      const saleUnit = isFarm ? 'head' : isWeight ? 'weight' : 'piece';
+      const lineTotal = roundMoney(prices.unitPrice * quantity);
+      prepared.push({
+        product,
+        category,
+        isWeight,
+        quantity,
+        stockProduct,
+        prices,
+        saleUnit,
+        lineTotal,
+      });
+    }
+
+    const subtotalPreview = roundMoney(prepared.reduce((sum, row) => sum + row.lineTotal, 0));
+    const paymentCatalog = await salePaymentMethods(session);
+    const crmReservation = parseCrmReservation(
+      body,
+      subtotalPreview,
+      new Set(paymentCatalog.map((row) => row.key))
+    );
+    const depositShares = crmReservation
+      ? allocateDeposit(
+          prepared.map((row) => row.lineTotal),
+          crmReservation.depositAmount
+        )
+      : prepared.map(() => 0);
+    const snapshots = [];
+    let subtotal = 0;
+
+    for (let index = 0; index < prepared.length; index += 1) {
+      const {
+        product,
+        category,
+        isWeight,
+        quantity,
+        stockProduct,
+        prices,
+        saleUnit,
+        lineTotal,
+      } = prepared[index];
+      const depositShare = depositShares[index] || 0;
       const reservedProduct = await Product.findOneAndUpdate(
         {
           _id: stockProduct._id,
@@ -476,6 +576,18 @@ export async function createCrmOrder(req, res) {
         pickupBranchId: branch._id,
         paidOnline: false,
         allowFractionalQuantity: isWeight,
+        ...(crmReservation
+          ? {
+              bookingSource: 'crm',
+              depositAmount: depositShare,
+              depositPayments:
+                depositShare > 0
+                  ? [{ method: crmReservation.paymentMethod, amount: depositShare }]
+                  : [],
+              transferReferencePhone: crmReservation.transferReferencePhone,
+              depositTransferImageUrls: crmReservation.imageUrls,
+            }
+          : {}),
       });
       const [reservation] = await EcommerceChannelReservation.create(
         [
@@ -496,8 +608,6 @@ export async function createCrmOrder(req, res) {
         ],
         { session }
       );
-      const saleUnit = isFarm ? 'head' : isWeight ? 'weight' : 'piece';
-      const lineTotal = roundMoney(prices.unitPrice * quantity);
       subtotal = roundMoney(subtotal + lineTotal);
       snapshots.push({
         product: product._id,
@@ -541,8 +651,17 @@ export async function createCrmOrder(req, res) {
           items: snapshots,
           subtotal,
           total: subtotal,
-          notes: String(body.notes || ''),
-          paymentMethod: String(body.paymentMethod || ''),
+          notes: [
+            crmReservation ? 'محجوز من CRM' : '',
+            String(body.notes || '').trim(),
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          isReservation: Boolean(crmReservation),
+          depositAmount: crmReservation?.depositAmount || 0,
+          depositPaymentMethod: crmReservation?.paymentMethod || '',
+          transferReferencePhone: crmReservation?.transferReferencePhone || '',
+          paymentMethod: crmReservation?.paymentMethod || String(body.paymentMethod || ''),
           deliveryMethod: String(body.deliveryMethod || ''),
           deliveryAddress: String(body.deliveryAddress || body.customer.address || ''),
           channel: 'crm',
@@ -587,6 +706,36 @@ export async function createCrmOrder(req, res) {
     void emitOnlineOrderCreatedAlert(onlineOrder).catch((alertErr) => {
       console.warn('⚠️ online order created alert:', alertErr?.message || alertErr);
     });
+    if (crmReservation && crmReservation.depositAmount > 0) {
+      const depositBooking = bookingNotifications[0]?.booking;
+      const actorId = depositBooking?.createdBy;
+      void safeTreasuryPost('crm_reservation_deposit', async () => {
+        await postPaymentMethodInflows({
+          branchId: branch._id,
+          methodAmounts: [
+            { method: crmReservation.paymentMethod, amount: crmReservation.depositAmount },
+          ],
+          sourceType: 'booking_deposit',
+          sourceId: onlineOrder._id,
+          note: `CRM reservation deposit — ${crmOrderNumber}`,
+          createdBy: actorId,
+        });
+      });
+      if (isPhysicalCashMethod(crmReservation.paymentMethod) && depositBooking?.client && actorId) {
+        try {
+          await recordClientCashDrawerReceipt({
+            branchId: branch._id,
+            userId: actorId,
+            clientId: depositBooking.client,
+            amount: crmReservation.depositAmount,
+            paymentType: 'booking_deposit',
+            note: `CRM reservation deposit — ${crmOrderNumber}`,
+          });
+        } catch (drawerErr) {
+          console.warn('⚠️ CRM reservation cash drawer receipt:', drawerErr?.message || drawerErr);
+        }
+      }
+    }
     return res.status(201).json({
       ok: true,
       status: onlineOrder.status,
@@ -708,7 +857,7 @@ export async function listOnlineOrders(req, res) {
     const [orders, total, channelAgg] = await Promise.all([
       OnlineOrder.find(query)
         .select(
-          'crmOrderId crmOrderNumber customer branch branchSnapshot total status channel reservationKey createdAt updatedAt invexOrderId invexInvoiceNumber items notes'
+          'crmOrderId crmOrderNumber customer branch branchSnapshot total status channel reservationKey isReservation depositAmount createdAt updatedAt invexOrderId invexInvoiceNumber items notes'
         )
         .populate('branch', 'name storeAddress')
         .sort({ createdAt: -1 })
@@ -789,7 +938,7 @@ async function cancelOnlineOrder(order, actor) {
       { session }
     );
     await ProductBooking.updateMany(
-      { ecommerceOrderId: current.reservationKey, source: 'ecommerce', status: 'active' },
+      { ecommerceOrderId: current.reservationKey, source: { $in: ONLINE_BOOKING_SOURCES }, status: 'active' },
       {
         $set: {
           status: 'cancelled',
@@ -863,7 +1012,7 @@ async function completeOnlineOrder(order, actor, paymentMethod, options = {}) {
     const [bookings, settings, productDocs, lastOrder] = await Promise.all([
       ProductBooking.find({
         ecommerceOrderId: current.reservationKey,
-        source: 'ecommerce',
+        source: { $in: ONLINE_BOOKING_SOURCES },
         status: 'active',
       }).session(session),
       latestSettings(session),
@@ -1032,9 +1181,28 @@ async function completeOnlineOrder(order, actor, paymentMethod, options = {}) {
           subtotalPrice: current.subtotal,
           invoiceDiscountAmount: 0,
           totalPrice: current.total,
-          amountPaid: 0,
-          paymentStatus: 'unpaid',
-          payments: [],
+          amountPaid: (() => {
+            if (!current.isReservation) return 0;
+            return Math.min(roundMoney(current.depositAmount), roundMoney(current.total));
+          })(),
+          paymentStatus: (() => {
+            if (!current.isReservation) return 'unpaid';
+            const paid = Math.min(roundMoney(current.depositAmount), roundMoney(current.total));
+            if (paid + 0.009 >= roundMoney(current.total) && paid > 0) return 'paid';
+            return paid > 0 ? 'partial' : 'unpaid';
+          })(),
+          payments:
+            current.isReservation && roundMoney(current.depositAmount) > 0
+              ? [
+                  {
+                    amount: Math.min(roundMoney(current.depositAmount), roundMoney(current.total)),
+                    paidAt: current.createdAt || new Date(),
+                    method: String(current.depositPaymentMethod || current.paymentMethod || ''),
+                    countsTowardInvoice: true,
+                    branch: current.branch,
+                  },
+                ]
+              : [],
           products: invoiceItems,
           status: 'completed',
           orderNumber: Number(lastOrder?.orderNumber || 0) + 1,
@@ -1067,7 +1235,7 @@ async function completeOnlineOrder(order, actor, paymentMethod, options = {}) {
         { session }
       ),
       ProductBooking.updateMany(
-        { ecommerceOrderId: current.reservationKey, source: 'ecommerce', status: 'active' },
+        { ecommerceOrderId: current.reservationKey, source: { $in: ONLINE_BOOKING_SOURCES }, status: 'active' },
         {
           $set: {
             status: 'cancelled',

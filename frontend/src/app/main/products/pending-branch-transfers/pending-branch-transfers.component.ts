@@ -36,6 +36,8 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
   actingId: string | null = null;
 
   branches: Branch[] = [];
+  /** Stable list for the "to" ng-select. A getter that returns a new array each cycle clears the selection. */
+  toBranchOptions: Branch[] = [];
   categories: Category[] = [];
   selectedFromBranches: string[] = [];
   selectedToBranches: string[] = [];
@@ -116,11 +118,6 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
     return canPickBranchRole(role) || isBranchManager(role);
   }
 
-  /** Destination branch options (exclude synthetic warehouse row). */
-  get toBranchOptions(): Branch[] {
-    return (this.branches || []).filter((b) => String(b._id) !== '__warehouse__');
-  }
-
   /** Label for transfer source: warehouse or branch name. */
   transferFromLabel(t: BranchTransferItem | null | undefined): string {
     if (!t) {
@@ -140,6 +137,7 @@ export class PendingBranchTransfersComponent implements OnInit, OnDestroy {
       this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
         next: (res: any) => {
           const list = res?.branches || [];
+          this.toBranchOptions = list;
           if (this.showFromBranchFilter) {
             this.branches = [
               { _id: '__warehouse__', name: this.translate.instant('tr_warehouse') } as Branch,

@@ -243,6 +243,7 @@ export async function emitBookingCreatedNotification(booking, product, quantity,
         ? branchName
         : 'Branch';
     const fromWeb = booking?.source === 'ecommerce';
+    const fromCrm = booking?.source === 'crm';
     let pickupNote = '';
     if (booking?.pickupType === 'branch_pickup' && booking?.pickupBranch) {
       const pickupId = String(booking.pickupBranch);
@@ -256,7 +257,7 @@ export async function emitBookingCreatedNotification(booking, product, quantity,
 
     const notification = await Notification.create({
       type: 'booking_created',
-      title: fromWeb ? 'New website booking' : 'New booking',
+      title: fromCrm ? 'Reserved from CRM' : fromWeb ? 'New website booking' : 'New booking',
       body: `${product.name} ×${quantity} (${locationLabel})${pickupNote}`,
       data: {
         bookingId: booking._id,
@@ -322,6 +323,11 @@ export async function createBookingFromEcommerceOrder({
   pickupBranchId = '',
   paidOnline = false,
   allowFractionalQuantity = false,
+  bookingSource = 'ecommerce',
+  depositAmount: explicitDeposit = null,
+  depositPayments: explicitDepositPayments = null,
+  transferReferencePhone = '',
+  depositTransferImageUrls = [],
 }) {
   const rawQuantity = Number(quantity);
   const qty = allowFractionalQuantity
@@ -363,7 +369,27 @@ export async function createBookingFromEcommerceOrder({
 
   const unit = Math.round((Number(unitPrice) || Number(snap.price) || Number(product.price) || 0) * 100) / 100;
   const lineTotal = Math.round(unit * qty * 100) / 100;
-  const dep = paidOnline ? lineTotal : 0;
+  const fromCrm = bookingSource === 'crm';
+  const dep = fromCrm
+    ? Math.round((Number(explicitDeposit) || 0) * 100) / 100
+    : paidOnline
+      ? lineTotal
+      : 0;
+  const depositPayments = fromCrm
+    ? Array.isArray(explicitDepositPayments)
+      ? explicitDepositPayments
+      : dep > 0
+        ? [{ method: 'cash', amount: dep }]
+        : []
+    : paidOnline && dep > 0
+      ? [{ method: 'online', amount: dep }]
+      : [];
+  const proofUrls = fromCrm
+    ? [...new Set((depositTransferImageUrls || []).map((url) => String(url || '').trim()).filter((url) => /^https?:\/\//i.test(url)))].slice(0, 10)
+    : [];
+  const transferRefStored = fromCrm && String(transferReferencePhone || '').trim()
+    ? canonicalPhoneForStorage(transferReferencePhone)
+    : '';
   const [booking] = await ProductBooking.create(
     [
       {
@@ -378,16 +404,19 @@ export async function createBookingFromEcommerceOrder({
         pickupType: isPickup ? 'branch_pickup' : 'online_shipping',
         shippingAddress: address,
         depositAmount: dep,
-        depositPayments: paidOnline && dep > 0 ? [{ method: 'online', amount: dep }] : [],
+        depositPayments,
         productUnitPrice: unit,
         productNameSnapshot: String(snap.name || product.name || '').trim(),
         productCodeSnapshot: String(snap.code || product.code || '').trim(),
+        depositTransferImageUrls: proofUrls,
+        depositTransferImageUrl: proofUrls[0] || '',
+        transferReferencePhone: transferRefStored,
         bookingDate: new Date(),
         status: 'active',
         confirmed: true,
         confirmedAt: new Date(),
         createdBy: userId,
-        source: 'ecommerce',
+        source: fromCrm ? 'crm' : 'ecommerce',
         ecommerceOrderId: String(ecommerceOrderId || ''),
       },
     ],
@@ -1427,7 +1456,7 @@ export const getActiveReservationsForProduct = async (req, res) => {
         confirmed: Boolean(b.confirmed),
         createdAt: b.createdAt,
         bookingDate: b.bookingDate,
-        source: b.source === 'ecommerce' ? 'ecommerce' : 'pos',
+        source: b.source === 'ecommerce' || b.source === 'crm' ? b.source : 'pos',
       })),
     });
   } catch (error) {
@@ -1499,7 +1528,7 @@ export const getActiveBookingsForCheckout = async (req, res) => {
         confirmed: Boolean(b.confirmed),
         createdAt: b.createdAt,
         bookingDate: b.bookingDate,
-        source: b.source === 'ecommerce' ? 'ecommerce' : 'pos',
+        source: b.source === 'ecommerce' || b.source === 'crm' ? b.source : 'pos',
       })),
     });
   } catch (error) {

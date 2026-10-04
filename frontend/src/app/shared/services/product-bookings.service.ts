@@ -89,7 +89,7 @@ export interface CheckoutActiveBooking {
   confirmed?: boolean;
   createdAt?: string;
   bookingDate?: string;
-  source?: 'pos' | 'ecommerce';
+  source?: 'pos' | 'ecommerce' | 'crm';
 }
 
 export interface BookingDepositAllocation {

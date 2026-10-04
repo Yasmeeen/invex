@@ -91,10 +91,10 @@ const productBookingSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    /** pos = cashier/app booking; ecommerce = paid order from the website. */
+    /** pos = cashier booking; ecommerce = website; crm = reserved from the CRM. */
     source: {
       type: String,
-      enum: ['pos', 'ecommerce'],
+      enum: ['pos', 'ecommerce', 'crm'],
       default: 'pos',
       index: true,
     },

@@ -73,6 +73,23 @@
     font-weight: 600;
   }
 
+  &__installment,
+  &__fee-row__source {
+    position: relative;
+
+    &:has(.ng-select-opened) {
+      z-index: 8;
+    }
+
+    ::ng-deep ng-select.ng-select-opened {
+      z-index: 60 !important;
+    }
+
+    ::ng-deep ng-select .ng-dropdown-panel {
+      z-index: 70 !important;
+    }
+  }
+
   &__section-title {
     font-size: 1rem;
     margin: 0 0 0.5rem;
@@ -106,11 +123,16 @@
   }
 
   &__fee-row {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.35rem;
     padding: 0.65rem 0;
     border-bottom: 1px solid #eee;
+
+    &:has(.ng-select-opened) {
+      z-index: 8;
+    }
 
     &:last-child {
       border-bottom: none;

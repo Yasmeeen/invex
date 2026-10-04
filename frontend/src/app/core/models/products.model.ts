@@ -128,7 +128,7 @@ export interface ProductActiveBooking {
   confirmedAt?: string;
   confirmedBy?: { _id?: string; name?: string };
   productInWarehouse?: boolean;
-  source?: 'pos' | 'ecommerce';
+  source?: 'pos' | 'ecommerce' | 'crm';
   ecommerceOrderId?: string;
 }
 export interface Category {

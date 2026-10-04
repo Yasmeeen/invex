@@ -56,10 +56,14 @@
                   <i class="fa fa-globe" aria-hidden="true"></i>
                   {{ 'tr_booking_source_ecommerce' | translate }}
                 </span>
+                <span *ngIf="b.source === 'crm'" class="booking-card__badge">
+                  <i class="fa fa-headphones" aria-hidden="true"></i>
+                  {{ 'tr_booking_source_crm' | translate }}
+                </span>
                 <span *ngIf="b.confirmed" class="booking-card__badge booking-card__badge--ok">
                   <i class="fa fa-check-circle" aria-hidden="true"></i>
                   {{ 'tr_booking_confirmed_status' | translate }}
-                  <ng-container *ngIf="b.confirmedBy?.name && b.source !== 'ecommerce'">
+                  <ng-container *ngIf="b.confirmedBy?.name && b.source === 'pos'">
                     — {{ b.confirmedBy?.name }}</ng-container
                   >
                 </span>
@@ -145,8 +149,8 @@
                     (b.createdAt ? b.createdAt : b.bookingDate) | date : 'medium'
                   }}
                 </dd>
-                <dt *ngIf="b.createdBy?.name && b.source !== 'ecommerce'">{{ 'tr_requested_by' | translate }}</dt>
-                <dd *ngIf="b.createdBy?.name && b.source !== 'ecommerce'">{{ b.createdBy?.name }}</dd>
+                <dt *ngIf="b.createdBy?.name && b.source === 'pos'">{{ 'tr_requested_by' | translate }}</dt>
+                <dd *ngIf="b.createdBy?.name && b.source === 'pos'">{{ b.createdBy?.name }}</dd>
                 <ng-container *ngIf="depositProofUrls(b).length">
                   <dt>{{ 'tr_booking_deposit_proof' | translate }}</dt>
                   <dd class="booking-deposit-proof-dd">

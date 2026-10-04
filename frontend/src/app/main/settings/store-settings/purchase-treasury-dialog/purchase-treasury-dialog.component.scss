@@ -2,6 +2,20 @@
   padding-bottom: 0.5rem;
 }
 
+.filters-card {
+  position: relative;
+  z-index: 6;
+  overflow: visible;
+
+  ::ng-deep ng-select.ng-select-opened {
+    z-index: 60 !important;
+  }
+
+  ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
+  }
+}
+
 .money-accounts-kpis {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

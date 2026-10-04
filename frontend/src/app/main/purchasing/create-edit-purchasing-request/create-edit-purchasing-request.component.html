@@ -19,7 +19,7 @@
               <div class="row">
                 <!-- Vendor -->
                 <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="vendor.invalid && purchasingForm.submitted">
+                  <div class="form-group purchasing-select-field" [class.has-error]="vendor.invalid && purchasingForm.submitted">
                     <label>{{ 'tr_supplier' | translate }}</label>
                     <div class="input-with-icon bg-white">
                       <ng-select
@@ -30,7 +30,6 @@
                         [(ngModel)]="selectedVendor"
                         (ngModelChange)="onVendorSelected()"
                         bindLabel="nameOfcompany"
-                        appendTo="#purchasing-request-modal-root"
                         [placeholder]="'tr_select' | translate"
                         [clearable]="true"
                         [searchable]="true"
@@ -45,7 +44,7 @@
                 </div>
 
                 <div class="col-md-6">
-                  <div class="form-group" [class.has-error]="paymentStatus.invalid && purchasingForm.submitted">
+                  <div class="form-group purchasing-select-field" [class.has-error]="paymentStatus.invalid && purchasingForm.submitted">
                     <label>{{ 'tr_payment_terms' | translate }}</label>
                     <div class="input-with-icon bg-white">
                       <ng-select
@@ -57,7 +56,6 @@
                         [items]="supplierPaymentOptions"
                         bindLabel="label"
                         bindValue="value"
-                        appendTo="#purchasing-request-modal-root"
                         [placeholder]="'tr_select' | translate"
                         [disabled]="!selectedVendor || supplierPaymentOptions.length === 0"
                         [clearable]="true"

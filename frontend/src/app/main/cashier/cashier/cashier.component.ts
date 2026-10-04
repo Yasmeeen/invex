@@ -982,6 +982,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     phone: string;
     days: number;
     fromWebsite: boolean;
+    fromCrm: boolean;
   } | null {
     const pid = this.orderLineProductId(item);
     const foreign = this.foreignReservationsForProduct(pid);
@@ -992,6 +993,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       phone: String(b.customerPhone || '').trim() || '—',
       days: this.bookingDaysAgo(b),
       fromWebsite: b.source === 'ecommerce',
+      fromCrm: b.source === 'crm',
     };
   }
 
@@ -1003,6 +1005,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     phone: string;
     days: number;
     fromWebsite: boolean;
+    fromCrm: boolean;
   }> {
     const bars: Array<{
       productId: string;
@@ -1011,6 +1014,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       phone: string;
       days: number;
       fromWebsite: boolean;
+      fromCrm: boolean;
     }> = [];
     const seen = new Set<string>();
     for (const item of this.orderItems || []) {
@@ -1026,6 +1030,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         phone: wp?.phone || '—',
         days: wp?.days ?? 0,
         fromWebsite: !!wp?.fromWebsite,
+        fromCrm: !!wp?.fromCrm,
       });
     }
     return bars;
@@ -1134,14 +1139,19 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const b = foreign[0];
     const days = this.bookingDaysAgo(b);
     const fromWebsite = b.source === 'ecommerce';
+    const fromCrm = b.source === 'crm';
     const key =
       days <= 0
-        ? fromWebsite
-          ? 'tr_cashier_booked_for_customer_website_today'
-          : 'tr_cashier_booked_for_customer_today'
-        : fromWebsite
-          ? 'tr_cashier_booked_for_customer_website'
-          : 'tr_cashier_booked_for_customer';
+        ? fromCrm
+          ? 'tr_cashier_booked_for_customer_crm_today'
+          : fromWebsite
+            ? 'tr_cashier_booked_for_customer_website_today'
+            : 'tr_cashier_booked_for_customer_today'
+        : fromCrm
+          ? 'tr_cashier_booked_for_customer_crm'
+          : fromWebsite
+            ? 'tr_cashier_booked_for_customer_website'
+            : 'tr_cashier_booked_for_customer';
     this.translate
       .get(key, {
         name: String(b.customerName || '').trim() || '—',

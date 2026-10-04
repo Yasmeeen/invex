@@ -505,6 +505,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       .open(TransferProductBranchDialogComponent, {
         width: '520px',
         maxWidth: '95vw',
+        panelClass: 'transfer-branch-dialog-panel',
         data: { product, branches, maxQuantity: maxQ },
         disableClose: true,
       })

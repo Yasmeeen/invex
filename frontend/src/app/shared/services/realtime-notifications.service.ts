@@ -21,6 +21,13 @@ export class RealtimeNotificationsService {
   private lastConnectedUserId: string | null = null;
   /** Emits newly received notifications for UI to update immediately. */
   readonly newNotification$ = new Subject<NotificationItem>();
+  /** Fires when a CRM/online order is created (banner + refresh). */
+  readonly onlineOrderNew$ = new Subject<{
+    onlineOrderId?: string;
+    branchId?: string;
+    pendingCount?: number;
+    notification?: NotificationItem;
+  }>();
 
   constructor(
     private globals: Globals,
@@ -95,7 +102,28 @@ export class RealtimeNotificationsService {
       const msg = n.body || this.translate.instant('tr_notifications');
       this.notify.push(msg, 'info');
       this.newNotification$.next(n);
+      if (n.type === 'online_order_created') {
+        this.onlineOrderNew$.next({
+          onlineOrderId: n.data?.onlineOrderId ? String(n.data.onlineOrderId) : undefined,
+          branchId: n.data?.branchId ? String(n.data.branchId) : undefined,
+          pendingCount:
+            n.data?.pendingCount != null ? Number(n.data.pendingCount) : undefined,
+          notification: n,
+        });
+      }
     });
+
+    this.socket.on(
+      'online-order:new',
+      (payload: {
+        onlineOrderId?: string;
+        branchId?: string;
+        pendingCount?: number;
+        notification?: NotificationItem;
+      }) => {
+        this.onlineOrderNew$.next(payload || {});
+      }
+    );
   }
 }
 

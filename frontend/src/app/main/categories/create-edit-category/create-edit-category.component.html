@@ -271,6 +271,18 @@
                           />
                           <label [attr.for]="'category-attr-' + i + '-barcode'">{{ 'tr_attr_barcode_short' | translate }}</label>
                         </span>
+                        <span
+                          class="s-checkbox size-tiny flex"
+                          [attr.title]="'tr_show_attribute_on_ecommerce' | translate"
+                        >
+                          <input
+                            type="checkbox"
+                            [id]="'category-attr-' + i + '-ecommerce'"
+                            [(ngModel)]="attributeRows[i].showOnEcommerce"
+                            [ngModelOptions]="{ standalone: true }"
+                          />
+                          <label [attr.for]="'category-attr-' + i + '-ecommerce'">{{ 'tr_attr_ecommerce_short' | translate }}</label>
+                        </span>
                       </div>
                       <div class="category-attr-row__remove">
                         <button type="button" class="s-btn btn-danger" (click)="removeAttributeRow(i)">

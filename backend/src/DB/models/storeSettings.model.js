@@ -99,6 +99,11 @@ const storeSettingsSchema = new mongoose.Schema(
     storeName: { type: String, default: 'Store' },
     storePhoneNumber: { type: String, default: '' },
     logoUrl: { type: String, default: '' },
+    /**
+     * Optional URL encoded as QR on printed invoices/receipts.
+     * Empty → clients fall back to Innovation website QR.
+     */
+    invoiceQrUrl: { type: String, default: '', trim: true, maxlength: 500 },
     /** Language for printed receipts/invoices (not the admin UI language). */
     receiptLanguage: {
       type: String,
@@ -165,6 +170,12 @@ const storeSettingsSchema = new mongoose.Schema(
     ecommerceBaseUrl: { type: String, default: '', trim: true },
     /** Shared secret for service-to-service calls (header x-integration-key). */
     ecommerceSharedKey: { type: String, default: '', trim: true },
+    /** CRM integration (independently gated by CRM_INTEGRATION_FEATURE env). */
+    crmIntegrationEnabled: { type: Boolean, default: false },
+    /** Public/API base URL of the CRM installation. */
+    crmBaseUrl: { type: String, default: '', trim: true },
+    /** CRM-only shared secret for service-to-service calls. */
+    crmSharedKey: { type: String, default: '', trim: true },
     /** all = every sellable product; online_only = products on Online branch only. */
     ecommerceCatalogMode: {
       type: String,

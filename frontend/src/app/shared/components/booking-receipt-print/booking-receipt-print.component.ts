@@ -10,8 +10,7 @@ import {
 import { TranslateService } from '@ngx-translate/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
-import { environment } from 'src/environments/environment';
-import { toDataURL as qrToDataUrl } from 'qrcode';
+import { buildInvoiceQrDataUrl } from '@shared/utils/invoice-qr.util';
 import { take } from 'rxjs/operators';
 
 /** Shape expected by the booking receipt printer. */
@@ -48,6 +47,7 @@ export class BookingReceiptPrintComponent implements OnInit, AfterViewInit {
   receiptDir: 'rtl' | 'ltr' = 'ltr';
 
   invoiceQrDataUrl: string | null = null;
+  invoiceQrCaption = 'innovation-tec.com';
 
   constructor(
     public storeSettings: StoreSettingsService,
@@ -62,19 +62,15 @@ export class BookingReceiptPrintComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
-    qrToDataUrl(qrUrl, {
-      width: 240,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    })
-      .then((dataUrl) => {
-        this.invoiceQrDataUrl = dataUrl;
-        this.cdr.detectChanges();
-      })
-      .catch(() => {
+    buildInvoiceQrDataUrl(this.storeSettings.snapshot.invoiceQrUrl).then((result) => {
+      if (result) {
+        this.invoiceQrDataUrl = result.dataUrl;
+        this.invoiceQrCaption = result.caption;
+      } else {
         this.invoiceQrDataUrl = null;
-      });
+      }
+      this.cdr.detectChanges();
+    });
   }
 
   productName(): string {

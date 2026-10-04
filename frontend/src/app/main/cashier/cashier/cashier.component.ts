@@ -11,8 +11,8 @@ import { formatDate } from '@angular/common';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
-import { Observable, of, Subject, Subscription } from 'rxjs';
-import { debounceTime, switchMap, catchError, takeUntil, distinctUntilChanged, tap, map } from 'rxjs/operators';
+import { EMPTY, Observable, of, Subject, Subscription } from 'rxjs';
+import { debounceTime, switchMap, catchError, takeUntil, distinctUntilChanged, tap, map, expand, reduce } from 'rxjs/operators';
 import { Globals } from '@core/globals';
 import {
   buildCashierPaymentMethods,
@@ -23,17 +23,19 @@ import {
   findProductByScannedCode,
   productMatchesSearchTerm,
 } from '@shared/utils/product-code-match.util';
-import { Branch, Product } from '@core/models/products.model';
+import { Branch, Category, Product } from '@core/models/products.model';
 import { User } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
+import { CategoriesServce } from '@shared/services/categories.service';
 import { OrdersSerivce } from '@shared/services/orders.service';
 import { VendorsSerivce } from '@shared/services/vendors.service';
 import { CollectionsService } from '@shared/services/collections.service';
 import { OrderPartyType } from '@core/models/products.model';
 import { ProductsSerivce } from '@shared/services/products.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { OnlineOrdersAlertService } from '@shared/services/online-orders-alert.service';
 import {
   formatWeightQuantity,
   isWeightSaleUnit,
@@ -86,8 +88,7 @@ import {
   paymentSplitsNetTotal,
   round2,
 } from '@shared/utils/payment-app-fee.util';
-import { toDataURL as qrToDataUrl } from 'qrcode';
-import { environment } from 'src/environments/environment';
+import { buildInvoiceQrDataUrl } from '@shared/utils/invoice-qr.util';
 import { IsolatedReceiptPrintHandle, printIsolatedReceipt } from '@shared/utils/isolated-receipt-print';
 
 @Component({
@@ -112,8 +113,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   editingPriceValue: number | string = '';
   todayDate = new Date();
   createdOrder:any;
-  /** Data URL for Innovation website QR on printed receipt. */
+  /** Data URL for invoice QR on printed receipt (custom link or Innovation default). */
   invoiceQrDataUrl: string | null = null;
+  invoiceQrCaption = 'innovation-tec.com';
   /** How the cashier enters invoice-level discount: %, fixed amount, or target final total. */
   invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
   /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
@@ -128,6 +130,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   curentUser;
   branches: Branch [] =[];
   adminSelectedBranchId: string
+  /** All store categories (paginated until the API has no next page). */
+  categories: Category[] = [];
+  /** Empty = show products from every category. */
+  selectedCategoryId: string | null = null;
   branchSalespeople: string[] = [];
   branchDeliveryStaff: string[] = [];
   selectedSellerName: string | null = null;
@@ -205,6 +211,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private dialog: MatDialog,
     private authenticationService: AuthenticationService,
     private branchesServce: BranchesServce,
+    private categoriesServce: CategoriesServce,
     private globals: Globals,
     private appNotificationService: AppNotificationService,
     private fb: FormBuilder,
@@ -216,9 +223,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private invoiceReprint: InvoiceReprintService,
     private productPurchaseRequests: ProductPurchaseRequestsService,
     private collectionsService: CollectionsService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private onlineOrdersAlert: OnlineOrdersAlertService
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
+    this.loadAllCategories();
     if (canPickBranchRole(this.curentUser?.role)) {
       this.getBranches(); // loadProducts runs after a branch is selected
     } else {
@@ -231,8 +240,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnInit(): void {
     this.rebuildPaymentMethods();
-    this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
+    this.settingsSub = this.storeSettings.settings$.subscribe(() => {
+      this.rebuildPaymentMethods();
+      this.loadInvoiceQr();
+    });
     this.loadDrawerOpeningBalance();
+    this.syncOnlineOrdersBannerBranch();
   }
 
   ngOnDestroy(): void {
@@ -244,6 +257,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.barcodeScanTimer = null;
     }
     this.disposeCashierPrint();
+    this.onlineOrdersAlert.clearScopeBranchId();
   }
 
   private rebuildPaymentMethods(): void {
@@ -1214,12 +1228,47 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.adminSelectedBranchId = this.branches[0]._id
       this.loadProducts();
       this.loadBranchSalespeople();
+      this.syncOnlineOrdersBannerBranch();
    })
   }
 
   onAdminBranchChange(): void {
     this.loadProducts();
     this.loadBranchSalespeople();
+    this.syncOnlineOrdersBannerBranch();
+  }
+
+  onCashierCategoryChange(categoryId: string | null): void {
+    this.selectedCategoryId = categoryId || null;
+    this.loadProducts(true, { refreshDrawer: false });
+  }
+
+  /** Walk every categories page. Default API page size is 10, so a single call is not enough. */
+  private loadAllCategories(): void {
+    const pageSize = 200;
+    const fetchPage = (page: number) =>
+      this.categoriesServce.getCategorys({ page, limit: pageSize, lite: '1' });
+
+    fetchPage(1)
+      .pipe(
+        expand((res: any) => {
+          const next = res?.meta?.nextPage;
+          return next ? fetchPage(Number(next)) : EMPTY;
+        }),
+        reduce((acc: Category[], res: any) => {
+          const list = Array.isArray(res?.categories) ? res.categories : [];
+          return acc.concat(list);
+        }, [] as Category[]),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((categories) => {
+        this.categories = categories;
+        this.cdr.markForCheck();
+      });
+  }
+
+  private syncOnlineOrdersBannerBranch(): void {
+    this.onlineOrdersAlert.setScopeBranchId(this.cashierBranchId());
   }
 
   private resolveCashierBranchId(): string | null {
@@ -1738,19 +1787,19 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngAfterViewInit() {
     this.focusBarcodeInput();
-    const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
-    qrToDataUrl(qrUrl, {
-      width: 240,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    })
-      .then((dataUrl) => {
-        this.invoiceQrDataUrl = dataUrl;
-        this.cdr.detectChanges();
-      })
-      .catch(() => {
+    this.loadInvoiceQr();
+  }
+
+  private loadInvoiceQr(): void {
+    buildInvoiceQrDataUrl(this.storeSettings.snapshot.invoiceQrUrl).then((result) => {
+      if (result) {
+        this.invoiceQrDataUrl = result.dataUrl;
+        this.invoiceQrCaption = result.caption;
+      } else {
         this.invoiceQrDataUrl = null;
-      });
+      }
+      this.cdr.detectChanges();
+    });
   }
 
   focusBarcodeInput() {
@@ -1806,6 +1855,9 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       page,
       limit: this.productsPageSize,
     });
+    if (this.selectedCategoryId) {
+      params['categoryId'] = this.selectedCategoryId;
+    }
 
     this.productsSerivce.getProducts(params).subscribe({
       next: (res: any) => {

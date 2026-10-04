@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Product from '../../DB/models/product.model.js';
 import Category from '../../DB/models/category.model.js';
+import { buildEcommerceSpecs } from './catalogSpecs.js';
 
 const COLOR_TOKEN_RE =
   /\b(black|white|silver|gold|golden|blue|red|green|pink|gray|grey|brown|purple|violet|orange|yellow|beige|navy|titanium|graphite|midnight|starlight|space\s*black|deep\s*purple|أسود|ابيض|أبيض|فضي|ذهبي|ازرق|أزرق|احمر|أحمر|اخضر|أخضر|وردي|رمادي|بني|بنفسجي|برتقالي|اصفر|أصفر|بيج|كحلي|تيتانيوم|جرافيت|منتصف\s*الليل)\b/giu;
@@ -365,6 +366,8 @@ export async function joinVariantGroup(productId, otherProductId) {
         ecommerceVariantGroupLocked: true,
         ecommerceVariantGroupSource: 'manual',
         ecommerceVariantAxisKey: axis.key,
+        // Joining for storefront variants implies these SKUs should be listed online.
+        listedOnEcommerce: true,
       },
     }
   );
@@ -445,6 +448,7 @@ export async function setVariantGroupMembers(productId, memberIds = []) {
     doc.ecommerceVariantGroupLocked = true;
     doc.ecommerceVariantGroupSource = 'manual';
     doc.ecommerceVariantAxisKey = axis.key;
+    doc.listedOnEcommerce = true;
     if (!doc.ecommerceVariantLabel) {
       doc.ecommerceVariantLabel = resolveVariantLabel(doc, axis.key);
     }
@@ -553,6 +557,10 @@ export function collapseProductsForCatalog(products, mapFlatProduct) {
         offerPrice: flat.offerPrice,
         stock: flat.stock,
         image: flat.imageUrl || '',
+        description: flat.description || '',
+        shortDescription: flat.shortDescription || '',
+        // Exclude the variant axis (e.g. color) — already shown as the picker.
+        specs: buildEcommerceSpecs(m, { excludeKeys: [axisKey] }),
       };
     });
 
@@ -560,11 +568,27 @@ export function collapseProductsForCatalog(products, mapFlatProduct) {
       ...new Set(sorted.map((m) => m.imageUrl).filter(Boolean).map(String)),
     ];
 
+    // Prefer a non-empty description for the parent page (before a color is chosen).
+    const flats = sorted.map((m) => mapFlatProduct(m));
+    const groupDescription =
+      flats.map((f) => String(f.description || '').trim()).find(Boolean) ||
+      flatPrimary.description ||
+      '';
+    const groupShortDescription =
+      flats.map((f) => String(f.shortDescription || '').trim()).find(Boolean) ||
+      flatPrimary.shortDescription ||
+      '';
+
     out.push({
       ...flatPrimary,
       invexProductId: `vg:${groupId}`,
       name: pickListingTitle(sorted, axisKey),
       code: primary.code || '',
+      description: groupDescription,
+      ecommerceDescription: groupDescription,
+      shortDescription: groupShortDescription,
+      // Parent specs: first member until a variant is selected on the storefront.
+      specs: buildEcommerceSpecs(primary, { excludeKeys: [axisKey] }),
       price: 0,
       stock: variants.reduce((s, v) => s + (Number(v.stock) || 0), 0),
       imageUrl: images[0] || flatPrimary.imageUrl || '',

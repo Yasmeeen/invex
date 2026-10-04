@@ -14,7 +14,7 @@ const ecommerceChannelReservationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    quantity: { type: Number, required: true, min: 1 },
+    quantity: { type: Number, required: true, min: 0.001 },
     unitPrice: { type: Number, default: 0, min: 0 },
     productNameSnapshot: { type: String, default: '', trim: true },
     productCodeSnapshot: { type: String, default: '', trim: true },

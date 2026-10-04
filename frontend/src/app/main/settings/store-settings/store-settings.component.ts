@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { BASE_URL } from '@core/base/urls';
 import {
   ReceiptLanguageCode,
   StoreSettings,
@@ -8,7 +9,7 @@ import {
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 
-type SettingsTabId = 'general' | 'features' | 'policies' | 'ecommerce';
+type SettingsTabId = 'general' | 'features' | 'policies' | 'ecommerce' | 'crm';
 
 interface SettingsTab {
   id: SettingsTabId;
@@ -16,6 +17,8 @@ interface SettingsTab {
   icon: string;
   /** When true, tab only shows if ecommerce feature env is unlocked. */
   requiresEcommerceFeature?: boolean;
+  /** When true, tab only shows if CRM feature env is unlocked. */
+  requiresCrmFeature?: boolean;
 }
 
 @Component({
@@ -28,6 +31,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     storeName: '',
     storePhoneNumber: '',
     logoUrl: '',
+    invoiceQrUrl: '',
     receiptLanguage: 'en',
     purchaseTreasuryMethods: [],
     moneyAccounts: [],
@@ -48,7 +52,14 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     ecommerceSharedKey: '',
     ecommerceCatalogMode: 'all',
     onlineBranchId: null,
+    crmIntegrationFeatureAvailable: false,
+    crmIntegrationEnabled: false,
+    crmBaseUrl: '',
+    crmSharedKey: '',
+    crmHasSharedKey: false,
   };
+
+  showCrmSharedKey = false;
 
   readonly receiptLanguageOptions: { value: ReceiptLanguageCode; labelKey: string }[] = [
     { value: 'ar', labelKey: 'tr_lang_ar' },
@@ -67,6 +78,12 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
       icon: 'fa-globe',
       requiresEcommerceFeature: true,
     },
+    {
+      id: 'crm',
+      labelKey: 'tr_settings_tab_crm',
+      icon: 'fa-address-book',
+      requiresCrmFeature: true,
+    },
   ];
 
   activeTab: SettingsTabId = 'general';
@@ -82,8 +99,19 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
 
   get visibleTabs(): SettingsTab[] {
     return this.allTabs.filter(
-      (t) => !t.requiresEcommerceFeature || this.form.ecommerceIntegrationFeatureAvailable
+      (t) =>
+        (!t.requiresEcommerceFeature || this.form.ecommerceIntegrationFeatureAvailable) &&
+        (!t.requiresCrmFeature || this.form.crmIntegrationFeatureAvailable)
     );
+  }
+
+  get invexCrmApiUrl(): string {
+    const apiBase = String(BASE_URL || '').replace(/\/+$/, '');
+    if (/^https?:\/\//i.test(apiBase)) {
+      return `${apiBase}/integrations/crm`;
+    }
+    const relative = apiBase.startsWith('/') ? apiBase : `/${apiBase}`;
+    return `${window.location.origin}${relative}/integrations/crm`;
   }
 
   setTab(id: SettingsTabId): void {
@@ -97,6 +125,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         storeName: v.storeName,
         storePhoneNumber: v.storePhoneNumber,
         logoUrl: v.logoUrl,
+        invoiceQrUrl: v.invoiceQrUrl || '',
         receiptLanguage: v.receiptLanguage || 'en',
         purchaseTreasuryMethods: v.purchaseTreasuryMethods || [],
         moneyAccounts: v.moneyAccounts || [],
@@ -117,12 +146,20 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         ecommerceSharedKey: v.ecommerceSharedKey || '',
         ecommerceCatalogMode: v.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
         onlineBranchId: v.onlineBranchId || null,
+        crmIntegrationFeatureAvailable: Boolean(v.crmIntegrationFeatureAvailable),
+        crmIntegrationEnabled: Boolean(v.crmIntegrationEnabled),
+        crmBaseUrl: v.crmBaseUrl || '',
+        crmSharedKey: '',
+        crmHasSharedKey: Boolean(v.crmHasSharedKey),
       };
       this.logoPreview = this.form.logoUrl || '';
       if (
         this.activeTab === 'ecommerce' &&
         !this.form.ecommerceIntegrationFeatureAvailable
       ) {
+        this.activeTab = 'general';
+      }
+      if (this.activeTab === 'crm' && !this.form.crmIntegrationFeatureAvailable) {
         this.activeTab = 'general';
       }
     });
@@ -168,6 +205,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         storeName: this.form.storeName?.trim() || '',
         storePhoneNumber: this.form.storePhoneNumber?.trim() || '',
         logoUrl: this.form.logoUrl || '',
+        invoiceQrUrl: this.form.invoiceQrUrl?.trim() || '',
         receiptLanguage: this.form.receiptLanguage || 'en',
         returnExchangePolicy: this.form.returnExchangePolicy?.trim() || '',
         showReturnExchangePolicyOnReceipt: Boolean(this.form.showReturnExchangePolicyOnReceipt),
@@ -182,6 +220,9 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',
         ecommerceCatalogMode:
           this.form.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+        crmIntegrationEnabled: Boolean(this.form.crmIntegrationEnabled),
+        crmBaseUrl: this.form.crmBaseUrl?.trim() || '',
+        crmSharedKey: this.form.crmSharedKey?.trim() || '',
       })
       .subscribe({
         next: () => {

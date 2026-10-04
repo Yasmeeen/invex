@@ -40,6 +40,8 @@ const categorySchema = new mongoose.Schema({
         showOnInvoice: { type: Boolean, default: false },
         /** When true, only the attribute value (not the label) is shown on the barcode sticker. */
         showInBarcode: { type: Boolean, default: false },
+        /** When true, attribute is shown on the e-commerce product page for this SKU. */
+        showOnEcommerce: { type: Boolean, default: false },
       },
     ],
     default: [],
@@ -110,6 +112,7 @@ categorySchema.pre('validate', function normalizeAttributeDefs(next) {
         label,
         showOnInvoice: !!row?.showOnInvoice,
         showInBarcode: !!row?.showInBarcode,
+        showOnEcommerce: !!row?.showOnEcommerce,
       });
     }
     this.attributeDefs = cleaned;

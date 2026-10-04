@@ -26,6 +26,7 @@ import paymentMethodsRoutes from './modules/payment_methods_module/router.js';
 import installmentPlansRoutes from './modules/installment_plans_module/router.js';
 import collectionsRoutes from './modules/collections_module/router.js';
 import integrationsRoutes from './modules/integrations_module/router.js';
+import onlineOrdersRoutes from './modules/online_orders_module/router.js';
 
 const bootstrap = (app, express) => {
   // Middleware
@@ -88,6 +89,7 @@ const bootstrap = (app, express) => {
   app.use('/api/installment-plans', installmentPlansRoutes);
   app.use('/api/collections', collectionsRoutes);
   app.use('/api/integrations', integrationsRoutes);
+  app.use('/api/online-orders', onlineOrdersRoutes);
 
   return app;
 };

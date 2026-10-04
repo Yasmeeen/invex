@@ -14,6 +14,7 @@ export interface CategoryAttributeRow {
   key: string;
   showOnInvoice: boolean;
   showInBarcode: boolean;
+  showOnEcommerce: boolean;
 }
 
 @Component({
@@ -81,7 +82,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
       this.applyCategoryToForm(this.data.category as Category);
     }
     if (!this.isEdit && !this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false, showOnEcommerce: false }];
     }
   }
 
@@ -110,27 +111,28 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     const defs = Array.isArray((c as any).attributeDefs) ? (c as any).attributeDefs : [];
     this.attributeRows = defs.map((x: any) => {
       if (typeof x === 'string') {
-        return { key: String(x), showOnInvoice: false, showInBarcode: false };
+        return { key: String(x), showOnInvoice: false, showInBarcode: false, showOnEcommerce: false };
       }
       return {
         key: String(x?.key ?? ''),
         showOnInvoice: !!x?.showOnInvoice,
         showInBarcode: !!x?.showInBarcode,
+        showOnEcommerce: !!x?.showOnEcommerce,
       };
     });
     if (!this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false, showOnEcommerce: false }];
     }
   }
 
   addAttributeRow(): void {
-    this.attributeRows.push({ key: '', showOnInvoice: false, showInBarcode: false });
+    this.attributeRows.push({ key: '', showOnInvoice: false, showInBarcode: false, showOnEcommerce: false });
   }
 
   removeAttributeRow(i: number): void {
     this.attributeRows.splice(i, 1);
     if (!this.attributeRows.length) {
-      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false }];
+      this.attributeRows = [{ key: '', showOnInvoice: false, showInBarcode: false, showOnEcommerce: false }];
     }
   }
 
@@ -145,11 +147,13 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
     key: string;
     showOnInvoice: boolean;
     showInBarcode: boolean;
+    showOnEcommerce: boolean;
   }> {
     const out: Array<{
       key: string;
       showOnInvoice: boolean;
       showInBarcode: boolean;
+      showOnEcommerce: boolean;
     }> = [];
     const seen = new Set<string>();
     for (const row of this.attributeRows || []) {
@@ -161,6 +165,7 @@ export class CreateEditCategoryComponent implements OnInit, AfterViewInit {
         key,
         showOnInvoice: !!row?.showOnInvoice,
         showInBarcode: !!row?.showInBarcode,
+        showOnEcommerce: !!row?.showOnEcommerce,
       });
     }
     return out;

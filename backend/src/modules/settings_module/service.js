@@ -13,7 +13,10 @@ import {
   mergeMoneyAccountsFromCatalog,
   normalizePaymentMethodsCatalog,
 } from './paymentMethodsCatalog.js';
-import { isEcommerceIntegrationFeatureAvailable } from '../integrations_module/feature.js';
+import {
+  isCrmIntegrationFeatureAvailable,
+  isEcommerceIntegrationFeatureAvailable,
+} from '../integrations_module/feature.js';
 import { ensureOnlineBranch } from '../integrations_module/onlineBranch.js';
 import { pushFullCatalog } from '../integrations_module/catalogSync.js';
 import { normalizeRolesHiddenFromCostPrice } from '../../utils/cost-price-access.js';
@@ -60,11 +63,13 @@ function serializeSettings(doc) {
     moneyAccounts
   );
   const featureAvailable = isEcommerceIntegrationFeatureAvailable();
+  const crmFeatureAvailable = isCrmIntegrationFeatureAvailable();
 
   return {
     storeName: doc.storeName,
     storePhoneNumber: doc.storePhoneNumber,
     logoUrl: doc.logoUrl || '',
+    invoiceQrUrl: doc.invoiceQrUrl || '',
     receiptLanguage: doc.receiptLanguage || 'en',
     paymentMethodsCatalog,
     purchaseTreasuryMethods,
@@ -86,6 +91,11 @@ function serializeSettings(doc) {
     ecommerceCatalogMode:
       featureAvailable && doc.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
     onlineBranchId: featureAvailable && doc.onlineBranchId ? String(doc.onlineBranchId) : null,
+    crmIntegrationFeatureAvailable: crmFeatureAvailable,
+    crmIntegrationEnabled: crmFeatureAvailable && Boolean(doc.crmIntegrationEnabled),
+    crmBaseUrl: crmFeatureAvailable ? doc.crmBaseUrl || '' : '',
+    crmSharedKey: '',
+    crmHasSharedKey: crmFeatureAvailable && Boolean(doc.crmSharedKey),
     rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(doc.rolesHiddenFromCostPrice),
   };
 }
@@ -114,6 +124,7 @@ export const updateStoreSettings = async (req, res) => {
       storeName,
       storePhoneNumber,
       logoUrl,
+      invoiceQrUrl,
       receiptLanguage,
       purchaseTreasuryMethods,
       moneyAccounts,
@@ -132,11 +143,15 @@ export const updateStoreSettings = async (req, res) => {
       ecommerceBaseUrl,
       ecommerceSharedKey,
       ecommerceCatalogMode,
+      crmIntegrationEnabled,
+      crmBaseUrl,
+      crmSharedKey,
       rolesHiddenFromCostPrice,
     } = req.body;
 
     const ALLOWED_RECEIPT_LANGS = ['ar', 'en', 'de', 'fr'];
     const featureAvailable = isEcommerceIntegrationFeatureAvailable();
+    const crmFeatureAvailable = isCrmIntegrationFeatureAvailable();
 
     if (storeName !== undefined && typeof storeName !== 'string') {
       return res.status(400).json({ error: 'storeName must be a string' });
@@ -146,6 +161,16 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (logoUrl !== undefined && typeof logoUrl !== 'string') {
       return res.status(400).json({ error: 'logoUrl must be a string' });
+    }
+    let invoiceQrUrlNormalized;
+    if (invoiceQrUrl !== undefined) {
+      if (typeof invoiceQrUrl !== 'string') {
+        return res.status(400).json({ error: 'invoiceQrUrl must be a string' });
+      }
+      invoiceQrUrlNormalized = invoiceQrUrl.trim().slice(0, 500);
+      if (invoiceQrUrlNormalized && !/^https?:\/\//i.test(invoiceQrUrlNormalized)) {
+        invoiceQrUrlNormalized = `https://${invoiceQrUrlNormalized}`;
+      }
     }
     let receiptLangNormalized;
     if (receiptLanguage !== undefined) {
@@ -406,6 +431,7 @@ export const updateStoreSettings = async (req, res) => {
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
     if (storePhoneNumber !== undefined) update.storePhoneNumber = storePhoneNumber.trim().slice(0, 50);
     if (logoUrl !== undefined) update.logoUrl = logoUrl;
+    if (invoiceQrUrl !== undefined) update.invoiceQrUrl = invoiceQrUrlNormalized;
     if (receiptLanguage !== undefined) update.receiptLanguage = receiptLangNormalized;
     if (catalogNormalized !== undefined) update.paymentMethodsCatalog = catalogNormalized;
     if (treasuryNormalized !== undefined) update.purchaseTreasuryMethods = treasuryNormalized;
@@ -459,6 +485,20 @@ export const updateStoreSettings = async (req, res) => {
         update.ecommerceCatalogMode =
           ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all';
         shouldPushCatalog = true;
+      }
+    }
+    if (crmFeatureAvailable) {
+      if (crmIntegrationEnabled !== undefined) {
+        update.crmIntegrationEnabled = crmIntegrationEnabled === true;
+      }
+      if (crmBaseUrl !== undefined) {
+        update.crmBaseUrl = String(crmBaseUrl || '')
+          .trim()
+          .replace(/\/+$/, '')
+          .slice(0, 500);
+      }
+      if (crmSharedKey !== undefined && String(crmSharedKey || '').trim()) {
+        update.crmSharedKey = String(crmSharedKey).trim().slice(0, 200);
       }
     }
 

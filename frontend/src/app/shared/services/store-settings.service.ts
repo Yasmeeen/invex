@@ -68,6 +68,8 @@ export interface StoreSettings {
   storeName: string;
   storePhoneNumber: string;
   logoUrl: string;
+  /** Optional URL for invoice/receipt QR. Empty → Innovation default. */
+  invoiceQrUrl: string;
   receiptLanguage: ReceiptLanguageCode;
   /** Unified payment methods (visibility + effect + sale fee%). */
   paymentMethodsCatalog: PaymentMethodCatalogRow[];
@@ -89,7 +91,7 @@ export interface StoreSettings {
   showBookingPolicyOnReceipt: boolean;
   /** Master switch for sell-by-weight categories and cashier weight entry. */
   weightSalesEnabled: boolean;
-  /** Deduct fridge/carcass stock when selling a cut SKU (butcher). Default off. */
+  /** Deduct stock from a linked source product when selling. Default off. */
   cutFromSourceEnabled: boolean;
   /** Master switch for delivery invoices at cashier. */
   deliveryOrdersEnabled: boolean;
@@ -102,6 +104,12 @@ export interface StoreSettings {
   ecommerceSharedKey?: string;
   ecommerceCatalogMode?: 'all' | 'online_only';
   onlineBranchId?: string | null;
+  /** Env-gated CRM integration. The shared key is write-only. */
+  crmIntegrationFeatureAvailable?: boolean;
+  crmIntegrationEnabled?: boolean;
+  crmBaseUrl?: string;
+  crmSharedKey?: string;
+  crmHasSharedKey?: boolean;
   /** Roles that must not see product cost / purchase price. Super Admin is never hidden. */
   rolesHiddenFromCostPrice?: string[];
 }
@@ -110,6 +118,7 @@ const DEFAULTS: StoreSettings = {
   storeName: 'Store',
   storePhoneNumber: '',
   logoUrl: '',
+  invoiceQrUrl: '',
   receiptLanguage: 'en',
   paymentMethodsCatalog: [
     { key: 'cash', label: 'Cash', showIn: 'both', effectMode: 'instant', feePercent: 0 },
@@ -137,6 +146,11 @@ const DEFAULTS: StoreSettings = {
   ecommerceSharedKey: '',
   ecommerceCatalogMode: 'all',
   onlineBranchId: null,
+  crmIntegrationFeatureAvailable: true,
+  crmIntegrationEnabled: false,
+  crmBaseUrl: '',
+  crmSharedKey: '',
+  crmHasSharedKey: false,
   rolesHiddenFromCostPrice: [...DEFAULT_ROLES_HIDDEN_FROM_COST_PRICE],
 };
 
@@ -327,6 +341,7 @@ export class StoreSettingsService {
           storeName: data.storeName ?? DEFAULTS.storeName,
           storePhoneNumber: data.storePhoneNumber ?? '',
           logoUrl: data.logoUrl ?? '',
+          invoiceQrUrl: String(data.invoiceQrUrl ?? '').trim(),
           receiptLanguage,
           paymentMethodsCatalog: this.normalizePaymentMethodsCatalog(data.paymentMethodsCatalog),
           purchaseTreasuryMethods: methods.length ? methods : DEFAULTS.purchaseTreasuryMethods,
@@ -350,6 +365,11 @@ export class StoreSettingsService {
           ecommerceCatalogMode:
             data.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
           onlineBranchId: data.onlineBranchId ?? null,
+          crmIntegrationFeatureAvailable: data.crmIntegrationFeatureAvailable !== false,
+          crmIntegrationEnabled: Boolean(data.crmIntegrationEnabled),
+          crmBaseUrl: data.crmBaseUrl ?? '',
+          crmSharedKey: '',
+          crmHasSharedKey: Boolean(data.crmHasSharedKey),
           rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(
             data.rolesHiddenFromCostPrice
           ),

@@ -42,6 +42,7 @@ export const BRANCH_DELETE_BRANCH_URL = BRANCHES_URL + '/deleteBranch';
 
 
 export const ORDERS_URL = BASE_URL + '/orders';
+export const ONLINE_ORDERS_URL = BASE_URL + '/online-orders';
 export const ORDER_CREATE_URL = ORDERS_URL + '/createOrder';
 export const ORDER_UPDATE_URL = ORDERS_URL + '/updateOrder';
 

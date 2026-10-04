@@ -5,6 +5,7 @@ import User from '../../DB/models/user.model.js';
 import {
   notifyCategoryChanged,
   notifyCategoryDeleted,
+  notifyProductChanged,
 } from '../integrations_module/catalogSync.js';
 
 /** Roles allowed to create / edit / delete categories (matches frontend RoleGuard). */
@@ -75,10 +76,12 @@ const normalizeAttributeDefs = (raw) => {
       typeof r === 'string' ? false : !!r?.showOnInvoice;
     const showInBarcode =
       typeof r === 'string' ? false : !!r?.showInBarcode;
+    const showOnEcommerce =
+      typeof r === 'string' ? false : !!r?.showOnEcommerce;
     if (!key) continue;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ key, label: label || key, showOnInvoice, showInBarcode });
+    out.push({ key, label: label || key, showOnInvoice, showInBarcode, showOnEcommerce });
   }
   return out;
 };
@@ -109,16 +112,39 @@ export const getCategories = async (req, res) => {
     const { page = 1, limit = 10, search = '' } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     const searchRegex = new RegExp(search, 'i');
+    // Name-only list (cashier filter). Skips per-category product scans.
+    const lite =
+      String(req.query.lite || '') === '1' ||
+      String(req.query.lite || '').toLowerCase() === 'true';
 
     const query = search ? { name: { $regex: searchRegex } } : {};
 
     // Fetch categories and total count in parallel
+    const categoryQuery = Category.find(query).skip(skip).limit(Number(limit));
+    if (lite) {
+      categoryQuery.select('name code imageUrl').sort({ name: 1 });
+    }
     const [categories, total] = await Promise.all([
-      Category.find(query)
-        .skip(skip)
-        .limit(Number(limit)),
+      categoryQuery,
       Category.countDocuments(query),
     ]);
+
+    const totalPages = Math.ceil(total / Number(limit)) || 0;
+    const meta = {
+      currentPage: Number(page),
+      limit: Number(limit),
+      nextPage: Number(page) < totalPages ? Number(page) + 1 : null,
+      prevPage: Number(page) > 1 ? Number(page) - 1 : null,
+      totalCount: total,
+      totalPages,
+    };
+
+    if (lite) {
+      return res.json({
+        categories: categories.map((category) => toCategoryResponse(category)),
+        meta,
+      });
+    }
 
     // Add product count and total stock per category
     const categoriesWithCount = await Promise.all(
@@ -131,18 +157,9 @@ export const getCategories = async (req, res) => {
       })
     );
 
-    const totalPages = Math.ceil(total / limit);
-
     res.json({
       categories: categoriesWithCount,
-      meta: {
-        currentPage: Number(page),
-        limit: Number(limit), // ✅ same naming as getProducts
-        nextPage: page < totalPages ? Number(page) + 1 : null,
-        prevPage: page > 1 ? Number(page) - 1 : null,
-        totalCount: total,
-        totalPages,
-      },
+      meta,
     });
   } catch (err) {
     console.error('❌ Error fetching categories:', err.message);
@@ -364,6 +381,24 @@ export const updateCategory = async (req, res) => {
     }
 
     notifyCategoryChanged(updatedCategory._id);
+    // Specs visibility (showOnEcommerce) lives on category — re-push member products.
+    if (updates.attributeDefs !== undefined) {
+      setImmediate(async () => {
+        try {
+          const members = await Product.find({
+            category: updatedCategory._id,
+            removedWhenOutOfStock: { $ne: true },
+          })
+            .select('_id')
+            .lean();
+          for (const m of members) {
+            notifyProductChanged(m._id);
+          }
+        } catch (e) {
+          console.error('[category update] product catalog refresh', e.message);
+        }
+      });
+    }
     res.json({
       message: '✅ Category updated',
       category: toCategoryResponse(updatedCategory),

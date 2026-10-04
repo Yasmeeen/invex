@@ -99,7 +99,7 @@
 
     <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
       <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
-      <div class="invoice-qr__caption">innovation-tec.com</div>
+      <div class="invoice-qr__caption">{{ invoiceQrCaption }}</div>
     </div>
   </ng-container>
 </div>

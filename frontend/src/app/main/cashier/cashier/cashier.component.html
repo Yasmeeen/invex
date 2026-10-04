@@ -26,6 +26,28 @@
         </div>
       </div>
 
+      <div class="branch-selection category-selection max-300 width-100">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_category' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [items]="categories"
+              bindLabel="name"
+              bindValue="_id"
+              [clearable]="true"
+              [searchable]="true"
+              placeholder="{{ 'tr_report_all_categories' | translate }}"
+              [ngModel]="selectedCategoryId"
+              name="cashierCategoryId"
+              (ngModelChange)="onCashierCategoryChange($event)"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <div class="cashier-header__actions flex flex-middle">
@@ -54,6 +76,8 @@
       <i class="fa fa-arrows-alt pointer cashier-header__zoom" *ngIf="!isCashierFullScreen" (click)="isCashierFullScreen = true" aria-hidden="true"></i>
     </div>
   </div>
+
+  <app-online-orders-banner variant="cashier"></app-online-orders-banner>
 
   <div class="cashier-opening-balance cashier-opening-balance--closed" *ngIf="drawerPeriodAlreadyClosed" role="status">
     <i class="fa fa-check-circle" aria-hidden="true"></i>
@@ -1102,7 +1126,7 @@
 
     <div class="invoice-qr center" *ngIf="invoiceQrDataUrl">
       <img class="invoice-qr__img" [src]="invoiceQrDataUrl" alt="" />
-      <div class="invoice-qr__caption">innovation-tec.com</div>
+      <div class="invoice-qr__caption">{{ invoiceQrCaption }}</div>
     </div>
   </ng-container>
 </div>

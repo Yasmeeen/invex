@@ -57,6 +57,11 @@ export const AdminSidebar = [
         icon: 'fa fa-list-alt icon',
       },
       {
+        name: 'tr_online_orders',
+        routerLink: '/online-orders',
+        icon: 'fa fa-shopping-bag icon',
+      },
+      {
         name: 'tr_clients',
         routerLink: '/clients',
         icon: 'fa fa-user-circle-o icon',
@@ -223,6 +228,11 @@ export const BranchManagerSidebar = CoAdminSidebar.filter(
 );
 
 export const Cashier = [
+  {
+    name: 'tr_online_orders',
+    routerLink: '/online-orders',
+    icon: 'fa fa-shopping-bag icon',
+  },
   {
     name: 'tr_orders',
     routerLink: '/orders',

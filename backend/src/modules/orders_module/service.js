@@ -464,7 +464,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber installmentSaleNumber partyType vendorId clientId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
+          'orderNumber installmentSaleNumber partyType vendorId clientId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt source ecommerceOrderId ecommerceOrderNumber returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
         .sort(sortSpec)

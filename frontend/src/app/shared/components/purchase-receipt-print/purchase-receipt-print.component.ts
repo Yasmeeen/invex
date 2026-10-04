@@ -8,8 +8,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
-import { environment } from 'src/environments/environment';
-import { toDataURL as qrToDataUrl } from 'qrcode';
+import { buildInvoiceQrDataUrl } from '@shared/utils/invoice-qr.util';
 import { take } from 'rxjs/operators';
 
 @Component({
@@ -30,6 +29,7 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
   receiptDir: 'rtl' | 'ltr' = 'ltr';
 
   invoiceQrDataUrl: string | null = null;
+  invoiceQrCaption = 'innovation-tec.com';
 
   constructor(public storeSettings: StoreSettingsService, private cdr: ChangeDetectorRef) {}
 
@@ -40,19 +40,15 @@ export class PurchaseReceiptPrintComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    const qrUrl = environment.innovationWebsiteUrl || 'https://www.innovation-tec.com/';
-    qrToDataUrl(qrUrl, {
-      width: 240,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    })
-      .then((dataUrl) => {
-        this.invoiceQrDataUrl = dataUrl;
-        this.cdr.detectChanges();
-      })
-      .catch(() => {
+    buildInvoiceQrDataUrl(this.storeSettings.snapshot.invoiceQrUrl).then((result) => {
+      if (result) {
+        this.invoiceQrDataUrl = result.dataUrl;
+        this.invoiceQrCaption = result.caption;
+      } else {
         this.invoiceQrDataUrl = null;
-      });
+      }
+      this.cdr.detectChanges();
+    });
   }
 
   get purchaseReferenceDisplay(): string {

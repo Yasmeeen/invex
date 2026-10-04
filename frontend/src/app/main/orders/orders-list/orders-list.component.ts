@@ -30,6 +30,7 @@ import {
   isInstallmentOutstanding,
   isInstallmentSale,
   isInstallmentSettled,
+  isDeferredCollectionOrder,
   isPayLaterMethod,
   isPayLaterSettled,
   orderDisplayPaid,
@@ -212,7 +213,9 @@ export class OrdersListComponent implements OnInit {
   canPayOrder(order: Order): boolean {
     if (!order?._id) return false;
     if (order.status === 'restored') return false;
-    if (!isPayLaterMethod(order.paymentMethod)) return false;
+    if (!isPayLaterMethod(order.paymentMethod) && !isDeferredCollectionOrder(order)) {
+      return false;
+    }
     return orderDisplayRemaining(order) > 0;
   }
 

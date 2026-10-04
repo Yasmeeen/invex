@@ -1,0 +1,64 @@
+/* Global `.mat-dialog-container` is transparent — host supplies the white panel. */
+.complete-oo-dialog {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(420px, 92vw);
+  min-width: 0;
+  padding: 1rem 1.15rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.06),
+    0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  color: #2c3e50;
+  overflow: hidden;
+}
+
+.complete-oo-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.complete-oo-dialog__body {
+  padding-top: 0.25rem;
+}
+
+.complete-oo-dialog__message {
+  margin: 0 0 1rem;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.complete-oo-dialog__hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.complete-oo-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+  width: 100%;
+
+  .s-btn {
+    flex: 0 1 auto;
+    max-width: 100%;
+    white-space: nowrap;
+    height: auto;
+    min-height: 2rem;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+}

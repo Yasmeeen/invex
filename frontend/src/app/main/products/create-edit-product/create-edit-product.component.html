@@ -1391,6 +1391,12 @@
                               <div>
                                 <div class="ecom-variant-member__name">{{ m.name }}</div>
                                 <div class="text-muted size-small">{{ m.code }} · {{ m.stock }}</div>
+                                <div
+                                  class="text-warning size-small"
+                                  *ngIf="showOnlineListingOption && !m.listedOnEcommerce"
+                                >
+                                  {{ 'tr_product_variant_not_listed' | translate }}
+                                </div>
                               </div>
                             </div>
                             <button

@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const branchSchema = new mongoose.Schema({
   name: { type: String, required: true },
   storeAddress: { type: String, required: true },
+  /** Disabled branches are excluded from external ordering catalogs. */
+  active: { type: Boolean, default: true, index: true },
   rent: { type: Number, default: 0 },
   employeesSalary: { type: Number, default: 0 },
   branchInvoices: {type: Number, default: 0 },

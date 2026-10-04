@@ -8,6 +8,7 @@ import {
   collapseProductsForCatalog,
   ensureAutoGroupForProduct,
 } from './ecommerceVariantGroup.js';
+import { buildEcommerceSpecs } from './catalogSpecs.js';
 
 const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
 
@@ -81,6 +82,7 @@ function mapProduct(product, categoryIdOnEcomHint) {
     hasVariants: false,
     attributes: [],
     variants: [],
+    specs: buildEcommerceSpecs(product),
   };
 }
 
@@ -128,9 +130,14 @@ export async function buildCatalogPayload() {
     };
   }
 
-  const products = (
+  const seed = (
     await Product.find(productQuery).populate('category').populate('branch').lean()
   ).filter((p) => sellableStock(p) > 0);
+
+  // Pull full variant-group siblings so colors sync even if a sibling
+  // was never individually flagged listedOnEcommerce / has 0 stock.
+  const products = await expandCatalogProductsWithGroupSiblings(seed);
+
   const branches = await Branch.find({ name: { $ne: ONLINE_BRANCH_NAME } })
     .select('name storeAddress')
     .lean();
@@ -152,6 +159,36 @@ export async function buildCatalogPayload() {
     products: collapseProductsForCatalog(products, (p) => mapProduct(p)),
     branches: branches.map(mapBranch),
   };
+}
+
+/**
+ * If any member of a variant group is in the catalog seed, include every
+ * non-deleted sibling so the storefront gets a full variant list.
+ */
+async function expandCatalogProductsWithGroupSiblings(seedProducts) {
+  const groupIds = [
+    ...new Set(
+      (seedProducts || [])
+        .map((p) => (p?.ecommerceVariantGroupId ? String(p.ecommerceVariantGroupId) : ''))
+        .filter(Boolean)
+    ),
+  ];
+  if (!groupIds.length) return seedProducts || [];
+
+  const byId = new Map((seedProducts || []).map((p) => [String(p._id), p]));
+  const siblings = await Product.find({
+    ecommerceVariantGroupId: { $in: groupIds },
+    removedWhenOutOfStock: { $ne: true },
+  })
+    .populate('category')
+    .populate('branch')
+    .lean();
+
+  for (const s of siblings) {
+    if (shouldDeleteFromStorefront(s)) continue;
+    byId.set(String(s._id), s);
+  }
+  return [...byId.values()];
 }
 
 async function postToEcommerce(path, body) {
@@ -281,9 +318,14 @@ export async function pushProductUpsert(productId) {
       .populate('category')
       .populate('branch')
       .lean();
-    const eligible = [];
+
+    // Anchor = at least one member is allowed on the storefront catalog.
+    let hasAnchor = false;
     for (const m of members) {
-      if (await isProductInCatalog(m, cfg)) eligible.push(m);
+      if (await isProductInCatalog(m, cfg)) {
+        hasAnchor = true;
+        break;
+      }
     }
 
     // Always delete flat keys for members (group uses vg:{id})
@@ -293,13 +335,19 @@ export async function pushProductUpsert(productId) {
       });
     }
 
-    if (eligible.length < 2) {
+    // Include all non-deleted siblings as variants (not only individually-listed ones).
+    const eligible = members.filter(
+      (m) => !m.removedWhenOutOfStock && !shouldDeleteFromStorefront(m)
+    );
+
+    if (!hasAnchor || eligible.length < 2) {
       // Group collapsed — delete group page and upsert survivors as flat
       await postToEcommerce('/api/integration/invex/catalog/product-delete', {
         invexProductId: `vg:${groupId}`,
       });
       let last = { ok: true };
       for (const m of eligible) {
+        if (!(await isProductInCatalog(m, cfg))) continue;
         const mapped = mapProduct(m);
         last = await postToEcommerce('/api/integration/invex/catalog/product-upsert', {
           category: m.category ? mapCategory(m.category) : null,

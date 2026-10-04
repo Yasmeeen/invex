@@ -9,6 +9,24 @@ export function isPayLaterMethod(method: string | null | undefined): boolean {
   return m === 'credit' || m === 'installment';
 }
 
+/** Online/COD invoice created before the delivery payment is collected. */
+export function isDeferredCollectionOrder(
+  order:
+    | {
+        source?: string | null;
+        ecommerceOrderId?: string | null;
+        paymentStatus?: string | null;
+      }
+    | null
+    | undefined
+): boolean {
+  if (!order) return false;
+  const isOnline =
+    String(order.source || '').trim().toLowerCase() === 'ecommerce' ||
+    !!String(order.ecommerceOrderId || '').trim();
+  return isOnline && order.paymentStatus !== 'paid';
+}
+
 /** Sale has an installment schedule (even if paymentMethod is mixed historically). */
 export function orderHasInstallmentSchedule(order: { installments?: unknown[] } | null | undefined): boolean {
   return Array.isArray(order?.installments) && order!.installments!.length > 0;
@@ -78,7 +96,7 @@ function toMoney(v: unknown): number {
 export function orderDisplayPaid(order: Order | null | undefined): number {
   if (!order) return 0;
   const total = toMoney(order.totalPrice);
-  if (!isPayLaterMethod(order.paymentMethod)) {
+  if (!isPayLaterMethod(order.paymentMethod) && !isDeferredCollectionOrder(order)) {
     return total;
   }
   const paidStored = toMoney(order.amountPaid);
@@ -91,7 +109,7 @@ export function orderDisplayPaid(order: Order | null | undefined): number {
 export function orderDisplayRemaining(order: Order | null | undefined): number {
   if (!order) return 0;
   const total = toMoney(order.totalPrice);
-  if (!isPayLaterMethod(order.paymentMethod)) {
+  if (!isPayLaterMethod(order.paymentMethod) && !isDeferredCollectionOrder(order)) {
     return 0;
   }
   const paidStored = toMoney(order.amountPaid);

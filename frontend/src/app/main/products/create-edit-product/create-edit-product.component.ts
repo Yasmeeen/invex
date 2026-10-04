@@ -114,7 +114,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   isUploadingImage = false;
   /** Show this SKU on the e-commerce website (catalog mode = all). Default off. */
   listedOnEcommerce = false;
-  /** Fridge/carcass product this cut deducts from (butcher). */
+  /** Source product this SKU deducts stock from (when cut-from-source is enabled). */
   selectedSourceProductId: string | null = null;
   sourceStockCandidates: Product[] = [];
   /** Storefront description pushed to the e-commerce catalog. */

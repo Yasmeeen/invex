@@ -1,0 +1,23 @@
+<button
+  type="button"
+  class="sys-online-orders-banner"
+  [class.sys-online-orders-banner--cashier]="variant === 'cashier'"
+  [class.sys-online-orders-banner--overdue]="overdue"
+  *ngIf="visible"
+  (click)="openOnlineOrders()"
+>
+  <span class="sys-online-orders-banner__badge" aria-hidden="true">{{ pendingCount }}</span>
+  <i class="fa fa-shopping-bag sys-online-orders-banner__icon" aria-hidden="true"></i>
+  <span class="sys-online-orders-banner__text">
+    <ng-container *ngIf="pendingCount === 1; else manyOnlineOrders">
+      {{ 'tr_online_orders_banner_one' | translate }}
+    </ng-container>
+    <ng-template #manyOnlineOrders>
+      {{ 'tr_online_orders_banner_many' | translate: { count: pendingCount } }}
+    </ng-template>
+  </span>
+  <span class="sys-online-orders-banner__cta">
+    {{ 'tr_online_orders_banner_cta' | translate }}
+    <i class="fa fa-angle-left" aria-hidden="true"></i>
+  </span>
+</button>

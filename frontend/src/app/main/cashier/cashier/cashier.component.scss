@@ -279,8 +279,9 @@
       color: rgba(255, 255, 255, 0.92);
     }
 
-    /** Branch ng-select (same pattern as drawer-close): caret must not steal clicks */
-    .branch-selection {
+    /** Branch / category ng-select: caret must not steal clicks */
+    .branch-selection,
+    .category-selection {
       position: relative;
       z-index: 24;
 
@@ -635,6 +636,9 @@
     .products-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      grid-auto-rows: max-content;
+      align-content: start;
+      align-items: start;
       gap: 1rem;
       flex: 1;
       min-height: 0;

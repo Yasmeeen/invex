@@ -85,41 +85,46 @@
             </div>
           </div>
           <div class="col-md-6">
-            <div class="form-group booking-pickup-type-field">
+            <div class="form-group booking-select-field">
               <label>{{ 'tr_booking_pickup_type' | translate }}</label>
-              <ng-select
-                class="s-control s-select width-100 booking-pickup-ng-select"
-                formControlName="pickupType"
-                [items]="pickupTypeOptions"
-                bindLabel="labelKey"
-                bindValue="id"
-                [clearable]="false"
-                [searchable]="false"
-                appendTo="body"
-              >
-                <ng-template ng-label-tmp let-item="item">
-                  {{ item.labelKey | translate }}
-                </ng-template>
-                <ng-template ng-option-tmp let-item="item">
-                  {{ item.labelKey | translate }}
-                </ng-template>
-              </ng-select>
+              <div class="input-with-icon">
+                <ng-select
+                  class="s-control s-select width-100"
+                  formControlName="pickupType"
+                  [items]="pickupTypeOptions"
+                  bindLabel="labelKey"
+                  bindValue="id"
+                  [clearable]="false"
+                  [searchable]="false"
+                >
+                  <ng-template ng-label-tmp let-item="item">
+                    {{ item.labelKey | translate }}
+                  </ng-template>
+                  <ng-template ng-option-tmp let-item="item">
+                    {{ item.labelKey | translate }}
+                  </ng-template>
+                </ng-select>
+                <i class="fa fa-caret-down input-icon"></i>
+              </div>
             </div>
           </div>
           <div class="col-md-6" *ngIf="form.get('pickupType')?.value === 'branch_pickup'">
-            <div class="form-group">
+            <div class="form-group booking-select-field">
               <label>{{ 'tr_booking_pickup_branch' | translate }}</label>
-              <ng-select
-                class="s-control s-select width-100"
-                formControlName="pickupBranchId"
-                [items]="branches"
-                bindLabel="name"
-                bindValue="_id"
-                [clearable]="false"
-                appendTo="body"
-                placeholder="{{ 'tr_select' | translate }}"
-              >
-              </ng-select>
+              <div class="input-with-icon">
+                <ng-select
+                  class="s-control s-select width-100"
+                  formControlName="pickupBranchId"
+                  [items]="branches"
+                  bindLabel="name"
+                  bindValue="_id"
+                  [clearable]="false"
+                  [searchable]="true"
+                  placeholder="{{ 'tr_select' | translate }}"
+                >
+                </ng-select>
+                <i class="fa fa-caret-down input-icon"></i>
+              </div>
               <p class="size-small text-muted m-0 mt-1">{{ 'tr_booking_pickup_branch_hint' | translate }}</p>
             </div>
           </div>

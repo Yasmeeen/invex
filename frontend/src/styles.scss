@@ -445,6 +445,22 @@ body[dir=rtl] {
   overflow: visible !important;
 }
 
+.cdk-overlay-backdrop.complete-online-order-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.complete-online-order-dialog-panel {
+  box-shadow: none;
+}
+
+.complete-online-order-dialog-panel .mat-dialog-container,
+.complete-online-order-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
 .cdk-overlay-backdrop.promise-to-pay-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }
@@ -523,6 +539,49 @@ body[dir=rtl] {
   box-shadow: none;
   padding: 0;
   overflow: visible !important;
+}
+
+.cdk-overlay-pane.book-product-dialog-panel {
+  max-height: 85vh !important;
+}
+
+.book-product-dialog-panel .mat-dialog-container,
+.book-product-dialog-panel .mat-mdc-dialog-container {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 85vh !important;
+  overflow: hidden !important;
+}
+
+.book-product-dialog-panel .complex-modal,
+.book-product-dialog-panel .modal-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  min-height: 0;
+  width: 100%;
+}
+
+.book-product-dialog-panel .modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.book-product-dialog-panel .modal-header,
+.book-product-dialog-panel .modal-footer {
+  flex: 0 0 auto;
+}
+
+.book-product-dialog-panel .modal-wrapper .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(85vh - 8.5rem) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
 }
 
 .cdk-overlay-pane.payment-splits-dialog-panel {

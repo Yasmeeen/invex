@@ -119,22 +119,56 @@ tooltip-content .tooltip {
     width: max-content;
 }
 
+/*
+ * ng-select menu. Inline panels (cashier category) anchor to the control.
+ * appendTo="body" panels get top/left/width from ng-select; these rules only
+ * give them the same white list, so they are not a tiny transparent bubble.
+ */
 .ng-dropdown-panel {
     box-sizing: border-box;
     position: absolute;
-    top: calc(100% + 6px);
-    border: 1px solid #eee;
+    top: calc(100% + 4px);
     left: 0;
-    opacity: 0;
     width: 100%;
-    z-index: 5;
+    border: 1px solid #e6e8eb;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    z-index: 10050 !important;
     -webkit-overflow-scrolling: touch;
+    pointer-events: auto;
 }
 
+.ng-dropdown-panel.ng-select-bottom,
+.ng-dropdown-panel.ng-select-top,
+.ng-dropdown-panel.ng-select-left,
+.ng-dropdown-panel.ng-select-right {
+    opacity: 1 !important;
+}
 
-/* ng-select: dropdown panel stacks above modals / Material overlay */
-.ng-dropdown-panel {
-  z-index: 10050 !important;
+.ng-dropdown-panel .ng-dropdown-panel-items {
+    background: #fff;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+}
+
+.ng-dropdown-panel .ng-option {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    cursor: pointer;
+    background: #fff;
+    color: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: auto;
+}
+
+.ng-dropdown-panel .ng-option.ng-option-marked,
+.ng-dropdown-panel .ng-option:hover {
+    background: #f4f7fb;
 }
 
 /**

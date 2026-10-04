@@ -88,14 +88,16 @@
             <ng-select
               class="s-control s-select"
               [(ngModel)]="selectedFromBranches"
+              name="fromBranchIds"
               [items]="branches"
               bindLabel="name"
               bindValue="_id"
               [multiple]="true"
               [closeOnSelect]="false"
+              [searchable]="true"
               [clearable]="true"
-              (change)="applyFilters()"
-              placeholder="{{ 'tr_from' | translate }}"
+              (ngModelChange)="applyFilters()"
+              placeholder="{{ 'tr_select' | translate }}"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
@@ -110,14 +112,16 @@
             <ng-select
               class="s-control s-select"
               [(ngModel)]="selectedToBranches"
+              name="toBranchIds"
               [items]="toBranchOptions"
               bindLabel="name"
               bindValue="_id"
               [multiple]="true"
               [closeOnSelect]="false"
+              [searchable]="true"
               [clearable]="true"
-              (change)="applyFilters()"
-              placeholder="{{ 'tr_to' | translate }}"
+              (ngModelChange)="applyFilters()"
+              placeholder="{{ 'tr_select' | translate }}"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
@@ -132,14 +136,16 @@
             <ng-select
               class="s-control s-select"
               [(ngModel)]="selectedCategories"
+              name="categoryIds"
               [items]="categories"
               bindLabel="name"
               bindValue="_id"
               [multiple]="true"
               [closeOnSelect]="false"
+              [searchable]="true"
               [clearable]="true"
-              (change)="applyFilters()"
-              placeholder="{{ 'tr_category' | translate }}"
+              (ngModelChange)="applyFilters()"
+              placeholder="{{ 'tr_select' | translate }}"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>

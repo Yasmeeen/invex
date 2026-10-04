@@ -102,6 +102,8 @@ label {
 }
 
 .s-select {
+    position: relative;
+
     .ng-spinner-loader {
         display: none;
     }
@@ -123,7 +125,7 @@ label {
     }
 
     .ng-dropdown-panel .ng-dropdown-panel-items{
-        max-height: 110px !important;
+        max-height: 240px !important;
     }
 
     .ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
@@ -144,8 +146,9 @@ label {
         align-items: center;
     }
 
+    /* static made the menu anchor to a small ancestor and open as a bubble. */
     .ng-select-container {
-        position: static !important;
+        position: relative !important;
     }
 
     .ng-dropdown-panel-items {
@@ -355,10 +358,12 @@ textarea.s-control {
         @extend %flex-centered;
         z-index: 1;
         border-radius: 4px;
+        pointer-events: none;
 
         &.date-picker {
             width: 100%;
             z-index: 9;
+            pointer-events: auto;
 
             .mat-button-wrapper {
                 svg {

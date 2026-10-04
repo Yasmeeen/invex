@@ -337,6 +337,7 @@ export class ViewProductBookingDialogComponent implements OnInit {
     this.dialog
       .open(BookProductDialogComponent, {
         width: '640px',
+        panelClass: 'book-product-dialog-panel',
         data: { product: this.product, maxQuantity: max },
         disableClose: true,
       })

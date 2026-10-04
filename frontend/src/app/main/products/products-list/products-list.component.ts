@@ -807,6 +807,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     this.dialog
       .open(BookProductDialogComponent, {
         width: '640px',
+        panelClass: 'book-product-dialog-panel',
         data: { product, maxQuantity: maxQ },
         disableClose: true,
       })

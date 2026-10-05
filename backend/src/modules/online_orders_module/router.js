@@ -1,6 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import User from '../../DB/models/user.model.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
+import { isCrmIntegrationFeatureAvailable } from '../integrations_module/feature.js';
 import {
   getOnlineOrder,
   listOnlineOrders,
@@ -37,7 +39,27 @@ async function requireOnlineOrderStaff(req, res, next) {
   }
 }
 
+async function requireCrmIntegrationEnabled(req, res, next) {
+  try {
+    if (!isCrmIntegrationFeatureAvailable()) {
+      return res.status(403).json({ error: 'CRM integration feature is disabled' });
+    }
+    const settings = await StoreSettings.findOne()
+      .sort({ updatedAt: -1 })
+      .select('crmIntegrationEnabled')
+      .lean();
+    if (!settings?.crmIntegrationEnabled) {
+      return res.status(403).json({ error: 'CRM integration is not enabled in store settings' });
+    }
+    return next();
+  } catch (error) {
+    console.error('requireCrmIntegrationEnabled:', error);
+    return res.status(500).json({ error: 'Failed to verify CRM integration' });
+  }
+}
+
 router.use(requireOnlineOrderStaff);
+router.use(requireCrmIntegrationEnabled);
 router.get('/pending-summary', pendingOnlineOrdersSummary);
 router.get('/', listOnlineOrders);
 router.get('/:id', getOnlineOrder);

@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { AuthenticationGuard } from '@core/guards';
 import { MainComponent } from './main.component';
 import { RoleGuard } from '@core/guards/role.guard';
+import { CrmIntegrationGuard } from '@core/guards/crm-integration.guard';
 import { LEGACY_OPERATION_MANAGER } from '@core/utils/role-utils';
 
 /** DB may still store legacy "Operation Manager"; canonical name is Warehouse. */
@@ -100,7 +101,7 @@ const routes: Routes = [
         path: 'online-orders',
         loadChildren: () =>
           import('./online-orders/online-orders.module').then((m) => m.OnlineOrdersModule),
-        canActivate: [RoleGuard],
+        canActivate: [RoleGuard, CrmIntegrationGuard],
         data: {
           allowedRoles: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'],
         },

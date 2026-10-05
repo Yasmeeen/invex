@@ -173,6 +173,11 @@ export class StoreSettingsService {
     return this._settings.value;
   }
 
+  /** Online orders are visible only when CRM integration is turned on in store settings. */
+  get crmIntegrationEnabled(): boolean {
+    return Boolean(this._settings.value.crmIntegrationEnabled);
+  }
+
   canSeeCostPrice(role: string | undefined | null): boolean {
     return canSeeCostPrice(role, this._settings.value.rolesHiddenFromCostPrice);
   }
@@ -377,7 +382,11 @@ export class StoreSettingsService {
         this.ensureReceiptTranslationPacks();
       },
       error: () => {
+        if (epoch !== this.loadEpoch) {
+          return;
+        }
         this._hydrated = true;
+        this._settings.next({ ...this._settings.value });
       },
     });
   }

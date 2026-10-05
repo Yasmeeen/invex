@@ -42,6 +42,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     '/collections/due',
     '/reports/installments',
   ]);
+  private readonly onlineOrdersLink = '/online-orders';
   private subscriptions: Subscription[] = [];
   private hasSaleInstallments = false;
 
@@ -85,6 +86,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
 
     this.refreshPendingTransferCount();
+
+    this.subscriptions.push(
+      this.storeSettings.settings$.subscribe(() => {
+        this.appSidebar = this.filterSidebar(this.baseSidebar);
+      })
+    );
 
     this.subscriptions.push(
       this.collectionsService.hasInstallments().subscribe({
@@ -207,9 +214,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   private filterSidebar(items: SidebarItem[]): SidebarItem[] {
-    if (this.hasSaleInstallments) {
-      return items;
-    }
     return items
       .map((item) => {
         if (!item.children?.length) {
@@ -221,7 +225,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
         };
       })
       .filter((item) => {
-        if (this.installmentOnlyLinks.has(String(item.routerLink || ''))) {
+        if (
+          item.routerLink === this.onlineOrdersLink &&
+          !this.storeSettings.crmIntegrationEnabled
+        ) {
+          return false;
+        }
+        if (!this.hasSaleInstallments && this.installmentOnlyLinks.has(String(item.routerLink || ''))) {
           return false;
         }
         if (item.routerLink === 'null' && item.children && !item.children.length) {

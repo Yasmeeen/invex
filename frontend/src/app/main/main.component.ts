@@ -39,6 +39,7 @@ export class MainComponent implements OnInit, OnDestroy {
   /** Cashier embeds its own banner (fullscreen overlay covers the global one). */
   isCashierRoute = false;
   private celebrationSub?: Subscription;
+  private settingsSub?: Subscription;
 
   constructor(
       private router:Router,
@@ -57,6 +58,15 @@ export class MainComponent implements OnInit, OnDestroy {
       this.syncOpeningCelebration(this.openingCelebration.snapshot);
       this.openingCelebration.load();
       this.storeSettingsService.load();
+      this.settingsSub = this.storeSettingsService.settings$.subscribe(() => {
+        if (!this.storeSettingsService.hydrated || this.storeSettingsService.crmIntegrationEnabled) {
+          return;
+        }
+        const path = this.router.url.split('?')[0];
+        if (path.startsWith('/online-orders')) {
+          this.router.navigate(['/orders']);
+        }
+      });
       this.onlineOrdersAlert.start();
       this.syncCashierRoute(this.router.url);
     // Hide Vixa for warehouse (and legacy Operation Manager) and cashier.
@@ -95,6 +105,7 @@ export class MainComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.celebrationSub?.unsubscribe();
+    this.settingsSub?.unsubscribe();
     this.onlineOrdersAlert.stop();
   }
 

@@ -6,6 +6,7 @@ import { AuthenticationService } from '@core/services/authentication.service';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { TranslateService } from '@ngx-translate/core';
 import { NotificationsService, NotificationItem } from './notifications.service';
+import { StoreSettingsService } from './store-settings.service';
 import { BASE_URL } from '@core/base/urls';
 
 function socketBaseUrl(apiBaseUrl: string): string {
@@ -34,7 +35,8 @@ export class RealtimeNotificationsService {
     private auth: AuthenticationService,
     private notify: AppNotificationService,
     private translate: TranslateService,
-    private notificationsApi: NotificationsService
+    private notificationsApi: NotificationsService,
+    private storeSettings: StoreSettingsService
   ) {}
 
   /** Tear down socket (e.g. on logout). */
@@ -98,6 +100,9 @@ export class RealtimeNotificationsService {
       if (!n?._id) {
         return;
       }
+      if (n.type === 'online_order_created' && !this.storeSettings.crmIntegrationEnabled) {
+        return;
+      }
       this.globals.unseenNotificationsCount = (this.globals.unseenNotificationsCount || 0) + 1;
       const msg = n.body || this.translate.instant('tr_notifications');
       this.notify.push(msg, 'info');
@@ -121,6 +126,9 @@ export class RealtimeNotificationsService {
         pendingCount?: number;
         notification?: NotificationItem;
       }) => {
+        if (!this.storeSettings.crmIntegrationEnabled) {
+          return;
+        }
         this.onlineOrderNew$.next(payload || {});
       }
     );

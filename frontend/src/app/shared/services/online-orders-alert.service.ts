@@ -4,6 +4,7 @@ import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { OnlineOrdersService } from './online-orders.service';
 import { RealtimeNotificationsService } from './realtime-notifications.service';
+import { StoreSettingsService } from './store-settings.service';
 
 const ONLINE_ORDER_ROLES = new Set(['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier']);
 const BRANCH_SCOPED_ROLES = new Set(['Branch Manager', 'Cashier']);
@@ -37,12 +38,15 @@ export class OnlineOrdersAlertService implements OnDestroy {
 
   private pollSub?: Subscription;
   private realtimeSub?: Subscription;
+  private settingsSub?: Subscription;
   private started = false;
+  private polling = false;
 
   constructor(
     private onlineOrders: OnlineOrdersService,
     private auth: AuthenticationService,
-    private realtime: RealtimeNotificationsService
+    private realtime: RealtimeNotificationsService,
+    private storeSettings: StoreSettingsService
   ) {}
 
   get pendingCount(): number {
@@ -55,7 +59,7 @@ export class OnlineOrdersAlertService implements OnDestroy {
 
   get canSeeBanner(): boolean {
     const role = String(this.auth.getUserFromLocalStorage()?.role || '');
-    return ONLINE_ORDER_ROLES.has(role);
+    return ONLINE_ORDER_ROLES.has(role) && this.storeSettings.crmIntegrationEnabled;
   }
 
   /** True when oldest pending order is older than 15 minutes. */
@@ -96,10 +100,31 @@ export class OnlineOrdersAlertService implements OnDestroy {
   }
 
   start(): void {
-    if (this.started || !this.canSeeBanner) {
+    if (this.started) {
       return;
     }
     this.started = true;
+    this.settingsSub = this.storeSettings.settings$.subscribe(() => this.syncPolling());
+  }
+
+  stop(): void {
+    this.started = false;
+    this.settingsSub?.unsubscribe();
+    this.settingsSub = undefined;
+    this.stopPolling();
+  }
+
+  private syncPolling(): void {
+    if (!this.canSeeBanner) {
+      this.stopPolling();
+      this.stateSubject.next({ count: 0, oldestPendingAt: null });
+      return;
+    }
+    if (this.polling) {
+      this.refresh();
+      return;
+    }
+    this.polling = true;
     this.refresh();
     this.pollSub = interval(POLL_MS)
       .pipe(switchMap(() => this.fetchCount$()))
@@ -114,8 +139,8 @@ export class OnlineOrdersAlertService implements OnDestroy {
     });
   }
 
-  stop(): void {
-    this.started = false;
+  private stopPolling(): void {
+    this.polling = false;
     this.pollSub?.unsubscribe();
     this.realtimeSub?.unsubscribe();
     this.pollSub = undefined;

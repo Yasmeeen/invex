@@ -83,12 +83,20 @@ export class HeaderComponent implements OnInit {
     this.refreshNotifications();
     this.realtime.newNotification$.subscribe((n) => {
       // Prepend so it shows immediately (no refresh needed)
-      this.notifications = [n, ...(this.notifications || [])].slice(0, 20);
+      this.notificationItems = [n, ...this.notificationItems].slice(0, 20);
     });
   }
 
   notificationsLoading = false;
-  notifications: NotificationItem[] = [];
+  private notificationItems: NotificationItem[] = [];
+
+  /** Hides CRM/online-order alerts until integration is enabled in store settings. */
+  get notifications(): NotificationItem[] {
+    if (this.storeSettings.crmIntegrationEnabled) {
+      return this.notificationItems;
+    }
+    return this.notificationItems.filter((n) => n.type !== 'online_order_created');
+  }
 
   private get userId(): string | null {
     const u: any = this.authenticationService.getUserFromLocalStorage();
@@ -101,7 +109,7 @@ export class HeaderComponent implements OnInit {
     this.notificationsLoading = true;
     this.notificationsApi.list(uid, 1, 20).subscribe({
       next: (res) => {
-        this.notifications = res.notifications || [];
+        this.notificationItems = res.notifications || [];
         this.notificationsLoading = false;
         this.notificationsApi.unreadCount(uid).subscribe({
           next: (r) => (this.globals.unseenNotificationsCount = Number(r?.unreadCount) || 0),

@@ -364,6 +364,106 @@ async function collectApproverUserIds(branchId) {
   return users.map((u) => u._id);
 }
 
+/** Super Admin, Co Admin, and this branch's manager — except the person who just recorded it. */
+async function notifyPurchaseStakeholders({
+  type,
+  title,
+  created,
+  branch,
+  branchId,
+  actor,
+  name,
+  codeSummary,
+  categoryId,
+  payload,
+  quantity,
+  unitCodesNorm,
+}) {
+  try {
+    const actorId = actor?._id ? String(actor._id) : '';
+    const recipientIds = (await collectApproverUserIds(branchId)).filter(
+      (id) => String(id) !== actorId
+    );
+    if (!recipientIds.length) return;
+
+    const total = deskPurchaseLineTotal(created);
+    const by = String(actor?.name || '').trim();
+    const notification = await Notification.create({
+      type,
+      title,
+      body: `${name} (${codeSummary}) — ${quantity} unit(s)${
+        Number.isFinite(total) ? ` · ${total}` : ''
+      } · Branch: ${branch?.name || 'Branch'}${by ? ` · ${by}` : ''}`,
+      data: {
+        purchaseId: created._id,
+        branchId,
+        branchName: branch?.name || null,
+        createdById: actor?._id || null,
+        createdByName: actor?.name || null,
+        product: {
+          name,
+          code: codeSummary,
+          categoryId: String(categoryId),
+          price: payload?.price,
+          netPrice: payload?.netPrice,
+          ...(Array.isArray(unitCodesNorm) && unitCodesNorm.length ? { unitCodes: unitCodesNorm } : {}),
+        },
+        quantity,
+        total,
+      },
+      recipients: recipientIds,
+      readBy: [],
+    });
+    emitToUsers(recipientIds, 'notification:new', { notification });
+  } catch (e) {
+    console.warn('⚠️ product purchase notification:', e?.message || e);
+  }
+}
+
+/** Notify after an exchange trade-in is finalized at checkout (outside the order transaction). */
+export async function notifyRecordedPurchaseById(purchaseId, actorOrId) {
+  try {
+    if (!purchaseId || !mongoose.Types.ObjectId.isValid(String(purchaseId))) return;
+    const purchase = await ProductPurchaseRequest.findById(purchaseId).lean();
+    if (!purchase) return;
+
+    const branchId = purchase.branch;
+    const branch = branchId ? await Branch.findById(branchId).select('_id name').lean() : null;
+
+    let actor = null;
+    const actorId =
+      actorOrId && typeof actorOrId === 'object' ? actorOrId._id || actorOrId : actorOrId;
+    if (actorId && mongoose.Types.ObjectId.isValid(String(actorId))) {
+      actor = await User.findById(actorId).select('_id name').lean();
+    }
+
+    const lines = Array.isArray(purchase.lines) ? purchase.lines : [];
+    const names = lines.map((l) => String(l?.productPayload?.name || '').trim()).filter(Boolean);
+    const codes = lines.map((l) => String(l?.productPayload?.code || '').trim()).filter(Boolean);
+    const pp = purchase.productPayload || {};
+    const name = names.length ? names.join(', ') : String(pp.name || 'Purchase');
+    const codeSummary = codes.length ? codes.join(', ') : String(pp.code || '').trim() || name;
+    const quantity =
+      lines.reduce((acc, l) => acc + (Number(l?.quantity) || 0), 0) || Number(purchase.quantity) || 1;
+
+    await notifyPurchaseStakeholders({
+      type: 'product_purchase_created',
+      title: 'Product purchase recorded',
+      created: purchase,
+      branch,
+      branchId,
+      actor,
+      name,
+      codeSummary,
+      categoryId: pp.category || pp.categoryId || '',
+      payload: pp,
+      quantity,
+    });
+  } catch (e) {
+    console.warn('⚠️ product purchase notification:', e?.message || e);
+  }
+}
+
 /** Populated refs are `{ _id, ... }`; permission checks must compare raw ObjectIds. */
 function dereferenceDocId(ref) {
   if (ref == null) return ref;
@@ -898,6 +998,20 @@ export const createProductPurchaseRequest = async (req, res) => {
 
         const purchaseOut = await leanPurchaseForResponse(created._id);
         await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
+        await notifyPurchaseStakeholders({
+          type: 'product_purchase_created',
+          title: 'Product purchase recorded',
+          created,
+          branch,
+          branchId,
+          actor,
+          name,
+          codeSummary: unitCodesNorm.join(', '),
+          categoryId,
+          payload,
+          quantity: q,
+          unitCodesNorm,
+        });
         return res.status(201).json({
           message: '✅ Purchase created and approved',
           purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -971,6 +1085,19 @@ export const createProductPurchaseRequest = async (req, res) => {
 
           const purchaseOut = await leanPurchaseForResponse(created._id);
           await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
+          await notifyPurchaseStakeholders({
+            type: 'product_purchase_created',
+            title: 'Product purchase recorded',
+            created,
+            branch,
+            branchId,
+            actor,
+            name,
+            codeSummary: code,
+            categoryId,
+            payload,
+            quantity: q,
+          });
           return res.status(201).json({
             message: '✅ Purchase created and approved',
             purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -1057,6 +1184,19 @@ export const createProductPurchaseRequest = async (req, res) => {
 
       const purchaseOut = await leanPurchaseForResponse(created._id);
       await postDeskPurchaseTreasuryLedger(created, { userId: actor._id, branchId });
+      await notifyPurchaseStakeholders({
+        type: 'product_purchase_created',
+        title: 'Product purchase recorded',
+        created,
+        branch,
+        branchId,
+        actor,
+        name,
+        codeSummary: code,
+        categoryId,
+        payload,
+        quantity: q,
+      });
       return res.status(201).json({
         message: '✅ Purchase created and approved',
         purchase: purchaseOut || (created.toObject ? created.toObject() : created),
@@ -1069,37 +1209,22 @@ export const createProductPurchaseRequest = async (req, res) => {
 
     // Exchange drafts await checkout — do not notify managers as pending approvals.
     if (!exchangeTradeIn) {
-      try {
-        const recipientIds = await collectApproverUserIds(branchId);
-        const codeSummary =
-          categoryIsMulti && q > 1 && unitCodesNorm.length ? unitCodesNorm.join(', ') : code;
-        const notification = await Notification.create({
-          type: 'product_purchase_pending',
-          title: 'Product purchase pending approval',
-          body: `${name} (${codeSummary}) — ${q} unit(s) · Branch: ${branch?.name || 'Branch'}`,
-          data: {
-            purchaseId: created._id,
-            branchId,
-            branchName: branch?.name || null,
-            createdById: actor._id,
-            createdByName: actor?.name || null,
-            product: {
-              name,
-              code: codeSummary,
-              categoryId: String(categoryId),
-              price: payload.price,
-              netPrice: payload.netPrice,
-              ...(categoryIsMulti && q > 1 && unitCodesNorm.length ? { unitCodes: unitCodesNorm } : {}),
-            },
-            quantity: q,
-          },
-          recipients: recipientIds,
-          readBy: [],
-        });
-        emitToUsers(recipientIds, 'notification:new', { notification });
-      } catch (e) {
-        console.warn('⚠️ product purchase notification:', e?.message || e);
-      }
+      const codeSummary =
+        categoryIsMulti && q > 1 && unitCodesNorm.length ? unitCodesNorm.join(', ') : code;
+      await notifyPurchaseStakeholders({
+        type: 'product_purchase_pending',
+        title: 'Product purchase pending approval',
+        created,
+        branch,
+        branchId,
+        actor,
+        name,
+        codeSummary,
+        categoryId,
+        payload,
+        quantity: q,
+        unitCodesNorm: categoryIsMulti && q > 1 ? unitCodesNorm : undefined,
+      });
     }
 
     await auditLog(req, {

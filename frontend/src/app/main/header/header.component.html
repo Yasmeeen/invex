@@ -65,6 +65,9 @@
                     <span *ngSwitchCase="'product_purchase_pending'">{{
                       'tr_notification_product_purchase_pending_title' | translate
                     }}</span>
+                    <span *ngSwitchCase="'product_purchase_created'">{{
+                      'tr_notification_product_purchase_created_title' | translate
+                    }}</span>
                     <span *ngSwitchDefault>{{ n.title || ('tr_notifications' | translate) }}</span>
                   </ng-container>
                 </div>

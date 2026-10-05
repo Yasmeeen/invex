@@ -92,6 +92,25 @@
           {{ 'tr_drawer_close_none' | translate }}
         </div>
 
+        <ng-container *ngIf="preview.installmentCollectionsByMethod?.length">
+          <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_installment_collections' | translate }}</h4>
+          <div
+            class="drawer-close-dialog__row"
+            [class.drawer-close-dialog__row--highlight]="row.key === 'cash'"
+            [class.drawer-close-dialog__row--in]="row.key === 'cash'"
+            *ngFor="let row of preview.installmentCollectionsByMethod"
+          >
+            <span>
+              {{ payMethodLabel(row.key) || row.label }}
+              <span class="drawer-close-dialog__hint">
+                · {{ 'tr_drawer_close_client_cash_count' | translate : { count: row.count } }}
+              </span>
+            </span>
+            <span>+{{ row.total | currency : 'EGP ' : 'symbol' : '1.2-2' }}</span>
+          </div>
+          <p class="drawer-close-dialog__note">{{ 'tr_drawer_close_note_installment_collections' | translate }}</p>
+        </ng-container>
+
         <h4 class="drawer-close-dialog__section">{{ 'tr_drawer_close_refunds_title' | translate }}</h4>
         <div class="drawer-close-dialog__muted">
           {{ 'tr_drawer_close_restored_count' | translate : { count: preview.restoredInvoiceCount } }}

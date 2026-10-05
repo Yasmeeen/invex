@@ -161,7 +161,7 @@ export class HeaderComponent implements OnInit {
     if (n?.type === 'booking_created') {
       return 'fa-bookmark';
     }
-    if (n?.type === 'product_purchase_pending') {
+    if (n?.type === 'product_purchase_pending' || n?.type === 'product_purchase_created') {
       return 'fa-shopping-cart';
     }
     if (
@@ -175,7 +175,7 @@ export class HeaderComponent implements OnInit {
   }
 
   private navigateFromNotification(n: NotificationItem): void {
-    if (n.type === 'product_purchase_pending') {
+    if (n.type === 'product_purchase_pending' || n.type === 'product_purchase_created') {
       const purchaseId = normalizeMongoId(n?.data?.purchaseId);
       if (!purchaseId) return;
       this.dialog.open(ProductPurchaseApprovalDialogComponent, {

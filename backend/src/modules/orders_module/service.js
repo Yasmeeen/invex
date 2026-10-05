@@ -14,7 +14,10 @@ import moment from 'moment-timezone';
 import { auditLog } from '../audit_module/audit.service.js';
 import { resolveBranchForCashDrawer } from '../../utils/vendor-cash-drawer.js';
 import { recordExchangeSettlement } from '../../utils/exchange-settlement.js';
-import { finalizeExchangeTradeInPurchaseInSession } from '../product_purchase_requests_module/service.js';
+import {
+  finalizeExchangeTradeInPurchaseInSession,
+  notifyRecordedPurchaseById,
+} from '../product_purchase_requests_module/service.js';
 import {
   processFullOrderRestore,
   processOrderReturn,
@@ -1428,6 +1431,7 @@ export const createOrder = async (req, res) => {
 
     // Finalize exchange trade-ins (create products/stock) only when the sale commits.
     const exchangePurchaseStockMovements = [];
+    const newlyFinalizedPurchaseIds = [];
     if (exchangeProductPurchaseRequestIds.length) {
       for (const purchaseId of exchangeProductPurchaseRequestIds) {
         const finalized = await finalizeExchangeTradeInPurchaseInSession(
@@ -1445,10 +1449,17 @@ export const createOrder = async (req, res) => {
         if (Array.isArray(finalized?.stockMovementRows) && finalized.stockMovementRows.length) {
           exchangePurchaseStockMovements.push(...finalized.stockMovementRows);
         }
+        if (!finalized?.alreadyApproved) {
+          newlyFinalizedPurchaseIds.push(purchaseId);
+        }
       }
     }
 
     await commitOrderSession(session);
+
+    for (const purchaseId of newlyFinalizedPurchaseIds) {
+      await notifyRecordedPurchaseById(purchaseId, userId);
+    }
 
     const storeOwesExchange = round2(
       Math.max(0, exchangeTradeInCreditAmount - totalRounded)

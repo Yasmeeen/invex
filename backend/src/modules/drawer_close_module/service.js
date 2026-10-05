@@ -372,6 +372,93 @@ async function sumClientCreditOrderCashPayments(branchOid, start, end) {
   };
 }
 
+function orderHasSaleInstallments(order) {
+  if (String(order?.paymentMethod || '').trim().toLowerCase() === 'installment') return true;
+  return Array.isArray(order?.installments) && order.installments.length > 0;
+}
+
+/** Checkout down payment — not a later installment collection. */
+function isCheckoutSalePayment(order, payment) {
+  const note = String(payment?.note || '').trim();
+  if (note.startsWith('Payment ·')) return false;
+  if (
+    note.startsWith('Checkout ·') ||
+    note.startsWith('Installment down payment') ||
+    note.startsWith('Initial payment') ||
+    note === 'Full payment at checkout'
+  ) {
+    return true;
+  }
+  const created = order?.createdAt ? new Date(order.createdAt).getTime() : NaN;
+  const paid = payment?.paidAt ? new Date(payment.paidAt).getTime() : NaN;
+  return Number.isFinite(created) && Number.isFinite(paid) && Math.abs(paid - created) < 15000;
+}
+
+function collectionMethodKey(payment, split) {
+  let method = String(split?.key ?? payment?.method ?? '').trim().toLowerCase();
+  if (method === 'same') {
+    method = String(payment?.feeForMethod || '').trim().toLowerCase();
+  }
+  if (!method || method === 'credit' || method === 'installment' || method === 'same') return '';
+  return method;
+}
+
+/**
+ * Follow-up installment collections in the period, grouped by customer payment method
+ * (cash, wallets, …). Informational — cash is already inside paymentsReceivedByMethod.
+ */
+async function installmentCollectionsByMethod(branchOid, start, end) {
+  const orders = await Order.find({
+    partyType: { $ne: 'supplier' },
+    $or: [{ paymentMethod: 'installment' }, { 'installments.0': { $exists: true } }],
+    payments: { $elemMatch: { paidAt: { $gte: start, $lte: end } } },
+  })
+    .select('payments branch createdAt paymentMethod installments')
+    .lean();
+
+  const byKey = {};
+  for (const o of orders) {
+    if (!orderHasSaleInstallments(o)) continue;
+    for (const p of o.payments || []) {
+      const t = p.paidAt ? new Date(p.paidAt).getTime() : NaN;
+      if (Number.isNaN(t) || t < start.getTime() || t > end.getTime()) continue;
+      if (!paymentBelongsToBranch(p, o, branchOid)) continue;
+      if (isCheckoutSalePayment(o, p)) continue;
+
+      const splits = Array.isArray(p.paymentTreasurySplits) ? p.paymentTreasurySplits : [];
+      const lines = splits.length
+        ? splits.map((s) => ({
+            key: collectionMethodKey(p, s),
+            label: String(s.label || '').trim(),
+            amount: Number(s.amount || 0),
+          }))
+        : [
+            {
+              key: collectionMethodKey(p),
+              label: '',
+              amount: Number(p.amount || 0),
+            },
+          ];
+
+      for (const line of lines) {
+        if (!line.key || !Number.isFinite(line.amount) || line.amount <= 0) continue;
+        if (!byKey[line.key]) {
+          byKey[line.key] = { key: line.key, label: line.label || line.key, total: 0, count: 0 };
+        }
+        byKey[line.key].total = round2(byKey[line.key].total + line.amount);
+        byKey[line.key].count += 1;
+        if (!byKey[line.key].label && line.label) byKey[line.key].label = line.label;
+      }
+    }
+  }
+
+  return Object.values(byKey).sort((a, b) => {
+    if (a.key === 'cash') return -1;
+    if (b.key === 'cash') return 1;
+    return String(a.key).localeCompare(String(b.key));
+  });
+}
+
 /** Refund allocation for restored invoices (same split as original payments when possible). */
 function refundAllocationFromOrder(order) {
   const pays = order.payments || [];
@@ -573,6 +660,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     clientCashInfo,
     clientDepositCashInfo,
     purchaseReturnInfo,
+    installmentCollections,
   ] = await Promise.all([
     paymentsReceivedByMethod(branchOid, start, end),
     refundsByMethod(branchOid, start, end),
@@ -585,6 +673,7 @@ export async function computeDrawerPreview(branchOid, bounds) {
     sumClientCreditOrderCashPayments(branchOid, start, end),
     sumClientCashDrawerInflows(branchOid, start, end),
     sumPurchaseReturnCashDrawerInflow(branchOid, start, end),
+    installmentCollectionsByMethod(branchOid, start, end),
   ]);
 
   const cashTransferNet = await sumCashTransferNet({
@@ -633,6 +722,8 @@ export async function computeDrawerPreview(branchOid, bounds) {
     vendorCashDrawerInflowCount: vendorCashInflowInfo.vendorCashDrawerInflowCount,
     clientOrderCashDrawerTotal: clientCashInfo.clientOrderCashDrawerTotal,
     clientOrderCashDrawerPaymentCount: clientCashInfo.clientOrderCashDrawerPaymentCount,
+    /** Follow-up installment collections by method (cash, wallets, …). Cash is already in paymentsReceivedByMethod. */
+    installmentCollectionsByMethod: installmentCollections,
     clientDepositCashDrawerTotal: clientDepositCashInfo.clientDepositCashDrawerTotal,
     clientDepositCashDrawerCount: clientDepositCashInfo.clientDepositCashDrawerCount,
     cashReceivedTotal: cashReceived,
@@ -686,6 +777,7 @@ export const previewDrawerClose = async (req, res) => {
         periodNetCashMovements: 0,
         expectedCashInDrawer: 0,
         paymentsReceivedByMethod: {},
+        installmentCollectionsByMethod: [],
         refundsByMethod: {},
         salesReturnRefundsByTreasury: [],
         restoredInvoiceCount: 0,

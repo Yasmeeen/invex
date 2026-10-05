@@ -52,6 +52,8 @@ export interface DrawerClosePreview {
   /** Cash collected from clients on credit sales (installments) — included in cashReceivedTotal. */
   clientOrderCashDrawerTotal?: number;
   clientOrderCashDrawerPaymentCount?: number;
+  /** Follow-up customer installment collections in the period, by payment method. */
+  installmentCollectionsByMethod?: DeskPurchaseTreasuryLine[];
   /** Cash received from clients as prepaid deposits. */
   clientDepositCashDrawerTotal?: number;
   clientDepositCashDrawerCount?: number;

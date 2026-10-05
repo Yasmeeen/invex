@@ -547,6 +547,26 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return Math.max(0, this.installmentTotalCount(order) - this.installmentPaidCount(order));
   }
 
+  collectorDisplayName(order: ClientHistoryOrderRow): string {
+    const name = String(order?.collectorName || '').trim();
+    return name || this.translate.instant('tr_no_collector');
+  }
+
+  /** Due date of the final installment on this sale. */
+  lastInstallmentDueDate(order: ClientHistoryOrderRow): string | null {
+    const rows = Array.isArray(order?.installments) ? [...order.installments] : [];
+    if (!rows.length) return null;
+    rows.sort((a, b) => {
+      const seqDiff = (Number(b?.sequence) || 0) - (Number(a?.sequence) || 0);
+      if (seqDiff) return seqDiff;
+      const db = b?.dueDate ? new Date(b.dueDate).getTime() : 0;
+      const da = a?.dueDate ? new Date(a.dueDate).getTime() : 0;
+      return db - da;
+    });
+    const due = rows[0]?.dueDate;
+    return due ? String(due) : null;
+  }
+
   isInstallmentCollapsed(order: ClientHistoryOrderRow): boolean {
     const key = this.installmentOrderKey(order);
     if (!key) return false;

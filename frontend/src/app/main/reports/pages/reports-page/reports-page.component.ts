@@ -365,9 +365,21 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       const netIsLoss = netProfit < 0;
       const marginIsLoss = profitMargin < 0;
       const lossBadge = t('tr_report_loss_badge');
+      const downPaid = Number(s.installmentDownPayment) || 0;
       this.cards = [
-        { titleKey: 'tr_report_card_revenue', value: s.totalRevenue ?? 0, money: true },
-        { titleKey: 'tr_report_card_cost', value: s.totalCost ?? 0, money: true },
+        {
+          titleKey: 'tr_report_card_revenue',
+          value: s.totalRevenue ?? 0,
+          money: true,
+          hintKey: downPaid > 0 ? 'tr_report_revenue_down_payment_hint' : undefined,
+          hintParams: downPaid > 0 ? { amount: formatEgpMoney(downPaid) } : undefined,
+        },
+        {
+          titleKey: 'tr_report_card_cost',
+          value: s.totalCost ?? 0,
+          money: true,
+          hintKey: downPaid > 0 ? 'tr_report_cost_down_payment_hint' : undefined,
+        },
         {
           titleKey: tradingIsLoss
             ? 'tr_report_card_trading_loss'

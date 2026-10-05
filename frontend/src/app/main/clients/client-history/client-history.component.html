@@ -345,6 +345,14 @@
               </span>
             </div>
             <div class="installment-order-head__details">
+              <span class="installment-order-head__meta-line">
+                {{ 'tr_collector' | translate }}:
+                <strong>{{ collectorDisplayName(o) }}</strong>
+              </span>
+              <span class="installment-order-head__meta-line" *ngIf="lastInstallmentDueDate(o) as lastDue">
+                {{ 'tr_last_installment_due_date' | translate }}:
+                <strong>{{ lastDue | date:'dd/MM/yyyy' }}</strong>
+              </span>
               <span class="installment-order-head__meta-line" *ngIf="installmentMonthlyAmount(o) > 0">
                 {{ 'tr_invoice_installment_monthly' | translate }}:
                 <strong>{{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>

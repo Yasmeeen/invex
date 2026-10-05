@@ -390,6 +390,110 @@ const getDateGroupExprForField = (groupBy, dateField) =>
     ? { $dateToString: { format: '%Y-%m', date: dateField, timezone: REPORT_TZ } }
     : { $dateToString: { format: '%Y-%m-%d', date: dateField, timezone: REPORT_TZ } };
 
+/** Sum of price×qty or cost×qty on order lines. */
+function productLineSumExpr(field) {
+  return {
+    $reduce: {
+      input: { $ifNull: ['$products', []] },
+      initialValue: 0,
+      in: {
+        $add: [
+          '$$value',
+          {
+            $multiply: [
+              { $ifNull: [`$$this.${field}`, 0] },
+              { $ifNull: ['$$this.quantity', 0] },
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+
+/**
+ * Cash collected at installment checkout (the down payment).
+ * Later installment collections carry installmentProfit, or a payment note, and are excluded.
+ * `p` is an aggregation path: '$payments' or '$$p'.
+ */
+function downPaymentAmountExpr(p) {
+  const field = (name) => `${p}.${name}`;
+  return {
+    $cond: [
+      {
+        $and: [
+          { $ne: [field('countsTowardInvoice'), false] },
+          { $lte: [{ $strLenCP: { $ifNull: [field('feeForMethod'), ''] } }, 0] },
+          { $lte: [{ $ifNull: [field('installmentProfit'), 0] }, 0.001] },
+          {
+            $gt: [
+              { $strLenCP: { $trim: { input: { $ifNull: [field('method'), ''] } } } },
+              0,
+            ],
+          },
+          {
+            $not: {
+              $in: [
+                { $toLower: { $ifNull: [field('method'), ''] } },
+                ['credit', 'installment'],
+              ],
+            },
+          },
+          {
+            $or: [
+              {
+                $regexMatch: {
+                  input: { $ifNull: [field('note'), ''] },
+                  regex: 'مقدم|down payment|^Checkout',
+                  options: 'i',
+                },
+              },
+              {
+                $and: [
+                  { $gte: [field('paidAt'), { $subtract: ['$createdAt', 5 * 60 * 1000] }] },
+                  { $lte: [field('paidAt'), { $add: ['$createdAt', 5 * 60 * 1000] }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { $ifNull: [field('amount'), 0] },
+      0,
+    ],
+  };
+}
+
+/** Line totals plus the share of trading profit already taken by the down payment. */
+const installmentEconomicsStages = [
+  {
+    $addFields: {
+      lineRevenue: productLineSumExpr('price'),
+      lineCost: productLineSumExpr('cost'),
+      downPaymentTotal: {
+        $sum: {
+          $map: {
+            input: { $ifNull: ['$payments', []] },
+            as: 'p',
+            in: downPaymentAmountExpr('$$p'),
+          },
+        },
+      },
+    },
+  },
+  {
+    $addFields: {
+      downProfitRatio: {
+        $cond: [
+          { $gt: ['$lineRevenue', 0] },
+          { $min: [1, { $divide: ['$downPaymentTotal', '$lineRevenue'] }] },
+          0,
+        ],
+      },
+    },
+  },
+];
+
 /** Orders with a customer installment schedule (profit is cash-basis on collection). */
 const hasInstallmentsExpr = {
   $gt: [{ $size: { $ifNull: ['$installments', []] } }, 0],
@@ -634,6 +738,7 @@ export const getProfitReport = async (req, res) => {
     /** Installment profit from payment lines (new data). */
     const installmentProfitFromPayments = await Order.aggregate([
       { $match: installmentOrderMatch },
+      ...installmentEconomicsStages,
       { $unwind: '$payments' },
       {
         $match: {
@@ -644,7 +749,14 @@ export const getProfitReport = async (req, res) => {
       {
         $group: {
           _id: getDateGroupExprForField(f.groupBy, '$payments.paidAt'),
-          installmentProfit: { $sum: { $ifNull: ['$payments.installmentProfit', 0] } },
+          installmentProfit: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$payments.installmentProfit', 0] },
+                { $subtract: [1, { $ifNull: ['$downProfitRatio', 0] }] },
+              ],
+            },
+          },
         },
       },
       { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
@@ -656,6 +768,7 @@ export const getProfitReport = async (req, res) => {
      */
     const installmentProfitLegacy = await Order.aggregate([
       { $match: installmentOrderMatch },
+      ...installmentEconomicsStages,
       {
         $addFields: {
           trackedInstallmentProfit: {
@@ -764,7 +877,14 @@ export const getProfitReport = async (req, res) => {
       {
         $group: {
           _id: getDateGroupExprForField(f.groupBy, '$installments.paidAt'),
-          installmentProfit: { $sum: '$approxProfit' },
+          installmentProfit: {
+            $sum: {
+              $multiply: [
+                '$approxProfit',
+                { $subtract: [1, { $ifNull: ['$downProfitRatio', 0] }] },
+              ],
+            },
+          },
         },
       },
       { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
@@ -782,9 +902,81 @@ export const getProfitReport = async (req, res) => {
       [...installmentByPeriod.values()].reduce((s, n) => s + n, 0)
     );
 
-    const totalRevenue = aggSummary?.totalRevenue ?? 0;
-    const totalCost = aggSummary?.totalCost ?? 0;
-    const cashSalesTrading = aggSummary?.tradingProfit ?? round2(totalRevenue - totalCost);
+    /**
+     * Down payment is cash received at checkout on an installment sale.
+     * Book it as revenue in the period it was paid, with the matching slice of cost,
+     * so trading profit keeps only the margin. Installment profit above is scaled by
+     * (1 − downPayment/lineRevenue) so that margin is not recognized again on collection.
+     */
+    const downPaymentInPeriod = await Order.aggregate([
+      { $match: installmentOrderMatch },
+      ...installmentEconomicsStages,
+      { $unwind: '$payments' },
+      {
+        $match: {
+          'payments.paidAt': { $gte: f.from, $lte: f.to },
+        },
+      },
+      { $addFields: { downAmount: downPaymentAmountExpr('$payments') } },
+      { $match: { downAmount: { $gt: 0 } } },
+      {
+        $group: {
+          _id: {
+            period: getDateGroupExprForField(f.groupBy, '$payments.paidAt'),
+            orderId: '$_id',
+          },
+          downAmount: { $sum: '$downAmount' },
+          lineRevenue: { $first: '$lineRevenue' },
+          lineCost: { $first: '$lineCost' },
+        },
+      },
+      {
+        $addFields: {
+          payRatio: {
+            $cond: [
+              { $gt: ['$lineRevenue', 0] },
+              { $min: [1, { $divide: ['$downAmount', '$lineRevenue'] }] },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$_id.period',
+          downRevenue: { $sum: { $multiply: ['$lineRevenue', '$payRatio'] } },
+          downCost: { $sum: { $multiply: ['$lineCost', '$payRatio'] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          downRevenue: { $round: ['$downRevenue', 2] },
+          downCost: { $round: ['$downCost', 2] },
+        },
+      },
+    ]);
+
+    const downByPeriod = new Map();
+    for (const row of downPaymentInPeriod || []) {
+      downByPeriod.set(String(row.period), {
+        downRevenue: Number(row.downRevenue) || 0,
+        downCost: Number(row.downCost) || 0,
+      });
+    }
+    const installmentDownPayment = round2(
+      [...downByPeriod.values()].reduce((s, row) => s + row.downRevenue, 0)
+    );
+    const installmentDownPaymentCost = round2(
+      [...downByPeriod.values()].reduce((s, row) => s + row.downCost, 0)
+    );
+
+    const nonInstallmentRevenue = aggSummary?.totalRevenue ?? 0;
+    const nonInstallmentCost = aggSummary?.totalCost ?? 0;
+    const totalRevenue = round2(nonInstallmentRevenue + installmentDownPayment);
+    const totalCost = round2(nonInstallmentCost + installmentDownPaymentCost);
+    const cashSalesTrading = round2(totalRevenue - totalCost);
     const tradingProfit = round2(cashSalesTrading + installmentProfitCollected);
     const dailyExpensesTotal = dailyExpenses.total;
     const netProfitAfterBranch = round2(
@@ -798,6 +990,7 @@ export const getProfitReport = async (req, res) => {
     const summary = {
       totalRevenue,
       totalCost,
+      installmentDownPayment,
       tradingProfit,
       installmentProfitCollected,
       cashSalesTradingProfit: cashSalesTrading,
@@ -850,14 +1043,16 @@ export const getProfitReport = async (req, res) => {
       ...new Set([
         ...salesByPeriod.keys(),
         ...installmentByPeriod.keys(),
+        ...downByPeriod.keys(),
         ...dailyExpenses.byPeriod.keys(),
       ]),
     ].sort();
 
     const profitOverTime = allPeriods.map((period) => {
       const row = salesByPeriod.get(period);
-      const revenue = Number(row?.revenue) || 0;
-      const cost = Number(row?.cost) || 0;
+      const down = downByPeriod.get(period);
+      const revenue = (Number(row?.revenue) || 0) + (Number(down?.downRevenue) || 0);
+      const cost = (Number(row?.cost) || 0) + (Number(down?.downCost) || 0);
       const installmentProfit = installmentByPeriod.get(period) || 0;
       const trading = round2(revenue - cost + installmentProfit);
       let overheadAlloc = 0;

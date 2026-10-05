@@ -1351,6 +1351,25 @@ export const updateClient = async (req, res) => {
   }
 };
 
+/** Sale collector overrides the client's collector when the invoice has one. */
+function resolveEffectiveCollector(order, client) {
+  const orderCol = order?.collectorId;
+  if (orderCol) {
+    return {
+      id: String(orderCol._id || orderCol),
+      name: String(orderCol.name || "").trim(),
+    };
+  }
+  const clientCol = client?.collectorId;
+  if (clientCol) {
+    return {
+      id: String(clientCol._id || clientCol),
+      name: String(clientCol.name || "").trim(),
+    };
+  }
+  return { id: "", name: "" };
+}
+
 /**
  * GET client account history: sales orders, purchases from client, loyalty points, pay-later balance.
  */
@@ -1361,7 +1380,7 @@ export const getClientHistory = async (req, res) => {
       return res.status(400).json({ error: "Invalid client id" });
     }
 
-    const client = await Client.findById(clientId).lean();
+    const client = await Client.findById(clientId).populate("collectorId", "name").lean();
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
     }
@@ -1371,9 +1390,10 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
+        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName collectorId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
       )
       .populate("branch", "name")
+      .populate("collectorId", "name")
       .sort({ createdAt: -1 })
       .limit(200)
       .lean();
@@ -1396,8 +1416,11 @@ export const getClientHistory = async (req, res) => {
         ...r,
         promiseToPayHistoryPast: serializePastPromiseHistory(r),
       }));
+      const collector = resolveEffectiveCollector(o, client);
       return {
         ...o,
+        collectorId: collector.id || null,
+        collectorName: collector.name,
         installments: installmentsWithPromises,
         remaining,
         pointsEarned,
@@ -1498,7 +1521,7 @@ export const getClientHistory = async (req, res) => {
         additionalAddresses: client.additionalAddresses || [],
         nationalIdImageUrl: client.nationalIdImageUrl || "",
         guarantor: client.guarantor || null,
-        collectorId: client.collectorId || null,
+        collectorId: client.collectorId?._id || client.collectorId || null,
       },
       totalPointsEarned,
       clientOwesUs,

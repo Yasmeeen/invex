@@ -53,6 +53,10 @@ import {
   AdminEditSaleNumberDialogComponent,
   AdminEditSaleNumberDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-edit-sale-number-dialog.component';
+import {
+  AdminMinimumCollectionDialogComponent,
+  AdminMinimumCollectionDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-minimum-collection-dialog.component';
 import { Subscription } from 'rxjs';
 
 export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
@@ -89,6 +93,8 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   canAdminInstallments = false;
   /** Super Admin or Co Admin can edit installment sale number. */
   canEditInstallmentSaleNumber = false;
+  /** Super Admin or Co Admin can set the minimum collection on a sale. */
+  canEditMinimumCollection = false;
 
   private routeSub?: Subscription;
 
@@ -112,6 +118,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     const role = String(actor?.role || '');
     this.canAdminInstallments = role === 'Super Admin';
     this.canEditInstallmentSaleNumber = role === 'Super Admin' || role === 'Co Admin';
+    this.canEditMinimumCollection = this.canEditInstallmentSaleNumber;
   }
 
   ngOnInit(): void {
@@ -834,6 +841,68 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
         },
       });
     });
+  }
+
+  editMinimumCollection(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.canEditMinimumCollection) return;
+    if (order?.status === 'restored') return;
+    const orderId = normalizeMongoId(order._id);
+    const userId = this.currentUserId();
+    if (!orderId || !userId) return;
+
+    const ref = this.dialog.open(AdminMinimumCollectionDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        minimumCollectionAmount: order.minimumCollectionAmount,
+        installmentAmount: this.installmentMonthlyAmount(order),
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        clientName: this.clientTitle,
+        productNames: this.installmentProductNames(order),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminMinimumCollectionDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders
+        .adminUpdateMinimumCollection(orderId, {
+          userId,
+          minimumCollectionAmount: result.minimumCollectionAmount,
+          reason: result.reason || undefined,
+        })
+        .subscribe({
+          next: () => {
+            const okKey = result.cleared
+              ? 'tr_minimum_collection_cleared'
+              : 'tr_minimum_collection_ok';
+            this.notify.push(this.translate.instant(okKey), 'success');
+            this.afterBalanceChange();
+          },
+          error: (err) => {
+            this.notify.push(this.minimumCollectionError(err), 'error');
+          },
+        });
+    });
+  }
+
+  private minimumCollectionError(err: any): string {
+    const code = err?.error?.code;
+    if (code === 'MINIMUM_COLLECTION_TOO_HIGH') {
+      return this.translate.instant('tr_minimum_collection_too_high');
+    }
+    if (code === 'INVALID_MINIMUM_COLLECTION') {
+      return this.translate.instant('tr_minimum_collection_invalid');
+    }
+    return (
+      err?.error?.error ||
+      err?.error?.message ||
+      this.translate.instant('tr_unexpected_error_message')
+    );
   }
 
   adminEditSaleNumber(order: ClientHistoryOrderRow, event?: Event): void {

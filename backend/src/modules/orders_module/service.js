@@ -354,6 +354,55 @@ function appendFeePaymentLines(payments, feeAllocations, { paidAt, paidByUserId 
   }
 }
 
+/**
+ * Invoices still owed: pay-later (credit / installment) or unpaid online collection,
+ * with a remaining balance. Cash and other instant methods count as settled.
+ */
+function salesInvoiceOutstandingExpr() {
+  return {
+    $and: [
+      { $ne: ['$paymentStatus', 'paid'] },
+      {
+        $gt: [
+          {
+            $subtract: [
+              { $ifNull: ['$totalPrice', 0] },
+              { $ifNull: ['$amountPaid', 0] },
+            ],
+          },
+          0.005,
+        ],
+      },
+      {
+        $or: [
+          {
+            $in: [
+              { $toLower: { $ifNull: ['$paymentMethod', ''] } },
+              ['credit', 'installment'],
+            ],
+          },
+          { $eq: [{ $toLower: { $ifNull: ['$source', ''] } }, 'ecommerce'] },
+          {
+            $gt: [
+              {
+                $strLenCP: {
+                  $convert: {
+                    input: '$ecommerceOrderId',
+                    to: 'string',
+                    onError: '',
+                    onNull: '',
+                  },
+                },
+              },
+              0,
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 export const getOrders = async (req, res) => {
   try {
     const {
@@ -365,6 +414,7 @@ export const getOrders = async (req, res) => {
       status,
       paymentMethod,
       installmentPlanMonths,
+      settlement = '',
       from,
       to,
       sortBy = '',
@@ -396,6 +446,16 @@ export const getOrders = async (req, res) => {
     // ✅ 1b. Optional payment method filter (cash, visa, valu, installment, …)
     if (paymentMethod && String(paymentMethod).trim() !== '') {
       query.paymentMethod = String(paymentMethod).trim();
+    }
+
+    // ✅ 1b2. Fully paid vs still outstanding (same remaining column as the list)
+    const settlementFilter = String(settlement || '')
+      .trim()
+      .toLowerCase();
+    if (settlementFilter === 'open') {
+      query.$expr = salesInvoiceOutstandingExpr();
+    } else if (settlementFilter === 'settled') {
+      query.$expr = { $not: [salesInvoiceOutstandingExpr()] };
     }
 
     // ✅ 1c. Filter installment invoices by plan months (6 / 12 / 24 …)
@@ -2111,6 +2171,7 @@ function installmentSaleSnapshot(order) {
     orderId: order._id,
     orderNumber: order.orderNumber,
     installmentSaleNumber: order.installmentSaleNumber,
+    minimumCollectionAmount: roundMoney2(order.minimumCollectionAmount),
     clientId: order.clientId,
     clientName: order.clientName,
     clientPhoneNumber: order.clientPhoneNumber,
@@ -2327,6 +2388,110 @@ export const adminUpdateInstallmentSaleNumber = async (req, res) => {
       });
     }
     res.status(500).json({ error: 'Failed to update installment sale number' });
+  }
+};
+
+/**
+ * PATCH /api/orders/:orderId/minimum-collection
+ * Super Admin / Co Admin — set the minimum collection that fully meets
+ * collector performance on each installment of this sale.
+ * Body: { userId, minimumCollectionAmount, reason? }
+ * minimumCollectionAmount 0 clears the minimum (full installment is the target).
+ */
+export const adminUpdateMinimumCollection = async (req, res) => {
+  try {
+    const auth = await requireInstallmentSaleNumberEditorActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    const raw = req.body?.minimumCollectionAmount;
+    const parsed = roundMoney2(raw);
+    if (raw === '' || raw === null || raw === undefined || !Number.isFinite(Number(raw)) || parsed < 0) {
+      return res.status(400).json({
+        error: 'minimumCollectionAmount must be a number greater than or equal to 0',
+        code: 'INVALID_MINIMUM_COLLECTION',
+      });
+    }
+
+    const { orderId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales support this edit' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot edit a restored invoice' });
+    }
+
+    const maxInstallment = roundMoney2(
+      Math.max(0, ...(order.installments || []).map((row) => Number(row?.amount) || 0))
+    );
+    if (parsed > 0.001 && maxInstallment > 0.001 && parsed >= maxInstallment - 0.001) {
+      return res.status(400).json({
+        error: 'Minimum collection must be less than the installment amount',
+        code: 'MINIMUM_COLLECTION_TOO_HIGH',
+      });
+    }
+
+    const previous = roundMoney2(order.minimumCollectionAmount);
+    if (Math.abs(previous - parsed) < 0.001) {
+      return res.json({
+        message: '✅ Minimum collection unchanged',
+        orderId: order._id,
+        minimumCollectionAmount: previous,
+      });
+    }
+
+    const before = installmentSaleSnapshot(order);
+    order.minimumCollectionAmount = parsed;
+    await order.save();
+
+    const saleLabel =
+      order.installmentSaleNumber != null
+        ? `تقسيط #${order.installmentSaleNumber}`
+        : `فاتورة #${order.orderNumber}`;
+    const fromLabel = previous > 0.001 ? String(previous) : 'بدون حد';
+    const toLabel = parsed > 0.001 ? String(parsed) : 'بدون حد';
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'update',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: saleLabel,
+      message: reason
+        ? `${auth.user.role} set minimum collection ${fromLabel} → ${toLabel}: ${reason}`
+        : `${auth.user.role} set minimum collection ${fromLabel} → ${toLabel}`,
+      metadata: {
+        reason: reason || undefined,
+        adminAction: 'edit_minimum_collection',
+        previousMinimumCollectionAmount: previous,
+        minimumCollectionAmount: parsed,
+        orderNumber: order.orderNumber,
+        installmentSaleNumber: order.installmentSaleNumber,
+        clientName: order.clientName,
+        clientPhoneNumber: order.clientPhoneNumber,
+      },
+      before,
+      after: installmentSaleSnapshot(order),
+    });
+
+    res.json({
+      message: '✅ Minimum collection updated',
+      orderId: order._id,
+      previousMinimumCollectionAmount: previous,
+      minimumCollectionAmount: parsed,
+      reason: reason || undefined,
+    });
+  } catch (err) {
+    console.error('❌ adminUpdateMinimumCollection:', err.message);
+    res.status(500).json({ error: 'Failed to update minimum collection' });
   }
 };
 

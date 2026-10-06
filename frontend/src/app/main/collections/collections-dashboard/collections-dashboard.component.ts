@@ -63,6 +63,7 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
     overdue: 0,
     dueSoon: 0,
     collectionRate: 0,
+    usesMinimumCollection: false,
     unassignedOrdersCount: 0,
   };
   collectorRows: CollectorPerformance[] = [];
@@ -165,6 +166,7 @@ export class CollectionsDashboardComponent implements OnInit, AfterViewInit, OnD
               overdue: Number(res?.summary?.overdue) || 0,
               dueSoon: Number(res?.summary?.dueSoon) || 0,
               collectionRate: Number(res?.summary?.collectionRate) || 0,
+              usesMinimumCollection: !!res?.summary?.usesMinimumCollection,
               unassignedOrdersCount: Number(res?.summary?.unassignedOrdersCount) || 0,
             };
             this.collectorRows = res?.collectors || [];

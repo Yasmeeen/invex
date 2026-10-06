@@ -65,6 +65,33 @@
           </div>
         </div>
       </div>
+      <div class="col-md-3">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_invoice_settlement_filter' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select"
+              [items]="settlementOptions"
+              bindLabel="labelKey"
+              bindValue="value"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="settlementFilter"
+              (change)="onSettlementFilterChange()"
+              name="purchaseSettlementFilter"
+              placeholder="{{ 'tr_invoice_settlement_filter_all' | translate }}"
+            >
+              <ng-template ng-label-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+              <ng-template ng-option-tmp let-item="item">
+                {{ item.labelKey | translate }}
+              </ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
       <div
         class="col-md-3"
         *ngIf="curentUser?.role === 'Super Admin' || curentUser?.role === 'Co Admin'"

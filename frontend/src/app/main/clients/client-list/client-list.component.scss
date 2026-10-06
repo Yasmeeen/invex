@@ -160,6 +160,21 @@
   }
 }
 
+.installment-sale__min-btn,
+.table-installment-hint__min-btn {
+  display: inline-flex;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .installment-sale__badge {
   display: inline-flex;
   align-items: center;

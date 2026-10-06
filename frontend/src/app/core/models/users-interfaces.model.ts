@@ -32,6 +32,8 @@ export interface ClientInstallmentSaleSummary {
   paidInstallmentsCount?: number;
   unpaidInstallmentsCount?: number;
   hasOpen?: boolean;
+  /** Amount that fully meets collector performance on each installment. 0 = full installment. */
+  minimumCollectionAmount?: number;
 }
 
 export class Client{
@@ -110,6 +112,8 @@ export interface ClientHistoryOrderRow {
   unpaidInstallmentsCount?: number;
   installmentPlanSnapshot?: { name?: string; months?: number; interestPercent?: number };
   installmentStartDate?: string;
+  /** Per sale: collecting at least this amount fully meets collector performance. */
+  minimumCollectionAmount?: number;
   /** Sold products on the installment invoice (snapshot). */
   products?: Array<{
     name?: string;

@@ -154,7 +154,11 @@
         </div>
         <div class="cdash-kpi__body">
           <span class="cdash-kpi__label">{{ 'tr_collections_rate' | translate }}</span>
-          <span class="cdash-kpi__hint">{{ 'tr_collections_rate_hint' | translate }}</span>
+          <span class="cdash-kpi__hint">{{
+            (summary.usesMinimumCollection
+              ? 'tr_collections_rate_hint_minimum'
+              : 'tr_collections_rate_hint') | translate
+          }}</span>
         </div>
       </article>
     </section>
@@ -165,6 +169,7 @@
           <div>
             <h2 class="cdash-card__title">{{ 'tr_collections_collectors_perf' | translate }}</h2>
             <p class="cdash-card__sub" *ngIf="isAdminView">{{ 'tr_collections_workload_hint' | translate }}</p>
+            <p class="cdash-card__sub" *ngIf="summary.usesMinimumCollection">{{ 'tr_collections_minimum_perf_hint' | translate }}</p>
           </div>
         </div>
         <div class="cdash-table-wrap" *ngIf="collectorRows.length; else noCollectors">

@@ -100,6 +100,12 @@ export class OrdersListComponent implements OnInit {
   branches:Branch[] =[]
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
+  settlementFilter: 'all' | 'open' | 'settled' = 'all';
+  readonly settlementOptions: { value: 'all' | 'open' | 'settled'; labelKey: string }[] = [
+    { value: 'all', labelKey: 'tr_invoice_settlement_filter_all' },
+    { value: 'open', labelKey: 'tr_invoice_settlement_filter_open' },
+    { value: 'settled', labelKey: 'tr_invoice_settlement_filter_settled' },
+  ];
   readonly paymentMethodOptions: PaymentMethodOption[] = PAYMENT_METHOD_OPTIONS;
   /** Filter installment invoices by plan months (null = all). */
   selectedInstallmentMonths: number | null = null;
@@ -337,6 +343,12 @@ export class OrdersListComponent implements OnInit {
       delete this.params['paymentMethod'];
     }
 
+    if (this.settlementFilter === 'open' || this.settlementFilter === 'settled') {
+      this.params.settlement = this.settlementFilter;
+    } else {
+      delete this.params.settlement;
+    }
+
     if (this.selectedInstallmentMonths) {
       this.params['installmentPlanMonths'] = this.selectedInstallmentMonths;
       if (!this.selectedPaymentMethod) {
@@ -384,6 +396,14 @@ export class OrdersListComponent implements OnInit {
     }))
   }
 
+
+  onSettlementFilterChange(): void {
+    if (this.settlementFilter !== 'open' && this.settlementFilter !== 'settled') {
+      this.settlementFilter = 'all';
+    }
+    this.params.page = 1;
+    this.getOrders();
+  }
 
   filterorders(term: any, searchKey: string) {
     clearTimeout(this.searchTimeout);

@@ -41,6 +41,12 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
   searchTerm = '';
   searchTimeout: any;
   selectedStatus: string | null = null;
+  settlementFilter: 'all' | 'open' | 'settled' = 'all';
+  readonly settlementOptions: { value: 'all' | 'open' | 'settled'; labelKey: string }[] = [
+    { value: 'all', labelKey: 'tr_invoice_settlement_filter_all' },
+    { value: 'open', labelKey: 'tr_invoice_settlement_filter_open' },
+    { value: 'settled', labelKey: 'tr_invoice_settlement_filter_settled' },
+  ];
   selectedBranchId: string | null = null;
   selectedTreasuryKey: string | null = null;
   listFromDate: Date | null = null;
@@ -138,6 +144,9 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
     };
     if (this.selectedStatus) {
       q.status = this.selectedStatus;
+    }
+    if (this.settlementFilter === 'open' || this.settlementFilter === 'settled') {
+      q.settlement = this.settlementFilter;
     }
     const branchId = this.resolveBranchId();
     if (branchId) {
@@ -431,6 +440,14 @@ export class PurchaseInvoicesListComponent implements OnInit, OnDestroy {
   }
 
   onStatusChange(): void {
+    this.params.page = 1;
+    this.loadPurchases();
+  }
+
+  onSettlementFilterChange(): void {
+    if (this.settlementFilter !== 'open' && this.settlementFilter !== 'settled') {
+      this.settlementFilter = 'all';
+    }
     this.params.page = 1;
     this.loadPurchases();
   }

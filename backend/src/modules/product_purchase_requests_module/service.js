@@ -515,9 +515,93 @@ export const getProductPurchaseRequest = async (req, res) => {
   }
 };
 
+const DEFERRED_TREASURY_KEY = 'deferred';
+
+function purchaseInvoiceLineTotal(p) {
+  if (Array.isArray(p?.lines) && p.lines.length) {
+    return (
+      Math.round(
+        p.lines.reduce((sum, line) => {
+          const q = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+          const net = Number(line?.productPayload?.netPrice) || 0;
+          return sum + net * q;
+        }, 0) * 100
+      ) / 100
+    );
+  }
+  const q = Math.max(1, Math.floor(Number(p?.quantity) || 1));
+  const net = Number(p?.productPayload?.netPrice) || 0;
+  return Math.round(net * q * 100) / 100;
+}
+
+function purchaseInvoiceHasDeferred(p) {
+  const splits = Array.isArray(p?.purchaseTreasurySplits) ? p.purchaseTreasurySplits : [];
+  if (splits.some((s) => String(s?.key || '').toLowerCase() === DEFERRED_TREASURY_KEY)) {
+    return true;
+  }
+  return String(p?.purchaseTreasuryKey || '').toLowerCase() === DEFERRED_TREASURY_KEY;
+}
+
+function purchaseInvoiceDeferredAmount(p) {
+  const splits = Array.isArray(p?.purchaseTreasurySplits) ? p.purchaseTreasurySplits : [];
+  const deferredSplits = splits.filter(
+    (s) => String(s?.key || '').toLowerCase() === DEFERRED_TREASURY_KEY
+  );
+  if (deferredSplits.length) {
+    return (
+      Math.round(deferredSplits.reduce((a, s) => a + (Number(s?.amount) || 0), 0) * 100) / 100
+    );
+  }
+  if (purchaseInvoiceHasDeferred(p)) return purchaseInvoiceLineTotal(p);
+  return 0;
+}
+
+function purchaseInvoicePaidNow(p) {
+  const splits = Array.isArray(p?.purchaseTreasurySplits) ? p.purchaseTreasurySplits : [];
+  if (splits.length) {
+    return (
+      Math.round(
+        splits
+          .filter((s) => String(s?.key || '').toLowerCase() !== DEFERRED_TREASURY_KEY)
+          .reduce((a, s) => a + (Number(s?.amount) || 0), 0) * 100
+      ) / 100
+    );
+  }
+  if (purchaseInvoiceHasDeferred(p)) return 0;
+  return purchaseInvoiceLineTotal(p);
+}
+
+/** Same remaining figure as the purchase invoices list. */
+function purchaseInvoiceRemaining(p) {
+  if (!purchaseInvoiceHasDeferred(p) || p?.status !== 'approved') return 0;
+  const deferred = purchaseInvoiceDeferredAmount(p);
+  const paidNow = purchaseInvoicePaidNow(p);
+  const totalPaid = Number(p?.amountPaid) || 0;
+  const deferredPaid = Math.max(0, Math.round((totalPaid - paidNow) * 100) / 100);
+  return Math.max(0, Math.round((deferred - deferredPaid) * 100) / 100);
+}
+
+function purchaseMatchesSettlement(p, settlement) {
+  const remaining = purchaseInvoiceRemaining(p);
+  if (settlement === 'open') return remaining > 0.005;
+  const status = String(p?.status || '');
+  const countable =
+    status === 'approved' || status === 'partially_returned' || status === 'returned';
+  return countable && remaining <= 0.005;
+}
+
 export const listProductPurchaseRequests = async (req, res) => {
   try {
-    const { status, branchId, page = 1, limit = 20, from, to, purchaseTreasuryKey } = req.query;
+    const {
+      status,
+      branchId,
+      page = 1,
+      limit = 20,
+      from,
+      to,
+      purchaseTreasuryKey,
+      settlement = '',
+    } = req.query;
     const p = Math.max(1, Number(page) || 1);
     const lim = Math.max(1, Math.min(50, Number(limit) || 20));
     const skip = (p - 1) * lim;
@@ -554,17 +638,48 @@ export const listProductPurchaseRequests = async (req, res) => {
       q.createdAt = createdAt;
     }
 
-    const [items, total] = await Promise.all([
-      ProductPurchaseRequest.find(q)
+    const settlementFilter = String(settlement || '')
+      .trim()
+      .toLowerCase();
+    const applySettlement = settlementFilter === 'open' || settlementFilter === 'settled';
+
+    const withPurchasePopulates = (query) =>
+      query
         .populate('branch', 'name')
         .populate('createdBy', 'name role')
-        .populate('resolvedBy', 'name role')
+        .populate('resolvedBy', 'name role');
+
+    let items;
+    let total;
+    if (!applySettlement) {
+      [items, total] = await Promise.all([
+        withPurchasePopulates(ProductPurchaseRequest.find(q))
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(lim)
+          .lean(),
+        ProductPurchaseRequest.countDocuments(q),
+      ]);
+    } else {
+      const candidates = await ProductPurchaseRequest.find(q)
+        .select(
+          'status amountPaid purchaseTreasuryKey purchaseTreasurySplits lines.quantity lines.productPayload.netPrice quantity productPayload.netPrice'
+        )
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(lim)
-        .lean(),
-      ProductPurchaseRequest.countDocuments(q),
-    ]);
+        .lean();
+      const matchedIds = candidates
+        .filter((row) => purchaseMatchesSettlement(row, settlementFilter))
+        .map((row) => row._id);
+      const pageIds = matchedIds.slice(skip, skip + lim);
+      const docs = pageIds.length
+        ? await withPurchasePopulates(
+            ProductPurchaseRequest.find({ _id: { $in: pageIds } })
+          ).lean()
+        : [];
+      const byId = new Map(docs.map((doc) => [String(doc._id), doc]));
+      items = pageIds.map((id) => byId.get(String(id))).filter(Boolean);
+      total = matchedIds.length;
+    }
 
     await enrichPurchasesAcquiredFromDisplay(items);
 

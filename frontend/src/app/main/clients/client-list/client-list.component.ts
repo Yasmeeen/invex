@@ -10,6 +10,12 @@ import { CreateEditClientComponent } from '../create-edit-client/create-edit-cli
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { UserSerivce } from '@shared/services/user.service';
+import { OrdersSerivce } from '@shared/services/orders.service';
+import { normalizeMongoId } from '@core/utils/mongo-id.util';
+import {
+  AdminMinimumCollectionDialogComponent,
+  AdminMinimumCollectionDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-minimum-collection-dialog.component';
 import {
   InstallmentPlan,
   InstallmentPlansService,
@@ -56,6 +62,8 @@ export class ClientListComponent implements OnInit {
   paginationData: PaginationData;
   paginationPerPage = 10;
   viewMode: 'table' | 'cards' = 'cards';
+  /** Super Admin or Co Admin can set the minimum collection on each sale. */
+  canEditMinimumCollection = false;
   params: any = { page: 1, perPage: this.paginationPerPage, sortDir: 'desc' };
   /** Expanded installment detail blocks on cards (key = client id). Missing → collapsed when multiple sales. */
   private installmentCardExpanded: Record<string, boolean> = {};
@@ -67,6 +75,7 @@ export class ClientListComponent implements OnInit {
 
   constructor(
     private userSerivce: UserSerivce,
+    private orders: OrdersSerivce,
     private installmentPlansService: InstallmentPlansService,
     private dialog: MatDialog,
     private auth: AuthenticationService,
@@ -77,6 +86,8 @@ export class ClientListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    const role = String(this.auth.getUserFromLocalStorage()?.role || '');
+    this.canEditMinimumCollection = role === 'Super Admin' || role === 'Co Admin';
     const saved = localStorage.getItem('clients.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
     if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
@@ -388,6 +399,66 @@ export class ClientListComponent implements OnInit {
 
   createClient(): void {
     this.createOrEditClient(false);
+  }
+
+  editMinimumCollection(
+    sale: NonNullable<Client['installmentSales']>[number],
+    client: Client,
+    event?: Event
+  ): void {
+    event?.stopPropagation();
+    if (!this.canEditMinimumCollection) return;
+    const orderId = normalizeMongoId(sale?.orderId);
+    const actor = this.auth.getUserFromLocalStorage();
+    const userId = normalizeMongoId(actor?._id || (actor as { id?: string })?.id);
+    if (!orderId || !userId) return;
+
+    const ref = this.dialog.open(AdminMinimumCollectionDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        minimumCollectionAmount: sale?.minimumCollectionAmount,
+        installmentAmount: sale?.installmentAmount,
+        installmentSaleNumber: sale?.installmentSaleNumber,
+        orderNumber: sale?.orderNumber,
+        clientName: client?.name,
+        productNames: sale?.productNames,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminMinimumCollectionDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders
+        .adminUpdateMinimumCollection(orderId, {
+          userId,
+          minimumCollectionAmount: result.minimumCollectionAmount,
+          reason: result.reason || undefined,
+        })
+        .subscribe({
+          next: () => {
+            const okKey = result.cleared
+              ? 'tr_minimum_collection_cleared'
+              : 'tr_minimum_collection_ok';
+            this.notificationService.push(this.translate.instant(okKey), 'success');
+            this.getClients();
+          },
+          error: (err) => {
+            const code = err?.error?.code;
+            const msg =
+              code === 'MINIMUM_COLLECTION_TOO_HIGH'
+                ? this.translate.instant('tr_minimum_collection_too_high')
+                : code === 'INVALID_MINIMUM_COLLECTION'
+                  ? this.translate.instant('tr_minimum_collection_invalid')
+                  : err?.error?.error ||
+                    err?.error?.message ||
+                    this.translate.instant('tr_unexpected_error_message');
+            this.notificationService.push(msg, 'error');
+          },
+        });
+    });
   }
 
   openClientDeposit(client: Client): void {

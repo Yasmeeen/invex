@@ -343,6 +343,13 @@ const orderSchema = new mongoose.Schema(
       min: 1,
     },
 
+    /**
+     * Per installment on this sale: collecting at least this amount fully
+     * meets collector performance. 0 = measure against the full installment.
+     * The client still owes any unpaid remainder.
+     */
+    minimumCollectionAmount: { type: Number, min: 0, default: 0 },
+
     /** pos = cashier; ecommerce = confirmed online store order (invoice source). */
     source: {
       type: String,

@@ -307,6 +307,7 @@ export const getClients = async (req, res) => {
               paymentStatus: 1,
               amountPaid: 1,
               installmentSaleNumber: 1,
+              minimumCollectionAmount: 1,
               installmentPlanId: 1,
               installmentPlanSnapshot: 1,
               installmentPrincipal: 1,
@@ -789,6 +790,12 @@ export const getClients = async (req, res) => {
                       ],
                     },
                     hasOpen: { $gt: ["$$remainingAmount", 0.001] },
+                    minimumCollectionAmount: {
+                      $round: [
+                        { $ifNull: ["$$o.minimumCollectionAmount", 0] },
+                        2,
+                      ],
+                    },
                   },
                 },
               },
@@ -1390,7 +1397,7 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber installmentSaleNumber totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName collectorId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
+        "orderNumber installmentSaleNumber minimumCollectionAmount totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName collectorId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
       )
       .populate("branch", "name")
       .populate("collectorId", "name")

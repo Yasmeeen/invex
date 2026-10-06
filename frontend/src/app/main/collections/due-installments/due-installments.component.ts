@@ -23,6 +23,8 @@ import {
   AssignCollectorDialogComponent,
   AssignCollectorDialogResult,
 } from '@shared/components/assign-collector-dialog/assign-collector-dialog.component';
+import { saveAs } from 'file-saver';
+import * as ExcelJS from 'exceljs';
 import { Subscription } from 'rxjs';
 
 /** Sentinel value for collector filter: invoices with no effective collector. */
@@ -38,6 +40,7 @@ const UNASSIGNED_COLLECTOR = 'unassigned';
 })
 export class DueInstallmentsComponent implements OnInit, OnDestroy {
   loading = false;
+  exporting = false;
 
   branches: Branch[] = [];
   collectors: CollectorUser[] = [];
@@ -59,6 +62,7 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   isAdminView = false;
   isCollectorView = false;
   currentUserId = '';
+  private currentUserName = '';
 
   readonly unassignedCollectorValue = UNASSIGNED_COLLECTOR;
 
@@ -93,6 +97,7 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   ) {
     const u = this.auth.getUserFromLocalStorage();
     this.currentUserId = String(u?._id || '');
+    this.currentUserName = String(u?.name || '').trim();
     this.isCollectorView = isCollector(u?.role);
     this.isAdminView = canPickBranchRole(u?.role) || u?.role === 'Branch Manager';
     if (this.isCollectorView) {
@@ -103,7 +108,7 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const now = new Date();
     this.fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    this.toDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    this.toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     if (this.isAdminView) {
       this.subs.push(
@@ -120,6 +125,17 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
 
   get showDaysOverdue(): boolean {
     return this.statusFilter === 'overdue' || this.statusFilter === 'all';
+  }
+
+  /** A named collector is selected (not "all" and not "unassigned"). */
+  get isNamedCollectorFilter(): boolean {
+    const id = (this.selectedCollectorId || '').trim();
+    return !!id && id !== this.unassignedCollectorValue;
+  }
+
+  /** Hide the collector column when every row belongs to one collector. */
+  get showCollectorColumn(): boolean {
+    return this.isAdminView && !this.isNamedCollectorFilter;
   }
 
   collectorOptionLabel(c: CollectorUser): string {
@@ -142,46 +158,9 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   load(page = 1): void {
     this.loading = true;
     this.page = Math.max(1, Number(page) || 1);
-    const collectorId = this.isAdminView
-      ? this.selectedCollectorId || undefined
-      : this.currentUserId || undefined;
-
-    const saleRaw = (this.installmentSaleNumberTerm ?? '').toString().trim();
-    let installmentSaleNumber: number | undefined;
-    if (saleRaw !== '') {
-      const n = Math.floor(Number(saleRaw));
-      if (Number.isFinite(n) && n > 0) {
-        installmentSaleNumber = n;
-      }
-    }
-
-    let sortBy: string | undefined;
-    let sortDir: 'asc' | 'desc' | undefined;
-    if (this.saleNumberSort) {
-      sortBy = 'saleNumber';
-      sortDir = this.saleNumberSort;
-    } else if (this.remainingSort) {
-      sortBy = 'remaining';
-      sortDir = this.remainingSort;
-    }
 
     this.subs.push(
-      this.collections
-        .listDue({
-          collectorId,
-          branchId: this.isAdminView ? this.selectedBranchId || undefined : undefined,
-          status: this.statusFilter,
-          from: this.formatDate(this.fromDate),
-          to: this.formatDate(this.toDate),
-          promiseFrom: this.formatDate(this.promiseFromDate),
-          promiseTo: this.formatDate(this.promiseToDate),
-          installmentSaleNumber,
-          page: this.page,
-          limit: this.perPage,
-          sortBy,
-          sortDir,
-        })
-        .subscribe({
+      this.collections.listDue(this.dueQueryParams(this.page, this.perPage)).subscribe({
           next: (res) => {
             this.loading = false;
             this.items = res?.items || [];
@@ -260,6 +239,12 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
       this.saleNumberSort = '';
     }
     this.load(1);
+  }
+
+  clientPhone(item: CollectionDueItem): string {
+    const phone = String(item?.clientPhoneNumber || '').trim();
+    if (!phone || phone === '00') return '';
+    return phone;
   }
 
   statusLabelKey(status?: string): string {
@@ -394,6 +379,209 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
           },
         });
     });
+  }
+
+  async exportExcel(): Promise<void> {
+    if (this.exporting || !this.pagination.totalCount) return;
+    this.exporting = true;
+    try {
+      const items = await this.fetchAllDueItems();
+      if (!items.length) {
+        this.notify.push(this.translate.instant('tr_collections_empty'), 'error');
+        return;
+      }
+      await this.writeDueWorkbook(items);
+    } catch {
+      this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+    } finally {
+      this.exporting = false;
+    }
+  }
+
+  private dueQueryParams(page: number, limit: number) {
+    const collectorId = this.isAdminView
+      ? this.selectedCollectorId || undefined
+      : this.currentUserId || undefined;
+
+    const saleRaw = (this.installmentSaleNumberTerm ?? '').toString().trim();
+    let installmentSaleNumber: number | undefined;
+    if (saleRaw !== '') {
+      const n = Math.floor(Number(saleRaw));
+      if (Number.isFinite(n) && n > 0) {
+        installmentSaleNumber = n;
+      }
+    }
+
+    let sortBy: string | undefined;
+    let sortDir: 'asc' | 'desc' | undefined;
+    if (this.saleNumberSort) {
+      sortBy = 'saleNumber';
+      sortDir = this.saleNumberSort;
+    } else if (this.remainingSort) {
+      sortBy = 'remaining';
+      sortDir = this.remainingSort;
+    }
+
+    return {
+      collectorId,
+      branchId: this.isAdminView ? this.selectedBranchId || undefined : undefined,
+      status: this.statusFilter,
+      from: this.formatDate(this.fromDate),
+      to: this.formatDate(this.toDate),
+      promiseFrom: this.formatDate(this.promiseFromDate),
+      promiseTo: this.formatDate(this.promiseToDate),
+      installmentSaleNumber,
+      page,
+      limit,
+      sortBy,
+      sortDir,
+    };
+  }
+
+  private async fetchAllDueItems(): Promise<CollectionDueItem[]> {
+    const limit = 200;
+    const first = await this.collections.listDue(this.dueQueryParams(1, limit)).toPromise();
+    const items = [...(first?.items || [])];
+    const totalPages = Math.max(1, Number(first?.meta?.totalPages) || 1);
+    for (let page = 2; page <= totalPages; page++) {
+      const res = await this.collections.listDue(this.dueQueryParams(page, limit)).toPromise();
+      items.push(...(res?.items || []));
+    }
+    return items;
+  }
+
+  private async writeDueWorkbook(items: CollectionDueItem[]): Promise<void> {
+    const showCollector = this.showCollectorColumn;
+    const showDays = this.showDaysOverdue;
+    const t = (key: string) => this.translate.instant(key);
+    const headers: string[] = [
+      t('tr_client_name'),
+      t('tr_installment_sale_number'),
+      t('tr_client_phone'),
+    ];
+    if (showCollector) headers.push(t('tr_collector'));
+    headers.push(t('tr_installment_due_date'));
+    if (showDays) {
+      headers.push(t('tr_collections_days_overdue'));
+      headers.push(t('tr_overdue_installments_col'));
+    }
+    headers.push(t('tr_remaining'), t('tr_minimum_collection'), t('tr_status'));
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'INVEX';
+    const isAr = String(this.translate.currentLang || '').toLowerCase().startsWith('ar');
+    const sheetName = String(t('tr_due_installments_title') || 'Due').slice(0, 31);
+    const ws = workbook.addWorksheet(sheetName);
+    ws.views = [{ state: 'frozen', ySplit: 1, rightToLeft: isAr }];
+    ws.addRow(headers);
+
+    const headerRow = ws.getRow(1);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF6C5CE7' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+
+    const phoneCol = 3;
+    for (const item of items) {
+      const rowValues: Array<string | number> = [
+        item.clientName || '',
+        item.installmentSaleNumber != null ? Number(item.installmentSaleNumber) : '',
+        '',
+      ];
+      if (showCollector) {
+        rowValues.push(item.collectorName || t('tr_unassigned_collector'));
+      }
+      rowValues.push(this.formatDisplayDate(item.dueDate));
+      if (showDays) {
+        rowValues.push(item.status === 'overdue' ? Number(item.daysOverdue) || 0 : '');
+        rowValues.push(
+          item.status === 'overdue' ? Number(item.overdueInstallmentCount) || 0 : ''
+        );
+      }
+      rowValues.push(Number(item.remaining) || 0);
+      rowValues.push(
+        (Number(item.minimumCollectionAmount) || 0) > 0
+          ? Number(item.minimumCollectionAmount)
+          : ''
+      );
+      rowValues.push(t(this.statusLabelKey(item.status)));
+
+      const row = ws.addRow(rowValues);
+      const phoneCell = row.getCell(phoneCol);
+      phoneCell.value = this.clientPhone(item);
+      phoneCell.numFmt = '@';
+    }
+
+    headers.forEach((header, index) => {
+      const col = ws.getColumn(index + 1);
+      col.width = index === phoneCol - 1 ? 18 : Math.min(36, Math.max(14, String(header).length + 4));
+    });
+    ws.getColumn(phoneCol).numFmt = '@';
+
+    const buffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
+    saveAs(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+      this.exportFilename(items)
+    );
+  }
+
+  private exportFilename(items: CollectionDueItem[]): string {
+    const parts = [this.exportCollectorLabel(items), this.exportDatePart()].filter((part) => !!part);
+    const base = this.safeFilePart(parts.join('_')) || 'due-installments';
+    return `${base}.xlsx`;
+  }
+
+  private exportCollectorLabel(items: CollectionDueItem[]): string {
+    if (!this.isNamedCollectorFilter && !this.isCollectorView) return '';
+    const fromList = this.collectors.find(
+      (c) => String(c._id) === String(this.selectedCollectorId)
+    )?.name;
+    return String(
+      fromList || (this.isCollectorView ? this.currentUserName : '') || items[0]?.collectorName || ''
+    ).trim();
+  }
+
+  private exportDatePart(): string {
+    const dueFrom = this.formatDateLabel(this.fromDate);
+    const dueTo = this.formatDateLabel(this.toDate);
+    if (dueFrom || dueTo) return this.joinDateLabels(dueFrom, dueTo);
+    return this.joinDateLabels(
+      this.formatDateLabel(this.promiseFromDate),
+      this.formatDateLabel(this.promiseToDate)
+    );
+  }
+
+  private joinDateLabels(from?: string, to?: string): string {
+    if (from && to && from !== to) return `${from}_${to}`;
+    return from || to || '';
+  }
+
+  private formatDateLabel(d: Date | null): string | undefined {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return undefined;
+    const day = String(d.getDate()).padStart(2, '0');
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}-${m}-${d.getFullYear()}`;
+  }
+
+  private formatDisplayDate(value?: string): string {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}/${m}/${d.getFullYear()}`;
+  }
+
+  private safeFilePart(value: string): string {
+    return value.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   private formatDate(d: Date | null): string | undefined {

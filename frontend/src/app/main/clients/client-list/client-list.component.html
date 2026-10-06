@@ -282,6 +282,22 @@
                         {{ 'tr_invoice_installment_monthly' | translate }}:
                         {{ sale.installmentAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
                       </span>
+                      <span class="table-installment-hint__meta" *ngIf="(sale.minimumCollectionAmount || 0) > 0">
+                        {{ 'tr_minimum_collection' | translate }}:
+                        {{ sale.minimumCollectionAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+                      </span>
+                      <button
+                        type="button"
+                        class="table-installment-hint__min-btn"
+                        *ngIf="canEditMinimumCollection"
+                        (click)="editMinimumCollection(sale, client, $event)"
+                      >
+                        {{
+                          ((sale.minimumCollectionAmount || 0) > 0
+                            ? 'tr_minimum_collection_edit'
+                            : 'tr_minimum_collection_set') | translate
+                        }}
+                      </button>
                       <span class="table-installment-hint__meta">
                         {{ 'tr_remaining' | translate }}:
                         {{ (sale.remainingAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
@@ -495,7 +511,7 @@
                       <strong>#{{ sale.orderNumber }}</strong>
                     </span>
                   </div>
-                  <div class="installment-sale__meta" *ngIf="sale.productNames || sale.installmentAmount">
+                  <div class="installment-sale__meta" *ngIf="sale.productNames || sale.installmentAmount || (sale.minimumCollectionAmount || 0) > 0">
                     <span *ngIf="sale.productNames">
                       {{ 'tr_product_name' | translate }}:
                       <strong>{{ sale.productNames }}</strong>
@@ -504,7 +520,23 @@
                       {{ 'tr_invoice_installment_monthly' | translate }}:
                       <strong>{{ sale.installmentAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
                     </span>
+                    <span *ngIf="(sale.minimumCollectionAmount || 0) > 0">
+                      {{ 'tr_minimum_collection' | translate }}:
+                      <strong>{{ sale.minimumCollectionAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    class="installment-sale__min-btn"
+                    *ngIf="canEditMinimumCollection"
+                    (click)="editMinimumCollection(sale, client, $event)"
+                  >
+                    {{
+                      ((sale.minimumCollectionAmount || 0) > 0
+                        ? 'tr_minimum_collection_edit'
+                        : 'tr_minimum_collection_set') | translate
+                    }}
+                  </button>
                   <div class="installment-stats">
                     <div class="installment-stat installment-stat--remaining">
                       <div class="installment-stat__label">

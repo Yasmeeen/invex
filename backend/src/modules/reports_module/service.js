@@ -23,6 +23,7 @@ import {
 import { NON_OPERATING_DAILY_EXPENSE_TYPES } from '../../utils/daily-expense-categories.js';
 import { companyOpeningForAccount, isCashDrawerAccount } from '../../utils/treasury-ledger.js';
 import { getCurrentDrawerCash, sumCurrentDrawerCashAllBranches } from '../drawer_close_module/service.js';
+import { installmentPerformanceCredit } from '../../utils/collection-performance.js';
 
 /** Business calendar for report date filters (matches orders/dashboard). */
 const REPORT_TZ = 'Africa/Cairo';
@@ -1585,7 +1586,7 @@ export const getInstallmentsReport = async (req, res) => {
 
     const orders = await Order.find(orderMatch)
       .select(
-        'orderNumber clientId clientName clientPhoneNumber branch installmentPlanSnapshot installments totalPrice amountPaid paymentStatus collectorId'
+        'orderNumber clientId clientName clientPhoneNumber branch installmentPlanSnapshot installments totalPrice amountPaid paymentStatus collectorId minimumCollectionAmount'
       )
       .populate('branch', 'name')
       .populate('collectorId', 'name')
@@ -1605,6 +1606,7 @@ export const getInstallmentsReport = async (req, res) => {
           overdueCount: 0,
           promisedCount: 0,
           collectionRate: 0,
+          usesMinimumCollection: false,
         },
         byCollector: [],
         overTime: [],
@@ -1634,6 +1636,8 @@ export const getInstallmentsReport = async (req, res) => {
         collectedAmount: 0,
         remainingAmount: 0,
         overdueAmount: 0,
+        perfTarget: 0,
+        perfCollected: 0,
       });
     }
 
@@ -1649,6 +1653,9 @@ export const getInstallmentsReport = async (req, res) => {
     let unpaidCount = 0;
     let overdueCount = 0;
     let promisedCount = 0;
+    let perfTarget = 0;
+    let perfCollected = 0;
+    let usesMinimumCollection = false;
 
     const rows = [];
 
@@ -1673,6 +1680,8 @@ export const getInstallmentsReport = async (req, res) => {
           collectedAmount: 0,
           remainingAmount: 0,
           overdueAmount: 0,
+          perfTarget: 0,
+          perfCollected: 0,
         });
       }
       const colStat = colId ? collectorStats.get(colId) : null;
@@ -1704,6 +1713,16 @@ export const getInstallmentsReport = async (req, res) => {
           continue;
         }
 
+        const kpi = installmentPerformanceCredit(
+          amount,
+          paidAmt,
+          order.minimumCollectionAmount
+        );
+        if (kpi.eased) usesMinimumCollection = true;
+        const counted = kpi.eased ? kpi.collected : Math.min(paidAmt, amount);
+        perfTarget = round2(perfTarget + kpi.target);
+        perfCollected = round2(perfCollected + counted);
+
         totalAmount = round2(totalAmount + amount);
         collectedAmount = round2(collectedAmount + Math.min(paidAmt, amount));
         remainingAmount = round2(remainingAmount + rem);
@@ -1721,6 +1740,8 @@ export const getInstallmentsReport = async (req, res) => {
           colStat.collectedAmount = round2(
             colStat.collectedAmount + Math.min(paidAmt, amount)
           );
+          colStat.perfTarget = round2(colStat.perfTarget + kpi.target);
+          colStat.perfCollected = round2(colStat.perfCollected + counted);
           colStat.remainingAmount = round2(colStat.remainingAmount + rem);
           if (rowStatus === 'overdue') {
             colStat.overdueAmount = round2(colStat.overdueAmount + rem);
@@ -1762,13 +1783,16 @@ export const getInstallmentsReport = async (req, res) => {
 
     const byCollector = [...collectorStats.values()]
       .filter((c) => c.totalAmount > 0 || c.collectedAmount > 0)
-      .map((c) => ({
-        ...c,
-        collectionRate:
-          c.totalAmount > 0
-            ? Math.round((c.collectedAmount / c.totalAmount) * 1000) / 10
-            : 0,
-      }))
+      .map((c) => {
+        const { perfTarget: rowTarget, perfCollected: rowCollected, ...rest } = c;
+        return {
+          ...rest,
+          collectionRate:
+            rowTarget > 0
+              ? Math.round((rowCollected / rowTarget) * 1000) / 10
+              : 0,
+        };
+      })
       .sort((a, b) => b.collectedAmount - a.collectedAmount);
 
     const overTime = [...overTimeMap.values()].sort((a, b) =>
@@ -1776,8 +1800,8 @@ export const getInstallmentsReport = async (req, res) => {
     );
 
     const collectionRate =
-      totalAmount > 0
-        ? Math.round((collectedAmount / totalAmount) * 1000) / 10
+      perfTarget > 0
+        ? Math.round((perfCollected / perfTarget) * 1000) / 10
         : 0;
 
     return res.json({
@@ -1793,6 +1817,7 @@ export const getInstallmentsReport = async (req, res) => {
         overdueCount,
         promisedCount,
         collectionRate,
+        usesMinimumCollection,
       },
       byCollector,
       overTime,

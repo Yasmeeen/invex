@@ -92,6 +92,14 @@ adminUpdateInstallmentSaleNumber(
   return this.http.patch(`${ORDERS_URL}/${orderId}/admin-sale-number`, payload);
 }
 
+/** Super Admin / Co Admin: minimum collection that fully meets collector performance. */
+adminUpdateMinimumCollection(
+  orderId: string,
+  payload: { userId: string; minimumCollectionAmount: number; reason?: string }
+): Observable<any> {
+  return this.http.patch(`${ORDERS_URL}/${orderId}/minimum-collection`, payload);
+}
+
 /** Super Admin: edit installment dueDate/amount (optional reason, audited). */
 adminUpdateInstallmentRow(
   orderId: string,

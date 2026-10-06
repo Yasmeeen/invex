@@ -4,6 +4,7 @@ import Order from "../../DB/models/order.model.js";
 import Client from "../../DB/models/client.model.js";
 import User from "../../DB/models/user.model.js";
 import { serializePastPromiseHistory } from "../../utils/promise-to-pay.js";
+import { installmentPerformanceCredit } from "../../utils/collection-performance.js";
 
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
@@ -19,6 +20,37 @@ export function isAssignableCollectorRole(role) {
 function installmentRemaining(row) {
   if (!row || row.paid) return 0;
   return Math.max(0, round2((Number(row.amount) || 0) - (Number(row.paidAmount) || 0)));
+}
+
+/** Same client shares one key so an older unpaid installment hides later months. */
+function clientDebtKey(order) {
+  const clientId = String(order?.clientId || "");
+  if (clientId) return `client:${clientId}`;
+  return `order:${String(order?._id || "")}`;
+}
+
+function hasUnpaidInstallmentBefore(order, fromDate, timezone) {
+  for (const inst of order.installments || []) {
+    if (installmentRemaining(inst) <= 0.001) continue;
+    const due = inst.dueDate ? moment(inst.dueDate).tz(timezone) : null;
+    if (due && due.isValid() && due.isBefore(fromDate)) return true;
+  }
+  return false;
+}
+
+/** Same overdue rule as the due-installments list (promise wins over overdue). */
+function isListedOverdue(inst, now, timezone) {
+  if (installmentRemaining(inst) <= 0.001) return false;
+  const promise = inst.promiseToPayAt
+    ? moment(inst.promiseToPayAt).tz(timezone)
+    : null;
+  if (promise && promise.isValid()) return false;
+  const due = inst.dueDate ? moment(inst.dueDate).tz(timezone) : null;
+  const todayEnd = now.clone().endOf("day");
+  if (!(due && due.isValid() && due.isBefore(todayEnd) && due.isBefore(now))) {
+    return false;
+  }
+  return due.clone().endOf("day").isBefore(now);
 }
 
 function isUnassignedFilter(raw) {
@@ -163,7 +195,9 @@ async function computeCollectorWorkload() {
 /**
  * GET /api/collections/due
  * Query: collectorId (or "unassigned"), branchId, status=due|overdue|promised|all,
- *        from, to (dueDate), promiseFrom, promiseTo (promiseToPayAt),
+ *        from, to (dueDate). Clients with an unpaid installment before `from`
+ *        are omitted until the range includes that earlier due date.
+ *        promiseFrom, promiseTo (promiseToPayAt),
  *        installmentSaleNumber (exact),
  *        page, limit, sortBy=remaining|saleNumber|date, sortDir=asc|desc
  */
@@ -218,7 +252,7 @@ export const listCollectionsDue = async (req, res) => {
 
     const orders = await Order.find(orderQuery)
       .select(
-        "orderNumber installmentSaleNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
+        "orderNumber installmentSaleNumber minimumCollectionAmount clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
       )
       .populate("branch", "name")
       .populate("collectorId", "name role")
@@ -251,6 +285,45 @@ export const listCollectionsDue = async (req, res) => {
         .endOf("day");
     }
     const hasPromiseDateFilter = !!(promiseFromDate || promiseToDate);
+    // Default month window should list people who became late in that window.
+    // A client already unpaid before `from` stays hidden until the range moves back.
+    const hideClientsWithOlderDebt =
+      !hasPromiseDateFilter &&
+      !hasInstallmentSaleNumberFilter &&
+      !!(fromDate && fromDate.isValid());
+
+    const clientsWithOlderUnpaid = new Set();
+    if (hideClientsWithOlderDebt) {
+      for (const order of orders) {
+        const client = clientById.get(String(order.clientId)) || null;
+        const collector = resolveCollector(order, client);
+        if (collectorFilter.mode === "collector") {
+          if (collector.id !== String(collectorFilter.collectorOid)) continue;
+        } else if (collectorFilter.mode === "unassigned") {
+          if (collector.id) continue;
+        }
+        if (hasUnpaidInstallmentBefore(order, fromDate, timezone)) {
+          clientsWithOlderUnpaid.add(clientDebtKey(order));
+        }
+      }
+    }
+
+    const overdueInstallmentCountByClient = new Map();
+    for (const order of orders) {
+      const client = clientById.get(String(order.clientId)) || null;
+      const collector = resolveCollector(order, client);
+      if (collectorFilter.mode === "collector") {
+        if (collector.id !== String(collectorFilter.collectorOid)) continue;
+      } else if (collectorFilter.mode === "unassigned") {
+        if (collector.id) continue;
+      }
+      const key = clientDebtKey(order);
+      let count = overdueInstallmentCountByClient.get(key) || 0;
+      for (const inst of order.installments || []) {
+        if (isListedOverdue(inst, now, timezone)) count += 1;
+      }
+      overdueInstallmentCountByClient.set(key, count);
+    }
 
     const items = [];
     let dueCount = 0;
@@ -267,6 +340,13 @@ export const listCollectionsDue = async (req, res) => {
         if (collector.id !== String(collectorFilter.collectorOid)) continue;
       } else if (collectorFilter.mode === "unassigned") {
         if (collector.id) continue;
+      }
+
+      if (
+        hideClientsWithOlderDebt &&
+        clientsWithOlderUnpaid.has(clientDebtKey(order))
+      ) {
+        continue;
       }
 
       for (const inst of order.installments || []) {
@@ -332,11 +412,16 @@ export const listCollectionsDue = async (req, res) => {
           amount: round2(inst.amount),
           paidAmount: round2(inst.paidAmount),
           remaining: rem,
+          minimumCollectionAmount: round2(order.minimumCollectionAmount),
           promiseToPayAt: inst.promiseToPayAt || null,
           promiseToPayHistory: serializePastPromiseHistory(inst),
           note: inst.note || "",
           status: rowStatus,
           daysOverdue,
+          overdueInstallmentCount:
+            rowStatus === "overdue"
+              ? overdueInstallmentCountByClient.get(clientDebtKey(order)) || 0
+              : 0,
           orderRemaining: Math.max(
             0,
             round2((Number(order.totalPrice) || 0) - (Number(order.amountPaid) || 0))
@@ -567,7 +652,7 @@ export const getCollectionsDashboard = async (req, res) => {
 
     const orders = await Order.find(orderQuery)
       .select(
-        "orderNumber installmentSaleNumber clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
+        "orderNumber installmentSaleNumber minimumCollectionAmount clientId clientName clientPhoneNumber totalPrice amountPaid paymentStatus installmentPlanSnapshot installments createdAt branch collectorId"
       )
       .populate("branch", "name")
       .populate("collectorId", "name role")
@@ -599,6 +684,9 @@ export const getCollectionsDashboard = async (req, res) => {
 
     let totalInstallments = 0;
     let collected = 0;
+    let perfTarget = 0;
+    let perfCollected = 0;
+    let usesMinimumCollection = false;
     let overdue = 0;
     let dueSoon = 0;
 
@@ -679,10 +767,17 @@ export const getCollectionsDashboard = async (req, res) => {
 
         const dueInRange = inDateRange(due);
         const paidInRange = inDateRange(paidAt);
+        const kpi = installmentPerformanceCredit(
+          amount,
+          paidAmt,
+          order.minimumCollectionAmount
+        );
 
         if (dueInRange) {
           totalInstallments = round2(totalInstallments + amount);
-          if (colStat) colStat.target = round2(colStat.target + amount);
+          perfTarget = round2(perfTarget + kpi.target);
+          if (kpi.eased) usesMinimumCollection = true;
+          if (colStat) colStat.target = round2(colStat.target + kpi.target);
           if (due && due.isValid()) {
             const mk = due.format("YYYY-MM");
             if (monthlyMap.has(mk)) {
@@ -695,7 +790,10 @@ export const getCollectionsDashboard = async (req, res) => {
           const creditPaid = paidAt && paidAt.isValid() ? paidInRange : dueInRange;
           if (creditPaid) {
             collected = round2(collected + paidAmt);
-            if (colStat) colStat.collected = round2(colStat.collected + paidAmt);
+            const counted = kpi.eased ? kpi.collected : paidAmt;
+            if (kpi.eased) usesMinimumCollection = true;
+            perfCollected = round2(perfCollected + counted);
+            if (colStat) colStat.collected = round2(colStat.collected + counted);
             if (paidAt && paidAt.isValid()) {
               const mk = paidAt.format("YYYY-MM");
               if (monthlyMap.has(mk)) {
@@ -837,8 +935,8 @@ export const getCollectionsDashboard = async (req, res) => {
     );
 
     const collectionRate =
-      totalInstallments > 0
-        ? Math.round((collected / totalInstallments) * 1000) / 10
+      perfTarget > 0
+        ? Math.round((perfCollected / perfTarget) * 1000) / 10
         : 0;
 
     let unassignedOrdersCount = 0;
@@ -865,6 +963,7 @@ export const getCollectionsDashboard = async (req, res) => {
         overdue,
         dueSoon,
         collectionRate,
+        usesMinimumCollection,
         unassignedOrdersCount,
       },
       collectors: collectorsPerf,

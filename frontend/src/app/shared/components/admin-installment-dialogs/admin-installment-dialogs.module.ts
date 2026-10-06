@@ -6,18 +6,21 @@ import { SharedModule } from '@shared/shared.module';
 import { AdminDeleteSaleDialogComponent } from './admin-delete-sale-dialog.component';
 import { AdminEditInstallmentDialogComponent } from './admin-edit-installment-dialog.component';
 import { AdminEditSaleNumberDialogComponent } from './admin-edit-sale-number-dialog.component';
+import { AdminMinimumCollectionDialogComponent } from './admin-minimum-collection-dialog.component';
 
 @NgModule({
   declarations: [
     AdminDeleteSaleDialogComponent,
     AdminEditInstallmentDialogComponent,
     AdminEditSaleNumberDialogComponent,
+    AdminMinimumCollectionDialogComponent,
   ],
   imports: [CommonModule, FormsModule, SharedModule, MatDialogModule],
   exports: [
     AdminDeleteSaleDialogComponent,
     AdminEditInstallmentDialogComponent,
     AdminEditSaleNumberDialogComponent,
+    AdminMinimumCollectionDialogComponent,
   ],
 })
 export class AdminInstallmentDialogsModule {}

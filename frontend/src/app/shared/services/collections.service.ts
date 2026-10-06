@@ -21,6 +21,8 @@ export interface CollectionDueItem {
   amount?: number;
   paidAmount?: number;
   remaining?: number;
+  /** Sale-level minimum that fully meets collector performance. 0 = full installment. */
+  minimumCollectionAmount?: number;
   promiseToPayAt?: string;
   promiseToPayHistory?: Array<{
     promiseToPayAt?: string;
@@ -31,6 +33,8 @@ export interface CollectionDueItem {
   status?: 'due' | 'overdue' | 'promised' | 'severe' | 'paid';
   orderRemaining?: number;
   daysOverdue?: number;
+  /** Overdue installments on this client, across their open sales in the current scope. */
+  overdueInstallmentCount?: number;
 }
 
 export interface CollectorUser {
@@ -64,6 +68,8 @@ export interface CollectionsDashboardResponse {
     overdue: number;
     dueSoon: number;
     collectionRate: number;
+    /** True when at least one sale in range uses a minimum collection target. */
+    usesMinimumCollection?: boolean;
     unassignedOrdersCount?: number;
   };
   collectors: CollectorPerformance[];

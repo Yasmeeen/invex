@@ -428,6 +428,22 @@ export async function createCrmOrder(req, res) {
     }).session(session);
     if (!branch) throw new Error('Branch not found or disabled');
 
+    let pickupBranchDoc = branch;
+    if (String(body.deliveryMethod || '') === 'pickup') {
+      const requestedPickup = String(body.pickupBranchId || '').trim();
+      if (requestedPickup && requestedPickup !== String(branch._id)) {
+        if (!mongoose.Types.ObjectId.isValid(requestedPickup)) {
+          throw new Error('Valid pickup branch is required');
+        }
+        const found = await Branch.findOne({
+          _id: requestedPickup,
+          active: { $ne: false },
+        }).session(session);
+        if (!found) throw new Error('Pickup branch not found or disabled');
+        pickupBranchDoc = found;
+      }
+    }
+
     const quantities = new Map();
     for (const item of body.items) {
       const id = String(item?.invexProductId || '').trim();
@@ -572,8 +588,11 @@ export async function createCrmOrder(req, res) {
         ecommerceOrderId: reservationKey,
         session,
         pickupType: body.deliveryMethod === 'pickup' ? 'branch_pickup' : 'online_shipping',
-        pickupLocation: body.deliveryAddress || body.customer.address || branch.name,
-        pickupBranchId: branch._id,
+        pickupLocation:
+          body.deliveryMethod === 'pickup'
+            ? String(pickupBranchDoc.name || branch.name)
+            : body.deliveryAddress || body.customer.address || branch.name,
+        pickupBranchId: body.deliveryMethod === 'pickup' ? pickupBranchDoc._id : branch._id,
         paidOnline: false,
         allowFractionalQuantity: isWeight,
         ...(crmReservation

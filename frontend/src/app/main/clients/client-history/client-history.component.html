@@ -357,6 +357,13 @@
                 {{ 'tr_invoice_installment_monthly' | translate }}:
                 <strong>{{ installmentMonthlyAmount(o) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
               </span>
+              <span
+                class="installment-order-head__meta-line"
+                *ngIf="(o.minimumCollectionAmount || 0) > 0"
+              >
+                {{ 'tr_minimum_collection' | translate }}:
+                <strong>{{ o.minimumCollectionAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+              </span>
               <span class="installment-order-head__meta-line" *ngIf="o.installmentStartDate">
                 {{ 'tr_installment_start_date' | translate }}:
                 <strong>{{ o.installmentStartDate | date:'dd/MM/yyyy' }}</strong>
@@ -388,6 +395,18 @@
               (click)="openPayOrderDialog(o)"
             >
               {{ 'tr_add_payment' | translate }}
+            </button>
+            <button
+              type="button"
+              class="s-btn btn-secondary btn-sm installment-order-head__pay"
+              *ngIf="canEditMinimumCollection && o.status !== 'restored'"
+              (click)="editMinimumCollection(o, $event)"
+            >
+              {{
+                ((o.minimumCollectionAmount || 0) > 0
+                  ? 'tr_minimum_collection_edit'
+                  : 'tr_minimum_collection_set') | translate
+              }}
             </button>
             <button
               type="button"

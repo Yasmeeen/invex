@@ -189,6 +189,21 @@
     <section class="cdash-card">
       <div class="cdash-card__head">
         <h2 class="cdash-card__title">{{ 'tr_due_installments_list' | translate }}</h2>
+        <button
+          type="button"
+          class="cdash-export"
+          (click)="exportExcel()"
+          [disabled]="exporting || !pagination.totalCount"
+        >
+          <i
+            class="fa"
+            [class.fa-file-excel-o]="!exporting"
+            [class.fa-spinner]="exporting"
+            [class.fa-spin]="exporting"
+            aria-hidden="true"
+          ></i>
+          {{ 'tr_report_export_excel' | translate }}
+        </button>
       </div>
       <div class="cdash-table-wrap" *ngIf="items.length; else noDue">
         <table class="cdash-table">
@@ -213,7 +228,8 @@
                   ></i>
                 </button>
               </th>
-              <th *ngIf="isAdminView">{{ 'tr_collector' | translate }}</th>
+              <th>{{ 'tr_client_phone' | translate }}</th>
+              <th *ngIf="showCollectorColumn">{{ 'tr_collector' | translate }}</th>
               <th>{{ 'tr_installment_due_date' | translate }}</th>
               <th *ngIf="showDaysOverdue">{{ 'tr_collections_days_overdue' | translate }}</th>
               <th>
@@ -254,7 +270,10 @@
                   <ng-template #noSaleNumber>—</ng-template>
                 </button>
               </td>
-              <td *ngIf="isAdminView">
+              <td>
+                <span class="cdash-phone" dir="ltr">{{ clientPhone(item) || '—' }}</span>
+              </td>
+              <td *ngIf="showCollectorColumn">
                 <span *ngIf="item.collectorName; else noCollector">{{ item.collectorName }}</span>
                 <ng-template #noCollector>
                   <span class="cdash-unassigned">{{ 'tr_unassigned_collector' | translate }}</span>
@@ -262,7 +281,18 @@
               </td>
               <td>{{ item.dueDate | date:'dd/MM/yyyy' }}</td>
               <td *ngIf="showDaysOverdue" class="cdash-days">
-                {{ item.status === 'overdue' ? (item.daysOverdue || 0) : '—' }}
+                <ng-container *ngIf="item.status === 'overdue'; else noDaysOverdue">
+                  <span class="cdash-days__value">{{ item.daysOverdue || 0 }}</span>
+                  <span class="cdash-days__count" *ngIf="item.overdueInstallmentCount">
+                    <ng-container *ngIf="item.overdueInstallmentCount === 1; else manyOverdue">
+                      {{ 'tr_overdue_installment_count_one' | translate }}
+                    </ng-container>
+                    <ng-template #manyOverdue>
+                      {{ 'tr_overdue_installment_count_many' | translate:{ count: item.overdueInstallmentCount } }}
+                    </ng-template>
+                  </span>
+                </ng-container>
+                <ng-template #noDaysOverdue>—</ng-template>
               </td>
               <td class="cdash-amt-cell">
                 <span class="cdash-amt-cell__value">
@@ -274,6 +304,10 @@
                   [attr.title]="'tr_collections_share_of_total_hint' | translate"
                 >
                   {{ shareOfTotal(item.remaining) | number:'1.0-1' }}%
+                </span>
+                <span class="cdash-min" *ngIf="(item.minimumCollectionAmount || 0) > 0">
+                  {{ 'tr_minimum_collection' | translate }}:
+                  {{ item.minimumCollectionAmount | currency:'EGP ':'symbol':'1.0-0' }}
                 </span>
               </td>
               <td class="cdash-status-cell">

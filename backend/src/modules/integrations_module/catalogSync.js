@@ -12,6 +12,11 @@ import { buildEcommerceSpecs } from './catalogSpecs.js';
 
 const getLatestSettingsDoc = () => StoreSettings.findOne().sort({ updatedAt: -1 });
 
+export function normalizeEcommerceCatalogMode(value) {
+  if (value === 'online_only' || value === 'orders_only') return value;
+  return 'all';
+}
+
 function sellableStock(product) {
   const stock = Number(product.stock) || 0;
   const transfer = Number(product.transferReservedQuantity) || 0;
@@ -87,23 +92,24 @@ function mapProduct(product, categoryIdOnEcomHint) {
 }
 
 export async function getIntegrationConfig() {
-  if (!isEcommerceIntegrationFeatureAvailable()) {
-    return { enabled: false, reason: 'feature_disabled_env' };
-  }
   const settings = await getLatestSettingsDoc();
+  const catalogMode = normalizeEcommerceCatalogMode(settings?.ecommerceCatalogMode);
+  if (!isEcommerceIntegrationFeatureAvailable()) {
+    return { enabled: false, reason: 'feature_disabled_env', catalogMode };
+  }
   if (!settings?.ecommerceIntegrationEnabled) {
-    return { enabled: false, reason: 'disabled_settings' };
+    return { enabled: false, reason: 'disabled_settings', catalogMode };
   }
   const baseUrl = String(settings.ecommerceBaseUrl || '').trim().replace(/\/$/, '');
   const key = String(settings.ecommerceSharedKey || '').trim();
   if (!baseUrl || !key) {
-    return { enabled: false, reason: 'missing_connection' };
+    return { enabled: false, reason: 'missing_connection', catalogMode };
   }
   return {
     enabled: true,
     baseUrl,
     key,
-    catalogMode: settings.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+    catalogMode,
     onlineBranchId: settings.onlineBranchId || null,
     settings,
   };
@@ -113,6 +119,17 @@ export async function buildCatalogPayload() {
   const cfg = await getIntegrationConfig();
   if (!cfg.enabled) {
     return { ok: false, reason: cfg.reason, categories: [], products: [] };
+  }
+  if (cfg.catalogMode === 'orders_only') {
+    return {
+      ok: true,
+      skipped: true,
+      reason: 'orders_only',
+      catalogMode: 'orders_only',
+      categories: [],
+      products: [],
+      branches: [],
+    };
   }
 
   let productQuery = { removedWhenOutOfStock: { $ne: true } };
@@ -225,10 +242,19 @@ async function postToEcommerce(path, body) {
 }
 
 /** Full catalog replace/upsert push to e-commerce (batched to avoid huge payloads). */
+export async function pushCatalogMode(catalogMode) {
+  return postToEcommerce('/api/integration/invex/catalog-mode', {
+    catalogMode: normalizeEcommerceCatalogMode(catalogMode),
+  });
+}
+
 export async function pushFullCatalog() {
   const payload = await buildCatalogPayload();
   if (!payload.ok) {
     return { ok: false, reason: payload.reason };
+  }
+  if (payload.reason === 'orders_only' || payload.catalogMode === 'orders_only') {
+    return { ok: true, skipped: true, reason: 'orders_only', products: 0, categories: 0 };
   }
 
   const categories = payload.categories || [];
@@ -299,7 +325,9 @@ async function isProductInCatalog(product, cfg) {
 
 export async function pushProductUpsert(productId) {
   const cfg = await getIntegrationConfig();
-  if (!cfg.enabled) return { ok: false, skipped: true, reason: cfg.reason };
+  if (!cfg.enabled || cfg.catalogMode === 'orders_only') {
+    return { ok: false, skipped: true, reason: cfg.catalogMode === 'orders_only' ? 'orders_only' : cfg.reason };
+  }
 
   const product = await Product.findById(productId).populate('category').populate('branch').lean();
   if (!product) {
@@ -392,6 +420,10 @@ export async function pushProductUpsert(productId) {
 }
 
 export async function pushProductDelete(productId) {
+  const cfg = await getIntegrationConfig();
+  if (!cfg.enabled || cfg.catalogMode === 'orders_only') {
+    return { ok: false, skipped: true, reason: cfg.catalogMode === 'orders_only' ? 'orders_only' : cfg.reason };
+  }
   return postToEcommerce('/api/integration/invex/catalog/product-delete', {
     invexProductId: String(productId),
   });
@@ -399,7 +431,9 @@ export async function pushProductDelete(productId) {
 
 export async function pushCategoryUpsert(categoryId) {
   const cfg = await getIntegrationConfig();
-  if (!cfg.enabled) return { ok: false, skipped: true, reason: cfg.reason };
+  if (!cfg.enabled || cfg.catalogMode === 'orders_only') {
+    return { ok: false, skipped: true, reason: cfg.catalogMode === 'orders_only' ? 'orders_only' : cfg.reason };
+  }
   const cat = await Category.findById(categoryId).lean();
   if (!cat) {
     return postToEcommerce('/api/integration/invex/catalog/category-delete', {
@@ -412,6 +446,10 @@ export async function pushCategoryUpsert(categoryId) {
 }
 
 export async function pushCategoryDelete(categoryId) {
+  const cfg = await getIntegrationConfig();
+  if (!cfg.enabled || cfg.catalogMode === 'orders_only') {
+    return { ok: false, skipped: true, reason: cfg.catalogMode === 'orders_only' ? 'orders_only' : cfg.reason };
+  }
   return postToEcommerce('/api/integration/invex/catalog/category-delete', {
     invexCategoryId: String(categoryId),
   });
@@ -422,6 +460,8 @@ export function notifyProductChanged(productId) {
   if (!productId) return;
   setImmediate(() => {
     (async () => {
+      const cfg = await getIntegrationConfig();
+      if (!cfg.enabled || cfg.catalogMode === 'orders_only') return;
       try {
         await ensureAutoGroupForProduct(productId);
       } catch (err) {

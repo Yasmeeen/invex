@@ -92,7 +92,7 @@ export class HeaderComponent implements OnInit {
 
   /** Hides CRM/online-order alerts until integration is enabled in store settings. */
   get notifications(): NotificationItem[] {
-    if (this.storeSettings.crmIntegrationEnabled) {
+    if (this.storeSettings.onlineOrdersAccessEnabled) {
       return this.notificationItems;
     }
     return this.notificationItems.filter((n) => n.type !== 'online_order_created');

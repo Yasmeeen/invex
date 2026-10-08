@@ -102,7 +102,7 @@ export interface StoreSettings {
   ecommerceIntegrationEnabled?: boolean;
   ecommerceBaseUrl?: string;
   ecommerceSharedKey?: string;
-  ecommerceCatalogMode?: 'all' | 'online_only';
+  ecommerceCatalogMode?: 'all' | 'online_only' | 'orders_only';
   onlineBranchId?: string | null;
   /** Env-gated CRM integration. The shared key is write-only. */
   crmIntegrationFeatureAvailable?: boolean;
@@ -112,6 +112,13 @@ export interface StoreSettings {
   crmHasSharedKey?: boolean;
   /** Roles that must not see product cost / purchase price. Super Admin is never hidden. */
   rolesHiddenFromCostPrice?: string[];
+}
+
+function normalizeCatalogMode(
+  value: string | undefined | null
+): 'all' | 'online_only' | 'orders_only' {
+  if (value === 'online_only' || value === 'orders_only') return value;
+  return 'all';
 }
 
 const DEFAULTS: StoreSettings = {
@@ -173,7 +180,17 @@ export class StoreSettingsService {
     return this._settings.value;
   }
 
-  /** Online orders are visible only when CRM integration is turned on in store settings. */
+  /** Online orders page: CRM integration, or e-commerce orders without product sync. */
+  get onlineOrdersAccessEnabled(): boolean {
+    const settings = this._settings.value;
+    if (settings.crmIntegrationEnabled) return true;
+    return (
+      Boolean(settings.ecommerceIntegrationEnabled) &&
+      settings.ecommerceCatalogMode === 'orders_only'
+    );
+  }
+
+  /** @deprecated Prefer onlineOrdersAccessEnabled for the online-orders screen. */
   get crmIntegrationEnabled(): boolean {
     return Boolean(this._settings.value.crmIntegrationEnabled);
   }
@@ -367,8 +384,7 @@ export class StoreSettingsService {
           ecommerceIntegrationEnabled: Boolean(data.ecommerceIntegrationEnabled),
           ecommerceBaseUrl: data.ecommerceBaseUrl ?? '',
           ecommerceSharedKey: data.ecommerceSharedKey ?? '',
-          ecommerceCatalogMode:
-            data.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+          ecommerceCatalogMode: normalizeCatalogMode(data.ecommerceCatalogMode),
           onlineBranchId: data.onlineBranchId ?? null,
           crmIntegrationFeatureAvailable: data.crmIntegrationFeatureAvailable !== false,
           crmIntegrationEnabled: Boolean(data.crmIntegrationEnabled),
@@ -475,11 +491,9 @@ export class StoreSettingsService {
           moneyAccounts: mergedMoney,
           paymentMethodAccountMap: mergedMap,
           paymentAppFeePercents: mergedFees,
-          ecommerceCatalogMode:
-            (data as StoreSettings).ecommerceCatalogMode === 'online_only' ||
-            body.ecommerceCatalogMode === 'online_only'
-              ? 'online_only'
-              : 'all',
+          ecommerceCatalogMode: normalizeCatalogMode(
+            (data as StoreSettings).ecommerceCatalogMode || body.ecommerceCatalogMode
+          ),
           rolesHiddenFromCostPrice: normalizeRolesHiddenFromCostPrice(
             data.rolesHiddenFromCostPrice ??
               body.rolesHiddenFromCostPrice ??

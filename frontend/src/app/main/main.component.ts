@@ -59,7 +59,7 @@ export class MainComponent implements OnInit, OnDestroy {
       this.openingCelebration.load();
       this.storeSettingsService.load();
       this.settingsSub = this.storeSettingsService.settings$.subscribe(() => {
-        if (!this.storeSettingsService.hydrated || this.storeSettingsService.crmIntegrationEnabled) {
+        if (!this.storeSettingsService.hydrated || this.storeSettingsService.onlineOrdersAccessEnabled) {
           return;
         }
         const path = this.router.url.split('?')[0];

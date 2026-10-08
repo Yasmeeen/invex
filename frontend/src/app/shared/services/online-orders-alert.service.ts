@@ -59,7 +59,7 @@ export class OnlineOrdersAlertService implements OnDestroy {
 
   get canSeeBanner(): boolean {
     const role = String(this.auth.getUserFromLocalStorage()?.role || '');
-    return ONLINE_ORDER_ROLES.has(role) && this.storeSettings.crmIntegrationEnabled;
+    return ONLINE_ORDER_ROLES.has(role) && this.storeSettings.onlineOrdersAccessEnabled;
   }
 
   /** True when oldest pending order is older than 15 minutes. */

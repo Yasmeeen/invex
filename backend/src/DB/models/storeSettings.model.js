@@ -176,10 +176,14 @@ const storeSettingsSchema = new mongoose.Schema(
     crmBaseUrl: { type: String, default: '', trim: true },
     /** CRM-only shared secret for service-to-service calls. */
     crmSharedKey: { type: String, default: '', trim: true },
-    /** all = every sellable product; online_only = products on Online branch only. */
+    /**
+     * all = every sellable product opted in;
+     * online_only = products on the Online branch only;
+     * orders_only = no product sync, website orders land in online orders.
+     */
     ecommerceCatalogMode: {
       type: String,
-      enum: ['all', 'online_only'],
+      enum: ['all', 'online_only', 'orders_only'],
       default: 'all',
     },
     /** Branch used when ecommerceCatalogMode is online_only. */

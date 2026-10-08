@@ -100,7 +100,7 @@ export class RealtimeNotificationsService {
       if (!n?._id) {
         return;
       }
-      if (n.type === 'online_order_created' && !this.storeSettings.crmIntegrationEnabled) {
+      if (n.type === 'online_order_created' && !this.storeSettings.onlineOrdersAccessEnabled) {
         return;
       }
       this.globals.unseenNotificationsCount = (this.globals.unseenNotificationsCount || 0) + 1;
@@ -126,7 +126,7 @@ export class RealtimeNotificationsService {
         pendingCount?: number;
         notification?: NotificationItem;
       }) => {
-        if (!this.storeSettings.crmIntegrationEnabled) {
+        if (!this.storeSettings.onlineOrdersAccessEnabled) {
           return;
         }
         this.onlineOrderNew$.next(payload || {});

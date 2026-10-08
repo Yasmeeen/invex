@@ -5,7 +5,8 @@ import { Observable, of } from 'rxjs';
 import { filter, map, take } from 'rxjs/operators';
 
 /**
- * Online orders stay hidden until an admin enables CRM integration in store settings.
+ * Online orders stay hidden until CRM integration is on,
+ * or e-commerce is connected in orders-only mode.
  */
 @Injectable({ providedIn: 'root' })
 export class CrmIntegrationGuard implements CanActivate {
@@ -26,7 +27,7 @@ export class CrmIntegrationGuard implements CanActivate {
   }
 
   private allowOrRedirect(): boolean | UrlTree {
-    if (this.storeSettings.crmIntegrationEnabled) {
+    if (this.storeSettings.onlineOrdersAccessEnabled) {
       return true;
     }
     return this.router.createUrlTree(['/orders']);

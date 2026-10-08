@@ -227,7 +227,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       .filter((item) => {
         if (
           item.routerLink === this.onlineOrdersLink &&
-          !this.storeSettings.crmIntegrationEnabled
+          !this.storeSettings.onlineOrdersAccessEnabled
         ) {
           return false;
         }

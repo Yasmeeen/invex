@@ -42,13 +42,14 @@ const ONLINE_BOOKING_SOURCES = ['ecommerce', 'crm'];
 const objectIdIs = (left, right) => String(left || '') === String(right || '');
 const reservationKeyFor = (crmOrderId) => `crm:${String(crmOrderId).trim()}`;
 
-/** Staff who should see the global online-order banner / bell for a new CRM order. */
-async function onlineOrderAlertRecipientIds(branchId) {
+/** Staff who should see the global online-order banner / bell for a new order. */
+async function onlineOrderAlertRecipientIds(branchId, { allBranches = false } = {}) {
   const users = await User.find({
     role: { $in: ['Super Admin', 'Co Admin', 'Branch Manager', 'Cashier'] },
   })
     .select('_id role branch')
     .lean();
+  if (allBranches) return users.map((u) => u._id);
   const branch = String(branchId || '');
   return users
     .filter((u) => {
@@ -59,15 +60,16 @@ async function onlineOrderAlertRecipientIds(branchId) {
     .map((u) => u._id);
 }
 
-async function emitOnlineOrderCreatedAlert(onlineOrder) {
+export async function emitOnlineOrderCreatedAlert(onlineOrder) {
   try {
     const branchId = onlineOrder?.branch;
-    const recipientIds = await onlineOrderAlertRecipientIds(branchId);
+    const allBranches = resolveChannel(onlineOrder) === 'website';
+    const recipientIds = await onlineOrderAlertRecipientIds(branchId, { allBranches });
     if (!recipientIds.length) return;
 
     const branchPendingCount = await OnlineOrder.countDocuments({
       status: 'pending',
-      branch: branchId,
+      ...(allBranches ? {} : { branch: branchId }),
     });
     const orderNumber = String(onlineOrder.crmOrderNumber || onlineOrder.crmOrderId || '');
     const customerName = String(onlineOrder.customer?.name || '').trim();
@@ -86,6 +88,7 @@ async function emitOnlineOrderCreatedAlert(onlineOrder) {
         customerName,
         status: onlineOrder.status || 'pending',
         pendingCount: branchPendingCount,
+        channel: resolveChannel(onlineOrder),
       },
       recipients: recipientIds,
       readBy: [],
@@ -94,7 +97,7 @@ async function emitOnlineOrderCreatedAlert(onlineOrder) {
     const payload = {
       notification,
       onlineOrderId: String(onlineOrder._id),
-      branchId: String(branchId || ''),
+      branchId: allBranches ? '' : String(branchId || ''),
       pendingCount: branchPendingCount,
     };
     emitToUsers(recipientIds, 'notification:new', { notification });
@@ -215,6 +218,19 @@ function resolveChannel(order) {
   const key = String(order?.reservationKey || '');
   if (key.startsWith('web:') || key.startsWith('ecommerce:')) return 'website';
   return 'crm';
+}
+
+function staffMayAccessOrder(user, order) {
+  const role = String(user?.role || '');
+  if (!['Branch Manager', 'Cashier'].includes(role)) return true;
+  if (resolveChannel(order) === 'website') return true;
+  const branchId = order?.branch?._id || order?.branch;
+  return Boolean(user?.branch) && objectIdIs(branchId, user.branch);
+}
+
+function isUnlinkedWebsiteOrder(order) {
+  if (resolveChannel(order) !== 'website') return false;
+  return (order?.items || []).every((item) => !item?.product);
 }
 
 function publicOrder(order) {
@@ -803,11 +819,9 @@ export async function pendingOnlineOrdersSummary(req, res) {
       if (!req.user?.branch) {
         return res.json({ count: 0, status: 'pending', oldestPendingAt: null });
       }
-      // Branch staff only see orders fulfilled / picked up from their branch.
-      query.branch = req.user.branch;
+      query.$or = [{ branch: req.user.branch }, { channel: 'website' }];
     } else if (req.query?.branchId && mongoose.Types.ObjectId.isValid(String(req.query.branchId))) {
-      // Super Admin / Co Admin may scope the banner to the cashier-selected branch.
-      query.branch = req.query.branchId;
+      query.$or = [{ branch: req.query.branchId }, { channel: 'website' }];
     }
     const [count, oldest] = await Promise.all([
       OnlineOrder.countDocuments(query),
@@ -839,9 +853,15 @@ export async function listOnlineOrders(req, res) {
           channelCounts: { all: 0, crm: 0, website: 0 },
         });
       }
-      baseQuery.branch = req.user.branch;
+      baseQuery.$and = [
+        ...(baseQuery.$and || []),
+        { $or: [{ branch: req.user.branch }, { channel: 'website' }] },
+      ];
     } else if (req.query?.branchId && mongoose.Types.ObjectId.isValid(String(req.query.branchId))) {
-      baseQuery.branch = req.query.branchId;
+      baseQuery.$and = [
+        ...(baseQuery.$and || []),
+        { $or: [{ branch: req.query.branchId }, { channel: 'website' }] },
+      ];
     }
 
     const search = String(req.query?.search || '').trim();
@@ -920,11 +940,7 @@ export async function getOnlineOrder(req, res) {
       .populate('items.product', 'name code imageUrl')
       .lean();
     if (!order) return res.status(404).json({ error: 'Online order not found' });
-    if (
-      ['Branch Manager', 'Cashier'].includes(String(req.user?.role || '')) &&
-      req.user?.branch &&
-      !objectIdIs(order.branch?._id || order.branch, req.user.branch)
-    ) {
+    if (!staffMayAccessOrder(req.user, order)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const payload = publicOrder(order);
@@ -983,7 +999,13 @@ async function cancelOnlineOrder(order, actor) {
     await session.commitTransaction();
     const settings = await latestSettings();
     const cutFromSourceEnabled = isCutFromSourceEnabled(settings);
-    const cutProducts = await Product.find({ _id: { $in: current.items.map((item) => item.product) } })
+    const cutProducts = await Product.find({
+      _id: {
+        $in: current.items
+          .map((item) => item.product)
+          .filter((id) => id && mongoose.Types.ObjectId.isValid(String(id))),
+      },
+    })
       .select('_id sourceProductId')
       .lean();
     const notifyIds = new Set();
@@ -1013,11 +1035,27 @@ async function completeOnlineOrder(order, actor, paymentMethod, options = {}) {
   try {
     const current = await OnlineOrder.findById(order._id).session(session);
     if (!current) throw new Error('Online order not found');
-    if (current.status === 'completed' && current.invexOrderId) {
+    if (current.status === 'completed' && (current.invexOrderId || isUnlinkedWebsiteOrder(current))) {
       await session.abortTransaction();
       return current;
     }
     if (current.status !== 'ready') throw new Error('Only ready orders may be completed');
+
+    if (isUnlinkedWebsiteOrder(current)) {
+      current.status = 'completed';
+      current.completedAt = new Date();
+      if (paymentMethod) current.paymentMethod = String(paymentMethod);
+      current.statusHistory.push({
+        status: 'completed',
+        source: 'invex',
+        actorId: actor.id,
+        actorName: actor.name,
+        note: actor.note,
+      });
+      await current.save({ session });
+      await session.commitTransaction();
+      return current;
+    }
 
     const productIds = [
       ...new Set(
@@ -1286,11 +1324,7 @@ export async function updateOnlineOrderStatus(req, res) {
   try {
     const order = await OnlineOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ error: 'Online order not found' });
-    if (
-      ['Branch Manager', 'Cashier'].includes(String(req.user?.role || '')) &&
-      req.user?.branch &&
-      !objectIdIs(order.branch, req.user.branch)
-    ) {
+    if (!staffMayAccessOrder(req.user, order)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const nextStatus = String(req.body?.status || '').trim();
@@ -1310,8 +1344,8 @@ export async function updateOnlineOrderStatus(req, res) {
       return res.json({
         ok: true,
         order: publicOrder(completed),
-        invoiceId: String(completed.invexOrderId),
-        invoiceNumber: completed.invexInvoiceNumber,
+        invoiceId: completed.invexOrderId ? String(completed.invexOrderId) : null,
+        invoiceNumber: completed.invexInvoiceNumber ?? null,
         paymentStatus: 'unpaid',
       });
     }

@@ -257,7 +257,7 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     return (
       Boolean(s.ecommerceIntegrationFeatureAvailable) &&
       Boolean(s.ecommerceIntegrationEnabled) &&
-      s.ecommerceCatalogMode !== 'online_only'
+      s.ecommerceCatalogMode === 'all'
     );
   }
 
@@ -265,7 +265,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
     const s = this.storeSettings.snapshot;
     return (
       Boolean(s.ecommerceIntegrationFeatureAvailable) &&
-      Boolean(s.ecommerceIntegrationEnabled)
+      Boolean(s.ecommerceIntegrationEnabled) &&
+      s.ecommerceCatalogMode !== 'orders_only'
     );
   }
 

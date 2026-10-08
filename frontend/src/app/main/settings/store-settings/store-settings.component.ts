@@ -144,7 +144,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: v.ecommerceBaseUrl || '',
         ecommerceSharedKey: v.ecommerceSharedKey || '',
-        ecommerceCatalogMode: v.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+        ecommerceCatalogMode: this.catalogMode(v.ecommerceCatalogMode),
         onlineBranchId: v.onlineBranchId || null,
         crmIntegrationFeatureAvailable: Boolean(v.crmIntegrationFeatureAvailable),
         crmIntegrationEnabled: Boolean(v.crmIntegrationEnabled),
@@ -167,6 +167,11 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.settingsSub?.unsubscribe();
+  }
+
+  private catalogMode(value: string | undefined): 'all' | 'online_only' | 'orders_only' {
+    if (value === 'online_only' || value === 'orders_only') return value;
+    return 'all';
   }
 
   onLogoSelected(event: Event): void {
@@ -218,8 +223,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
         ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',
-        ecommerceCatalogMode:
-          this.form.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+        ecommerceCatalogMode: this.catalogMode(this.form.ecommerceCatalogMode),
         crmIntegrationEnabled: Boolean(this.form.crmIntegrationEnabled),
         crmBaseUrl: this.form.crmBaseUrl?.trim() || '',
         crmSharedKey: this.form.crmSharedKey?.trim() || '',

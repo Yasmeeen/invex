@@ -18,10 +18,12 @@ const onlineOrderSchema = new mongoose.Schema(
     },
     items: [
       {
-        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-        invexProductId: { type: String, required: true, trim: true },
+        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: false },
+        /** Empty when the line comes from the store catalog and is not an Invex SKU. */
+        invexProductId: { type: String, default: '', trim: true },
         name: { type: String, required: true, trim: true },
         code: { type: String, default: '', trim: true },
+        imageUrl: { type: String, default: '', trim: true },
         categoryId: { type: String, default: '', trim: true },
         quantity: { type: Number, required: true, min: 0.001 },
         saleUnit: {

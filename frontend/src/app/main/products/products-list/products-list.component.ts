@@ -182,7 +182,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return (
       Boolean(s.ecommerceIntegrationFeatureAvailable) &&
       Boolean(s.ecommerceIntegrationEnabled) &&
-      s.ecommerceCatalogMode !== 'online_only'
+      s.ecommerceCatalogMode === 'all'
     );
   }
 

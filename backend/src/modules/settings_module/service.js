@@ -18,7 +18,11 @@ import {
   isEcommerceIntegrationFeatureAvailable,
 } from '../integrations_module/feature.js';
 import { ensureOnlineBranch } from '../integrations_module/onlineBranch.js';
-import { pushFullCatalog } from '../integrations_module/catalogSync.js';
+import {
+  normalizeEcommerceCatalogMode,
+  pushCatalogMode,
+  pushFullCatalog,
+} from '../integrations_module/catalogSync.js';
 import { normalizeRolesHiddenFromCostPrice } from '../../utils/cost-price-access.js';
 
 const MAX_LOGO_LENGTH = 600000;
@@ -88,8 +92,9 @@ function serializeSettings(doc) {
     ecommerceIntegrationEnabled: featureAvailable && Boolean(doc.ecommerceIntegrationEnabled),
     ecommerceBaseUrl: featureAvailable ? doc.ecommerceBaseUrl || '' : '',
     ecommerceSharedKey: featureAvailable ? doc.ecommerceSharedKey || '' : '',
-    ecommerceCatalogMode:
-      featureAvailable && doc.ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all',
+    ecommerceCatalogMode: featureAvailable
+      ? normalizeEcommerceCatalogMode(doc.ecommerceCatalogMode)
+      : 'all',
     onlineBranchId: featureAvailable && doc.onlineBranchId ? String(doc.onlineBranchId) : null,
     crmIntegrationFeatureAvailable: crmFeatureAvailable,
     crmIntegrationEnabled: crmFeatureAvailable && Boolean(doc.crmIntegrationEnabled),
@@ -467,24 +472,28 @@ export const updateStoreSettings = async (req, res) => {
     }
 
     let shouldPushCatalog = false;
+    let shouldPushMode = false;
     if (featureAvailable) {
       if (ecommerceIntegrationEnabled !== undefined) {
         update.ecommerceIntegrationEnabled = ecommerceIntegrationEnabled === true;
         shouldPushCatalog = update.ecommerceIntegrationEnabled;
+        shouldPushMode = true;
       }
       if (ecommerceBaseUrl !== undefined) {
         update.ecommerceBaseUrl = String(ecommerceBaseUrl || '')
           .trim()
           .replace(/\/$/, '')
           .slice(0, 500);
+        shouldPushMode = true;
       }
       if (ecommerceSharedKey !== undefined) {
         update.ecommerceSharedKey = String(ecommerceSharedKey || '').trim().slice(0, 200);
+        shouldPushMode = true;
       }
       if (ecommerceCatalogMode !== undefined) {
-        update.ecommerceCatalogMode =
-          ecommerceCatalogMode === 'online_only' ? 'online_only' : 'all';
-        shouldPushCatalog = true;
+        update.ecommerceCatalogMode = normalizeEcommerceCatalogMode(ecommerceCatalogMode);
+        shouldPushCatalog = update.ecommerceCatalogMode !== 'orders_only';
+        shouldPushMode = true;
       }
     }
     if (crmFeatureAvailable) {
@@ -527,11 +536,19 @@ export const updateStoreSettings = async (req, res) => {
       }
     }
 
-    if (shouldPushCatalog && doc.ecommerceIntegrationEnabled) {
+    if (doc.ecommerceIntegrationEnabled && (shouldPushMode || shouldPushCatalog)) {
+      const mode = normalizeEcommerceCatalogMode(doc.ecommerceCatalogMode);
       setImmediate(() => {
-        pushFullCatalog().catch((err) =>
-          console.error('[settings] push catalog after save', err.message)
-        );
+        if (shouldPushMode) {
+          pushCatalogMode(mode).catch((err) =>
+            console.error('[settings] push catalog mode after save', err.message)
+          );
+        }
+        if (shouldPushCatalog && mode !== 'orders_only') {
+          pushFullCatalog().catch((err) =>
+            console.error('[settings] push catalog after save', err.message)
+          );
+        }
       });
     }
 

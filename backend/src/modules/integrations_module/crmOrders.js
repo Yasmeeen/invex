@@ -36,6 +36,7 @@ import { normalizePaymentMethodsCatalog } from '../settings_module/paymentMethod
 import { isPhysicalCashMethod } from '../../utils/deposit-payment-splits.js';
 import { recordClientCashDrawerReceipt } from '../../utils/client-cash-drawer.js';
 import { postPaymentMethodInflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import { buildCrmProductSpecs, plainProductAttributes } from './catalogSpecs.js';
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const ONLINE_BOOKING_SOURCES = ['ecommerce', 'crm'];
@@ -257,7 +258,7 @@ export async function getCrmCatalog(req, res) {
       .sort({ name: 1 })
       .lean();
     const categories = await Category.find()
-      .select('_id name code imageUrl sellByWeight weightUnit')
+      .select('_id name code imageUrl sellByWeight weightUnit attributeDefs')
       .sort({ name: 1 })
       .lean();
 
@@ -303,7 +304,7 @@ export async function getCrmCatalog(req, res) {
         : { stock: { $gt: 0 } }),
     })
       .select(
-        '_id name code catalogKey price discount stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category branch imageUrl productType sellByWeightOverride sourceProductId processingExtraCost'
+        '_id name code catalogKey price discount stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category branch imageUrl productType sellByWeightOverride sourceProductId processingExtraCost attributes'
       )
       .sort({ name: 1 })
       .lean();
@@ -312,41 +313,63 @@ export async function getCrmCatalog(req, res) {
     });
 
     // Products are stored per branch in Invex. Older branch copies may not have
-    // the image that was uploaded to another copy of the same catalog product.
-    // Resolve an image fallback without exposing stock or pricing from that branch.
+    // the image / attribute values that were filled on another copy of the same
+    // catalog product. Resolve those without exposing stock or pricing.
     const productsMissingImages = products.filter((product) => !String(product.imageUrl || '').trim());
-    const missingCatalogKeys = productsMissingImages
-      .map((product) => String(product.catalogKey || '').trim())
-      .filter(Boolean);
-    const missingCodes = productsMissingImages
-      .map((product) => String(product.code || '').trim())
-      .filter(Boolean);
-    const imageSources =
-      missingCatalogKeys.length || missingCodes.length
+    const productsMissingAttrs = products.filter(
+      (product) => Object.keys(plainProductAttributes(product.attributes)).length === 0
+    );
+    const fallbackCatalogKeys = [
+      ...new Set(
+        [...productsMissingImages, ...productsMissingAttrs]
+          .map((product) => String(product.catalogKey || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    const fallbackCodes = [
+      ...new Set(
+        [...productsMissingImages, ...productsMissingAttrs]
+          .map((product) => String(product.code || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+    const siblingSources =
+      fallbackCatalogKeys.length || fallbackCodes.length
         ? await Product.find({
-            imageUrl: { $nin: ['', null] },
             $or: [
-              ...(missingCatalogKeys.length ? [{ catalogKey: { $in: missingCatalogKeys } }] : []),
-              ...(missingCodes.length ? [{ code: { $in: missingCodes } }] : []),
+              ...(fallbackCatalogKeys.length ? [{ catalogKey: { $in: fallbackCatalogKeys } }] : []),
+              ...(fallbackCodes.length ? [{ code: { $in: fallbackCodes } }] : []),
             ],
           })
-            .select('catalogKey code category imageUrl updatedAt')
+            .select('catalogKey code category imageUrl attributes updatedAt')
             .sort({ updatedAt: -1 })
             .lean()
         : [];
     const imageByCatalogKey = new Map();
     const imageByCategoryAndCode = new Map();
-    for (const source of imageSources) {
+    const attrsByCatalogKey = new Map();
+    const attrsByCategoryAndCode = new Map();
+    for (const source of siblingSources) {
       const imageUrl = String(source.imageUrl || '').trim();
-      if (!imageUrl) continue;
+      const attrs = plainProductAttributes(source.attributes);
       const catalogKey = String(source.catalogKey || '').trim();
       const code = String(source.code || '').trim();
-      if (catalogKey && !imageByCatalogKey.has(catalogKey)) {
-        imageByCatalogKey.set(catalogKey, imageUrl);
-      }
       const categoryAndCode = `${String(source.category || '')}:${code}`;
-      if (code && !imageByCategoryAndCode.has(categoryAndCode)) {
-        imageByCategoryAndCode.set(categoryAndCode, imageUrl);
+      if (imageUrl) {
+        if (catalogKey && !imageByCatalogKey.has(catalogKey)) {
+          imageByCatalogKey.set(catalogKey, imageUrl);
+        }
+        if (code && !imageByCategoryAndCode.has(categoryAndCode)) {
+          imageByCategoryAndCode.set(categoryAndCode, imageUrl);
+        }
+      }
+      if (Object.keys(attrs).length) {
+        if (catalogKey && !attrsByCatalogKey.has(catalogKey)) {
+          attrsByCatalogKey.set(catalogKey, attrs);
+        }
+        if (code && !attrsByCategoryAndCode.has(categoryAndCode)) {
+          attrsByCategoryAndCode.set(categoryAndCode, attrs);
+        }
       }
     }
 
@@ -375,6 +398,21 @@ export async function getCrmCatalog(req, res) {
           const saleUnit = isFarmProduct(product) ? 'head' : isWeight ? 'weight' : 'piece';
           const prices = effectivePrice(product);
           const available = sellableStock(product, sourceById, cutFromSourceEnabled);
+          const catalogKey = String(product.catalogKey || '').trim();
+          const code = String(product.code || '').trim();
+          const categoryAndCode = `${String(product.category || '')}:${code}`;
+          const ownAttrs = plainProductAttributes(product.attributes);
+          const attributes =
+            Object.keys(ownAttrs).length > 0
+              ? ownAttrs
+              : attrsByCatalogKey.get(catalogKey) ||
+                attrsByCategoryAndCode.get(categoryAndCode) ||
+                {};
+          const specs = buildCrmProductSpecs({
+            ...product,
+            attributes,
+            category: category || product.category,
+          });
           return {
             invexProductId: String(product._id),
             invexCategoryId: String(product.category),
@@ -390,13 +428,13 @@ export async function getCrmCatalog(req, res) {
             sellableStock: available,
             imageUrl:
               String(product.imageUrl || '').trim() ||
-              imageByCatalogKey.get(String(product.catalogKey || '').trim()) ||
-              imageByCategoryAndCode.get(
-                `${String(product.category || '')}:${String(product.code || '').trim()}`
-              ) ||
+              imageByCatalogKey.get(catalogKey) ||
+              imageByCategoryAndCode.get(categoryAndCode) ||
               '',
             saleUnit,
             weightUnit: saleUnit === 'weight' ? normalizeWeightUnit(category?.weightUnit) : null,
+            attributes,
+            specs,
           };
         })
         .filter((product) => product.sellableStock > 0),

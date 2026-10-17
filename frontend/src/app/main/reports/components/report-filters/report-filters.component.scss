@@ -34,6 +34,13 @@
   margin-top: 0.75rem;
 }
 
+.report-filters__row--profit-extra {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
 .report-filters__field {
   flex: 1 1 150px;
   min-width: 140px;
@@ -68,6 +75,13 @@
 
 .report-filters--profit .report-filters__field--wide {
   max-width: 200px;
+}
+
+.report-filters__field--categories,
+.report-filters--profit .report-filters__field--categories {
+  flex: 1 1 280px;
+  min-width: 260px;
+  max-width: 360px;
 }
 
 .report-filters__field--sale-type {

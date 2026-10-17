@@ -1,36 +1,58 @@
-<article class="report-card" [class.report-card--loss]="tone === 'loss'">
+<article
+  class="report-card"
+  [class.report-card--loss]="tone === 'loss'"
+  [class.report-card--stat]="appearance === 'stat'"
+>
   <header class="report-card__head">
     <div class="report-card__head-main">
-      <span class="report-card__icon-box" aria-hidden="true">
+      <span class="report-card__icon-box" [ngClass]="iconToneClass" aria-hidden="true">
         <i class="fa" [ngClass]="headerIconClass"></i>
       </span>
-      <h3 class="report-card__title" *ngIf="titleKey">{{ titleKey | translate: titleParams }}</h3>
+      <div class="report-card__copy">
+        <h3 class="report-card__title" *ngIf="titleKey">{{ titleKey | translate: titleParams }}</h3>
+        <ng-container *ngIf="appearance === 'stat'">
+          <p class="report-card__value" *ngIf="money; else plainValueStat">
+            {{ value | currency: 'EGP ' : 'symbol' : '1.2-2' : 'en-EG' }}
+          </p>
+          <ng-template #plainValueStat>
+            <p class="report-card__value">{{ value }}</p>
+          </ng-template>
+          <p class="report-card__note" *ngIf="hintKey">{{ hintKey | translate: hintParams }}</p>
+        </ng-container>
+      </div>
     </div>
-    <button type="button" class="report-card__menu" [attr.aria-label]="'tr_menu' | translate">
+    <button
+      *ngIf="appearance !== 'stat'"
+      type="button"
+      class="report-card__menu"
+      [attr.aria-label]="'tr_menu' | translate"
+    >
       <i class="fa fa-ellipsis-h"></i>
     </button>
   </header>
-  <div class="report-card__rule" role="presentation"></div>
-  <div class="report-card__body">
-    <p class="report-card__value" *ngIf="money; else plainValue">
-      {{ value | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}
-    </p>
-    <ng-template #plainValue>
-      <p class="report-card__value">{{ value }}</p>
-    </ng-template>
-    <div class="report-card__footer" *ngIf="showFooter">
-      <span
-        *ngIf="trendLabel"
-        class="report-card__pill"
-        [class.report-card__pill--down]="trendPositive === false"
-      >
-        <i
-          class="fa"
-          [ngClass]="trendPositive === false ? 'fa-long-arrow-down' : 'fa-long-arrow-up'"
-        ></i>
-        {{ trendLabel }}
-      </span>
-      <span class="report-card__note" *ngIf="hintKey">{{ hintKey | translate: hintParams }}</span>
+  <ng-container *ngIf="appearance !== 'stat'">
+    <div class="report-card__rule" role="presentation"></div>
+    <div class="report-card__body">
+      <p class="report-card__value" *ngIf="money; else plainValue">
+        {{ value | currency: 'EGP ' : 'symbol' : '1.2-2' : 'en-EG' }}
+      </p>
+      <ng-template #plainValue>
+        <p class="report-card__value">{{ value }}</p>
+      </ng-template>
+      <div class="report-card__footer" *ngIf="showFooter">
+        <span
+          *ngIf="trendLabel"
+          class="report-card__pill"
+          [class.report-card__pill--down]="trendPositive === false"
+        >
+          <i
+            class="fa"
+            [ngClass]="trendPositive === false ? 'fa-long-arrow-down' : 'fa-long-arrow-up'"
+          ></i>
+          {{ trendLabel }}
+        </span>
+        <span class="report-card__note" *ngIf="hintKey">{{ hintKey | translate: hintParams }}</span>
+      </div>
     </div>
-  </div>
+  </ng-container>
 </article>

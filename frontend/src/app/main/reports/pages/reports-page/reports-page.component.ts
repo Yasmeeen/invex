@@ -19,12 +19,27 @@ type ProfitTabId = 'consolidated' | 'cash' | 'installment';
 
 type ReportColumnVM = { key: string; labelKey: string; format?: 'money' };
 
+type ProfitDetailMetric = {
+  titleKey: string;
+  value: number;
+  iconClass: string;
+  iconTone: 'green' | 'purple' | 'blue' | 'amber' | 'red';
+  hintKey?: string;
+  hintParams?: Record<string, unknown>;
+  /** Default money; use percent for margin cards. */
+  format?: 'money' | 'percent';
+};
+
 type ProfitTabView = {
   cards: ReportCardVM[];
+  /** Secondary metrics under “Account details” (installment first). */
+  detailMetrics: ProfitDetailMetric[];
   timeColumns: ReportColumnVM[];
   /** Newest period first. The chart uses chronological order. */
   timeRows: any[];
   chart: Highcharts.Options | null;
+  /** Optional second chart (e.g. installment profits vs collections bars). */
+  secondaryChart: Highcharts.Options | null;
   invoiceColumns: ReportColumnVM[];
   invoiceRows: any[];
   invoiceMeta: { totalCount: number; page: number; limit: number } | null;
@@ -44,6 +59,8 @@ type ReportCardVM = {
   money?: boolean;
   /** Red styling + loss messaging when period is at a loss. */
   tone?: 'loss';
+  iconClass?: string;
+  iconTone?: '' | 'green' | 'purple' | 'blue' | 'amber' | 'red';
 };
 
 @Component({
@@ -100,6 +117,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   };
   profitInvoiceColumns: ReportColumnVM[] = [];
   profitInvoiceRows: any[] = [];
+  /** Client-side filter for the current invoice page. */
+  profitInvoiceSearch = '';
+  profitDetailMetrics: ProfitDetailMetric[] = [];
+  profitAccountDetailsOpen = true;
   cashInvoicePage = 1;
   installmentInvoicePage = 1;
   profitInvoiceLimit = 25;
@@ -191,8 +212,49 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   setProfitTab(tab: ProfitTabId): void {
     if (this.profitTab === tab) return;
     this.profitTab = tab;
+    this.profitInvoiceSearch = '';
     this.applyProfitTab();
     this.applyCostPriceVisibility();
+  }
+
+  get filteredProfitInvoiceRows(): any[] {
+    const q = (this.profitInvoiceSearch || '').trim().toLowerCase();
+    const rows = this.profitInvoiceRows || [];
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const hay = [row.saleNumber, row.orderNumber, row.clientName, row.clientPhone, row.date]
+        .map((v) => String(v ?? '').toLowerCase())
+        .join(' ');
+      return hay.includes(q);
+    });
+  }
+
+  get profitTimeTotals(): Record<string, number> {
+    return this.sumMoneyColumns(this.tableColumns, this.tableRows);
+  }
+
+  get profitInvoiceTotals(): Record<string, number> {
+    return this.sumMoneyColumns(this.profitInvoiceColumns, this.filteredProfitInvoiceRows);
+  }
+
+  get profitInvoiceCountLabel(): { count: number } {
+    return { count: this.profitInvoiceMeta?.totalCount || this.profitInvoiceRows.length || 0 };
+  }
+
+  get profitTimeCountLabel(): { count: number } {
+    return { count: this.profitTimeTotalCount };
+  }
+
+  private sumMoneyColumns(
+    columns: ReportColumnVM[],
+    rows: any[]
+  ): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const col of columns || []) {
+      if (col.format !== 'money') continue;
+      out[col.key] = (rows || []).reduce((sum, row) => sum + (Number(row?.[col.key]) || 0), 0);
+    }
+    return out;
   }
 
   setProfitTimePage(page: number): void {
@@ -223,6 +285,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.profitTimePage = { consolidated: 1, cash: 1, installment: 1 };
     this.cashInvoicePage = 1;
     this.installmentInvoicePage = 1;
+    this.profitInvoiceSearch = '';
   }
 
   get bookingsTotalPages(): number {
@@ -809,6 +872,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       'tr_report_card_warehouse_inventory_capital',
     ]);
     this.cards = (this.cards || []).filter((c) => !hideCardKeys.has(c.titleKey));
+    this.profitDetailMetrics = (this.profitDetailMetrics || []).filter(
+      (m) => !hideCardKeys.has(m.titleKey)
+    );
     const hideCol = new Set([
       'cost',
       'unitCost',
@@ -1284,19 +1350,6 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         hintKey: loss ? lossHintKey || hintKey : hintKey,
       };
     };
-    const marginCard = (value: number, hintKey?: string): ReportCardVM => {
-      const n = Number(value) || 0;
-      const loss = n < 0;
-      return {
-        titleKey: loss ? 'tr_report_card_loss_margin' : 'tr_report_card_margin',
-        value: `${Math.abs(n).toFixed(2)}%`,
-        tone: loss ? 'loss' : undefined,
-        trendLabel: loss ? lossBadge : undefined,
-        trendPositive: loss ? false : undefined,
-        hintKey: loss ? 'tr_report_loss_margin_hint' : hintKey,
-      };
-    };
-
     const consolidatedAsc = res.consolidated?.overTime || res.profitOverTime || [];
     const cashAsc = res.cash?.overTime || [];
     const installmentAsc = res.installment?.overTime || [];
@@ -1306,39 +1359,75 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.installmentInvoicePage
     );
 
+    const installmentRecognized =
+      Number(s.downPaymentProfit || 0) + Number(s.installmentProfitCollected || 0);
+
     return {
       consolidated: {
+        // Hero: cash + installment + combined trading + net.
         cards: [
-          moneyLoss(
-            s.cashTradingProfit,
-            'tr_report_card_cash_trading_profit',
-            'tr_report_card_trading_loss',
-            'tr_report_card_cash_trading_hint',
-            'tr_report_trading_loss_hint'
-          ),
+          {
+            ...moneyLoss(
+              s.cashTradingProfit,
+              'tr_report_card_cash_trading_profit',
+              'tr_report_card_trading_loss',
+              'tr_report_card_cash_trading_hint',
+              'tr_report_trading_loss_hint'
+            ),
+            iconClass: 'fa-line-chart',
+            iconTone: 'green',
+          },
+          {
+            titleKey: 'tr_report_card_installment_recognized',
+            value: installmentRecognized,
+            money: true,
+            hintKey: 'tr_report_card_installment_recognized_hint',
+            iconClass: 'fa-calendar',
+            iconTone: 'purple',
+          },
+          {
+            ...moneyLoss(
+              s.tradingProfit,
+              'tr_report_card_consolidated_trading',
+              'tr_report_card_trading_loss',
+              'tr_report_card_consolidated_trading_hint',
+              'tr_report_trading_loss_hint'
+            ),
+            iconClass: 'fa-bar-chart',
+            iconTone: 'blue',
+          },
+          {
+            ...moneyLoss(
+              s.netProfit,
+              'tr_net_profit',
+              'tr_net_loss',
+              undefined,
+              'tr_report_net_loss_hint'
+            ),
+            iconClass: 'fa-check-circle',
+            iconTone: 'green',
+          },
+        ],
+        detailMetrics: [
           {
             titleKey: 'tr_report_card_down_payment_profit',
-            value: s.downPaymentProfit ?? 0,
-            money: true,
+            value: Number(s.downPaymentProfit || 0),
+            iconClass: 'fa-money',
+            iconTone: 'green',
             hintKey: 'tr_report_card_down_payment_profit_hint',
           },
           {
             titleKey: 'tr_report_card_installment_profit_collected',
-            value: s.installmentProfitCollected ?? 0,
-            money: true,
+            value: Number(s.installmentProfitCollected || 0),
+            iconClass: 'fa-calendar',
+            iconTone: 'purple',
             hintKey: 'tr_report_card_installment_profit_collected_hint',
           },
-          moneyLoss(
-            s.tradingProfit,
-            'tr_report_card_consolidated_trading',
-            'tr_report_card_trading_loss',
-            'tr_report_card_consolidated_trading_hint',
-            'tr_report_trading_loss_hint'
-          ),
           {
             titleKey: 'tr_report_card_branch_overhead',
-            value: s.branchOperatingCost ?? 0,
-            money: true,
+            value: Number(s.branchOperatingCost || 0),
+            iconClass: 'fa-building',
+            iconTone: 'amber',
             hintKey: bo ? 'tr_report_branch_overhead_hint' : undefined,
             hintParams: bo
               ? {
@@ -1351,19 +1440,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           },
           {
             titleKey: 'tr_report_card_daily_expenses',
-            value: s.dailyExpensesTotal ?? 0,
-            money: true,
+            value: Number(s.dailyExpensesTotal || 0),
+            iconClass: 'fa-credit-card',
+            iconTone: 'red',
             hintKey: 'tr_report_daily_expenses_hint',
             hintParams: { count: s.dailyExpensesCount ?? 0 },
           },
-          moneyLoss(
-            s.netProfit,
-            'tr_net_profit',
-            'tr_net_loss',
-            undefined,
-            'tr_report_net_loss_hint'
-          ),
-          marginCard(s.profitMargin),
         ],
         timeColumns: this.consolidatedTimeColumns(),
         timeRows: [...consolidatedAsc].reverse(),
@@ -1383,22 +1465,72 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             data: consolidatedAsc.map((x: any) => Number(x.netProfit || 0)),
           },
         ]),
+        secondaryChart: this.groupedBarChart(
+          t('tr_report_chart_profits_and_collections'),
+          consolidatedAsc.map((x: any) => x.period),
+          [
+            {
+              name: t('tr_report_series_cash_trading'),
+              data: consolidatedAsc.map((x: any) => Number(x.cashTradingProfit || 0)),
+              color: '#5b21b6',
+            },
+            {
+              name: t('tr_report_series_installment_recognized'),
+              data: consolidatedAsc.map(
+                (x: any) => Number(x.downPaymentProfit || 0) + Number(x.installmentProfit || 0)
+              ),
+              color: '#c4b5fd',
+            },
+          ]
+        ),
         invoiceColumns: [],
         invoiceRows: [],
         invoiceMeta: null,
       },
       cash: {
+        // Hero: revenue, cost, trading profit.
         cards: [
-          { titleKey: 'tr_report_card_revenue', value: cash.totalRevenue ?? 0, money: true },
-          { titleKey: 'tr_report_card_cost', value: cash.totalCost ?? 0, money: true },
-          moneyLoss(
-            cash.tradingProfit,
-            'tr_report_card_trading_profit',
-            'tr_report_card_trading_loss',
-            'tr_report_card_cash_trading_hint',
-            'tr_report_trading_loss_hint'
-          ),
-          marginCard(cash.profitMargin, 'tr_report_cash_margin_hint'),
+          {
+            titleKey: 'tr_report_card_revenue',
+            value: cash.totalRevenue ?? 0,
+            money: true,
+            iconClass: 'fa-line-chart',
+            iconTone: 'green',
+          },
+          {
+            titleKey: 'tr_report_card_cost',
+            value: cash.totalCost ?? 0,
+            money: true,
+            iconClass: 'fa-database',
+            iconTone: 'red',
+          },
+          {
+            ...moneyLoss(
+              cash.tradingProfit,
+              'tr_report_card_trading_profit',
+              'tr_report_card_trading_loss',
+              'tr_report_card_cash_trading_hint',
+              'tr_report_trading_loss_hint'
+            ),
+            iconClass: 'fa-bar-chart',
+            iconTone: 'purple',
+          },
+        ],
+        detailMetrics: [
+          {
+            titleKey:
+              Number(cash.profitMargin || 0) < 0
+                ? 'tr_report_card_loss_margin'
+                : 'tr_report_card_margin',
+            value: Math.abs(Number(cash.profitMargin || 0)),
+            iconClass: 'fa-percent',
+            iconTone: Number(cash.profitMargin || 0) < 0 ? 'red' : 'blue',
+            hintKey:
+              Number(cash.profitMargin || 0) < 0
+                ? 'tr_report_loss_margin_hint'
+                : 'tr_report_cash_margin_hint',
+            format: 'percent',
+          },
         ],
         timeColumns: this.cashTimeColumns(),
         timeRows: [...cashAsc].reverse(),
@@ -1410,58 +1542,89 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             data: cashAsc.map((x: any) => Number(x.tradingProfit || 0)),
           },
         ]),
+        secondaryChart: this.groupedBarChart(
+          t('tr_report_chart_profits_and_collections'),
+          cashAsc.map((x: any) => x.period),
+          [
+            {
+              name: t('tr_report_series_revenue'),
+              data: cashAsc.map((x: any) => Number(x.revenue || 0)),
+              color: '#5b21b6',
+            },
+            {
+              name: t('tr_report_series_cash_trading'),
+              data: cashAsc.map((x: any) => Number(x.tradingProfit || 0)),
+              color: '#c4b5fd',
+            },
+          ]
+        ),
         invoiceColumns: this.cashInvoiceColumns(),
         invoiceRows: this.mapCashProfitInvoiceRows(res.cashInvoices || [], t),
         invoiceMeta: cashMeta,
       },
       installment: {
+        // Hero: the four primary installment metrics.
         cards: [
-          {
-            titleKey: 'tr_report_card_down_payment_revenue',
-            value: inst.downPaymentRevenue ?? 0,
-            money: true,
-            hintKey: 'tr_report_card_down_payment_revenue_hint',
-          },
-          {
-            titleKey: 'tr_report_card_down_payment_cost',
-            value: inst.downPaymentCost ?? 0,
-            money: true,
-            hintKey: 'tr_report_card_down_payment_cost_hint',
-          },
           {
             titleKey: 'tr_report_card_down_payment_profit',
             value: inst.downPaymentProfit ?? 0,
             money: true,
             hintKey: 'tr_report_card_down_payment_profit_hint',
+            iconClass: 'fa-line-chart',
+            iconTone: 'green',
           },
           {
             titleKey: 'tr_report_card_financing_amount',
             value: inst.financingAmount ?? 0,
             money: true,
             hintKey: 'tr_report_card_financing_amount_hint',
+            iconClass: 'fa-credit-card',
+            iconTone: 'blue',
           },
           {
             titleKey: 'tr_report_card_installment_profit_collected',
             value: inst.installmentProfitCollected ?? 0,
             money: true,
             hintKey: 'tr_report_card_installment_profit_collected_hint',
-          },
-          {
-            titleKey: 'tr_report_card_installment_collected_cash',
-            value: inst.collectedCash ?? 0,
-            money: true,
-            hintKey: 'tr_report_card_installment_collected_cash_hint',
+            iconClass: 'fa-calendar',
+            iconTone: 'purple',
           },
           {
             titleKey: 'tr_report_card_installment_recognized',
             value: inst.recognizedProfit ?? 0,
             money: true,
             hintKey: 'tr_report_card_installment_recognized_hint',
+            iconClass: 'fa-bar-chart',
+            iconTone: 'green',
+          },
+        ],
+        detailMetrics: [
+          {
+            titleKey: 'tr_report_card_down_payment_revenue',
+            value: Number(inst.downPaymentRevenue || 0),
+            iconClass: 'fa-money',
+            iconTone: 'green',
+            hintKey: 'tr_report_card_down_payment_revenue_hint',
+          },
+          {
+            titleKey: 'tr_report_card_down_payment_cost',
+            value: Number(inst.downPaymentCost || 0),
+            iconClass: 'fa-database',
+            iconTone: 'red',
+            hintKey: 'tr_report_card_down_payment_cost_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_collected_cash',
+            value: Number(inst.collectedCash || 0),
+            iconClass: 'fa-check-circle',
+            iconTone: 'purple',
+            hintKey: 'tr_report_card_installment_collected_cash_hint',
           },
           {
             titleKey: 'tr_report_card_installment_remaining',
-            value: inst.remainingProfit ?? 0,
-            money: true,
+            value: Number(inst.remainingProfit || 0),
+            iconClass: 'fa-clock-o',
+            iconTone: 'blue',
             hintKey: 'tr_report_card_installment_remaining_hint',
           },
         ],
@@ -1481,11 +1644,31 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             data: installmentAsc.map((x: any) => Number(x.recognizedProfit || 0)),
           },
         ]),
+        secondaryChart: this.groupedBarChart(
+          t('tr_report_chart_profits_and_collections'),
+          installmentAsc.map((x: any) => x.period),
+          [
+            {
+              name: t('tr_report_card_installment_collected_cash'),
+              data: installmentAsc.map((x: any) => Number(x.collectedCash || 0)),
+              color: '#5b21b6',
+            },
+            {
+              name: t('tr_report_col_recognized_profit'),
+              data: installmentAsc.map((x: any) => Number(x.recognizedProfit || 0)),
+              color: '#c4b5fd',
+            },
+          ]
+        ),
         invoiceColumns: this.installmentInvoiceColumns(),
         invoiceRows: this.mapInstallmentProfitInvoiceRows(res.installmentInvoices || []),
         invoiceMeta: installmentMeta,
       },
     };
+  }
+
+  toggleProfitAccountDetails(): void {
+    this.profitAccountDetailsOpen = !this.profitAccountDetailsOpen;
   }
 
   private applyProfitTab(): void {
@@ -1495,15 +1678,20 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.tableColumns = [];
       this.tableRows = [];
       this.chartOptions = null;
+      this.secondaryChartOptions = null;
       this.profitInvoiceColumns = [];
       this.profitInvoiceRows = [];
       this.profitInvoiceMeta = null;
+      this.profitDetailMetrics = [];
       return;
     }
     this.cards = view.cards.map((card) => ({ ...card }));
+    this.profitDetailMetrics = (view.detailMetrics || []).map((m) => ({ ...m }));
     this.tableColumns = view.timeColumns.map((col) => ({ ...col }));
     this.chartOptions = view.chart;
+    this.secondaryChartOptions = view.secondaryChart || null;
     this.chartRedrawKey++;
+    this.chartBranchRedrawKey++;
     this.profitInvoiceColumns = view.invoiceColumns.map((col) => ({ ...col }));
     this.profitInvoiceRows = view.invoiceRows;
     this.profitInvoiceMeta = view.invoiceMeta ? { ...view.invoiceMeta } : null;
@@ -1572,28 +1760,32 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   private cashInvoiceColumns(): ReportColumnVM[] {
+    // Important first, then secondary detail columns.
     return [
-      { key: 'orderNumber', labelKey: 'tr_order_number' },
-      { key: 'date', labelKey: 'tr_report_col_date' },
+      { key: 'orderNumber', labelKey: 'tr_invoice_number' },
       { key: 'clientName', labelKey: 'tr_report_col_customer' },
-      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
-      { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
-      { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+      { key: 'date', labelKey: 'tr_report_col_invoice_date' },
+      { key: 'revenue', labelKey: 'tr_report_col_sale_total', format: 'money' },
       { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
+      { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
       { key: 'paymentStatus', labelKey: 'tr_status' },
     ];
   }
 
   private installmentInvoiceColumns(): ReportColumnVM[] {
+    // Important first (sale #, client, date, sale/finance/realized/remaining), then details.
     return [
-      { key: 'orderNumber', labelKey: 'tr_order_number' },
-      { key: 'date', labelKey: 'tr_report_col_date' },
+      { key: 'saleNumber', labelKey: 'tr_installment_sale_number' },
       { key: 'clientName', labelKey: 'tr_report_col_customer' },
-      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+      { key: 'date', labelKey: 'tr_report_col_invoice_date' },
       { key: 'revenue', labelKey: 'tr_report_col_sale_total', format: 'money' },
+      { key: 'financingAmount', labelKey: 'tr_report_col_financing_amount', format: 'money' },
+      { key: 'recognizedProfit', labelKey: 'tr_report_col_recognized_profit', format: 'money' },
+      { key: 'remainingProfit', labelKey: 'tr_report_col_remaining_profit_full', format: 'money' },
+      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
       { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
       { key: 'downPayment', labelKey: 'tr_report_col_down_payment', format: 'money' },
-      { key: 'financingAmount', labelKey: 'tr_report_col_financing_amount', format: 'money' },
       { key: 'downPaymentProfit', labelKey: 'tr_report_col_down_payment_profit', format: 'money' },
       {
         key: 'installmentProfitPeriod',
@@ -1606,7 +1798,6 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         format: 'money',
       },
       { key: 'potentialProfit', labelKey: 'tr_report_col_potential_profit', format: 'money' },
-      { key: 'remainingProfit', labelKey: 'tr_report_col_remaining_profit', format: 'money' },
     ];
   }
 
@@ -1621,7 +1812,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     };
     return (rows || []).map((x: any) => ({
       orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
-      date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
+      date: this.formatInvoiceDate(x.createdAt),
       clientName: x.clientName || '—',
       clientPhone: x.clientPhoneNumber || '—',
       revenue: x.revenue,
@@ -1632,21 +1823,40 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   private mapInstallmentProfitInvoiceRows(rows: any[]): Record<string, unknown>[] {
-    return (rows || []).map((x: any) => ({
-      orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
-      date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
-      clientName: x.clientName || '—',
-      clientPhone: x.clientPhoneNumber || '—',
-      revenue: x.revenue,
-      cost: x.cost,
-      downPayment: x.downPayment ?? 0,
-      financingAmount: x.financingAmount ?? 0,
-      downPaymentProfit: x.downPaymentProfit ?? 0,
-      installmentProfitPeriod: x.installmentProfitPeriod ?? 0,
-      installmentProfitLifetime: x.installmentProfitLifetime ?? 0,
-      potentialProfit: x.potentialProfit ?? 0,
-      remainingProfit: x.remainingProfit ?? 0,
-    }));
+    return (rows || []).map((x: any) => {
+      const down = Number(x.downPaymentProfit ?? 0);
+      const lifetime = Number(x.installmentProfitLifetime ?? 0);
+      const sale =
+        x.installmentSaleNumber != null && String(x.installmentSaleNumber).trim() !== ''
+          ? `#${x.installmentSaleNumber}`
+          : '—';
+      return {
+        saleNumber: sale,
+        date: this.formatInvoiceDate(x.createdAt),
+        clientName: x.clientName || '—',
+        clientPhone: x.clientPhoneNumber || '—',
+        revenue: x.revenue,
+        cost: x.cost,
+        downPayment: x.downPayment ?? 0,
+        financingAmount: x.financingAmount ?? 0,
+        downPaymentProfit: down,
+        installmentProfitPeriod: x.installmentProfitPeriod ?? 0,
+        installmentProfitLifetime: lifetime,
+        recognizedProfit: down + lifetime,
+        potentialProfit: x.potentialProfit ?? 0,
+        remainingProfit: x.remainingProfit ?? 0,
+      };
+    });
+  }
+
+  private formatInvoiceDate(value: unknown): string {
+    if (!value) return '—';
+    const d = new Date(value as string | number | Date);
+    if (Number.isNaN(d.getTime())) return '—';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   }
 
   private formatCardExportValue(c: ReportCardVM): string | number {
@@ -1791,6 +2001,69 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         },
       },
       series: [{ type: 'column' as const, name: title, data }] as any,
+    };
+  }
+
+  /** Grouped columns — installment profits vs collections. */
+  private groupedBarChart(
+    title: string,
+    categories: string[],
+    series: { name: string; data: number[]; color?: string }[]
+  ): Highcharts.Options {
+    return {
+      chart: { type: 'column', backgroundColor: 'transparent' },
+      colors: this.chartColors,
+      title: this.chartTitleStyle(title),
+      credits: { enabled: false },
+      legend: {
+        align: 'left',
+        verticalAlign: 'top',
+        itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
+        itemHoverStyle: { color: '#6d28d9' },
+      },
+      xAxis: {
+        categories,
+        lineColor: '#e2e8f0',
+        tickColor: '#e2e8f0',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+        gridLineColor: '#f1f5f9',
+      },
+      yAxis: {
+        title: { text: '', style: { color: '#64748b' } },
+        gridLineColor: '#eef2f6',
+        gridLineDashStyle: 'Dash',
+        labels: { style: { color: '#64748b', fontFamily: 'inherit' } },
+      },
+      plotOptions: {
+        column: {
+          borderRadius: 6,
+          borderWidth: 0,
+          grouping: true,
+          groupPadding: 0.18,
+          pointPadding: 0.08,
+          dataLabels: {
+            enabled: true,
+            style: {
+              color: '#64748b',
+              fontSize: '11px',
+              fontWeight: '600',
+              fontFamily: 'inherit',
+              textOutline: 'none',
+            },
+            formatter: function (this: Highcharts.PointLabelObject) {
+              const n = Number(this.y);
+              if (!Number.isFinite(n)) return '';
+              return n.toLocaleString('en-EG', { maximumFractionDigits: 2 });
+            },
+          },
+        },
+      },
+      series: series.map((s, i) => ({
+        type: 'column' as const,
+        name: s.name,
+        data: s.data,
+        color: s.color || this.chartColors[i % this.chartColors.length],
+      })) as any,
     };
   }
 

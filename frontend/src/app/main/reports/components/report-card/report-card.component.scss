@@ -46,6 +46,79 @@
   color: inherit;
 }
 
+.report-card__icon-box--green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.report-card__icon-box--purple {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.report-card__icon-box--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.report-card__icon-box--amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.report-card__icon-box--red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.report-card__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.report-card--stat {
+  border-radius: 14px;
+  border-color: #ece8f8;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+}
+
+.report-card--stat .report-card__head {
+  padding: 1.15rem 1.2rem;
+  align-items: center;
+}
+
+.report-card--stat .report-card__head-main {
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.report-card--stat .report-card__icon-box {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  font-size: 1.15rem;
+}
+
+.report-card--stat .report-card__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.35rem;
+}
+
+.report-card--stat .report-card__value {
+  font-size: 1.55rem;
+  color: #4c1d95;
+  margin-bottom: 0.35rem;
+}
+
+.report-card--stat .report-card__note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
 .report-card__title {
   margin: 0;
   font-size: 0.9375rem;
@@ -152,11 +225,15 @@
 .report-card__value,
 .report-card__note {
   font-family: inherit;
-}@media print {
+}
+
+@media print {
   .report-card {
     box-shadow: none;
     break-inside: avoid;
-  }  .report-card__menu {
+  }
+
+  .report-card__menu {
     display: none;
   }
 }

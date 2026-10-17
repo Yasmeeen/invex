@@ -44,7 +44,11 @@
     </ng-container>
   </app-report-filters>
 
-  <div class="reports-page__cards">
+  <div
+    class="reports-page__cards"
+    [class.reports-page__cards--profit-hero]="reportType === 'profit'"
+    [class.reports-page__cards--profit-hero-3]="reportType === 'profit' && profitTab === 'cash'"
+  >
     <app-report-card
       *ngFor="let card of cards; let i = index"
       [variantIndex]="i"
@@ -57,15 +61,83 @@
       [hintParams]="card.hintParams || {}"
       [trendLabel]="card.trendLabel || ''"
       [trendPositive]="card.trendPositive !== false"
+      [appearance]="reportType === 'profit' ? 'stat' : 'default'"
+      [iconClass]="card.iconClass || ''"
+      [iconTone]="card.iconTone || ''"
     ></app-report-card>
   </div>
 
-  <app-chart-wrapper
-    *ngIf="chartOptions"
-    [renderKey]="chartRedrawKey"
-    [title]="(reportTitleKey | translate) + ' — ' + ('tr_report_chart_suffix' | translate)"
-    [options]="chartOptions"
-  ></app-chart-wrapper>
+  <section
+    class="profit-details"
+    *ngIf="reportType === 'profit' && profitDetailMetrics.length"
+  >
+    <button
+      type="button"
+      class="profit-details__toggle"
+      (click)="toggleProfitAccountDetails()"
+      [attr.aria-expanded]="profitAccountDetailsOpen"
+    >
+      <span>{{ 'tr_report_account_details' | translate }}</span>
+      <i
+        class="fa"
+        [ngClass]="profitAccountDetailsOpen ? 'fa-angle-up' : 'fa-angle-down'"
+        aria-hidden="true"
+      ></i>
+    </button>
+    <div class="profit-details__grid" *ngIf="profitAccountDetailsOpen">
+      <article class="profit-details__item" *ngFor="let m of profitDetailMetrics">
+        <span
+          class="profit-details__icon"
+          [ngClass]="'profit-details__icon--' + m.iconTone"
+          aria-hidden="true"
+        >
+          <i class="fa" [ngClass]="m.iconClass"></i>
+        </span>
+        <div class="profit-details__meta">
+          <div class="profit-details__label-row">
+            <div class="profit-details__label">{{ m.titleKey | translate }}</div>
+            <span
+              class="profit-details__tip"
+              *ngIf="m.hintKey"
+              tabindex="0"
+              [attr.aria-label]="m.hintKey | translate: (m.hintParams || {})"
+            >
+              <i class="fa fa-info-circle" aria-hidden="true"></i>
+              <span class="profit-details__tooltip">
+                {{ m.hintKey | translate: (m.hintParams || {}) }}
+              </span>
+            </span>
+          </div>
+          <div class="profit-details__value" *ngIf="m.format === 'percent'">
+            {{ m.value | number: '1.2-2' }}%
+          </div>
+          <div class="profit-details__value" *ngIf="m.format !== 'percent'">
+            {{ m.value | currency: 'EGP ' : 'symbol' : '1.2-2' : 'en-EG' }}
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <div
+    class="reports-page__charts"
+    [class.reports-page__charts--split]="reportType === 'profit' && !!secondaryChartOptions"
+    *ngIf="chartOptions || (secondaryChartOptions && reportType === 'profit')"
+  >
+    <app-chart-wrapper
+      *ngIf="chartOptions"
+      [renderKey]="chartRedrawKey"
+      [title]="(reportTitleKey | translate) + ' — ' + ('tr_report_chart_suffix' | translate)"
+      [options]="chartOptions"
+    ></app-chart-wrapper>
+
+    <app-chart-wrapper
+      *ngIf="secondaryChartOptions && reportType === 'profit'"
+      [renderKey]="chartBranchRedrawKey"
+      [title]="''"
+      [options]="secondaryChartOptions"
+    ></app-chart-wrapper>
+  </div>
 
   <app-chart-wrapper
     *ngIf="secondaryChartOptions && reportType === 'bookings'"
@@ -141,81 +213,113 @@
   </div>
 
   <ng-container *ngIf="reportType === 'profit'">
-    <div class="mt-3">
-      <h3 class="reports-page__subtitle">{{ 'tr_report_chart_profit_over_time' | translate }}</h3>
-      <app-report-table [columns]="tableColumns" [rows]="tableRows"></app-report-table>
+    <section class="profit-table-panel mt-3">
+      <header class="profit-table-panel__head">
+        <div class="profit-table-panel__title-wrap">
+          <span class="profit-table-panel__icon" aria-hidden="true">
+            <i class="fa fa-calendar"></i>
+          </span>
+          <h3 class="profit-table-panel__title">
+            {{ 'tr_report_chart_profit_over_time' | translate }}
+          </h3>
+          <span class="profit-table-panel__badge" *ngIf="profitTimeTotalCount">
+            {{ 'tr_report_profit_periods_count' | translate: profitTimeCountLabel }}
+          </span>
+        </div>
+      </header>
+      <app-report-table
+        appearance="panel"
+        [columns]="tableColumns"
+        [rows]="tableRows"
+        [totals]="profitTimeTotals"
+        [showCurrencyNote]="true"
+      ></app-report-table>
       <div
-        class="reports-page__pagination mt-2"
+        class="profit-table-panel__pagination"
         *ngIf="profitTimeTotalCount > profitTimeLimit"
       >
         <button
           type="button"
-          class="s-btn btn-secondary btn-sm"
+          class="profit-table-panel__page-btn"
           [disabled]="profitTimePage[profitTab] <= 1"
           (click)="setProfitTimePage(profitTimePage[profitTab] - 1)"
         >
           {{ 'tr_bookings_report_prev' | translate }}
         </button>
-        <span class="size-small text-muted">
+        <span class="profit-table-panel__page-label">
           {{ 'tr_bookings_report_page' | translate : { page: profitTimePage[profitTab], total: profitTimeTotalPages } }}
         </span>
         <button
           type="button"
-          class="s-btn btn-secondary btn-sm"
+          class="profit-table-panel__page-btn"
           [disabled]="profitTimePage[profitTab] >= profitTimeTotalPages"
           (click)="setProfitTimePage(profitTimePage[profitTab] + 1)"
         >
           {{ 'tr_bookings_report_next' | translate }}
         </button>
       </div>
-    </div>
+    </section>
 
-    <div class="mt-4" *ngIf="profitTab !== 'consolidated'">
-      <h3 class="reports-page__subtitle">
-        {{
-          (profitTab === 'cash'
-            ? 'tr_report_profit_by_invoice_cash'
-            : 'tr_report_profit_by_invoice_installment'
-          ) | translate
-        }}
-      </h3>
-      <p class="text-muted size-small mb-2">
-        {{
-          (profitTab === 'cash'
-            ? 'tr_report_profit_cash_invoice_hint'
-            : 'tr_report_profit_installment_invoice_hint'
-          ) | translate
-        }}
-      </p>
-      <div class="text-muted size-small mb-2" *ngIf="profitInvoiceMeta && !loading">
-        {{ 'tr_report_profit_by_invoice_count' | translate : { count: profitInvoiceMeta.totalCount || 0 } }}
-      </div>
-      <app-report-table [columns]="profitInvoiceColumns" [rows]="profitInvoiceRows"></app-report-table>
+    <section class="profit-table-panel mt-4" *ngIf="profitTab !== 'consolidated'">
+      <header class="profit-table-panel__head">
+        <div class="profit-table-panel__title-wrap">
+          <span class="profit-table-panel__icon" aria-hidden="true">
+            <i class="fa fa-file-text-o"></i>
+          </span>
+          <h3 class="profit-table-panel__title">
+            {{
+              (profitTab === 'cash'
+                ? 'tr_report_profit_by_invoice_cash'
+                : 'tr_report_profit_by_invoice_installment'
+              ) | translate
+            }}
+          </h3>
+          <span class="profit-table-panel__badge" *ngIf="!loading">
+            {{ 'tr_report_profit_by_invoice_count' | translate: profitInvoiceCountLabel }}
+          </span>
+        </div>
+        <label class="profit-table-panel__search">
+          <i class="fa fa-search" aria-hidden="true"></i>
+          <input
+            type="search"
+            [(ngModel)]="profitInvoiceSearch"
+            [placeholder]="'tr_report_search_invoices' | translate"
+            autocomplete="off"
+          />
+        </label>
+      </header>
+      <app-report-table
+        appearance="panel"
+        [columns]="profitInvoiceColumns"
+        [rows]="filteredProfitInvoiceRows"
+        [totals]="profitInvoiceTotals"
+        [showCurrencyNote]="true"
+      ></app-report-table>
       <div
-        class="reports-page__pagination mt-2"
+        class="profit-table-panel__pagination"
         *ngIf="profitInvoiceMeta && profitInvoiceMeta.totalCount > profitInvoiceLimit"
       >
         <button
           type="button"
-          class="s-btn btn-secondary btn-sm"
+          class="profit-table-panel__page-btn"
           [disabled]="profitInvoiceMeta.page <= 1"
           (click)="setProfitInvoicePage(profitInvoiceMeta.page - 1)"
         >
           {{ 'tr_bookings_report_prev' | translate }}
         </button>
-        <span class="size-small text-muted">
+        <span class="profit-table-panel__page-label">
           {{ 'tr_bookings_report_page' | translate : { page: profitInvoiceMeta.page, total: profitInvoiceTotalPages } }}
         </span>
         <button
           type="button"
-          class="s-btn btn-secondary btn-sm"
+          class="profit-table-panel__page-btn"
           [disabled]="profitInvoiceMeta.page >= profitInvoiceTotalPages"
           (click)="setProfitInvoicePage(profitInvoiceMeta.page + 1)"
         >
           {{ 'tr_bookings_report_next' | translate }}
         </button>
       </div>
-    </div>
+    </section>
   </ng-container>
 
   <div class="mt-4" *ngIf="reportType === 'deskPurchases' && deskPurchasesDetailRows.length > 0">

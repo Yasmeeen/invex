@@ -1001,6 +1001,7 @@ async function loadInstallmentProfitInvoices({ match, from, to, page, limit, all
         _id: 0,
         orderId: '$_id',
         orderNumber: 1,
+        installmentSaleNumber: 1,
         createdAt: 1,
         clientName: 1,
         clientPhoneNumber: 1,

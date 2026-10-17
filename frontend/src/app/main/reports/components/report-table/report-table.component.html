@@ -1,4 +1,8 @@
-<div class="table-container reports-table bg-white plr-8 ptb-8" [class.reports-table--roomy]="roomy">
+<div
+  class="table-container reports-table bg-white plr-8 ptb-8"
+  [class.reports-table--roomy]="roomy"
+  [class.reports-table--panel]="appearance === 'panel'"
+>
   <table class="s-table table border-table" [class.layout-fixed]="!roomy">
     <thead>
       <tr>
@@ -65,8 +69,24 @@
       <tr *ngIf="!rows || rows.length === 0">
         <td [attr.colspan]="columns.length" class="text-center">{{ 'tr_report_no_data' | translate }}</td>
       </tr>
+      <tr class="reports-table__totals" *ngIf="hasTotals && rows?.length">
+        <td *ngFor="let col of columns" [attr.data-col]="col.key">
+          <ng-container *ngIf="col.key === totalsLabelColKey">
+            <strong>{{ totalsLabelKey | translate }}</strong>
+          </ng-container>
+          <ng-container *ngIf="col.key !== totalsLabelColKey && col.format === 'money'">
+            <ng-container *ngIf="totalsValue(col.key) == null; else totalsMoney">—</ng-container>
+            <ng-template #totalsMoney>
+              <strong>{{ totalsValue(col.key) | currency:'EGP ':'symbol':'1.2-2':'en-EG' }}</strong>
+            </ng-template>
+          </ng-container>
+        </td>
+      </tr>
     </tbody>
   </table>
+  <p class="reports-table__currency-note" *ngIf="showCurrencyNote">
+    {{ 'tr_report_amounts_in_egp' | translate }}
+  </p>
 </div>
 
 <!-- Image preview modal -->
@@ -87,4 +107,3 @@
     </div>
   </div>
 </div>
-

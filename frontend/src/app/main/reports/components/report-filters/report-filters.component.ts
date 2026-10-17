@@ -82,11 +82,6 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     return this.reportType === 'profit';
   }
 
-  /** Secondary filters: always for non-profit; for profit only when expanded. */
-  get showSecondaryProfitFilters(): boolean {
-    return !this.isProfitReport || this.showAdditionalFilters;
-  }
-
   setProfitSaleType(type: 'consolidated' | 'cash' | 'installment'): void {
     if (this.profitSaleType === type) return;
     this.profitSaleTypeChange.emit(type);

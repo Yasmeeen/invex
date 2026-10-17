@@ -21,11 +21,28 @@ export class ReportCardComponent {
   @Input() money = false;
   /** `loss` → red value / icon (negative profit period). */
   @Input() tone: '' | 'loss' = '';
+  /** `stat` = compact profit hero card (icon + title + value + hint). */
+  @Input() appearance: 'default' | 'stat' = 'default';
+  /** Optional FA4 icon class override. */
+  @Input() iconClass = '';
+  /** Icon tint for `stat` cards. */
+  @Input() iconTone: '' | 'green' | 'purple' | 'blue' | 'amber' | 'red' = '';
 
   get headerIconClass(): string {
     if (this.tone === 'loss') return 'fa-arrow-down';
-    const icons = ['fa-users', 'fa-hand-pointer-o', 'fa-file-text-o', 'fa-bar-chart'];
+    const custom = String(this.iconClass || '').trim();
+    if (custom) {
+      return custom.startsWith('fa-') ? custom : `fa-${custom}`;
+    }
+    const icons =
+      this.appearance === 'stat'
+        ? ['fa-line-chart', 'fa-credit-card', 'fa-calendar', 'fa-bar-chart']
+        : ['fa-users', 'fa-hand-pointer-o', 'fa-file-text-o', 'fa-bar-chart'];
     return icons[this.variantIndex % icons.length];
+  }
+
+  get iconToneClass(): string {
+    return this.iconTone ? `report-card__icon-box--${this.iconTone}` : '';
   }
 
   get showFooter(): boolean {

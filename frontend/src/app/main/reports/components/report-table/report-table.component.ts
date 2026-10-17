@@ -16,8 +16,27 @@ export class ReportTableComponent {
   @Input() rows: any[] = [];
   /** Larger padding / row height (used for bookings table). */
   @Input() roomy = false;
+  /** Soft purple panel look used on the profit report. */
+  @Input() appearance: 'default' | 'panel' = 'default';
+  /**
+   * Optional totals row. Keys match column keys; money columns show the number.
+   * Non-money / missing keys leave an empty cell (first non-money column shows the label).
+   */
+  @Input() totals: Record<string, number | null | undefined> | null = null;
+  @Input() totalsLabelKey = 'tr_audit_total';
+  @Input() showCurrencyNote = false;
 
   previewUrl: string | null = null;
+
+  get hasTotals(): boolean {
+    return !!this.totals && Object.keys(this.totals).length > 0;
+  }
+
+  /** First non-money column receives the “Total” label. */
+  get totalsLabelColKey(): string | null {
+    const col = (this.columns || []).find((c) => c.format !== 'money');
+    return col?.key || this.columns?.[0]?.key || null;
+  }
 
   isParts(v: any): v is ReportCellPart[] {
     return Array.isArray(v) && v.every((p) => p && typeof p === 'object' && 'text' in p);
@@ -45,5 +64,12 @@ export class ReportTableComponent {
 
   closePreview(): void {
     this.previewUrl = null;
+  }
+
+  totalsValue(key: string): number | null {
+    if (!this.totals || !(key in this.totals)) return null;
+    const v = this.totals[key];
+    if (v == null || v === undefined || Number.isNaN(Number(v))) return null;
+    return Number(v);
   }
 }

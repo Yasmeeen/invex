@@ -3,6 +3,95 @@
   border-radius: 14px;
   overflow: auto;
 
+  &--panel {
+    border: 1px solid #ece7ff;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    padding: 0 !important;
+    background: #fff;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    table {
+      margin: 0;
+      border: 0 !important;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: auto;
+      width: max-content;
+      min-width: 100%;
+    }
+
+    thead th {
+      background: #f5f3ff;
+      color: #6b7280;
+      font-weight: 600;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      border-bottom: 1px solid #ebe4ff !important;
+      padding: 14px 16px !important;
+    }
+
+    tbody td {
+      padding: 14px 16px !important;
+      color: #111827;
+      font-size: 0.92rem;
+      border-bottom: 1px solid #f3f4f6 !important;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0 !important;
+    }
+
+    /* Sticky identity column while scrolling wide tables. */
+    th:first-child,
+    td:first-child {
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 2;
+      background: #f5f3ff;
+      box-shadow: 4px 0 8px rgba(15, 23, 42, 0.04);
+    }
+
+    tbody td:first-child {
+      background: #fff;
+      font-weight: 700;
+      color: #5b21b6;
+    }
+
+    .reports-table__totals td {
+      background: #faf9ff;
+      border-top: 1px solid #ebe4ff !important;
+      border-bottom: 0 !important;
+      color: #5b21b6;
+      font-size: 0.95rem;
+      padding-top: 16px !important;
+      padding-bottom: 16px !important;
+
+      strong {
+        color: #5b21b6;
+        font-weight: 800;
+      }
+    }
+
+    .reports-table__totals td:first-child {
+      background: #faf9ff;
+      z-index: 3;
+    }
+
+    .reports-table__currency-note {
+      margin: 0;
+      padding: 10px 16px 14px;
+      text-align: start;
+      color: #9ca3af;
+      font-size: 0.78rem;
+      border-top: 1px solid #f3f4f6;
+      white-space: normal;
+    }
+  }
+
   &--roomy {
     table {
       table-layout: auto;
@@ -81,6 +170,20 @@
     table {
       table-layout: auto;
       min-width: 720px;
+    }
+
+    &--panel {
+      padding: 0 !important;
+
+      table {
+        min-width: 960px;
+      }
+
+      thead th,
+      tbody td {
+        padding: 12px 12px !important;
+        font-size: 0.84rem;
+      }
     }
 
     th,

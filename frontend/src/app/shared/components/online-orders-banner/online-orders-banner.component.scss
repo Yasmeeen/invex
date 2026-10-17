@@ -6,22 +6,34 @@
 
 .sys-online-orders-banner {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  align-items: stretch;
   width: 100%;
   margin: 0;
-  padding: 0.7rem 1rem;
+  padding: 0;
   border: 0;
-  cursor: pointer;
-  text-align: start;
   background: linear-gradient(90deg, #0f766e 0%, #0d9488 55%, #f59e0b 140%);
   color: #fff;
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
   animation: sys-online-orders-pulse 2.4s ease-in-out infinite;
 }
 
-.sys-online-orders-banner:hover,
-.sys-online-orders-banner:focus {
+.sys-online-orders-banner__main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0.7rem 0.5rem 0.7rem 1rem;
+  border: 0;
+  cursor: pointer;
+  text-align: start;
+  background: transparent;
+  color: inherit;
+}
+
+.sys-online-orders-banner__main:hover,
+.sys-online-orders-banner__main:focus {
   filter: brightness(1.05);
   outline: none;
 }
@@ -74,11 +86,38 @@ body[dir='ltr'] .sys-online-orders-banner__cta .fa-angle-left {
   transform: scaleX(-1);
 }
 
+.sys-online-orders-banner__close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.95rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sys-online-orders-banner__close:hover,
+.sys-online-orders-banner__close:focus {
+  background: rgba(0, 0, 0, 0.14);
+  color: #fff;
+  outline: none;
+}
+
 .sys-online-orders-banner--cashier {
   flex-shrink: 0;
-  padding: 0.65rem 1.25rem;
   font-size: 0.92rem;
   z-index: 2;
+
+  .sys-online-orders-banner__main {
+    padding: 0.65rem 0.5rem 0.65rem 1.25rem;
+  }
 }
 
 .sys-online-orders-banner--overdue {

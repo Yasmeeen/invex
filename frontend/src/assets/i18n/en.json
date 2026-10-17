@@ -2285,6 +2285,7 @@
   "tr_online_orders_banner_one": "A new online order has arrived",
   "tr_online_orders_banner_many": "{{count}} new online orders are waiting",
   "tr_online_orders_banner_cta": "View orders",
+  "tr_online_orders_banner_close": "Dismiss banner",
   "tr_online_orders_channel_all": "All",
   "tr_online_orders_channel_crm": "Novexa CRM",
   "tr_online_orders_channel_website": "Website",

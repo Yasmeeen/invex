@@ -2283,6 +2283,7 @@
   "tr_online_orders_banner_one": "طلب أونلاين جديد وصل",
   "tr_online_orders_banner_many": "{{count}} طلبات أونلاين جديدة بانتظار المراجعة",
   "tr_online_orders_banner_cta": "عرض الطلبات",
+  "tr_online_orders_banner_close": "إغلاق الشريط",
   "tr_online_orders_channel_all": "الكل",
   "tr_online_orders_channel_crm": "Novexa CRM",
   "tr_online_orders_channel_website": "الموقع الإلكتروني",

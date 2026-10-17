@@ -14,6 +14,8 @@ export class OnlineOrdersBannerComponent implements OnInit, OnDestroy {
 
   pendingCount = 0;
   overdue = false;
+  /** Hides banner until pending count rises again (new order). */
+  private dismissedAtCount: number | null = null;
   private sub?: Subscription;
   private tickSub?: Subscription;
 
@@ -35,15 +37,33 @@ export class OnlineOrdersBannerComponent implements OnInit, OnDestroy {
   }
 
   get visible(): boolean {
-    return this.onlineOrdersAlert.canSeeBanner && this.pendingCount > 0;
+    if (!this.onlineOrdersAlert.canSeeBanner || this.pendingCount <= 0) {
+      return false;
+    }
+    if (this.dismissedAtCount !== null && this.pendingCount <= this.dismissedAtCount) {
+      return false;
+    }
+    return true;
   }
 
   openOnlineOrders(): void {
     this.router.navigate(['/online-orders'], { queryParams: { status: 'pending' } });
   }
 
+  dismiss(event?: Event): void {
+    event?.stopPropagation();
+    this.dismissedAtCount = this.pendingCount;
+  }
+
   private syncFromAlert(): void {
-    this.pendingCount = this.onlineOrdersAlert.pendingCount;
+    const next = this.onlineOrdersAlert.pendingCount;
+    if (this.dismissedAtCount !== null && next > this.dismissedAtCount) {
+      this.dismissedAtCount = null;
+    }
+    if (next <= 0) {
+      this.dismissedAtCount = null;
+    }
+    this.pendingCount = next;
     this.syncOverdue();
   }
 

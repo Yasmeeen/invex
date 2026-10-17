@@ -21,7 +21,7 @@ export interface PurchaseTreasuryMethod {
   label: string;
 }
 
-export type MoneyAccountKind = 'cash' | 'treasury' | 'settlement';
+export type MoneyAccountKind = 'cash' | 'treasury' | 'vault' | 'settlement';
 export type MoneyAccountChannel = 'bank' | 'wallet' | '';
 
 export interface MoneyAccount {
@@ -36,6 +36,8 @@ export interface MoneyAccount {
   phone?: string;
   /** When false, account is inactive in UI (cash stays always enabled). */
   enabled?: boolean;
+  /** Empty = all branches (legacy / cash / settlement). */
+  branchIds?: string[];
 }
 
 export type PaymentMethodShowIn = 'sale' | 'purchase' | 'both';
@@ -49,6 +51,8 @@ export interface PaymentMethodCatalogRow {
   effectMode: PaymentMethodEffectMode;
   /** Sale/cashier fee only. */
   feePercent: number;
+  /** Empty = all branches (legacy / cash / credit / settlement methods). */
+  branchIds?: string[];
 }
 
 export interface PaymentMethodAccountMapRow {
@@ -225,6 +229,18 @@ export class StoreSettingsService {
     return out;
   }
 
+  private normalizeBranchIds(raw: unknown): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of Array.isArray(raw) ? raw : []) {
+      const id = String((item as { _id?: string })?._id || item || '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
+  }
+
   private normalizeMoneyAccounts(raw: unknown): MoneyAccount[] {
     if (!Array.isArray(raw)) return [...DEFAULTS.moneyAccounts];
     const seen = new Set<string>();
@@ -237,7 +253,9 @@ export class StoreSettingsService {
       let kind = String(row?.kind ?? 'treasury').trim().toLowerCase() as MoneyAccountKind;
       if (!key || !label || seen.has(key)) continue;
       if (key === 'cash') kind = 'cash';
-      if (kind !== 'cash' && kind !== 'treasury' && kind !== 'settlement') kind = 'treasury';
+      if (kind !== 'cash' && kind !== 'treasury' && kind !== 'vault' && kind !== 'settlement') {
+        kind = 'treasury';
+      }
       let channel = String(row?.channel ?? '')
         .trim()
         .toLowerCase() as MoneyAccountChannel;
@@ -249,8 +267,12 @@ export class StoreSettingsService {
       const phone = channel === 'wallet' ? String(row?.phone ?? '').trim().slice(0, 40) : '';
       let enabled = (row as MoneyAccount)?.enabled !== false;
       if (key === 'cash') enabled = true;
+      const branchIds =
+        key === 'cash' || kind === 'cash' || kind === 'settlement'
+          ? []
+          : this.normalizeBranchIds(row?.branchIds);
       seen.add(key);
-      out.push({ key, label, kind, channel, accountNumber, phone, enabled });
+      out.push({ key, label, kind, channel, accountNumber, phone, enabled, branchIds });
     }
     if (!out.some((a) => a.key === 'cash')) {
       out.unshift({
@@ -261,6 +283,7 @@ export class StoreSettingsService {
         accountNumber: '',
         phone: '',
         enabled: true,
+        branchIds: [],
       });
     }
     return out;
@@ -289,8 +312,12 @@ export class StoreSettingsService {
       feePercent = Math.max(0, Math.min(100, feePercent));
       if (key === 'cash') feePercent = 0;
       else if (key !== 'credit' && effectMode === 'none') feePercent = 0;
+      const branchIds =
+        key === 'cash' || key === 'credit' || effectMode === 'settlement'
+          ? []
+          : this.normalizeBranchIds((row as PaymentMethodCatalogRow)?.branchIds);
       seen.add(key);
-      out.push({ key, label, showIn, effectMode, feePercent });
+      out.push({ key, label, showIn, effectMode, feePercent, branchIds });
     }
     if (!out.some((r) => r.key === 'cash')) {
       out.unshift({
@@ -299,6 +326,7 @@ export class StoreSettingsService {
         showIn: 'both',
         effectMode: 'instant',
         feePercent: 0,
+        branchIds: [],
       });
     }
     return out;

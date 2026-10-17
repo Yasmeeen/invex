@@ -7,16 +7,27 @@
 }
 
 .payment-methods-table__col-method {
-  width: 16%;
+  width: 14%;
 }
 
 .payment-methods-table__col-effect,
 .payment-methods-table__col-show {
-  width: 11%;
+  width: 10%;
+}
+
+.payment-methods-table__col-branches {
+  width: 16%;
 }
 
 .payment-methods-table__col-linked {
-  width: 42%;
+  width: 30%;
+}
+
+.payment-methods-table__branches {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #4b5563;
+  word-break: break-word;
 }
 
 .payment-methods-table__col-fee {

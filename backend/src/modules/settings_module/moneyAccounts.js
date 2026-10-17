@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import StoreSettings from '../../DB/models/storeSettings.model.js';
 import {
   DEFAULT_PURCHASE_TREASURY_METHODS,
@@ -6,7 +7,47 @@ import {
 } from './treasuryMethods.js';
 
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
-const ACCOUNT_KINDS = new Set(['cash', 'treasury', 'settlement']);
+const ACCOUNT_KINDS = new Set(['cash', 'treasury', 'vault', 'settlement']);
+
+/**
+ * Normalize branch ObjectIds to hex strings.
+ * Empty array = available in all branches (legacy / company-wide kinds).
+ */
+export function normalizeBranchIds(raw) {
+  const seen = new Set();
+  const out = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    const id = String(item?._id || item || '').trim();
+    if (!id || !mongoose.Types.ObjectId.isValid(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/** cash + settlement money accounts are always company/all-branch. */
+export function moneyAccountAlwaysAllBranches(kind, key) {
+  const k = String(key || '')
+    .trim()
+    .toLowerCase();
+  const kindNorm = String(kind || '')
+    .trim()
+    .toLowerCase();
+  return k === 'cash' || kindNorm === 'cash' || kindNorm === 'settlement';
+}
+
+/**
+ * True when the row is available for a branch.
+ * Empty branchIds = all branches. Missing branchId (no filter) = show.
+ */
+export function isAvailableForBranch(branchIds, branchId, { alwaysAll = false } = {}) {
+  if (alwaysAll) return true;
+  const ids = Array.isArray(branchIds) ? branchIds.map((x) => String(x)) : [];
+  if (!ids.length) return true;
+  const bid = String(branchId || '').trim();
+  if (!bid) return true;
+  return ids.includes(bid);
+}
 
 /** Settlement apps — money held by the provider until they pay the store. */
 export const DEFAULT_SETTLEMENT_ACCOUNTS = [
@@ -82,7 +123,7 @@ export function inferAccountChannel(key) {
 }
 
 function normalizeChannel(kind, key, rawChannel) {
-  if (kind === 'cash' || kind === 'settlement') return '';
+  if (kind === 'cash' || kind === 'settlement' || kind === 'vault') return '';
   const c = String(rawChannel || '')
     .trim()
     .toLowerCase();
@@ -126,6 +167,9 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
     const phone = channel === 'wallet' ? normalizeOptionalRef(extras.phone, 40) : '';
     let enabled = extras.enabled !== false && extras.enabled !== 0 && extras.enabled !== 'false';
     if (k === 'cash') enabled = true;
+    const branchIds = moneyAccountAlwaysAllBranches(kindNorm, k)
+      ? []
+      : normalizeBranchIds(extras.branchIds);
     seen.add(k);
     out.push({
       key: k,
@@ -135,6 +179,7 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
       accountNumber,
       phone,
       enabled,
+      branchIds,
     });
   };
 
@@ -149,6 +194,25 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
     const k = normalizeKey(row?.key);
     if (kind === 'settlement' || (!kind && SETTLEMENT_DEFAULT_KEYS.has(k))) {
       push(row?.key, row?.label, 'settlement', row);
+    } else if (kind === 'vault') {
+      if (k && !seen.has(k)) {
+        push(row?.key, row?.label, 'vault', row);
+      } else if (k && seen.has(k)) {
+        const idx = out.findIndex((x) => x.key === k);
+        if (idx >= 0) {
+          let enabled = row.enabled !== false && row.enabled !== 0 && row.enabled !== 'false';
+          out[idx] = {
+            ...out[idx],
+            label: String(row?.label || out[idx].label).trim().slice(0, 120) || out[idx].label,
+            kind: 'vault',
+            channel: '',
+            accountNumber: '',
+            phone: '',
+            enabled,
+            branchIds: normalizeBranchIds(row.branchIds),
+          };
+        }
+      }
     } else if (kind === 'treasury' || kind === 'cash') {
       // Already pushed from treasuries when present; fill missing treasury-only rows
       if (k && !seen.has(k)) {
@@ -168,6 +232,7 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
               channel === 'bank' ? normalizeOptionalRef(row.accountNumber, 80) : '',
             phone: channel === 'wallet' ? normalizeOptionalRef(row.phone, 40) : '',
             enabled,
+            branchIds: normalizeBranchIds(row.branchIds),
           };
         }
       }
@@ -186,6 +251,7 @@ export function normalizeMoneyAccounts({ purchaseTreasuryMethods, moneyAccounts 
       accountNumber: '',
       phone: '',
       enabled: true,
+      branchIds: [],
     });
   }
 

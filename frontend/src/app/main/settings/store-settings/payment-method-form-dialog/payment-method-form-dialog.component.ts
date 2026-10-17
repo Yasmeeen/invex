@@ -1,11 +1,15 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
+import { Branch } from '@core/models/products.model';
+import { BranchesServce } from '@shared/services/branches.service';
 import {
   MoneyAccount,
   PaymentMethodEffectMode,
   PaymentMethodShowIn,
 } from '@shared/services/store-settings.service';
+import { paymentMethodAlwaysAllBranches } from '@shared/utils/branch-scope.util';
+import { Subscription } from 'rxjs';
 
 export interface PaymentMethodFormData {
   mode: 'add' | 'edit';
@@ -16,6 +20,7 @@ export interface PaymentMethodFormData {
   feePercent?: number;
   accountKey?: string;
   settlementBankAccountKey?: string;
+  branchIds?: string[];
   lockedKey?: boolean;
 }
 
@@ -27,6 +32,7 @@ export interface PaymentMethodFormResult {
   feePercent: number;
   accountKey: string;
   settlementBankAccountKey: string;
+  branchIds: string[];
   lockedKey: boolean;
 }
 
@@ -35,13 +41,16 @@ export interface PaymentMethodFormResult {
   templateUrl: './payment-method-form-dialog.component.html',
   styleUrls: ['./payment-method-form-dialog.component.scss'],
 })
-export class PaymentMethodFormDialogComponent {
+export class PaymentMethodFormDialogComponent implements OnInit, OnDestroy {
   label = '';
   showIn: PaymentMethodShowIn = 'sale';
   effectMode: PaymentMethodEffectMode = 'instant';
   feePercent = 0;
   accountKey = '';
   settlementBankAccountKey = '';
+  selectedBranchIds: string[] = [];
+  branches: Branch[] = [];
+  private subscriptions: Subscription[] = [];
 
   readonly showInOptions: { value: PaymentMethodShowIn; labelKey: string }[] = [
     { value: 'sale', labelKey: 'tr_pay_show_in_sale' },
@@ -63,7 +72,8 @@ export class PaymentMethodFormDialogComponent {
     private dialogRef: MatDialogRef<PaymentMethodFormDialogComponent, PaymentMethodFormResult | false>,
     @Inject(MAT_DIALOG_DATA)
     public data: PaymentMethodFormData & { accounts: MoneyAccount[] },
-    private translate: TranslateService
+    private translate: TranslateService,
+    private branchesService: BranchesServce
   ) {
     const all = Array.isArray(data.accounts) ? data.accounts : [];
     this.accounts = all.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
@@ -80,6 +90,20 @@ export class PaymentMethodFormDialogComponent {
     this.accountKey = this.isCash ? 'cash' : String(data.accountKey || '');
     this.settlementBankAccountKey = String(data.settlementBankAccountKey || '');
     this.onEffectChange();
+  }
+
+  ngOnInit(): void {
+    this.subscriptions.push(
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => {
+          this.branches = res?.branches || [];
+          this.initBranchSelection();
+        },
+        error: () => {
+          this.branches = [];
+        },
+      })
+    );
   }
 
   get isCash(): boolean {
@@ -110,9 +134,14 @@ export class PaymentMethodFormDialogComponent {
     return !this.isCredit && this.effectMode === 'settlement';
   }
 
+  get showBranchPicker(): boolean {
+    return !paymentMethodAlwaysAllBranches(this.data.key, this.effectMode);
+  }
+
   get cannotSave(): boolean {
     if (!String(this.label || '').trim()) return true;
     if (this.showSettlementLink && !this.accountKey) return true;
+    if (this.showBranchPicker && !this.selectedBranchIds.length) return true;
     return false;
   }
 
@@ -126,21 +155,21 @@ export class PaymentMethodFormDialogComponent {
       this.feePercent = 0;
       this.accountKey = 'cash';
       this.settlementBankAccountKey = '';
+      this.selectedBranchIds = [];
       return;
     }
     if (this.isCredit) {
       this.effectMode = 'none';
       this.accountKey = '';
       this.settlementBankAccountKey = '';
+      this.selectedBranchIds = [];
       return;
     }
     if (this.effectMode === 'none') {
       this.feePercent = 0;
       this.accountKey = '';
       this.settlementBankAccountKey = '';
-      return;
-    }
-    if (this.effectMode === 'settlement') {
+    } else if (this.effectMode === 'settlement') {
       const linked = String(this.accountKey || this.data.accountKey || '')
         .trim()
         .toLowerCase();
@@ -149,11 +178,16 @@ export class PaymentMethodFormDialogComponent {
         const misr = this.bankAccounts.find((a) => a.key === 'bank_misr');
         this.settlementBankAccountKey = misr?.key || this.bankAccounts[0]?.key || '';
       }
+      this.selectedBranchIds = [];
       return;
+    } else {
+      this.settlementBankAccountKey = '';
+      if (!this.accounts.some((a) => a.key === this.accountKey)) {
+        this.accountKey = '';
+      }
     }
-    this.settlementBankAccountKey = '';
-    if (!this.accounts.some((a) => a.key === this.accountKey)) {
-      this.accountKey = '';
+    if (this.showBranchPicker && this.branches.length && !this.selectedBranchIds.length) {
+      this.selectedBranchIds = this.branches.map((b) => String(b._id));
     }
   }
 
@@ -163,7 +197,7 @@ export class PaymentMethodFormDialogComponent {
 
   submit(): void {
     const label = String(this.label || '').trim().slice(0, 120);
-    if (!label) return;
+    if (!label || this.cannotSave) return;
 
     let effectMode: PaymentMethodEffectMode = this.effectMode || 'instant';
     if (this.isCash) effectMode = 'instant';
@@ -195,7 +229,27 @@ export class PaymentMethodFormDialogComponent {
           : Math.max(0, Math.min(100, Number(this.feePercent) || 0)),
       accountKey,
       settlementBankAccountKey,
+      branchIds: this.showBranchPicker
+        ? this.selectedBranchIds.map((id) => String(id))
+        : [],
       lockedKey: this.lockedKey,
     });
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.forEach((s) => s.unsubscribe());
+  }
+
+  private initBranchSelection(): void {
+    if (!this.showBranchPicker) {
+      this.selectedBranchIds = [];
+      return;
+    }
+    const existing = (this.data.branchIds || []).map((id) => String(id)).filter(Boolean);
+    if (existing.length) {
+      this.selectedBranchIds = existing;
+      return;
+    }
+    this.selectedBranchIds = this.branches.map((b) => String(b._id));
   }
 }

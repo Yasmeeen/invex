@@ -78,6 +78,11 @@
   color: #7c3aed;
 }
 
+.money-accounts-kpi[data-type='vault'] .money-accounts-kpi__icon {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
 .money-accounts-kpi[data-type='settlement'] .money-accounts-kpi__icon {
   background: rgba(245, 158, 11, 0.14);
   color: #d97706;
@@ -132,11 +137,49 @@
   }
 }
 
+.money-accounts-table__col-account {
+  width: 28%;
+}
+
+.money-accounts-table__col-type {
+  width: 11%;
+}
+
+.money-accounts-table__col-branches {
+  width: 18%;
+}
+
+.money-accounts-table__col-ref {
+  width: 14%;
+}
+
+.money-accounts-table__col-balance {
+  width: 14%;
+}
+
+.money-accounts-table__col-status {
+  width: 10%;
+}
+
+.money-accounts-table__col-actions {
+  width: 3.5rem;
+}
+
+.money-accounts-table__account-cell {
+  min-width: 11rem;
+}
+
 .money-accounts-table__acc {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   min-width: 0;
+}
+
+.money-accounts-table__acc-name {
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .money-accounts-table__icon {
@@ -168,6 +211,13 @@
     background: rgba(245, 158, 11, 0.14);
     color: #d97706;
   }
+}
+
+.money-accounts-table__branches {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #4b5563;
+  word-break: break-word;
 }
 
 .money-accounts-table__actions {
@@ -222,6 +272,11 @@
   &[data-type='wallet'] {
     background: rgba(139, 92, 246, 0.12);
     color: #6d28d9;
+  }
+
+  &[data-type='vault'] {
+    background: rgba(100, 116, 139, 0.14);
+    color: #334155;
   }
 
   &[data-type='settlement'] {

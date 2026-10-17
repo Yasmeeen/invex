@@ -88,6 +88,7 @@
             <option value="cash">{{ 'tr_treasury_type_cash' | translate }}</option>
             <option value="bank">{{ 'tr_money_account_channel_bank' | translate }}</option>
             <option value="wallet">{{ 'tr_money_account_channel_wallet' | translate }}</option>
+            <option value="vault">{{ 'tr_treasury_type_vault' | translate }}</option>
             <option value="settlement">{{ 'tr_treasury_type_settlement' | translate }}</option>
           </select>
         </div>
@@ -153,10 +154,20 @@
   <div class="plr-4 mt-2" *ngIf="listReady">
     <div class="table-container" *ngIf="filteredRows.length; else emptyAccounts">
       <table class="s-table table layout-fixed money-accounts-table">
+        <colgroup>
+          <col class="money-accounts-table__col-account" />
+          <col class="money-accounts-table__col-type" />
+          <col class="money-accounts-table__col-branches" />
+          <col class="money-accounts-table__col-ref" />
+          <col class="money-accounts-table__col-balance" />
+          <col class="money-accounts-table__col-status" />
+          <col class="money-accounts-table__col-actions" />
+        </colgroup>
         <thead>
           <tr>
             <th>{{ 'tr_treasury_account' | translate }}</th>
             <th>{{ 'tr_money_account_channel' | translate }}</th>
+            <th>{{ 'tr_branches' | translate }}</th>
             <th>{{ 'tr_money_account_ref' | translate }}</th>
             <th>{{ 'tr_money_account_current_balance' | translate }}</th>
             <th>{{ 'tr_status' | translate }}</th>
@@ -165,7 +176,7 @@
         </thead>
         <tbody>
           <tr *ngFor="let row of pagedRows">
-            <td>
+            <td class="money-accounts-table__account-cell">
               <div class="money-accounts-table__acc">
                 <span
                   class="money-accounts-table__icon"
@@ -174,7 +185,7 @@
                 >
                   <i class="fa" [ngClass]="channelIcon(row)"></i>
                 </span>
-                <span>{{ row.label }}</span>
+                <span class="money-accounts-table__acc-name">{{ row.label }}</span>
               </div>
             </td>
             <td>
@@ -182,6 +193,7 @@
                 {{ typeLabelKey(row) | translate }}
               </span>
             </td>
+            <td class="money-accounts-table__branches">{{ branchesLabel(row) }}</td>
             <td>
               <ng-container [ngSwitch]="rowDisplayChannel(row)">
                 <span *ngSwitchCase="'bank'">{{ row.accountNumber || '—' }}</span>

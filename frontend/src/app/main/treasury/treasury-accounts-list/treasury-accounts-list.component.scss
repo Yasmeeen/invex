@@ -142,6 +142,11 @@
   color: #7c3aed;
 }
 
+.tdash-kpi[data-type='vault'] .tdash-kpi__icon {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+
 .tdash-kpi[data-type='settlement'] .tdash-kpi__icon {
   background: rgba(245, 158, 11, 0.14);
   color: #d97706;
@@ -343,6 +348,13 @@
 .tdash-legend__dot[data-type='bank'] {
   background: rgba(59, 130, 246, 0.12);
   color: #2563eb;
+}
+
+.tdash-acc__icon[data-type='vault'],
+.tdash-badge[data-type='vault'],
+.tdash-legend__dot[data-type='vault'] {
+  background: rgba(100, 116, 139, 0.14);
+  color: #334155;
 }
 
 .tdash-acc__icon[data-type='wallet'],

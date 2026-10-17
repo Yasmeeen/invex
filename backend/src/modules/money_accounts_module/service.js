@@ -1,9 +1,14 @@
+import mongoose from 'mongoose';
+import Branch from '../../DB/models/branch.model.js';
 import {
   getOrCreateStoreSettings,
   patchStoreSettings,
 } from '../settings_module/storeSettingsDoc.js';
 import {
+  isAvailableForBranch,
+  moneyAccountAlwaysAllBranches,
   moneyAccountsToPurchaseTreasuries,
+  normalizeBranchIds,
   normalizeMoneyAccounts,
   syncPaymentMapWithCatalog,
 } from '../settings_module/moneyAccounts.js';
@@ -23,7 +28,7 @@ function allAccounts(doc) {
 function publicAccounts(accounts, includeSettlement) {
   const list = Array.isArray(accounts) ? accounts : [];
   if (includeSettlement) return list;
-  return list.filter((a) => a.kind === 'cash' || a.kind === 'treasury');
+  return list.filter((a) => a.kind === 'cash' || a.kind === 'treasury' || a.kind === 'vault');
 }
 
 function serializeAccount(a) {
@@ -35,15 +40,45 @@ function serializeAccount(a) {
     accountNumber: a.accountNumber || '',
     phone: a.phone || '',
     enabled: a.key === 'cash' ? true : a.enabled !== false,
+    branchIds: Array.isArray(a.branchIds) ? a.branchIds.map((id) => String(id)) : [],
   };
 }
 
 function parseChannel(kind, key, raw) {
-  if (key === 'cash' || kind === 'cash' || kind === 'settlement') return '';
+  if (key === 'cash' || kind === 'cash' || kind === 'settlement' || kind === 'vault') return '';
   const c = String(raw || '')
     .trim()
     .toLowerCase();
   return c === 'wallet' ? 'wallet' : 'bank';
+}
+
+function parseCreateKind(raw) {
+  const k = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (k === 'settlement') return 'settlement';
+  if (k === 'vault') return 'vault';
+  return 'treasury';
+}
+
+async function resolveBranchIdsForAccount(kind, key, raw, { requireNonEmpty = false } = {}) {
+  if (moneyAccountAlwaysAllBranches(kind, key)) {
+    return { branchIds: [] };
+  }
+  const branchIds = normalizeBranchIds(raw);
+  if (requireNonEmpty && !branchIds.length) {
+    return { error: 'Select at least one branch for this account' };
+  }
+  if (!branchIds.length) {
+    return { branchIds: [] };
+  }
+  const count = await Branch.countDocuments({
+    _id: { $in: branchIds.map((id) => new mongoose.Types.ObjectId(id)) },
+  });
+  if (count !== branchIds.length) {
+    return { error: 'One or more branches are invalid' };
+  }
+  return { branchIds };
 }
 
 async function persistAccounts(doc, accounts) {
@@ -73,8 +108,16 @@ export const listMoneyAccounts = async (req, res) => {
     const includeSettlement =
       String(req.query.includeSettlement || '').toLowerCase() === '1' ||
       String(req.query.includeSettlement || '').toLowerCase() === 'true';
-    const accounts = publicAccounts(allAccounts(doc), includeSettlement).map(serializeAccount);
-    res.status(200).json({ accounts });
+    const branch = String(req.query.branch || '').trim();
+    let accounts = publicAccounts(allAccounts(doc), includeSettlement);
+    if (branch && mongoose.Types.ObjectId.isValid(branch)) {
+      accounts = accounts.filter((a) =>
+        isAvailableForBranch(a.branchIds, branch, {
+          alwaysAll: moneyAccountAlwaysAllBranches(a.kind, a.key),
+        })
+      );
+    }
+    res.status(200).json({ accounts: accounts.map(serializeAccount) });
   } catch (error) {
     console.error('listMoneyAccounts:', error);
     res.status(500).json({ error: 'Failed to list money accounts' });
@@ -90,27 +133,29 @@ export const createMoneyAccount = async (req, res) => {
     const accounts = allAccounts(doc);
     const used = new Set(accounts.map((a) => a.key));
     const key = allocateKey(label, used);
-    const kind =
-      String(req.body?.kind || '')
-        .trim()
-        .toLowerCase() === 'settlement'
-        ? 'settlement'
-        : 'treasury';
+    const kind = parseCreateKind(req.body?.kind);
     const channel = parseChannel(kind, key, req.body?.channel);
+    const branchResolved = await resolveBranchIdsForAccount(kind, key, req.body?.branchIds, {
+      requireNonEmpty: !moneyAccountAlwaysAllBranches(kind, key),
+    });
+    if (branchResolved.error) {
+      return res.status(400).json({ error: branchResolved.error });
+    }
     const created = {
       key,
       label,
       kind,
       channel,
       accountNumber:
-        kind !== 'settlement' && channel === 'bank'
+        kind === 'treasury' && channel === 'bank'
           ? String(req.body?.accountNumber || '').trim().slice(0, 80)
           : '',
       phone:
-        kind !== 'settlement' && channel === 'wallet'
+        kind === 'treasury' && channel === 'wallet'
           ? String(req.body?.phone || '').trim().slice(0, 40)
           : '',
       enabled: req.body?.enabled !== false && req.body?.enabled !== 'false',
+      branchIds: branchResolved.branchIds,
     };
     const next = [...accounts, created];
     await persistAccounts(doc, next);
@@ -141,9 +186,17 @@ export const updateMoneyAccount = async (req, res) => {
     if (!label) return res.status(400).json({ error: 'label is required' });
 
     if (key === 'cash' || prev.kind === 'cash') {
-      accounts[idx] = { ...prev, label, kind: 'cash', channel: '', accountNumber: '', phone: '', enabled: true };
-    } else {
-      const channel = parseChannel(prev.kind, key, req.body?.channel ?? prev.channel);
+      accounts[idx] = {
+        ...prev,
+        label,
+        kind: 'cash',
+        channel: '',
+        accountNumber: '',
+        phone: '',
+        enabled: true,
+        branchIds: [],
+      };
+    } else if (prev.kind === 'settlement') {
       let enabled = prev.enabled !== false;
       if (req.body?.enabled !== undefined) {
         enabled = req.body.enabled !== false && req.body.enabled !== 'false' && req.body.enabled !== 0;
@@ -151,17 +204,69 @@ export const updateMoneyAccount = async (req, res) => {
       accounts[idx] = {
         ...prev,
         label,
-        kind: prev.kind === 'settlement' ? 'settlement' : 'treasury',
-        channel: prev.kind === 'settlement' ? '' : channel,
+        kind: 'settlement',
+        channel: '',
+        accountNumber: '',
+        phone: '',
+        enabled,
+        branchIds: [],
+      };
+    } else if (prev.kind === 'vault') {
+      let enabled = prev.enabled !== false;
+      if (req.body?.enabled !== undefined) {
+        enabled = req.body.enabled !== false && req.body.enabled !== 'false' && req.body.enabled !== 0;
+      }
+      let branchIds = prev.branchIds || [];
+      if (req.body?.branchIds !== undefined) {
+        const branchResolved = await resolveBranchIdsForAccount('vault', key, req.body.branchIds, {
+          requireNonEmpty: true,
+        });
+        if (branchResolved.error) {
+          return res.status(400).json({ error: branchResolved.error });
+        }
+        branchIds = branchResolved.branchIds;
+      }
+      accounts[idx] = {
+        ...prev,
+        label,
+        kind: 'vault',
+        channel: '',
+        accountNumber: '',
+        phone: '',
+        enabled,
+        branchIds,
+      };
+    } else {
+      const channel = parseChannel(prev.kind, key, req.body?.channel ?? prev.channel);
+      let enabled = prev.enabled !== false;
+      if (req.body?.enabled !== undefined) {
+        enabled = req.body.enabled !== false && req.body.enabled !== 'false' && req.body.enabled !== 0;
+      }
+      let branchIds = prev.branchIds || [];
+      if (req.body?.branchIds !== undefined) {
+        const branchResolved = await resolveBranchIdsForAccount('treasury', key, req.body.branchIds, {
+          requireNonEmpty: true,
+        });
+        if (branchResolved.error) {
+          return res.status(400).json({ error: branchResolved.error });
+        }
+        branchIds = branchResolved.branchIds;
+      }
+      accounts[idx] = {
+        ...prev,
+        label,
+        kind: 'treasury',
+        channel,
         accountNumber:
-          prev.kind !== 'settlement' && channel === 'bank'
+          channel === 'bank'
             ? String(req.body?.accountNumber ?? prev.accountNumber ?? '').trim().slice(0, 80)
             : '',
         phone:
-          prev.kind !== 'settlement' && channel === 'wallet'
+          channel === 'wallet'
             ? String(req.body?.phone ?? prev.phone ?? '').trim().slice(0, 40)
             : '',
-        enabled: prev.kind === 'settlement' ? enabled : enabled,
+        enabled,
+        branchIds,
       };
     }
 

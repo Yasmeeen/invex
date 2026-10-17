@@ -24,6 +24,29 @@
 
   <div class="filters-card bg-secondary plr-4 ptb-2 mb-4" *ngIf="isFilterOpen">
     <div class="row flex-wrap">
+      <div class="col-md-4" *ngIf="showBranchFilter">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branch' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="branches"
+              bindLabel="name"
+              bindValue="_id"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [searchable]="true"
+              [clearable]="true"
+              [(ngModel)]="selectedBranchIds"
+              name="paymentMethodBranchIds"
+              [placeholder]="'tr_money_accounts_all_branches' | translate"
+              (ngModelChange)="onBranchFilterChanged()"
+            >
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
       <div class="col-md-4">
         <div class="form-group mb-0">
           <label>{{ 'tr_search' | translate }}</label>
@@ -39,7 +62,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="form-group mb-0">
           <label>{{ 'tr_pay_show_in' | translate }}</label>
           <select
@@ -54,7 +77,7 @@
           </select>
         </div>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="form-group mb-0">
           <label>{{ 'tr_pay_effect' | translate }}</label>
           <select
@@ -79,6 +102,7 @@
           <col class="payment-methods-table__col-method" />
           <col class="payment-methods-table__col-effect" />
           <col class="payment-methods-table__col-show" />
+          <col class="payment-methods-table__col-branches" />
           <col class="payment-methods-table__col-linked" />
           <col class="payment-methods-table__col-fee" />
           <col class="payment-methods-table__col-actions" />
@@ -88,6 +112,7 @@
             <th>{{ 'tr_payment_methods_fees_col_method' | translate }}</th>
             <th>{{ 'tr_pay_effect' | translate }}</th>
             <th>{{ 'tr_pay_show_in' | translate }}</th>
+            <th>{{ 'tr_branches' | translate }}</th>
             <th>{{ 'tr_payment_linked_account' | translate }}</th>
             <th>{{ 'tr_payment_methods_fees_col_percent' | translate }}</th>
             <th>{{ 'tr_actions' | translate }}</th>
@@ -122,6 +147,7 @@
                 {{ showInLabelKey(row) | translate }}
               </span>
             </td>
+            <td class="payment-methods-table__branches">{{ branchesLabel(row) }}</td>
             <td>
               <div class="payment-methods-table__linked" *ngIf="hasLinkedAccount(row); else noLinkedAccount">
                 <ng-container *ngIf="row.accountKey">

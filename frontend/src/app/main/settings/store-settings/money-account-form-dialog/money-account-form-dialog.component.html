@@ -27,8 +27,12 @@
         >
           <option value="bank">{{ 'tr_money_account_channel_bank' | translate }}</option>
           <option value="wallet">{{ 'tr_money_account_channel_wallet' | translate }}</option>
+          <option value="vault">{{ 'tr_money_account_kind_vault' | translate }}</option>
           <option value="settlement">{{ 'tr_money_account_kind_settlement' | translate }}</option>
         </select>
+        <small class="ma-form__hint" *ngIf="isVault">
+          {{ 'tr_money_account_vault_hint' | translate }}
+        </small>
         <small class="ma-form__hint" *ngIf="isSettlement">
           {{ 'tr_money_account_settlement_hint' | translate }}
         </small>
@@ -58,6 +62,23 @@
           autocomplete="off"
           [attr.placeholder]="'tr_money_account_phone_placeholder' | translate"
         />
+      </label>
+
+      <label class="ma-form__field" *ngIf="showBranchPicker">
+        <span>{{ 'tr_branches' | translate }}</span>
+        <ng-select
+          class="s-control s-select width-100"
+          name="maBranches"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          [(ngModel)]="selectedBranchIds"
+          [placeholder]="'tr_money_account_branches_placeholder' | translate"
+        >
+        </ng-select>
+        <small class="ma-form__hint">{{ 'tr_money_account_branches_hint' | translate }}</small>
       </label>
     </ng-container>
 
@@ -93,7 +114,7 @@
     <button type="button" class="s-btn btn-secondary" (click)="cancel()">
       {{ 'tr_cancel' | translate }}
     </button>
-    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="!label.trim()">
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="cannotSave">
       {{ 'tr_save_settings' | translate }}
     </button>
   </div>

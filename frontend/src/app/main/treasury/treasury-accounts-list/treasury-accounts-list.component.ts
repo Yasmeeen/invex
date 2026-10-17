@@ -19,7 +19,7 @@ import { TreasuryTransferDialogComponent } from '../treasury-transfer-dialog/tre
 import { TreasuryDepositDialogComponent } from '../treasury-deposit-dialog/treasury-deposit-dialog.component';
 import { TreasurySettleDialogComponent } from '../treasury-settle-dialog/treasury-settle-dialog.component';
 
-export type TreasuryDisplayType = 'cash' | 'bank' | 'wallet' | 'settlement';
+export type TreasuryDisplayType = 'cash' | 'bank' | 'wallet' | 'vault' | 'settlement';
 
 type SummaryBucket = {
   type: TreasuryDisplayType;
@@ -93,6 +93,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
       cash: { type: 'cash', total: 0, count: 0 },
       bank: { type: 'bank', total: 0, count: 0 },
       wallet: { type: 'wallet', total: 0, count: 0 },
+      vault: { type: 'vault', total: 0, count: 0 },
       settlement: { type: 'settlement', total: 0, count: 0 },
     };
     for (const acc of this.accounts) {
@@ -100,7 +101,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
       buckets[t].total += Number(acc.expectedBalance) || 0;
       buckets[t].count += 1;
     }
-    return [buckets.cash, buckets.bank, buckets.wallet, buckets.settlement];
+    return [buckets.cash, buckets.bank, buckets.wallet, buckets.vault, buckets.settlement];
   }
 
   get totalBalance(): number {
@@ -195,6 +196,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
   displayType(acc: MoneyAccountBalance): TreasuryDisplayType {
     if (acc.kind === 'cash') return 'cash';
     if (acc.kind === 'settlement') return 'settlement';
+    if (acc.kind === 'vault') return 'vault';
     if (acc.channel === 'wallet') return 'wallet';
     return 'bank';
   }
@@ -204,6 +206,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
       cash: 'tr_treasury_type_cash',
       bank: 'tr_treasury_type_bank',
       wallet: 'tr_treasury_type_wallet',
+      vault: 'tr_treasury_type_vault',
       settlement: 'tr_treasury_type_settlement',
     };
     return this.translate.instant(map[type] || 'tr_treasury_kind_treasury');
@@ -212,6 +215,7 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
   typeIcon(type: TreasuryDisplayType | string): string {
     if (type === 'cash') return 'fa-money';
     if (type === 'wallet') return 'fa-mobile';
+    if (type === 'vault') return 'fa-lock';
     if (type === 'settlement') return 'fa-credit-card';
     return 'fa-university';
   }

@@ -98,8 +98,14 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
     return this.isCashKey(this.fromAccountKey) || this.isCashKey(this.toAccountKey);
   }
 
+  get involvesBranchScoped(): boolean {
+    return (
+      this.isBranchScopedKey(this.fromAccountKey) || this.isBranchScopedKey(this.toAccountKey)
+    );
+  }
+
   get showBranchPicker(): boolean {
-    return this.involvesCash && this.canPickBranch && this.branches.length > 0;
+    return this.involvesBranchScoped && this.canPickBranch && this.branches.length > 0;
   }
 
   get titleKey(): string {
@@ -128,7 +134,7 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
     if (!this.fromAccountKey || !this.toAccountKey || this.fromAccountKey === this.toAccountKey) {
       return true;
     }
-    if (this.involvesCash && this.canPickBranch && !this.selectedBranchId) return true;
+    if (this.involvesBranchScoped && this.canPickBranch && !this.selectedBranchId) return true;
     return this.fromHasNoBalance || this.amountExceedsBalance;
   }
 
@@ -137,7 +143,7 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
   }
 
   onAccountsChanged(): void {
-    if (!this.involvesCash) {
+    if (!this.involvesBranchScoped) {
       this.selectedBranchId = '';
     } else if (!this.selectedBranchId && this.branches.length === 1) {
       this.selectedBranchId = String(this.branches[0]._id || '');
@@ -153,7 +159,7 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
     const uid = this.globals.currentUser?._id;
     const amt = Number(this.amount);
     if (!uid) return;
-    if (this.involvesCash && this.canPickBranch && !this.selectedBranchId) {
+    if (this.involvesBranchScoped && this.canPickBranch && !this.selectedBranchId) {
       this.notify.push(this.translate.instant('tr_treasury_cash_branch_required'), 'error');
       return;
     }
@@ -184,7 +190,7 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
       note: this.note,
       isSettlement: !!this.data.isSettlement,
     };
-    if (this.involvesCash && this.selectedBranchId) {
+    if (this.involvesBranchScoped && this.selectedBranchId) {
       body.branch = this.selectedBranchId;
     }
     this.subscriptions.push(
@@ -210,6 +216,16 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
     if (k === 'cash') return true;
     const opt = this.accountOptions.find((a) => a.key === k);
     return opt?.kind === 'cash';
+  }
+
+  private isBranchScopedKey(key: string): boolean {
+    const k = String(key || '')
+      .trim()
+      .toLowerCase();
+    if (!k) return false;
+    if (k === 'cash') return true;
+    const opt = this.accountOptions.find((a) => a.key === k);
+    return opt?.kind === 'cash' || opt?.kind === 'vault';
   }
 
   private toOption(a: {
@@ -273,13 +289,13 @@ export class TreasuryTransferDialogComponent implements OnInit, OnDestroy {
       this.balancesByKey.clear();
       return;
     }
-    if (this.isCashKey(from) && this.canPickBranch && !this.selectedBranchId) {
+    if (this.isBranchScopedKey(from) && this.canPickBranch && !this.selectedBranchId) {
       this.balancesByKey.delete(from);
       return;
     }
     this.loadingBalances = true;
     const params: { key: string; userId: string; branch?: string } = { key: from, userId: uid };
-    if (this.isCashKey(from) && this.selectedBranchId) {
+    if (this.isBranchScopedKey(from) && this.selectedBranchId) {
       params.branch = this.selectedBranchId;
     }
     this.subscriptions.push(

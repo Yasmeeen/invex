@@ -6,6 +6,7 @@ import {
   listAccountLedger,
   createTreasuryTransfer,
   createTreasuryDeposit,
+  createTreasuryWithdraw,
   setAccountOpeningBalance,
   settleSettlementAccount,
 } from './service.js';
@@ -20,5 +21,6 @@ router.post('/accounts/:key/opening-balance', setAccountOpeningBalance);
 router.post('/accounts/:key/settle', settleSettlementAccount);
 router.post('/transfers', createTreasuryTransfer);
 router.post('/deposits', createTreasuryDeposit);
+router.post('/withdraws', createTreasuryWithdraw);
 
 export default router;

@@ -14,6 +14,7 @@ const SOURCE_TYPES = [
   'transfer',
   'settlement',
   'deposit',
+  'withdraw',
   'drawer_close',
   'drawer_variance',
   'opening',

@@ -17,14 +17,14 @@ const moneyAccountEntry = new mongoose.Schema(
   {
     key: { type: String, required: true, trim: true, maxlength: 40 },
     label: { type: String, required: true, trim: true, maxlength: 120 },
-    /** cash = drawer; treasury = bank/wallet; settlement = app pending payout (aman/valu/…). */
+    /** cash = drawer; treasury = bank/wallet; vault = physical safe; settlement = app pending payout. */
     kind: {
       type: String,
-      enum: ['cash', 'treasury', 'settlement'],
+      enum: ['cash', 'treasury', 'vault', 'settlement'],
       required: true,
       default: 'treasury',
     },
-    /** For treasury kind: bank vs mobile wallet (optional for cash/settlement). */
+    /** For treasury kind: bank vs mobile wallet (optional for cash/vault/settlement). */
     channel: {
       type: String,
       enum: ['bank', 'wallet', ''],
@@ -36,6 +36,14 @@ const moneyAccountEntry = new mongoose.Schema(
     phone: { type: String, trim: true, maxlength: 40, default: '' },
     /** When false, account is inactive in UI pickers (cash stays always enabled). */
     enabled: { type: Boolean, default: true },
+    /**
+     * Branches this account is available in.
+     * Empty = all branches (legacy / cash / settlement).
+     */
+    branchIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+      default: [],
+    },
   },
   { _id: false }
 );
@@ -61,6 +69,14 @@ const paymentMethodCatalogEntry = new mongoose.Schema(
     },
     /** Sale/cashier app surcharge only (ignored for purchase). */
     feePercent: { type: Number, default: 0, min: 0, max: 100 },
+    /**
+     * Branches this payment method is available in.
+     * Empty = all branches (legacy / cash / credit / settlement methods).
+     */
+    branchIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
+      default: [],
+    },
   },
   { _id: false }
 );

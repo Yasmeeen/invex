@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TREASURY_URL } from '@core/base/urls';
 
-export type MoneyAccountKind = 'cash' | 'treasury' | 'settlement';
+export type MoneyAccountKind = 'cash' | 'treasury' | 'vault' | 'settlement';
 
 export interface MoneyAccountBalance {
   key: string;
@@ -13,6 +13,7 @@ export interface MoneyAccountBalance {
   accountNumber?: string;
   phone?: string;
   enabled?: boolean;
+  branchIds?: string[];
   openingBalance: number;
   inTotal: number;
   outTotal: number;
@@ -107,6 +108,7 @@ export class TreasuryAccountsService {
       channel?: string;
       accountNumber?: string;
       phone?: string;
+      branchIds?: string[];
     };
     linkedPaymentMethods?: Array<{ key: string; label: string }>;
     openingBalance: number;
@@ -179,6 +181,16 @@ export class TreasuryAccountsService {
     note?: string;
   }): Observable<any> {
     return this.http.post(`${TREASURY_URL}/deposits`, body);
+  }
+
+  createWithdraw(body: {
+    userId: string;
+    branch: string;
+    accountKey: string;
+    amount: number;
+    note?: string;
+  }): Observable<any> {
+    return this.http.post(`${TREASURY_URL}/withdraws`, body);
   }
 
   setOpeningBalance(

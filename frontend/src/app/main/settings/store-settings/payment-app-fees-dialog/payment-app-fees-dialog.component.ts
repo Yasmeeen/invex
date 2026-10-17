@@ -1,9 +1,13 @@
 import { Component, OnDestroy, OnInit, Optional } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Globals } from '@core/globals';
+import { Branch } from '@core/models/products.model';
 import { PaginationData } from '@core/models/users-interfaces.model';
+import { canPickBranchRole } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { AppNotificationService } from '@shared/services/app-notification.service';
+import { BranchesServce } from '@shared/services/branches.service';
 import { TreasurySettleDialogComponent } from '../../../treasury/treasury-settle-dialog/treasury-settle-dialog.component';
 import {
   MoneyAccount,
@@ -13,6 +17,10 @@ import {
 } from '@shared/services/store-settings.service';
 import { MoneyAccountsService } from '@shared/services/money-accounts.service';
 import { PaymentMethodsService, PaymentMethodRecord } from '@shared/services/payment-methods.service';
+import {
+  isAvailableForBranch,
+  paymentMethodAlwaysAllBranches,
+} from '@shared/utils/branch-scope.util';
 import { forkJoin, Subscription } from 'rxjs';
 import {
   PaymentMethodFormDialogComponent,
@@ -28,6 +36,7 @@ interface CatalogUiRow {
   lockedKey: boolean;
   accountKey: string;
   settlementBankAccountKey: string;
+  branchIds: string[];
   linkedAccountLabel?: string;
   linkedAccountKind?: string;
   linkedAccountChannel?: string;
@@ -41,6 +50,8 @@ interface CatalogUiRow {
 export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
   rows: CatalogUiRow[] = [];
   accounts: MoneyAccount[] = [];
+  branches: Branch[] = [];
+  selectedBranchIds: string[] = [];
   saving = false;
   isFilterOpen = true;
   searchQuery = '';
@@ -48,6 +59,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
   effectFilter: '' | PaymentMethodEffectMode = '';
   page = 1;
   readonly paginationPerPage = 10;
+  private lockedBranchId = '';
 
   private subscriptions: Subscription[] = [];
 
@@ -57,17 +69,34 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
     private storeSettingsService: StoreSettingsService,
     private paymentMethodsApi: PaymentMethodsService,
     private moneyAccounts: MoneyAccountsService,
+    private branchesService: BranchesServce,
     private notify: AppNotificationService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private globals: Globals
   ) {}
 
   get isDialog(): boolean {
     return !!this.dialogRef;
   }
 
+  get showBranchFilter(): boolean {
+    return canPickBranchRole(this.globals.currentUser?.role);
+  }
+
+  get filterBranchIds(): string[] {
+    if (!this.showBranchFilter) {
+      return this.lockedBranchId ? [this.lockedBranchId] : [];
+    }
+    return (this.selectedBranchIds || []).map((id) => String(id)).filter(Boolean);
+  }
+
   get filteredRows(): CatalogUiRow[] {
     const q = this.searchQuery.trim().toLowerCase();
+    const branchIds = this.filterBranchIds;
     return this.rows.filter((row) => {
+      if (branchIds.length && !this.rowMatchesBranches(row, branchIds)) {
+        return false;
+      }
       if (this.showInFilter) {
         if (this.showInFilter === 'both') {
           if (row.showIn !== 'both') return false;
@@ -81,7 +110,8 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
         row.label.toLowerCase().includes(q) ||
         row.key.toLowerCase().includes(q) ||
         this.linkedAccountLabel(row).toLowerCase().includes(q) ||
-        this.settlementBankLabel(row).toLowerCase().includes(q)
+        this.settlementBankLabel(row).toLowerCase().includes(q) ||
+        this.branchesLabel(row).toLowerCase().includes(q)
       );
     });
   }
@@ -109,7 +139,42 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    if (!this.showBranchFilter) {
+      this.lockedBranchId = String(this.globals.currentUser?.branch || '');
+    }
+    this.subscriptions.push(
+      this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
+        next: (res: any) => (this.branches = res?.branches || []),
+        error: () => (this.branches = []),
+      })
+    );
     this.reloadFromApis();
+  }
+
+  onBranchFilterChanged(): void {
+    this.page = 1;
+  }
+
+  branchesLabel(row: CatalogUiRow): string {
+    if (paymentMethodAlwaysAllBranches(row.key, row.effectMode)) {
+      return this.translate.instant('tr_money_accounts_all_branches');
+    }
+    const ids = (row.branchIds || []).map((id) => String(id)).filter(Boolean);
+    if (!ids.length) {
+      return this.translate.instant('tr_money_accounts_all_branches');
+    }
+    const nameById = new Map(
+      (this.branches || []).map((b) => [String(b._id), String(b.name || '').trim()])
+    );
+    const names = ids.map((id) => nameById.get(id) || id).filter(Boolean);
+    return names.length ? names.join('، ') : this.translate.instant('tr_money_accounts_all_branches');
+  }
+
+  private rowMatchesBranches(row: CatalogUiRow, branchIds: string[]): boolean {
+    const alwaysAll = paymentMethodAlwaysAllBranches(row.key, row.effectMode);
+    return branchIds.some((bid) =>
+      isAvailableForBranch(row.branchIds, bid, alwaysAll)
+    );
   }
 
   ngOnDestroy(): void {
@@ -239,6 +304,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
       feePercent: row.feePercent,
       accountKey: row.accountKey,
       settlementBankAccountKey: row.settlementBankAccountKey,
+      branchIds: row.branchIds || [],
       lockedKey: row.lockedKey,
     });
   }
@@ -293,6 +359,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
     feePercent?: number;
     accountKey?: string;
     settlementBankAccountKey?: string;
+    branchIds?: string[];
     lockedKey?: boolean;
   }): void {
     const ref = this.dialog.open(PaymentMethodFormDialogComponent, {
@@ -321,6 +388,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
           feePercent: result.feePercent,
           accountKey: result.accountKey,
           settlementBankAccountKey: result.settlementBankAccountKey,
+          branchIds: result.branchIds || [],
         })
         .subscribe({
           next: () => this.afterMethodMutation(),
@@ -341,6 +409,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
           feePercent: result.feePercent,
           accountKey: result.accountKey,
           settlementBankAccountKey: result.settlementBankAccountKey,
+          branchIds: result.branchIds || [],
         })
         .subscribe({
           next: () => this.afterMethodMutation(),
@@ -381,6 +450,7 @@ export class PaymentAppFeesDialogComponent implements OnInit, OnDestroy {
       lockedKey: true,
       accountKey,
       settlementBankAccountKey: r.settlementBankAccountKey || '',
+      branchIds: Array.isArray(r.branchIds) ? r.branchIds.map((id) => String(id)) : [],
       linkedAccountLabel: r.linkedAccount?.label || '',
       linkedAccountKind: r.linkedAccount?.kind || '',
       linkedAccountChannel: r.linkedAccount?.channel || '',

@@ -12,6 +12,7 @@ import { TreasuryAccountsListComponent } from './treasury-accounts-list/treasury
 import { TreasuryAccountDetailComponent } from './treasury-account-detail/treasury-account-detail.component';
 import { TreasuryTransferDialogModule } from './treasury-transfer-dialog/treasury-transfer-dialog.module';
 import { TreasuryDepositDialogModule } from './treasury-deposit-dialog/treasury-deposit-dialog.module';
+import { TreasuryWithdrawDialogModule } from './treasury-withdraw-dialog/treasury-withdraw-dialog.module';
 import { TreasurySettleDialogModule } from './treasury-settle-dialog/treasury-settle-dialog.module';
 import { TreasuryOpeningDialogComponent } from './treasury-opening-dialog/treasury-opening-dialog.component';
 import { TreasuryConfigPageComponent } from './treasury-config-page/treasury-config-page.component';
@@ -50,6 +51,7 @@ const routes: Routes = [
     TreasuryAccountsListModule,
     TreasuryTransferDialogModule,
     TreasuryDepositDialogModule,
+    TreasuryWithdrawDialogModule,
     TreasurySettleDialogModule,
     PurchaseTreasuryDialogModule,
     PaymentAppFeesDialogModule,

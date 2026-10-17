@@ -16,6 +16,7 @@ import { Subscription } from 'rxjs';
 import { TreasuryOpeningDialogComponent } from '../treasury-opening-dialog/treasury-opening-dialog.component';
 import { TreasuryTransferDialogComponent } from '../treasury-transfer-dialog/treasury-transfer-dialog.component';
 import { TreasuryDepositDialogComponent } from '../treasury-deposit-dialog/treasury-deposit-dialog.component';
+import { TreasuryWithdrawDialogComponent } from '../treasury-withdraw-dialog/treasury-withdraw-dialog.component';
 import { TreasurySettleDialogComponent } from '../treasury-settle-dialog/treasury-settle-dialog.component';
 
 @Component({
@@ -32,6 +33,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
   channel = '';
   accountNumber = '';
   phone = '';
+  accountBranchIds: string[] = [];
   expectedBalance = 0;
   openingBalance = 0;
   entries: TreasuryLedgerEntry[] = [];
@@ -95,6 +97,10 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
     return this.accountKey === 'cash' || this.kind === 'cash';
   }
 
+  get isVault(): boolean {
+    return this.kind === 'vault';
+  }
+
   get canSetOpening(): boolean {
     if (this.isCashAccount) return false;
     const r = this.globals.currentUser?.role;
@@ -103,6 +109,10 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
 
   get canDeposit(): boolean {
     return this.canSetOpening && !this.isSettlement;
+  }
+
+  get canWithdraw(): boolean {
+    return this.canSetOpening && this.isVault;
   }
 
   get showBranchColumn(): boolean {
@@ -181,6 +191,9 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
           this.channel = res.account?.channel || '';
           this.accountNumber = res.account?.accountNumber || '';
           this.phone = res.account?.phone || '';
+          this.accountBranchIds = Array.isArray(res.account?.branchIds)
+            ? res.account.branchIds.map((id) => String(id))
+            : [];
           this.expectedBalance = res.expectedBalance;
           this.openingBalance = res.openingBalance;
           this.linkedPaymentMethods = res.linkedPaymentMethods || [];
@@ -279,6 +292,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
         branchId: isSettlement ? '' : this.filterBranchId,
+        branches: this.canPickBranch ? this.branches : [],
         isSettlement,
         preferFrom: this.accountKey,
       },
@@ -297,6 +311,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
       panelClass: 'treasury-transfer-dialog-panel',
       data: {
         branchId: this.filterBranchId,
+        branches: this.branches,
         preferAccount: this.accountKey,
       },
     });
@@ -305,6 +320,50 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
         if (ok) this.loadAll();
       })
     );
+  }
+
+  openWithdraw(): void {
+    if (!this.canWithdraw) return;
+    const branchId = this.resolveWithdrawBranchId();
+    if (!branchId) {
+      this.notify.push(this.translate.instant('tr_treasury_pick_one_branch'), 'error');
+      return;
+    }
+    const ref = this.dialog.open(TreasuryWithdrawDialogComponent, {
+      width: '480px',
+      panelClass: 'treasury-transfer-dialog-panel',
+      data: {
+        branchId,
+        branches: [],
+        accountKey: this.accountKey,
+        label: this.label,
+      },
+    });
+    this.subscriptions.push(
+      ref.afterClosed().subscribe((ok) => {
+        if (ok) this.loadAll();
+      })
+    );
+  }
+
+  /** Vault withdraw uses page branch / user branch / single linked branch — no picker in dialog. */
+  private resolveWithdrawBranchId(): string {
+    const fromFilter = String(this.filterBranchId || '').trim();
+    if (fromFilter) return fromFilter;
+    if (!this.canPickBranch) {
+      const userBranch = this.globals.currentUser?.branch as string | { _id?: string } | undefined;
+      if (userBranch && typeof userBranch === 'object' && userBranch._id) {
+        return String(userBranch._id);
+      }
+      return String(userBranch || '').trim();
+    }
+    if (this.accountBranchIds.length === 1) {
+      return this.accountBranchIds[0];
+    }
+    if (this.branches.length === 1) {
+      return String(this.branches[0]._id || '').trim();
+    }
+    return '';
   }
 
   openQuickSettle(): void {

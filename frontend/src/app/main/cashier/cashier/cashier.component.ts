@@ -264,7 +264,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.paymentMethods = buildCashierPaymentMethods(
       this.storeSettings.snapshot.paymentAppFeePercents,
       this.translate,
-      this.storeSettings.snapshot.paymentMethodsCatalog
+      this.storeSettings.snapshot.paymentMethodsCatalog,
+      this.cashierBranchId()
     );
     this.cdr.markForCheck();
   }
@@ -344,6 +345,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: this.effectiveCheckoutTotal(),
       mode: 'checkout',
+      branchId: this.cashierBranchId() || undefined,
       initialState: this.hasValidConfirmedPayment()
         ? {
             selectedPayMethods: this.confirmedPayment!.paymentSplits.map((s) => s.method),
@@ -1239,6 +1241,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadProducts();
       this.loadBranchSalespeople();
       this.syncOnlineOrdersBannerBranch();
+      this.rebuildPaymentMethods();
    })
   }
 
@@ -1246,6 +1249,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     this.loadProducts();
     this.loadBranchSalespeople();
     this.syncOnlineOrdersBannerBranch();
+    this.rebuildPaymentMethods();
+    this.invalidateConfirmedPayment();
   }
 
   onCashierCategoryChange(categoryId: string | null): void {

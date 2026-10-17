@@ -6,11 +6,12 @@ import { MoneyAccount, MoneyAccountChannel } from './store-settings.service';
 
 export interface MoneyAccountPayload {
   label: string;
-  kind?: 'cash' | 'treasury' | 'settlement';
+  kind?: 'cash' | 'treasury' | 'vault' | 'settlement';
   channel?: MoneyAccountChannel | '';
   accountNumber?: string;
   phone?: string;
   enabled?: boolean;
+  branchIds?: string[];
 }
 
 @Injectable({ providedIn: 'root' })

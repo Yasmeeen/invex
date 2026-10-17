@@ -96,6 +96,23 @@
         <small class="pm-form__hint">{{ 'tr_payment_settlement_bank_hint' | translate }}</small>
       </label>
     </ng-container>
+
+    <label class="pm-form__field" *ngIf="showBranchPicker">
+      <span>{{ 'tr_branches' | translate }}</span>
+      <ng-select
+        class="s-control s-select"
+        name="pmBranches"
+        [items]="branches"
+        bindLabel="name"
+        bindValue="_id"
+        [multiple]="true"
+        [closeOnSelect]="false"
+        [(ngModel)]="selectedBranchIds"
+        [placeholder]="'tr_money_account_branches_placeholder' | translate"
+      >
+      </ng-select>
+      <small class="pm-form__hint">{{ 'tr_payment_method_branches_hint' | translate }}</small>
+    </label>
   </div>
 
   <div class="pm-form__actions">

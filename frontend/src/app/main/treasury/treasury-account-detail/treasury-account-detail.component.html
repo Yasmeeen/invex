@@ -26,6 +26,14 @@
       >
         {{ 'tr_treasury_deposit' | translate }}
       </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary size-body"
+        *ngIf="canWithdraw"
+        (click)="openWithdraw()"
+      >
+        {{ 'tr_treasury_withdraw' | translate }}
+      </button>
       <button type="button" class="s-btn btn-secondary size-body" (click)="openTransfer(isSettlement)">
         {{ (isSettlement ? 'tr_treasury_settlement_manual' : 'tr_treasury_transfer') | translate }}
       </button>
@@ -70,6 +78,10 @@
 
   <p class="plr-4 text-muted size-caption mb-3" *ngIf="isCashAccount">
     {{ 'tr_treasury_cash_follows_drawer' | translate }}
+  </p>
+
+  <p class="plr-4 text-muted size-caption mb-3" *ngIf="isVault">
+    {{ 'tr_money_account_vault_hint' | translate }}
   </p>
 
   <p class="plr-4 text-muted size-caption mb-3" *ngIf="isSettlement">

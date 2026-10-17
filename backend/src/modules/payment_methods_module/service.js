@@ -1,9 +1,12 @@
+import mongoose from 'mongoose';
+import Branch from '../../DB/models/branch.model.js';
 import {
   getOrCreateStoreSettings,
   patchStoreSettings,
 } from '../settings_module/storeSettingsDoc.js';
 import {
   moneyAccountsToPurchaseTreasuries,
+  normalizeBranchIds,
   normalizeMoneyAccounts,
   syncPaymentMapWithCatalog,
   DEFAULT_SETTLEMENT_BANK_KEY,
@@ -12,6 +15,8 @@ import {
   catalogToPaymentAppFeePercents,
   mergeMoneyAccountsFromCatalog,
   normalizePaymentMethodsCatalog,
+  paymentMethodAlwaysAllBranches,
+  paymentMethodAvailableForBranch,
 } from '../settings_module/paymentMethodsCatalog.js';
 import { allocateKey, isValidKey } from '../settings_module/allocateKey.js';
 
@@ -59,6 +64,7 @@ function serializeMethod(row, mapRow, accountsByKey) {
     feePercent: row.feePercent || 0,
     accountKey,
     settlementBankAccountKey: mapRow?.settlementBankAccountKey || '',
+    branchIds: Array.isArray(row.branchIds) ? row.branchIds.map((id) => String(id)) : [],
     linkedAccount: acc
       ? {
           key: acc.key,
@@ -68,6 +74,26 @@ function serializeMethod(row, mapRow, accountsByKey) {
         }
       : null,
   };
+}
+
+async function resolveBranchIdsForMethod(key, effectMode, raw, { requireNonEmpty = false } = {}) {
+  if (paymentMethodAlwaysAllBranches(key, effectMode)) {
+    return { branchIds: [] };
+  }
+  const branchIds = normalizeBranchIds(raw);
+  if (requireNonEmpty && !branchIds.length) {
+    return { error: 'Select at least one branch for this payment method' };
+  }
+  if (!branchIds.length) {
+    return { branchIds: [] };
+  }
+  const count = await Branch.countDocuments({
+    _id: { $in: branchIds.map((id) => new mongoose.Types.ObjectId(id)) },
+  });
+  if (count !== branchIds.length) {
+    return { error: 'One or more branches are invalid' };
+  }
+  return { branchIds };
 }
 
 function serializeList(doc) {
@@ -153,7 +179,12 @@ export const listPaymentMethods = async (req, res) => {
     if (needsPersist) {
       doc = await patchStoreSettings(doc, { paymentMethodAccountMap: map });
     }
-    res.status(200).json({ paymentMethods: serializeList(doc) });
+    const branch = String(req.query.branch || '').trim();
+    let list = serializeList(doc);
+    if (branch && mongoose.Types.ObjectId.isValid(branch)) {
+      list = list.filter((row) => paymentMethodAvailableForBranch(row, branch));
+    }
+    res.status(200).json({ paymentMethods: list });
   } catch (error) {
     console.error('listPaymentMethods:', error);
     res.status(500).json({ error: 'Failed to list payment methods' });
@@ -183,7 +214,21 @@ export const createPaymentMethod = async (req, res) => {
     feePercent = Math.max(0, Math.min(100, feePercent));
     if (effectMode === 'none') feePercent = 0;
 
-    const created = { key, label, showIn, effectMode, feePercent };
+    const branchResolved = await resolveBranchIdsForMethod(key, effectMode, req.body?.branchIds, {
+      requireNonEmpty: !paymentMethodAlwaysAllBranches(key, effectMode),
+    });
+    if (branchResolved.error) {
+      return res.status(400).json({ error: branchResolved.error });
+    }
+
+    const created = {
+      key,
+      label,
+      showIn,
+      effectMode,
+      feePercent,
+      branchIds: branchResolved.branchIds,
+    };
     catalog.push(created);
 
     const mapRow = buildMapRow(
@@ -244,7 +289,20 @@ export const updatePaymentMethod = async (req, res) => {
     if (key === 'cash') feePercent = 0;
     else if (key !== 'credit' && effectMode === 'none') feePercent = 0;
 
-    catalog[idx] = { key, label, showIn, effectMode, feePercent };
+    let branchIds = prev.branchIds || [];
+    if (paymentMethodAlwaysAllBranches(key, effectMode)) {
+      branchIds = [];
+    } else if (req.body?.branchIds !== undefined) {
+      const branchResolved = await resolveBranchIdsForMethod(key, effectMode, req.body.branchIds, {
+        requireNonEmpty: true,
+      });
+      if (branchResolved.error) {
+        return res.status(400).json({ error: branchResolved.error });
+      }
+      branchIds = branchResolved.branchIds;
+    }
+
+    catalog[idx] = { key, label, showIn, effectMode, feePercent, branchIds };
 
     const accounts = accountsFrom(doc, catalog);
     const map = mapFrom(doc, accounts, catalog);

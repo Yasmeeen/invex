@@ -47,6 +47,8 @@ export interface PaymentSplitsDialogInitialState {
 export interface PaymentSplitsDialogData {
   invoiceNetTotal: number;
   mode: PaymentSplitsDialogMode;
+  /** When set, payment methods are filtered to this branch. */
+  branchId?: string;
   initialState?: PaymentSplitsDialogInitialState;
 }
 
@@ -87,6 +89,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
 
   readonly invoiceNetTotal: number;
   readonly mode: PaymentSplitsDialogMode;
+  readonly branchId: string;
 
   private settingsSub?: Subscription;
   private plansSub?: Subscription;
@@ -104,6 +107,7 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     private ordersService: OrdersSerivce
   ) {
     this.invoiceNetTotal = round2(Number(data.invoiceNetTotal) || 0);
+    this.branchId = String(data.branchId || '').trim();
     this.mode =
       data.mode === 'installment'
         ? 'installment'
@@ -224,7 +228,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
     const all = buildCashierPaymentMethods(
       this.storeSettings.snapshot.paymentAppFeePercents,
       this.translate,
-      this.storeSettings.snapshot.paymentMethodsCatalog
+      this.storeSettings.snapshot.paymentMethodsCatalog,
+      this.branchId || undefined
     );
     this.paymentMethods =
       this.mode === 'installment' || this.mode === 'deposit'

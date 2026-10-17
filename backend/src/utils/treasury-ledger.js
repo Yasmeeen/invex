@@ -32,9 +32,20 @@ export function isCashDrawerAccount(accountKey) {
   return String(accountKey || '').trim().toLowerCase() === 'cash';
 }
 
-/** Cash drawers sum per branch; bank/wallet/settlement identical openings count once. */
-export function companyOpeningForAccount(accountKey, amounts) {
-  if (isCashDrawerAccount(accountKey)) {
+/** Cash drawer + physical vault balances are per branch. */
+export function isBranchScopedMoneyAccount(accountKey, kind) {
+  const k = String(accountKey || '')
+    .trim()
+    .toLowerCase();
+  const kindNorm = String(kind || '')
+    .trim()
+    .toLowerCase();
+  return k === 'cash' || kindNorm === 'cash' || kindNorm === 'vault';
+}
+
+/** Cash/vault openings sum per branch; bank/wallet/settlement identical openings count once. */
+export function companyOpeningForAccount(accountKey, amounts, kind) {
+  if (isBranchScopedMoneyAccount(accountKey, kind)) {
     return round2((amounts || []).reduce((s, a) => s + round2(a ?? 0), 0));
   }
   return combineCompanyOpening(amounts);
@@ -165,6 +176,63 @@ export async function recordTreasuryDeposit({
     return { error: 'Failed to record deposit' };
   }
   return { entry };
+}
+
+/**
+ * One-sided outflow from a vault (physical safe) — no counter account.
+ */
+export async function recordTreasuryWithdraw({
+  branchId,
+  accountKey,
+  amount,
+  occurredAt,
+  note,
+  createdBy,
+  session,
+} = {}) {
+  const key = String(accountKey || '')
+    .trim()
+    .toLowerCase();
+  if (!key) return { error: 'Account is required' };
+
+  const amt = round2(amount);
+  if (!Number.isFinite(amt) || amt <= 0) {
+    return { error: 'Amount must be greater than zero' };
+  }
+
+  const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+  const acc = (moneyAccounts || []).find((a) => a.key === key);
+  if (!acc) return { error: 'Unknown account key' };
+  if (acc.kind !== 'vault') {
+    return { error: 'Withdraw is only allowed from vault accounts' };
+  }
+
+  const fromBal = await computeAccountExpectedBalance(branchId, key);
+  const available = round2(fromBal.expectedBalance);
+  const availableCents = Math.round(available * 100);
+  const amtCents = Math.round(amt * 100);
+  if (availableCents <= 0) {
+    return { error: 'INSUFFICIENT_FUNDS', available };
+  }
+  if (amtCents > availableCents) {
+    return { error: 'AMOUNT_EXCEEDS_BALANCE', available };
+  }
+
+  const entry = await recordTreasuryLedgerEntry({
+    branchId,
+    accountKey: key,
+    direction: 'out',
+    amount: amt,
+    occurredAt,
+    sourceType: 'withdraw',
+    note,
+    createdBy,
+    session,
+  });
+  if (!entry) {
+    return { error: 'Failed to record withdraw' };
+  }
+  return { entry, available };
 }
 
 /**
@@ -740,16 +808,19 @@ export async function computeAccountExpectedBalance(branchId, accountKey, untilD
   return bal;
 }
 
-/** Company-wide expected. Cash openings sum by drawer; other accounts share one opening. */
+/** Company-wide expected. Cash/vault openings sum by branch; other accounts share one opening. */
 export async function computeAccountExpectedBalanceAllBranches(accountKey, untilDate) {
   const key = String(accountKey || '')
     .trim()
     .toLowerCase();
   if (!key) return emptyBalance();
+  const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+  const kind = (moneyAccounts || []).find((a) => a.key === key)?.kind;
   const openings = await TreasuryAccountOpening.find({ accountKey: key }).select('amount').lean();
   const openingBalance = companyOpeningForAccount(
     key,
-    (openings || []).map((d) => d.amount)
+    (openings || []).map((d) => d.amount),
+    kind
   );
   const match = { accountKey: key };
   if (untilDate) {
@@ -865,7 +936,7 @@ export async function computeAccountsExpectedBalances(branchId, accountKeys, unt
   return overlayCashRowInBalanceMap(result, untilDate, { branchId, allBranches: false });
 }
 
-/** Company-wide balances: cash openings are summed; other accounts share one opening. */
+/** Company-wide balances: cash/vault openings are summed; other accounts share one opening. */
 export async function computeAccountsExpectedBalancesAllBranches(accountKeys, untilDate) {
   const keys = [
     ...new Set(
@@ -876,6 +947,9 @@ export async function computeAccountsExpectedBalancesAllBranches(accountKeys, un
   ];
   const result = new Map(keys.map((k) => [k, emptyBalance()]));
   if (!keys.length) return result;
+
+  const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+  const kindByKey = new Map((moneyAccounts || []).map((a) => [a.key, a.kind]));
 
   const openings = await TreasuryAccountOpening.find({ accountKey: { $in: keys } })
     .select('accountKey amount')
@@ -890,7 +964,7 @@ export async function computeAccountsExpectedBalancesAllBranches(accountKeys, un
   }
   for (const [key, amounts] of amountsByKey) {
     const row = result.get(key);
-    if (row) row.openingBalance = companyOpeningForAccount(key, amounts);
+    if (row) row.openingBalance = companyOpeningForAccount(key, amounts, kindByKey.get(key));
   }
 
   const match = { accountKey: { $in: keys } };

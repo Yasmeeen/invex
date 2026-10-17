@@ -20,6 +20,10 @@ import {
   MoneyAccountBalance,
   TreasuryAccountsService,
 } from '@shared/services/treasury-accounts.service';
+import {
+  isAvailableForBranch,
+  moneyAccountAlwaysAllBranches,
+} from '@shared/utils/branch-scope.util';
 import { Subscription } from 'rxjs';
 import {
   MoneyAccountFormDialogComponent,
@@ -32,15 +36,16 @@ import { TreasurySettleDialogComponent } from '../../../treasury/treasury-settle
 interface AccountUiRow {
   key: string;
   label: string;
-  kind: 'cash' | 'treasury' | 'settlement';
+  kind: 'cash' | 'treasury' | 'vault' | 'settlement';
   channel: MoneyAccountChannel | '';
   accountNumber: string;
   phone: string;
   enabled: boolean;
+  branchIds: string[];
   expectedBalance: number | null;
 }
 
-type AccountKpiType = 'cash' | 'bank' | 'wallet' | 'settlement';
+type AccountKpiType = 'cash' | 'bank' | 'wallet' | 'vault' | 'settlement';
 
 interface AccountKpi {
   type: AccountKpiType;
@@ -137,6 +142,13 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
         labelKey: 'tr_treasury_type_wallet',
         icon: 'fa-mobile',
       },
+      vault: {
+        type: 'vault',
+        total: 0,
+        count: 0,
+        labelKey: 'tr_treasury_type_vault',
+        icon: 'fa-lock',
+      },
       settlement: {
         type: 'settlement',
         total: 0,
@@ -150,7 +162,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       buckets[t].total += Number(row.expectedBalance) || 0;
       buckets[t].count += 1;
     }
-    return [buckets.cash, buckets.bank, buckets.wallet, buckets.settlement];
+    return [buckets.cash, buckets.bank, buckets.wallet, buckets.vault, buckets.settlement];
   }
 
   get totalBalance(): number {
@@ -163,9 +175,21 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   get filteredRows(): AccountUiRow[] {
     const q = this.searchQuery.trim().toLowerCase();
+    const branchFilter =
+      this.selectedBranchIds?.length === 1 ? String(this.selectedBranchIds[0]) : '';
     return this.treasuryRows.filter((row) => {
       const ch = this.rowDisplayChannel(row);
       if (this.channelFilter && ch !== this.channelFilter) return false;
+      if (
+        branchFilter &&
+        !isAvailableForBranch(
+          row.branchIds,
+          branchFilter,
+          moneyAccountAlwaysAllBranches(row.kind, row.key)
+        )
+      ) {
+        return false;
+      }
       if (!q) return true;
       return (
         String(row.label || '')
@@ -179,7 +203,8 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
           .includes(q) ||
         String(row.phone || '')
           .toLowerCase()
-          .includes(q)
+          .includes(q) ||
+        this.branchesLabel(row).toLowerCase().includes(q)
       );
     });
   }
@@ -236,6 +261,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   rowDisplayChannel(row: AccountUiRow): AccountKpiType {
     if (row.kind === 'settlement') return 'settlement';
+    if (row.kind === 'vault') return 'vault';
     if (row.key === 'cash' || row.kind === 'cash') return 'cash';
     return row.channel === 'wallet' ? 'wallet' : 'bank';
   }
@@ -248,6 +274,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     const ch = this.rowDisplayChannel(row);
     if (ch === 'cash') return 'fa-money';
     if (ch === 'wallet') return 'fa-mobile';
+    if (ch === 'vault') return 'fa-lock';
     if (ch === 'settlement') return 'fa-credit-card';
     return 'fa-university';
   }
@@ -256,15 +283,36 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     const ch = this.rowDisplayChannel(row);
     if (ch === 'cash') return 'tr_treasury_type_cash';
     if (ch === 'wallet') return 'tr_money_account_channel_wallet';
+    if (ch === 'vault') return 'tr_treasury_type_vault';
     if (ch === 'settlement') return 'tr_treasury_type_settlement';
     return 'tr_money_account_channel_bank';
   }
 
+  branchesLabel(row: AccountUiRow): string {
+    if (moneyAccountAlwaysAllBranches(row.kind, row.key)) {
+      return this.translate.instant('tr_money_accounts_all_branches');
+    }
+    const ids = (row.branchIds || []).map((id) => String(id)).filter(Boolean);
+    if (!ids.length) {
+      return this.translate.instant('tr_money_accounts_all_branches');
+    }
+    const nameById = new Map(
+      (this.branches || []).map((b) => [String(b._id), String(b.name || '').trim()])
+    );
+    const names = ids.map((id) => nameById.get(id) || id).filter(Boolean);
+    return names.length ? names.join('، ') : this.translate.instant('tr_money_accounts_all_branches');
+  }
+
   openAdd(): void {
-    const kind: 'settlement' | 'treasury' =
-      this.channelFilter === 'settlement' ? 'settlement' : 'treasury';
+    let kind: 'settlement' | 'vault' | 'treasury' = 'treasury';
+    if (this.channelFilter === 'settlement') kind = 'settlement';
+    else if (this.channelFilter === 'vault') kind = 'vault';
     const channel =
-      kind === 'settlement' ? '' : this.channelFilter === 'wallet' ? 'wallet' : 'bank';
+      kind === 'settlement' || kind === 'vault'
+        ? ''
+        : this.channelFilter === 'wallet'
+          ? 'wallet'
+          : 'bank';
     this.openFormDialog({ mode: 'add', kind, channel, enabled: true });
   }
 
@@ -314,15 +362,18 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   openEdit(row: AccountUiRow): void {
     if (!this.canManageRow(row)) return;
+    const kind: 'settlement' | 'vault' | 'treasury' =
+      row.kind === 'settlement' ? 'settlement' : row.kind === 'vault' ? 'vault' : 'treasury';
     this.openFormDialog({
       mode: 'edit',
       key: row.key,
       label: row.label,
-      kind: row.kind === 'settlement' ? 'settlement' : 'treasury',
-      channel: row.channel,
+      kind,
+      channel: kind === 'treasury' ? row.channel : '',
       accountNumber: row.accountNumber,
       phone: row.phone,
       enabled: row.enabled !== false,
+      branchIds: row.branchIds || [],
     });
   }
 
@@ -466,11 +517,12 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
     mode: 'add' | 'edit';
     key?: string;
     label?: string;
-    kind?: 'cash' | 'treasury' | 'settlement';
+    kind?: 'cash' | 'treasury' | 'vault' | 'settlement';
     channel?: MoneyAccountChannel | '';
     accountNumber?: string;
     phone?: string;
     enabled?: boolean;
+    branchIds?: string[];
   }): void {
     const ref = this.dialog.open(MoneyAccountFormDialogComponent, {
       width: '440px',
@@ -492,15 +544,19 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   private applyAdd(result: MoneyAccountFormResult): void {
     this.saving = true;
+    const kind =
+      result.kind === 'settlement' ? 'settlement' : result.kind === 'vault' ? 'vault' : 'treasury';
     this.subscriptions.push(
       this.moneyAccounts
         .create({
           label: result.label,
-          kind: result.kind === 'settlement' ? 'settlement' : 'treasury',
-          channel: result.kind === 'settlement' ? '' : result.channel === 'wallet' ? 'wallet' : 'bank',
-          accountNumber: result.accountNumber,
-          phone: result.phone,
+          kind,
+          channel:
+            kind === 'treasury' ? (result.channel === 'wallet' ? 'wallet' : 'bank') : '',
+          accountNumber: kind === 'treasury' ? result.accountNumber : '',
+          phone: kind === 'treasury' ? result.phone : '',
           enabled: result.enabled !== false,
+          branchIds: result.branchIds || [],
         })
         .subscribe({
           next: () => this.afterAccountMutation(),
@@ -512,14 +568,16 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
   private applyEdit(result: MoneyAccountFormResult): void {
     if (!result.key) return;
     this.saving = true;
+    const isTreasury = result.kind === 'treasury';
     this.subscriptions.push(
       this.moneyAccounts
         .update(result.key, {
           label: result.label,
-          channel: result.kind === 'settlement' ? '' : result.channel === 'wallet' ? 'wallet' : 'bank',
-          accountNumber: result.accountNumber,
-          phone: result.phone,
+          channel: isTreasury ? (result.channel === 'wallet' ? 'wallet' : 'bank') : '',
+          accountNumber: isTreasury ? result.accountNumber : '',
+          phone: isTreasury ? result.phone : '',
           enabled: result.enabled !== false,
+          branchIds: result.branchIds || [],
         })
         .subscribe({
           next: () => this.afterAccountMutation(),
@@ -656,7 +714,13 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   private toUiRowFromApi(a: MoneyAccountBalance): AccountUiRow {
     const kind: AccountUiRow['kind'] =
-      a.kind === 'cash' ? 'cash' : a.kind === 'settlement' ? 'settlement' : 'treasury';
+      a.kind === 'cash'
+        ? 'cash'
+        : a.kind === 'settlement'
+          ? 'settlement'
+          : a.kind === 'vault'
+            ? 'vault'
+            : 'treasury';
     const row = this.toUiRow({
       key: a.key,
       label: a.label,
@@ -665,6 +729,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
       accountNumber: a.accountNumber || '',
       phone: a.phone || '',
       enabled: a.enabled !== false,
+      branchIds: a.branchIds || [],
     });
     row.expectedBalance = Number.isFinite(Number(a.expectedBalance)) ? Number(a.expectedBalance) : 0;
     return row;
@@ -722,20 +787,29 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
 
   private toUiRow(a: MoneyAccount): AccountUiRow {
     const key = String(a.key || '').toLowerCase();
+    const kind: AccountUiRow['kind'] =
+      a.kind === 'settlement'
+        ? 'settlement'
+        : a.kind === 'vault'
+          ? 'vault'
+          : a.kind === 'cash' || key === 'cash'
+            ? 'cash'
+            : 'treasury';
     let channel: MoneyAccountChannel | '' =
       a.channel === 'bank' || a.channel === 'wallet' ? a.channel : '';
-    if (key !== 'cash' && !channel) {
+    if (kind === 'treasury' && !channel) {
       channel = this.guessChannel(key);
     }
-    if (key === 'cash') channel = '';
+    if (kind !== 'treasury') channel = '';
     return {
       key,
       label: a.label || '',
-      kind: a.kind === 'settlement' ? 'settlement' : a.kind === 'cash' || key === 'cash' ? 'cash' : 'treasury',
+      kind,
       channel,
       accountNumber: a.accountNumber || '',
       phone: a.phone || '',
       enabled: key === 'cash' ? true : a.enabled !== false,
+      branchIds: Array.isArray(a.branchIds) ? a.branchIds.map((id) => String(id)) : [],
       expectedBalance: null,
     };
   }

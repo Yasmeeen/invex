@@ -1,0 +1,41 @@
+.dialog-pad {
+  display: block;
+  padding: 1rem 1.15rem 1.05rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+}
+
+.dialog-pad h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.deposit-hint {
+  margin: 0 0 0.95rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.dialog-pad .form-group {
+  margin-bottom: 0.85rem;
+}
+
+.dialog-pad .form-group label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.transfer-balance {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4b5563;
+}

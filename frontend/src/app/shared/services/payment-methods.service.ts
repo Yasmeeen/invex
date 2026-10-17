@@ -22,6 +22,7 @@ export interface PaymentMethodRecord {
   feePercent: number;
   accountKey: string;
   settlementBankAccountKey: string;
+  branchIds?: string[];
   linkedAccount?: PaymentMethodLinkedAccount | null;
 }
 
@@ -32,6 +33,7 @@ export interface PaymentMethodPayload {
   feePercent?: number;
   accountKey?: string;
   settlementBankAccountKey?: string;
+  branchIds?: string[];
 }
 
 @Injectable({ providedIn: 'root' })

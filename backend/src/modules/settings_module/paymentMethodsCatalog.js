@@ -2,7 +2,12 @@ import { normalizePaymentAppFeePercents } from './paymentAppFees.js';
 import {
   RETIRED_DEFAULT_PURCHASE_TREASURY_KEYS,
 } from './treasuryMethods.js';
-import { DEFAULT_SETTLEMENT_ACCOUNTS, paymentMethodToAccountMap } from './moneyAccounts.js';
+import {
+  DEFAULT_SETTLEMENT_ACCOUNTS,
+  isAvailableForBranch,
+  normalizeBranchIds,
+  paymentMethodToAccountMap,
+} from './moneyAccounts.js';
 
 const KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
 const SHOW_IN = new Set(['sale', 'purchase', 'both']);
@@ -61,6 +66,23 @@ function normalizeFeePercent(key, raw) {
   return Math.max(0, Math.min(100, Math.round(percent * 100) / 100));
 }
 
+/** cash / credit / settlement methods are always available in every branch. */
+export function paymentMethodAlwaysAllBranches(key, effectMode) {
+  const k = String(key || '')
+    .trim()
+    .toLowerCase();
+  if (k === 'cash' || k === 'credit') return true;
+  return String(effectMode || '')
+    .trim()
+    .toLowerCase() === 'settlement';
+}
+
+export function paymentMethodAvailableForBranch(row, branchId) {
+  return isAvailableForBranch(row?.branchIds, branchId, {
+    alwaysAll: paymentMethodAlwaysAllBranches(row?.key, row?.effectMode),
+  });
+}
+
 /**
  * Normalize a stored/unified payment methods catalog.
  * Empty/missing → migrate from fees + treasuries + defaults (read-time only).
@@ -87,8 +109,11 @@ export function normalizePaymentMethodsCatalog({
       if (!row?.showIn && !defaults.showIn) showIn = 'both';
     }
     const feePercent = normalizeFeePercent(key, row?.feePercent ?? defaults.feePercent ?? 0);
+    const branchIds = paymentMethodAlwaysAllBranches(key, effectMode)
+      ? []
+      : normalizeBranchIds(row?.branchIds ?? defaults.branchIds);
     seen.add(key);
-    out.push({ key, label, showIn, effectMode, feePercent });
+    out.push({ key, label, showIn, effectMode, feePercent, branchIds });
   };
 
   const rawCatalog = Array.isArray(paymentMethodsCatalog) ? paymentMethodsCatalog : [];

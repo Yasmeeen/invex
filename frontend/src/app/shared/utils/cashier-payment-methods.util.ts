@@ -96,18 +96,28 @@ function showsInSale(showIn: string | undefined): boolean {
 
 /**
  * Cashier + lists: prefer unified catalog (sale/both), else fees + static fallback.
+ * When branchId is set, catalog rows scoped to other branches are omitted.
  */
 export function buildCashierPaymentMethods(
   fees: PaymentAppFeePercent[] | undefined | null,
   translate: TranslateService,
-  catalog?: PaymentMethodCatalogRow[] | null
+  catalog?: PaymentMethodCatalogRow[] | null,
+  branchId?: string | null
 ): CashierPaymentMethod[] {
   const seen = new Set<string>();
   const out: CashierPaymentMethod[] = [];
+  const bid = String(branchId || '').trim();
 
-  const catalogSale = (catalog || []).filter(
-    (r) => r?.key && !HIDDEN_METHODS.has(r.key) && showsInSale(r.showIn)
-  );
+  const catalogSale = (catalog || []).filter((r) => {
+    if (!r?.key || HIDDEN_METHODS.has(r.key) || !showsInSale(r.showIn)) return false;
+    if (!bid) return true;
+    const alwaysAll =
+      r.key === 'cash' || r.key === 'credit' || r.effectMode === 'settlement';
+    if (alwaysAll) return true;
+    const ids = (r.branchIds || []).map((id) => String(id)).filter(Boolean);
+    if (!ids.length) return true;
+    return ids.includes(bid);
+  });
 
   if (catalogSale.length) {
     for (const row of catalogSale) {

@@ -8,9 +8,96 @@
   margin-bottom: 1rem;
 }
 
+.reports-page__head--profit {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.15rem;
+}
+
+.reports-page__head-text {
+  min-width: 0;
+}
+
 .reports-page__title {
   margin: 0;
   color: #5b21b6;
+}
+
+.reports-page--profit .reports-page__title {
+  color: #111827;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.reports-page__lead {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  font-size: 0.92rem;
+}
+
+.reports-page__head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reports-page__ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  border-radius: 10px;
+  border-color: #ddd6fe;
+  color: #5b21b6;
+  background: #fff;
+  font-weight: 600;
+
+  .fa {
+    color: inherit;
+  }
+}
+
+.reports-page__export-wrap {
+  position: relative;
+
+  &:hover .reports-page__export-menu,
+  &:focus-within .reports-page__export-menu {
+    display: flex;
+  }
+}
+
+.reports-page__export-menu {
+  display: none;
+  position: absolute;
+  inset-inline-start: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  min-width: 100%;
+  flex-direction: column;
+  padding: 0.35rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+
+  button {
+    border: 0;
+    background: transparent;
+    text-align: start;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    color: #374151;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover {
+      background: #f5f3ff;
+      color: #5b21b6;
+    }
+  }
 }
 
 .reports-page__subtitle {
@@ -81,6 +168,10 @@
   :host ::ng-deep .main-sidebar,
   :host ::ng-deep .main-header,
   :host ::ng-deep .report-filters {
+    display: none !important;
+  }
+
+  .reports-page__head-actions {
     display: none !important;
   }
 }

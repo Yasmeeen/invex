@@ -28,8 +28,11 @@ import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from '
 export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   /** When `bookings`, show booking-specific filters and hide group-by. */
   @Input() reportType = '';
+  /** Profit report: الكل / كاش / تقسيط (client-side view switch). */
+  @Input() profitSaleType: 'consolidated' | 'cash' | 'installment' = 'consolidated';
 
   @Output() apply = new EventEmitter<any>();
+  @Output() profitSaleTypeChange = new EventEmitter<'consolidated' | 'cash' | 'installment'>();
 
   branches: any[] = [];
   products: any[] = [];
@@ -53,6 +56,9 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   private productTypeaheadSub?: Subscription;
   selectedProductLabel = '';
 
+  /** Profit: collapse product / phone / seller / category / group into “additional filters”. */
+  showAdditionalFilters = false;
+
   filters: any = {
     from: this.formatDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
     to: this.formatDate(new Date()),
@@ -71,6 +77,24 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
     booking_search: '',
     booking_created_by: null as string | null,
   };
+
+  get isProfitReport(): boolean {
+    return this.reportType === 'profit';
+  }
+
+  /** Secondary filters: always for non-profit; for profit only when expanded. */
+  get showSecondaryProfitFilters(): boolean {
+    return !this.isProfitReport || this.showAdditionalFilters;
+  }
+
+  setProfitSaleType(type: 'consolidated' | 'cash' | 'installment'): void {
+    if (this.profitSaleType === type) return;
+    this.profitSaleTypeChange.emit(type);
+  }
+
+  toggleAdditionalFilters(): void {
+    this.showAdditionalFilters = !this.showAdditionalFilters;
+  }
 
   constructor(
     private branchesServce: BranchesServce,

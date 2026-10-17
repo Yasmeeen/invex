@@ -1,46 +1,48 @@
-<div class="reports-page">
-  <div class="reports-page__head">
-    <h2 class="reports-page__title">{{ reportTitleKey | translate }}</h2>
+<div class="reports-page" [class.reports-page--profit]="reportType === 'profit'">
+  <div class="reports-page__head" [class.reports-page__head--profit]="reportType === 'profit'">
+    <div class="reports-page__head-text">
+      <h2 class="reports-page__title">{{ reportTitleKey | translate }}</h2>
+      <p class="reports-page__lead" *ngIf="reportType === 'profit'">
+        {{ 'tr_report_profit_subtitle' | translate }}
+      </p>
+    </div>
+    <div class="reports-page__head-actions" *ngIf="reportType === 'profit'">
+      <div class="reports-page__export-wrap">
+        <button class="s-btn btn-secondary reports-page__ghost-btn" type="button">
+          <i class="fa fa-download" aria-hidden="true"></i>
+          {{ 'tr_report_export' | translate }}
+          <i class="fa fa-angle-down" aria-hidden="true"></i>
+        </button>
+        <div class="reports-page__export-menu">
+          <button type="button" (click)="exportExcel()">{{ 'tr_report_export_excel' | translate }}</button>
+          <button type="button" (click)="exportPdf()">{{ 'tr_report_export_pdf' | translate }}</button>
+        </div>
+      </div>
+      <button class="s-btn btn-secondary reports-page__ghost-btn" type="button" (click)="printReport()">
+        <i class="fa fa-print" aria-hidden="true"></i>
+        {{ 'tr_report_print' | translate }}
+      </button>
+    </div>
   </div>
 
-  <app-report-filters [reportType]="reportType" (apply)="onApplyFilters($event)">
-    <button class="s-btn btn-secondary" type="button" (click)="exportExcel()">
-      {{ 'tr_report_export_excel' | translate }}
-    </button>
-    <button class="s-btn btn-secondary" type="button" (click)="exportPdf()">
-      {{ 'tr_report_export_pdf' | translate }}
-    </button>
-    <button class="s-btn btn-primary" type="button" (click)="printReport()">
-      {{ 'tr_report_print' | translate }}
-    </button>
+  <app-report-filters
+    [reportType]="reportType"
+    [profitSaleType]="profitTab"
+    (apply)="onApplyFilters($event)"
+    (profitSaleTypeChange)="setProfitTab($event)"
+  >
+    <ng-container *ngIf="reportType !== 'profit'">
+      <button class="s-btn btn-secondary" type="button" (click)="exportExcel()">
+        {{ 'tr_report_export_excel' | translate }}
+      </button>
+      <button class="s-btn btn-secondary" type="button" (click)="exportPdf()">
+        {{ 'tr_report_export_pdf' | translate }}
+      </button>
+      <button class="s-btn btn-primary" type="button" (click)="printReport()">
+        {{ 'tr_report_print' | translate }}
+      </button>
+    </ng-container>
   </app-report-filters>
-
-  <div class="reports-page__tabs" *ngIf="reportType === 'profit'">
-    <button
-      type="button"
-      class="reports-page__tab"
-      [class.is-active]="profitTab === 'consolidated'"
-      (click)="setProfitTab('consolidated')"
-    >
-      {{ 'tr_report_profit_tab_consolidated' | translate }}
-    </button>
-    <button
-      type="button"
-      class="reports-page__tab"
-      [class.is-active]="profitTab === 'cash'"
-      (click)="setProfitTab('cash')"
-    >
-      {{ 'tr_report_profit_tab_cash' | translate }}
-    </button>
-    <button
-      type="button"
-      class="reports-page__tab"
-      [class.is-active]="profitTab === 'installment'"
-      (click)="setProfitTab('installment')"
-    >
-      {{ 'tr_report_profit_tab_installment' | translate }}
-    </button>
-  </div>
 
   <div class="reports-page__cards">
     <app-report-card

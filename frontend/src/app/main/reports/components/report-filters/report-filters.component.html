@@ -1,5 +1,12 @@
-<div class="report-filters card">
-  <div class="report-filters__row">
+<div class="report-filters card" [class.report-filters--profit]="isProfitReport">
+  <div class="report-filters__row" [class.report-filters__row--profit]="isProfitReport">
+    <!-- Profit: Apply first so it sits at the start (right in RTL), matching the mockup. -->
+    <div class="report-filters__actions report-filters__actions--lead" *ngIf="isProfitReport">
+      <button class="s-btn btn-primary report-filters__apply" type="button" (click)="applyFilters()">
+        {{ 'tr_apply' | translate }}
+      </button>
+    </div>
+
     <div class="report-filters__field">
       <label>{{ 'tr_from' | translate }}</label>
       <input class="s-control" type="date" [(ngModel)]="filters.from" />
@@ -9,7 +16,7 @@
       <input class="s-control" type="date" [(ngModel)]="filters.to" />
     </div>
     <div class="report-filters__field report-filters__field--wide" *ngIf="!branchFilterLocked">
-      <label>{{ 'tr_branches' | translate }}</label>
+      <label>{{ (isProfitReport ? 'tr_branch' : 'tr_branches') | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
         [placeholder]="'tr_report_all_branches' | translate"
@@ -25,12 +32,43 @@
       </ng-select>
     </div>
     <div class="report-filters__field report-filters__field--wide" *ngIf="branchFilterLocked">
-      <label>{{ 'tr_branches' | translate }}</label>
+      <label>{{ (isProfitReport ? 'tr_branch' : 'tr_branches') | translate }}</label>
       <input class="s-control" type="text" [value]="lockedBranchLabel" disabled />
     </div>
+
+    <div class="report-filters__field report-filters__field--sale-type" *ngIf="isProfitReport">
+      <label>{{ 'tr_report_sale_type' | translate }}</label>
+      <div class="report-filters__segment" role="group" [attr.aria-label]="'tr_report_sale_type' | translate">
+        <button
+          type="button"
+          class="report-filters__segment-btn"
+          [class.is-active]="profitSaleType === 'consolidated'"
+          (click)="setProfitSaleType('consolidated')"
+        >
+          {{ 'tr_report_sale_type_all' | translate }}
+        </button>
+        <button
+          type="button"
+          class="report-filters__segment-btn"
+          [class.is-active]="profitSaleType === 'cash'"
+          (click)="setProfitSaleType('cash')"
+        >
+          {{ 'tr_report_profit_tab_cash' | translate }}
+        </button>
+        <button
+          type="button"
+          class="report-filters__segment-btn"
+          [class.is-active]="profitSaleType === 'installment'"
+          (click)="setProfitSaleType('installment')"
+        >
+          {{ 'tr_report_profit_tab_installment' | translate }}
+        </button>
+      </div>
+    </div>
+
     <div
       class="report-filters__field report-filters__field--wide"
-      *ngIf="categoryFilterVisible"
+      *ngIf="categoryFilterVisible && showSecondaryProfitFilters"
     >
       <label>{{ 'tr_report_filter_category_id' | translate }}</label>
       <ng-select
@@ -82,7 +120,12 @@
     </div>
     <div
       class="report-filters__field report-filters__field--wide"
-      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury' && reportType !== 'installments'"
+      *ngIf="
+        reportType !== 'deskPurchases' &&
+        reportType !== 'treasury' &&
+        reportType !== 'installments' &&
+        showSecondaryProfitFilters
+      "
     >
       <label>{{ 'tr_report_filter_product_id' | translate }}</label>
       <ng-select
@@ -118,7 +161,11 @@
     </div>
     <div
       class="report-filters__field"
-      *ngIf="reportType !== 'deskPurchases' && reportType !== 'treasury'"
+      *ngIf="
+        reportType !== 'deskPurchases' &&
+        reportType !== 'treasury' &&
+        showSecondaryProfitFilters
+      "
     >
       <label>{{ 'tr_report_filter_customer_phone' | translate }}</label>
       <input
@@ -156,7 +203,10 @@
         <option value="due">{{ 'tr_collections_due' | translate }}</option>
       </select>
     </div>
-    <div class="report-filters__field" *ngIf="reportType === 'sales' || reportType === 'profit'">
+    <div
+      class="report-filters__field"
+      *ngIf="(reportType === 'sales' || reportType === 'profit') && showSecondaryProfitFilters"
+    >
       <label>{{ 'tr_report_filter_seller' | translate }}</label>
       <ng-select
         class="s-control s-select report-filters__select"
@@ -171,7 +221,12 @@
     </div>
     <div
       class="report-filters__field"
-      *ngIf="reportType !== 'bookings' && reportType !== 'deskPurchases' && reportType !== 'treasury'"
+      *ngIf="
+        reportType !== 'bookings' &&
+        reportType !== 'deskPurchases' &&
+        reportType !== 'treasury' &&
+        showSecondaryProfitFilters
+      "
     >
       <label>{{ 'tr_report_filter_group' | translate }}</label>
       <select class="s-control" [(ngModel)]="filters.groupBy">
@@ -179,7 +234,8 @@
         <option value="monthly">{{ 'tr_report_group_monthly' | translate }}</option>
       </select>
     </div>
-    <div class="report-filters__actions">
+
+    <div class="report-filters__actions" *ngIf="!isProfitReport">
       <button class="s-btn btn-primary" type="button" (click)="applyFilters()">
         {{ 'tr_apply' | translate }}
       </button>
@@ -187,6 +243,23 @@
         {{ 'tr_reset' | translate }}
       </button>
       <ng-content></ng-content>
+    </div>
+
+    <div class="report-filters__actions report-filters__actions--trail" *ngIf="isProfitReport">
+      <button
+        class="s-btn btn-secondary report-filters__more-btn"
+        type="button"
+        [class.is-open]="showAdditionalFilters"
+        (click)="toggleAdditionalFilters()"
+      >
+        <i class="fa fa-filter" aria-hidden="true"></i>
+        <span>{{ 'tr_report_additional_filters' | translate }}</span>
+        <i
+          class="fa"
+          [ngClass]="showAdditionalFilters ? 'fa-angle-up' : 'fa-angle-down'"
+          aria-hidden="true"
+        ></i>
+      </button>
     </div>
   </div>
 

@@ -256,3 +256,210 @@ export function applyPaymentToInstallments(installments, appliedAmount, meta = {
     remainingInstallments: countUnpaidInstallments(installments),
   };
 }
+
+function installmentRowRemaining(row) {
+  return installmentRemaining(row);
+}
+
+/**
+ * Spread `total` across weights. Last bucket absorbs rounding.
+ * `capAtWeight` keeps each share within its weight (cash vs installment remaining).
+ */
+function allocateAcross(weights, total, { capAtWeight = false } = {}) {
+  const n = weights.length;
+  const out = new Array(n).fill(0);
+  const sum = round2(weights.reduce((s, w) => s + Math.max(0, Number(w) || 0), 0));
+  const target = round2(total);
+  if (!n || target === 0) return out;
+  if (sum <= 0) {
+    out[n - 1] = target;
+    return out;
+  }
+  if (capAtWeight && target >= sum - 0.001) return weights.map((w) => round2(Math.max(0, w)));
+
+  let allocated = 0;
+  for (let i = 0; i < n; i++) {
+    const cap = round2(Math.max(0, Number(weights[i]) || 0));
+    if (i === n - 1) {
+      const rest = round2(target - allocated);
+      out[i] = capAtWeight ? round2(Math.min(cap, Math.max(0, rest))) : rest;
+      break;
+    }
+    const share = round2((target * cap) / sum);
+    const take = capAtWeight ? round2(Math.min(cap, Math.max(0, share))) : share;
+    out[i] = take;
+    allocated = round2(allocated + take);
+  }
+  if (capAtWeight) {
+    let left = round2(target - out.reduce((s, n) => s + n, 0));
+    for (let i = 0; i < n && left > 0.001; i++) {
+      const room = round2(Math.max(0, Number(weights[i]) || 0) - out[i]);
+      if (room <= 0.001) continue;
+      const add = round2(Math.min(room, left));
+      out[i] = round2(out[i] + add);
+      left = round2(left - add);
+    }
+  }
+  return out;
+}
+
+/**
+ * Early settlement: customer pays `settlementAmount` instead of the open balance.
+ * Interest is whatever is collected above installment principal (principal first).
+ * Sale profit is cash that will have been collected minus goods cost.
+ */
+export function previewEarlySettlement(order, settlementAmount) {
+  const rows = Array.isArray(order?.installments) ? order.installments : [];
+  const unpaid = rows.filter((r) => installmentRowRemaining(r) > 0.001);
+  const installmentRemainingTotal = round2(
+    unpaid.reduce((s, r) => s + installmentRowRemaining(r), 0)
+  );
+  const scheduleTotal = round2(rows.reduce((s, r) => s + round2(r.amount), 0));
+  const schedulePaid = round2(rows.reduce((s, r) => s + round2(r.paidAmount), 0));
+  const principal = round2(order?.installmentPrincipal);
+  const interestFromFields = round2(
+    (Number(order?.installmentInterestAmount) || 0) +
+      (Number(order?.installmentSurchargeAmount) || 0) -
+      (Number(order?.installmentDiscountAmount) || 0)
+  );
+  const hasInterestInfo =
+    interestFromFields > 0.001 ||
+    (principal > 0.001 && scheduleTotal > principal + 0.001);
+  const interestPlanned = !hasInterestInfo
+    ? 0
+    : interestFromFields > 0.001
+      ? interestFromFields
+      : round2(scheduleTotal - principal);
+
+  const amountPaid = round2(order?.amountPaid);
+  const totalPrice = round2(order?.totalPrice);
+  const invoiceRemaining = round2(Math.max(0, totalPrice - amountPaid));
+  const due =
+    invoiceRemaining > 0.001 ? invoiceRemaining : installmentRemainingTotal;
+
+  const rawSettlement = round2(settlementAmount);
+  const settlementValid =
+    Number.isFinite(rawSettlement) &&
+    rawSettlement > 0.001 &&
+    rawSettlement <= due + 0.001 &&
+    due > 0.001;
+  const settlement = settlementValid ? Math.min(rawSettlement, due) : 0;
+  const waiver = settlementValid ? round2(due - settlement) : 0;
+
+  const scheduleCollectedAfter = round2(
+    schedulePaid + Math.min(settlement || 0, installmentRemainingTotal)
+  );
+  const interestKept = hasInterestInfo
+    ? round2(Math.max(0, scheduleCollectedAfter - principal))
+    : 0;
+  const interestShortfall = round2(Math.max(0, interestPlanned - interestKept));
+  let interestVerdict = "none";
+  if (hasInterestInfo) {
+    interestVerdict = interestKept > 0.005 ? "gain" : "loss";
+  }
+
+  const cost = round2(
+    (order?.products || []).reduce((s, p) => {
+      return s + (Number(p?.cost) || 0) * (Number(p?.quantity) || 0);
+    }, 0)
+  );
+  const collectedBefore = amountPaid;
+  const profitBefore = round2(collectedBefore + due - cost);
+  const profitAfter = settlementValid
+    ? round2(collectedBefore + settlement - cost)
+    : profitBefore;
+  let saleVerdict = "even";
+  if (profitAfter > 0.005) saleVerdict = "gain";
+  else if (profitAfter < -0.005) saleVerdict = "loss";
+
+  return {
+    due,
+    unpaidCount: unpaid.length,
+    installmentRemaining: installmentRemainingTotal,
+    settlement,
+    waiver,
+    principal,
+    interestPlanned,
+    interestKept,
+    interestShortfall,
+    interestVerdict,
+    cost,
+    profitBefore,
+    profitAfter,
+    saleVerdict,
+    valid: settlementValid,
+  };
+}
+
+/**
+ * Close every unpaid installment for a discounted (or full) early settlement.
+ * Mutates installment rows. Profit booked on the payment is the signed change
+ * so a waiver larger than remaining margin becomes a loss.
+ */
+export function applyEarlySettlementToInstallments(order, settlementAmount, meta = {}) {
+  const preview = previewEarlySettlement(order, settlementAmount);
+  if (!preview.valid) {
+    return { ...preview, applied: 0, installmentProfit: 0 };
+  }
+
+  let totalProfit = ensureInstallmentProfitShares(order);
+  const lineProfit = orderLineTradingProfit(order.products);
+  if (Math.abs(totalProfit) <= 0.001 && Math.abs(lineProfit) > 0.001) {
+    totalProfit = lineProfit;
+    if (lineProfit > 0.001) {
+      allocateInstallmentProfitShares(order.installments, lineProfit);
+      order.installmentTotalProfit = lineProfit;
+    }
+  }
+  const rows = order.installments || [];
+  const unpaid = rows
+    .filter((r) => installmentRowRemaining(r) > 0.001)
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  const remainings = unpaid.map((r) => installmentRowRemaining(r));
+  const takes = allocateAcross(
+    remainings,
+    Math.min(preview.settlement, preview.installmentRemaining),
+    { capAtWeight: true }
+  );
+
+  const trackedAlready = round2(
+    (order.payments || []).reduce((s, p) => s + (Number(p?.installmentProfit) || 0), 0)
+  );
+  const targetProfit = round2(totalProfit - preview.waiver);
+  const installmentProfit = round2(targetProfit - trackedAlready);
+  const positiveRecognize = round2(Math.max(0, installmentProfit));
+  const recognizeWeights = takes.some((t) => t > 0.001) ? takes : remainings;
+  const recognizeParts = allocateAcross(recognizeWeights, positiveRecognize);
+
+  const paidAt = meta.paidAt ? new Date(meta.paidAt) : new Date();
+  const method = String(meta.paymentMethod || "").trim();
+  const uid = meta.paidByUserId || undefined;
+
+  unpaid.forEach((row, i) => {
+    const take = takes[i] || 0;
+    row.paidAmount = round2((Number(row.paidAmount) || 0) + take);
+    row.paid = true;
+    row.earlySettlement = true;
+    row.paidAt = paidAt;
+    if (method) row.paymentMethod = method;
+    if (uid) row.paidByUserId = uid;
+    const prev = round2(row.recognizedProfit);
+    row.recognizedProfit = round2(prev + (recognizeParts[i] || 0));
+    row.profitShare = row.recognizedProfit;
+    onInstallmentPaymentForPromises(row, { userId: uid, now: paidAt });
+  });
+
+  order.installmentTotalProfit = round2(Math.max(0, targetProfit));
+  order.earlySettlementClosed = true;
+  order.earlySettlementWaiver = round2(
+    (Number(order.earlySettlementWaiver) || 0) + preview.waiver
+  );
+  order.earlySettlementAmount = preview.settlement;
+  order.earlySettlementAt = paidAt;
+
+  return {
+    ...preview,
+    applied: preview.settlement,
+    installmentProfit,
+  };
+}

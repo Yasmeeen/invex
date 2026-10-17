@@ -54,9 +54,11 @@ import InstallmentPlan from '../../DB/models/installmentPlan.model.js';
 import {
   applyPaymentToInstallments,
   allocateInstallmentProfitShares,
+  applyEarlySettlementToInstallments,
   buildSaleInstallmentSchedule,
   ensureInstallmentProfitShares,
   orderLineTradingProfit,
+  previewEarlySettlement,
 } from '../../utils/sale-installments.js';
 import {
   clearInstallmentPromiseToPay,
@@ -1858,6 +1860,194 @@ export const addOrderPayment = async (req, res) => {
   } catch (error) {
     console.error('addOrderPayment:', error);
     res.status(500).json({ error: 'Failed to add payment' });
+  }
+};
+
+function distributeSignedProfit(total, weights) {
+  const n = weights.length;
+  const out = new Array(n).fill(0);
+  const sum = Math.round(weights.reduce((s, w) => s + (Number(w) || 0), 0) * 100) / 100;
+  const target = Math.round((Number(total) || 0) * 100) / 100;
+  if (!n || !target) return out;
+  if (sum <= 0) {
+    out[n - 1] = target;
+    return out;
+  }
+  let allocated = 0;
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1) {
+      out[i] = Math.round((target - allocated) * 100) / 100;
+      break;
+    }
+    const share = Math.round(((target * (Number(weights[i]) || 0)) / sum) * 100) / 100;
+    out[i] = share;
+    allocated = Math.round((allocated + share) * 100) / 100;
+  }
+  return out;
+}
+
+/** POST close remaining installments for a custom amount and record the payment. */
+export const earlySettleOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const {
+      settlementAmount,
+      paidAt,
+      userId,
+      note,
+      paymentSplits: paymentSplitsRaw,
+      paymentFeeAllocations: paymentFeeAllocationsRaw,
+      branchId: branchIdRaw,
+    } = req.body || {};
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status === 'restored') return res.status(400).json({ error: 'Order is restored' });
+    if (!Array.isArray(order.installments) || !order.installments.length) {
+      return res.status(400).json({ error: 'Order has no installments' });
+    }
+
+    const preview = previewEarlySettlement(order, settlementAmount);
+    if (!preview.valid) {
+      return res.status(400).json({ error: 'Invalid early settlement amount', preview });
+    }
+
+    const splitsRaw = Array.isArray(paymentSplitsRaw) ? paymentSplitsRaw : [];
+    const splits = splitsRaw
+      .map((s) => ({
+        method: String(s?.method ?? s?.key ?? '').trim().toLowerCase(),
+        amount: Math.round((Number(s?.amount) || 0) * 100) / 100,
+      }))
+      .filter(
+        (s) =>
+          s.method &&
+          s.method !== 'credit' &&
+          s.method !== 'installment' &&
+          Number.isFinite(s.amount) &&
+          s.amount > 0
+      );
+    if (!splits.length) {
+      return res.status(400).json({ error: 'At least one payment method with amount is required' });
+    }
+
+    const paidNet = Math.round(splits.reduce((a, s) => a + s.amount, 0) * 100) / 100;
+    if (Math.abs(paidNet - preview.settlement) > 0.02) {
+      return res.status(400).json({
+        error: 'Payment methods must equal the early settlement amount',
+      });
+    }
+
+    const dt = paidAt ? new Date(paidAt) : new Date();
+    if (Number.isNaN(dt.getTime())) return res.status(400).json({ error: 'Invalid paidAt date' });
+
+    const uid = mongoose.Types.ObjectId.isValid(String(userId || ''))
+      ? new mongoose.Types.ObjectId(String(userId))
+      : undefined;
+
+    const resolvedPaymentBranch = await resolveBranchForCashDrawer({
+      userId,
+      branchId: branchIdRaw,
+    });
+
+    const noteStr = String(note || '').trim() || 'سداد معجل';
+    const primaryMethod = splits.length === 1 ? splits[0].method : 'mixed';
+    order.payments = order.payments || [];
+
+    const settlementResult = applyEarlySettlementToInstallments(order, preview.settlement, {
+      paidAt: dt,
+      paymentMethod: primaryMethod,
+      paidByUserId: uid,
+    });
+    const profitParts = distributeSignedProfit(
+      settlementResult.installmentProfit,
+      splits.map((s) => s.amount)
+    );
+
+    splits.forEach((s, i) => {
+      order.payments.push({
+        amount: s.amount,
+        paidAt: dt,
+        paidByUserId: uid,
+        ...(resolvedPaymentBranch ? { branch: resolvedPaymentBranch } : {}),
+        method: s.method,
+        countsTowardInvoice: true,
+        earlySettlement: true,
+        installmentProfit: profitParts[i] || 0,
+        note: noteStr,
+      });
+    });
+
+    const feeAllocations = normalizePaymentFeeAllocations(paymentFeeAllocationsRaw);
+    appendFeePaymentLines(order.payments, feeAllocations, {
+      paidAt: dt,
+      paidByUserId: uid,
+    });
+
+    const alreadyPaid = Number(order.amountPaid) || 0;
+    order.amountPaid = Math.round((alreadyPaid + preview.settlement) * 100) / 100;
+    const waivedTotal = Math.round(((Number(order.totalPrice) || 0) - preview.waiver) * 100) / 100;
+    order.totalPrice = Math.round(Math.max(order.amountPaid, waivedTotal) * 100) / 100;
+    if (order.amountPaid + 0.001 >= order.totalPrice) {
+      order.totalPrice = order.amountPaid;
+      order.paymentStatus = 'paid';
+    } else {
+      order.paymentStatus = order.amountPaid > 0 ? 'partial' : 'unpaid';
+    }
+
+    order.markModified('installments');
+    order.markModified('payments');
+    await order.save();
+
+    await safeTreasuryPost('order_payment', async () => {
+      const branchForLedger =
+        resolvedPaymentBranch || order.branch || (await resolveBranchForCashDrawer({ userId }));
+      if (!branchForLedger) return;
+      const recent = (order.payments || []).slice(-20);
+      const justAdded = recent.filter(
+        (p) => p.paidAt && Math.abs(new Date(p.paidAt).getTime() - dt.getTime()) < 2000
+      );
+      await postOrderPaymentLinesToLedger({
+        branchId: branchForLedger,
+        payments: justAdded.length ? justAdded : recent.slice(-5),
+        orderId: order._id,
+        createdBy: userId,
+      });
+    });
+
+    await auditLog(req, {
+      action: 'payment',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: order?.orderNumber != null ? `#${order.orderNumber}` : undefined,
+      message: `Early settlement ${preview.settlement} (waived ${preview.waiver})`,
+      metadata: {
+        orderNumber: order?.orderNumber,
+        earlySettlement: true,
+        amount: preview.settlement,
+        waiver: preview.waiver,
+        interestVerdict: preview.interestVerdict,
+        saleVerdict: preview.saleVerdict,
+        profitAfter: preview.profitAfter,
+        interestKept: preview.interestKept,
+        amountPaid: order.amountPaid,
+        totalPrice: order.totalPrice,
+      },
+    });
+
+    res.json({
+      message: 'Early settlement recorded',
+      order,
+      preview: settlementResult,
+      remainingInstallments: 0,
+      remainingAfter: Math.max(
+        0,
+        Math.round(((Number(order.totalPrice) || 0) - (Number(order.amountPaid) || 0)) * 100) / 100
+      ),
+    });
+  } catch (error) {
+    console.error('earlySettleOrder:', error);
+    res.status(500).json({ error: 'Failed to record early settlement' });
   }
 };
 

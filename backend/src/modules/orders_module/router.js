@@ -6,6 +6,7 @@ import {
     getNextInstallmentSaleNumber,
     createOrder,
     addOrderPayment,
+    earlySettleOrder,
     setInstallmentPromise,
     updateOrder,
     deleteOrder,
@@ -21,6 +22,7 @@ router.get('/next-installment-sale-number', getNextInstallmentSaleNumber);
 router.get('/:id', getOrderById);        // GET one by ID
 router.post('/createOrder', createOrder);           // POST create
 router.post('/:orderId/payments', addOrderPayment);
+router.post('/:orderId/early-settlement', earlySettleOrder);
 router.post('/:orderId/installments/:installmentId/promise', setInstallmentPromise);
 router.post('/:orderId/admin-delete', adminDeleteInstallmentSale);
 router.patch('/:orderId/admin-sale-number', adminUpdateInstallmentSaleNumber);

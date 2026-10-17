@@ -1397,7 +1397,7 @@ export const getClientHistory = async (req, res) => {
       partyType: { $ne: "supplier" },
     })
       .select(
-        "orderNumber installmentSaleNumber minimumCollectionAmount totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName collectorId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments products.name products.code products.quantity"
+        "orderNumber installmentSaleNumber minimumCollectionAmount totalPrice amountPaid paymentMethod paymentStatus status createdAt branch sellerName collectorId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installmentDiscountAmount installmentSurchargeAmount installmentTotalProfit earlySettlementClosed earlySettlementWaiver earlySettlementAmount installments products.name products.code products.quantity products.cost"
       )
       .populate("branch", "name")
       .populate("collectorId", "name")

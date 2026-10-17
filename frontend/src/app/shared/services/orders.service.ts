@@ -65,6 +65,27 @@ addPayment(
   return this.http.post(`${ORDERS_URL}/${orderId}/payments`, payload);
 }
 
+earlySettle(
+  orderId: string,
+  payload: {
+    settlementAmount: number;
+    paidAt?: string;
+    userId?: string;
+    note?: string;
+    branchId?: string;
+    paymentSplits?: { method: string; amount: number }[];
+    paymentFeeAllocations?: {
+      forMethod: string;
+      feeNet: number;
+      paidVia: string;
+      feeGrossOnPaidVia: number;
+      feePercentSnapshot?: number;
+    }[];
+  }
+) {
+  return this.http.post(`${ORDERS_URL}/${orderId}/early-settlement`, payload);
+}
+
 setInstallmentPromise(
   orderId: string,
   installmentId: string,

@@ -125,8 +125,11 @@ const orderSchema = new mongoose.Schema(
         /**
          * Installment trading profit recognized by this payment (cash-basis).
          * Down payment at checkout is 0; follow-up collections get a proportional share.
+         * May be negative when an early settlement waives more than the remaining margin.
          */
-        installmentProfit: { type: Number, required: false, min: 0, default: 0 },
+        installmentProfit: { type: Number, required: false, default: 0 },
+        /** This collection closed the open installment balance early. */
+        earlySettlement: { type: Boolean, default: false },
         /** Purchase treasuries when recording pay-later settlement (same keys as desk purchase). */
         paymentTreasurySplits: {
           type: [
@@ -171,6 +174,11 @@ const orderSchema = new mongoose.Schema(
      * Recognized over time as installments are collected.
      */
     installmentTotalProfit: { type: Number, min: 0, default: 0 },
+    /** Open installments were closed for less than (or equal to) the balance due. */
+    earlySettlementClosed: { type: Boolean, default: false },
+    earlySettlementWaiver: { type: Number, min: 0, default: 0 },
+    earlySettlementAmount: { type: Number, min: 0, default: 0 },
+    earlySettlementAt: { type: Date, required: false },
     installments: [
       {
         sequence: { type: Number, required: true, min: 1 },
@@ -212,6 +220,8 @@ const orderSchema = new mongoose.Schema(
           },
         ],
         note: { type: String, trim: true, default: "" },
+        /** Closed as part of an early settlement (may be less cash than the scheduled amount). */
+        earlySettlement: { type: Boolean, default: false },
       },
     ],
 

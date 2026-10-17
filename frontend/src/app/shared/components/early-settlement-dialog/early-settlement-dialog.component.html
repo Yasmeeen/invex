@@ -1,0 +1,166 @@
+<div class="early-settlement-dialog">
+  <h2 class="early-settlement-dialog__title">{{ 'tr_early_settlement' | translate }}</h2>
+  <p class="early-settlement-dialog__hint">{{ 'tr_early_settlement_hint' | translate }}</p>
+
+  <ul class="early-settlement-dialog__facts">
+    <li *ngIf="order.installmentSaleNumber != null">
+      {{ 'tr_installment_sale_number' | translate }}:
+      <strong>#{{ order.installmentSaleNumber }}</strong>
+    </li>
+    <li *ngIf="order.orderNumber != null">
+      {{ 'tr_order_number' | translate }}: <strong>#{{ order.orderNumber }}</strong>
+    </li>
+    <li>
+      {{ 'tr_early_settlement_due' | translate }}:
+      <strong>{{ preview.due | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+    <li>
+      {{ 'tr_early_settlement_unpaid_count' | translate }}:
+      <strong>{{ preview.unpaidCount }}</strong>
+    </li>
+    <li>
+      {{ 'tr_early_settlement_cost' | translate }}:
+      <strong>{{ preview.cost | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+  </ul>
+
+  <label class="early-settlement-dialog__field" *ngIf="showBranchPicker">
+    <span>{{ 'tr_branch' | translate }}</span>
+    <select class="s-control" [(ngModel)]="branchId">
+      <option *ngFor="let b of branches" [value]="b._id">{{ b.name }}</option>
+    </select>
+  </label>
+
+  <label class="early-settlement-dialog__field">
+    <span>{{ 'tr_early_settlement_amount' | translate }}</span>
+    <input
+      type="number"
+      class="s-control"
+      min="0.01"
+      step="0.01"
+      [(ngModel)]="amount"
+      [placeholder]="'tr_early_settlement_amount_placeholder' | translate"
+    />
+    <p class="early-settlement-dialog__error" *ngIf="amountInvalid">
+      {{ 'tr_early_settlement_invalid_amount' | translate }}
+    </p>
+  </label>
+
+  <div class="early-settlement-dialog__results" *ngIf="preview.valid">
+    <p class="early-settlement-dialog__waiver" *ngIf="preview.waiver > 0.001">
+      {{ 'tr_early_settlement_waiver' | translate }}:
+      <strong>{{ preview.waiver | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </p>
+
+    <div
+      class="early-settlement-dialog__mixed"
+      *ngIf="preview.interestVerdict === 'loss' && preview.saleVerdict === 'gain'"
+    >
+      {{ 'tr_early_settlement_mixed' | translate }}
+    </div>
+
+    <section
+      class="early-settlement-dialog__card"
+      [class.early-settlement-dialog__card--gain]="preview.interestVerdict === 'gain'"
+      [class.early-settlement-dialog__card--loss]="preview.interestVerdict === 'loss'"
+    >
+      <header>
+        <h3>{{ 'tr_early_settlement_interest_title' | translate }}</h3>
+        <span class="early-settlement-dialog__badge" *ngIf="preview.interestVerdict === 'gain'">
+          {{ 'tr_early_settlement_gain' | translate }}
+        </span>
+        <span class="early-settlement-dialog__badge" *ngIf="preview.interestVerdict === 'loss'">
+          {{ 'tr_early_settlement_loss' | translate }}
+        </span>
+      </header>
+      <p *ngIf="preview.interestVerdict === 'none'">
+        {{ 'tr_early_settlement_interest_none' | translate }}
+      </p>
+      <ng-container *ngIf="preview.interestVerdict !== 'none'">
+        <p>
+          {{ 'tr_early_settlement_principal' | translate }}:
+          <strong>{{ preview.principal | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </p>
+        <p>
+          {{ 'tr_early_settlement_interest_planned' | translate }}:
+          <strong>{{ preview.interestPlanned | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </p>
+        <p>
+          {{ 'tr_early_settlement_interest_kept' | translate }}:
+          <strong>{{ preview.interestKept | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+        </p>
+        <p class="early-settlement-dialog__verdict" *ngIf="preview.interestVerdict === 'loss'">
+          {{ 'tr_early_settlement_interest_loss' | translate:{ planned: (preview.interestPlanned | number:'1.2-2') } }}
+        </p>
+        <p
+          class="early-settlement-dialog__verdict"
+          *ngIf="preview.interestVerdict === 'gain' && preview.interestShortfall > 0.005"
+        >
+          {{
+            'tr_early_settlement_interest_partial'
+              | translate:{
+                  kept: (preview.interestKept | number:'1.2-2'),
+                  shortfall: (preview.interestShortfall | number:'1.2-2')
+                }
+          }}
+        </p>
+        <p
+          class="early-settlement-dialog__verdict"
+          *ngIf="preview.interestVerdict === 'gain' && preview.interestShortfall <= 0.005"
+        >
+          {{ 'tr_early_settlement_interest_gain' | translate:{ amount: (preview.interestKept | number:'1.2-2') } }}
+        </p>
+      </ng-container>
+    </section>
+
+    <section
+      class="early-settlement-dialog__card"
+      [class.early-settlement-dialog__card--gain]="preview.saleVerdict === 'gain'"
+      [class.early-settlement-dialog__card--loss]="preview.saleVerdict === 'loss'"
+    >
+      <header>
+        <h3>{{ 'tr_early_settlement_sale_title' | translate }}</h3>
+        <span class="early-settlement-dialog__badge" *ngIf="preview.saleVerdict === 'gain'">
+          {{ 'tr_early_settlement_gain' | translate }}
+        </span>
+        <span class="early-settlement-dialog__badge" *ngIf="preview.saleVerdict === 'loss'">
+          {{ 'tr_early_settlement_loss' | translate }}
+        </span>
+        <span class="early-settlement-dialog__badge" *ngIf="preview.saleVerdict === 'even'">
+          {{ 'tr_early_settlement_even' | translate }}
+        </span>
+      </header>
+      <p>
+        {{ 'tr_early_settlement_sale_before' | translate }}:
+        <strong>{{ preview.profitBefore | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p>
+        {{ 'tr_early_settlement_sale_after' | translate }}:
+        <strong>{{ preview.profitAfter | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p class="early-settlement-dialog__verdict" *ngIf="preview.saleVerdict === 'gain'">
+        {{ 'tr_early_settlement_sale_gain' | translate:{ amount: (absAmount(preview.profitAfter) | number:'1.2-2') } }}
+      </p>
+      <p class="early-settlement-dialog__verdict" *ngIf="preview.saleVerdict === 'loss'">
+        {{ 'tr_early_settlement_sale_loss' | translate:{ amount: (absAmount(preview.profitAfter) | number:'1.2-2') } }}
+      </p>
+      <p class="early-settlement-dialog__verdict" *ngIf="preview.saleVerdict === 'even'">
+        {{ 'tr_early_settlement_sale_even' | translate }}
+      </p>
+    </section>
+  </div>
+
+  <div class="early-settlement-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      [disabled]="saving || !preview.valid"
+      (click)="pay()"
+    >
+      {{ 'tr_early_settlement_pay' | translate }}
+    </button>
+  </div>
+</div>

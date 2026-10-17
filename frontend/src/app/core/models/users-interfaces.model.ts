@@ -112,6 +112,10 @@ export interface ClientHistoryOrderRow {
   unpaidInstallmentsCount?: number;
   installmentPlanSnapshot?: { name?: string; months?: number; interestPercent?: number };
   installmentStartDate?: string;
+  installmentPrincipal?: number;
+  installmentInterestAmount?: number;
+  installmentSurchargeAmount?: number;
+  installmentDiscountAmount?: number;
   /** Per sale: collecting at least this amount fully meets collector performance. */
   minimumCollectionAmount?: number;
   /** Sold products on the installment invoice (snapshot). */
@@ -119,6 +123,7 @@ export interface ClientHistoryOrderRow {
     name?: string;
     code?: string;
     quantity?: number;
+    cost?: number;
   }>;
   installments?: Array<{
     _id?: string;
@@ -128,6 +133,7 @@ export interface ClientHistoryOrderRow {
     paid?: boolean;
     paidAt?: string;
     paidAmount?: number;
+    earlySettlement?: boolean;
     paymentMethod?: string;
     promiseToPayAt?: string;
     promiseToPayHistory?: Array<{

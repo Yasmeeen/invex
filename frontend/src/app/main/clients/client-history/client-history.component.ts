@@ -57,6 +57,7 @@ import {
   AdminMinimumCollectionDialogComponent,
   AdminMinimumCollectionDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-minimum-collection-dialog.component';
+import { EarlySettlementDialogComponent } from '@shared/components/early-settlement-dialog/early-settlement-dialog.component';
 import { Subscription } from 'rxjs';
 
 export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
@@ -730,6 +731,36 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     const dueDay = new Date(due);
     dueDay.setHours(0, 0, 0, 0);
     return dueDay.getTime() < today.getTime() ? 'overdue' : 'upcoming';
+  }
+
+  canEarlySettle(order: ClientHistoryOrderRow): boolean {
+    return this.canPayOrder(order) && this.installmentUnpaidCount(order) > 0;
+  }
+
+  openEarlySettlement(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.canEarlySettle(order)) return;
+    if (!this.paymentBranchId && !this.showBranchPicker) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    const ref = this.dialog.open(EarlySettlementDialogComponent, {
+      width: '600px',
+      maxWidth: '96vw',
+      panelClass: 'early-settlement-dialog-panel',
+      backdropClass: 'early-settlement-dialog-backdrop',
+      data: {
+        order,
+        clientName: this.clientTitle,
+        forcedBranchId: this.paymentBranchId,
+        showBranchPicker: this.showBranchPicker,
+        branches: this.branches,
+      },
+      disableClose: true,
+    });
+    ref.afterClosed().subscribe((ok) => {
+      if (ok) this.afterBalanceChange();
+    });
   }
 
   canPayInstallmentRow(

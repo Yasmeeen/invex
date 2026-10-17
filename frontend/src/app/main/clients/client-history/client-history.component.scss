@@ -365,9 +365,30 @@
   border-radius: 0;
 }
 
+.s-btn.installment-order-head__early {
+  background: #9a3412 !important;
+  border-color: #9a3412 !important;
+  color: #fff !important;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 2rem;
+  padding: 0.4rem 0.9rem;
+  font-weight: 650;
+}
+
+.s-btn.installment-order-head__early:hover {
+  background: #7c2d12 !important;
+  color: #fff !important;
+}
+
 .installment-row--paid > td {
   background: #ecfdf5;
   color: #065f46;
+}
+
+.installment-row--early > td {
+  background: #fff7ed;
+  color: #9a3412;
 }
 
 .installment-row--overdue > td {
@@ -376,8 +397,21 @@
 }
 
 .installment-row--paid:hover > td,
-.installment-row--overdue:hover > td {
+.installment-row--overdue:hover > td,
+.installment-row--early:hover > td {
   filter: brightness(0.98);
+}
+
+.early-settlement-badge {
+  display: inline-block;
+  margin-inline-start: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: #9a3412;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .promise-cell {

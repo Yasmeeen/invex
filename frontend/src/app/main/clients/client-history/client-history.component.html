@@ -398,6 +398,14 @@
             </button>
             <button
               type="button"
+              class="s-btn btn-sm installment-order-head__early"
+              *ngIf="canEarlySettle(o)"
+              (click)="openEarlySettlement(o, $event)"
+            >
+              {{ 'tr_early_settlement' | translate }}
+            </button>
+            <button
+              type="button"
               class="s-btn btn-secondary btn-sm installment-order-head__pay"
               *ngIf="canEditMinimumCollection && o.status !== 'restored'"
               (click)="editMinimumCollection(o, $event)"
@@ -443,10 +451,16 @@
             <tbody>
               <tr
                 *ngFor="let row of o.installments || []"
-                [class.installment-row--paid]="installmentRowStatus(row) === 'paid'"
-                [class.installment-row--overdue]="installmentRowStatus(row) === 'overdue'"
+                [class.installment-row--early]="row.earlySettlement"
+                [class.installment-row--paid]="!row.earlySettlement && installmentRowStatus(row) === 'paid'"
+                [class.installment-row--overdue]="!row.earlySettlement && installmentRowStatus(row) === 'overdue'"
               >
-                <td>{{ row.sequence }}</td>
+                <td>
+                  {{ row.sequence }}
+                  <span class="early-settlement-badge" *ngIf="row.earlySettlement">
+                    {{ 'tr_early_settlement_done' | translate }}
+                  </span>
+                </td>
                 <td>{{ row.dueDate | date:'dd/MM/yyyy' }}</td>
                 <td>{{ row.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>
                 <td>{{ (row.paidAmount || 0) | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</td>

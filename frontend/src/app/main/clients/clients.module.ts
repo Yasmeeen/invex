@@ -15,6 +15,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 import { PromiseToPayDialogModule } from '@shared/components/promise-to-pay-dialog/promise-to-pay-dialog.module';
 import { AdminInstallmentDialogsModule } from '@shared/components/admin-installment-dialogs/admin-installment-dialogs.module';
+import { EarlySettlementDialogModule } from '@shared/components/early-settlement-dialog/early-settlement-dialog.module';
 
 
 @NgModule({
@@ -35,6 +36,7 @@ import { AdminInstallmentDialogsModule } from '@shared/components/admin-installm
     ClientPayClientDialogModule,
     PromiseToPayDialogModule,
     AdminInstallmentDialogsModule,
+    EarlySettlementDialogModule,
   ],
   providers: [
     UserSerivce

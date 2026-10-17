@@ -1,0 +1,135 @@
+.early-settlement-dialog {
+  display: block;
+  width: min(560px, 94vw);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+  padding: 1.25rem 1.35rem 1.1rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+  color: #111827;
+}
+
+.early-settlement-dialog__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.early-settlement-dialog__hint {
+  margin: 0 0 0.9rem;
+  color: #5c6570;
+  line-height: 1.5;
+}
+
+.early-settlement-dialog__facts {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  list-style: none;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  line-height: 1.55;
+}
+
+.early-settlement-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+
+  span {
+    font-size: 0.9rem;
+    font-weight: 650;
+  }
+}
+
+.early-settlement-dialog__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+
+.early-settlement-dialog__waiver {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.early-settlement-dialog__mixed {
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  line-height: 1.45;
+}
+
+.early-settlement-dialog__card {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  p {
+    margin: 0.2rem 0;
+  }
+}
+
+.early-settlement-dialog__card--gain {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.early-settlement-dialog__card--loss {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.early-settlement-dialog__badge {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.early-settlement-dialog__card--gain .early-settlement-dialog__badge {
+  background: #166534;
+}
+
+.early-settlement-dialog__card--loss .early-settlement-dialog__badge {
+  background: #b91c1c;
+}
+
+.early-settlement-dialog__verdict {
+  margin-top: 0.45rem !important;
+  font-weight: 650;
+}
+
+.early-settlement-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}

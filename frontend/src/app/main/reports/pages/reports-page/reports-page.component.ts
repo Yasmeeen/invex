@@ -15,6 +15,21 @@ import {
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 
+type ProfitTabId = 'consolidated' | 'cash' | 'installment';
+
+type ReportColumnVM = { key: string; labelKey: string; format?: 'money' };
+
+type ProfitTabView = {
+  cards: ReportCardVM[];
+  timeColumns: ReportColumnVM[];
+  /** Newest period first. The chart uses chronological order. */
+  timeRows: any[];
+  chart: Highcharts.Options | null;
+  invoiceColumns: ReportColumnVM[];
+  invoiceRows: any[];
+  invoiceMeta: { totalCount: number; page: number; limit: number } | null;
+};
+
 type ReportCardVM = {
   titleKey: string;
   titleParams?: Record<string, unknown>;
@@ -75,12 +90,21 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   salesPaymentColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   salesPaymentRows: any[] = [];
 
-  /** Profit report: per-invoice trading profit. */
-  profitInvoiceColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
+  /** Profit report: consolidated / cash / installments on one page. */
+  profitTab: ProfitTabId = 'consolidated';
+  profitTimeLimit = 25;
+  profitTimePage: Record<ProfitTabId, number> = {
+    consolidated: 1,
+    cash: 1,
+    installment: 1,
+  };
+  profitInvoiceColumns: ReportColumnVM[] = [];
   profitInvoiceRows: any[] = [];
-  profitInvoicePage = 1;
+  cashInvoicePage = 1;
+  installmentInvoicePage = 1;
   profitInvoiceLimit = 25;
   profitInvoiceMeta: { totalCount: number; page: number; limit: number } | null = null;
+  private profitViews: Partial<Record<ProfitTabId, ProfitTabView>> = {};
 
   /** Products report: inventory capital per branch. */
   branchCapitalColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
@@ -124,7 +148,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.reportType = d.reportType || 'sales';
       this.reportTitleKey = this.reportTitleKeys[this.reportType] || this.reportTitleKeys.sales;
       this.bookingsPage = 1;
-      this.profitInvoicePage = 1;
+      this.resetProfitPages();
       this.secondaryChartOptions = null;
       // First paint: wait for report-filters to emit defaults (from/to/branch). Later navigations reuse `filters`.
       if (Object.keys(this.filters || {}).length > 0) {
@@ -143,7 +167,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.bookingsPage = 1;
     }
     if (this.reportType === 'profit') {
-      this.profitInvoicePage = 1;
+      this.resetProfitPages();
     }
     this.loadReport(this.filters);
   }
@@ -164,11 +188,41 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  setProfitTab(tab: ProfitTabId): void {
+    if (this.profitTab === tab) return;
+    this.profitTab = tab;
+    this.applyProfitTab();
+    this.applyCostPriceVisibility();
+  }
+
+  setProfitTimePage(page: number): void {
+    const next = Math.min(this.profitTimeTotalPages, Math.max(1, page));
+    this.profitTimePage[this.profitTab] = next;
+    this.applyProfitTimeSlice();
+  }
+
   setProfitInvoicePage(page: number): void {
-    this.profitInvoicePage = Math.max(1, page);
+    const next = Math.max(1, page);
+    if (this.profitTab === 'cash') this.cashInvoicePage = next;
+    else if (this.profitTab === 'installment') this.installmentInvoicePage = next;
+    else return;
     if (Object.keys(this.filters || {}).length > 0) {
       this.loadReport(this.filters);
     }
+  }
+
+  get profitTimeTotalCount(): number {
+    return this.profitViews[this.profitTab]?.timeRows.length || 0;
+  }
+
+  get profitTimeTotalPages(): number {
+    return Math.max(1, Math.ceil(this.profitTimeTotalCount / this.profitTimeLimit));
+  }
+
+  private resetProfitPages(): void {
+    this.profitTimePage = { consolidated: 1, cash: 1, installment: 1 };
+    this.cashInvoicePage = 1;
+    this.installmentInvoicePage = 1;
   }
 
   get bookingsTotalPages(): number {
@@ -229,8 +283,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.reportType === 'profit'
         ? this.mergeBranchScope({
             ...filters,
-            invoice_page: this.profitInvoicePage,
-            invoice_limit: this.profitInvoiceLimit,
+            cash_invoice_page: this.cashInvoicePage,
+            cash_invoice_limit: this.profitInvoiceLimit,
+            installment_invoice_page: this.installmentInvoicePage,
+            installment_invoice_limit: this.profitInvoiceLimit,
           })
         : this.mergeBranchScope({ ...filters });
     this.loading = true;
@@ -356,149 +412,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
 
     if (this.reportType === 'profit') {
-      const s = res.summary || {};
-      const bo = s.branchOverhead;
-      const tradingProfit = Number(s.tradingProfit) || 0;
-      const netProfit = Number(s.netProfit) || 0;
-      const profitMargin = s.profitMargin != null ? Number(s.profitMargin) : 0;
-      const tradingIsLoss = tradingProfit < 0;
-      const netIsLoss = netProfit < 0;
-      const marginIsLoss = profitMargin < 0;
-      const lossBadge = t('tr_report_loss_badge');
-      const downPaid = Number(s.installmentDownPayment) || 0;
-      this.cards = [
-        {
-          titleKey: 'tr_report_card_revenue',
-          value: s.totalRevenue ?? 0,
-          money: true,
-          hintKey: downPaid > 0 ? 'tr_report_revenue_down_payment_hint' : undefined,
-          hintParams: downPaid > 0 ? { amount: formatEgpMoney(downPaid) } : undefined,
-        },
-        {
-          titleKey: 'tr_report_card_cost',
-          value: s.totalCost ?? 0,
-          money: true,
-          hintKey: downPaid > 0 ? 'tr_report_cost_down_payment_hint' : undefined,
-        },
-        {
-          titleKey: tradingIsLoss
-            ? 'tr_report_card_trading_loss'
-            : 'tr_report_card_trading_profit',
-          value: tradingIsLoss ? Math.abs(tradingProfit) : tradingProfit,
-          money: true,
-          tone: tradingIsLoss ? 'loss' : undefined,
-          trendLabel: tradingIsLoss ? lossBadge : undefined,
-          trendPositive: tradingIsLoss ? false : undefined,
-          hintKey: tradingIsLoss
-            ? 'tr_report_trading_loss_hint'
-            : 'tr_report_trading_profit_installment_hint',
-        },
-        {
-          titleKey: 'tr_report_card_installment_profit_collected',
-          value: s.installmentProfitCollected ?? 0,
-          money: true,
-          hintKey: 'tr_report_card_installment_profit_collected_hint',
-        },
-        {
-          titleKey: 'tr_report_card_branch_overhead',
-          value: s.branchOperatingCost ?? 0,
-          money: true,
-          hintKey: bo ? 'tr_report_branch_overhead_hint' : undefined,
-          hintParams: bo
-            ? {
-                monthly: formatEgpMoney(bo.monthlyFixedTotal),
-                daily: formatEgpMoney(bo.dailyRate),
-                days: bo.daysInPeriod,
-                divisor: bo.divisorDays,
-              }
-            : undefined,
-        },
-        {
-          titleKey: 'tr_report_card_daily_expenses',
-          value: s.dailyExpensesTotal ?? 0,
-          money: true,
-          hintKey: 'tr_report_daily_expenses_hint',
-          hintParams: { count: s.dailyExpensesCount ?? 0 },
-        },
-        {
-          titleKey: netIsLoss ? 'tr_net_loss' : 'tr_net_profit',
-          value: netIsLoss ? Math.abs(netProfit) : netProfit,
-          money: true,
-          tone: netIsLoss ? 'loss' : undefined,
-          trendLabel: netIsLoss ? lossBadge : undefined,
-          trendPositive: netIsLoss ? false : undefined,
-          hintKey: netIsLoss ? 'tr_report_net_loss_hint' : undefined,
-        },
-        {
-          titleKey: marginIsLoss ? 'tr_report_card_loss_margin' : 'tr_report_card_margin',
-          value: `${Math.abs(profitMargin).toFixed(2)}%`,
-          tone: marginIsLoss ? 'loss' : undefined,
-          trendLabel: marginIsLoss ? lossBadge : undefined,
-          trendPositive: marginIsLoss ? false : undefined,
-          hintKey: marginIsLoss ? 'tr_report_loss_margin_hint' : undefined,
-        },
-      ];
-      this.tableColumns = [
-        { key: 'period', labelKey: 'tr_report_col_period' },
-        { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
-        { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
-        {
-          key: 'installmentProfit',
-          labelKey: 'tr_report_col_installment_profit_collected',
-          format: 'money',
-        },
-        { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
-        { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead', format: 'money' },
-        { key: 'dailyExpenses', labelKey: 'tr_report_col_daily_expenses', format: 'money' },
-        { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch', format: 'money' },
-      ];
-      const profitOverTimeAsc = res.profitOverTime || [];
-      /** Newest period first in the table; chart stays chronological (oldest → newest). */
-      this.tableRows = [...profitOverTimeAsc].reverse();
-      this.chartOptions = this.lineChart(
-        t('tr_report_chart_profit_over_time'),
-        profitOverTimeAsc.map((x: any) => x.period),
-        [
-          { name: t('tr_report_series_revenue'), data: profitOverTimeAsc.map((x: any) => Number(x.revenue || 0)) },
-          { name: t('tr_report_series_cost'), data: profitOverTimeAsc.map((x: any) => Number(x.cost || 0)) },
-          { name: t('tr_report_series_net_after_branch'), data: profitOverTimeAsc.map((x: any) => Number(x.netProfit || 0)) },
-        ]
-      );
-
-      this.profitInvoiceColumns = [
-        { key: 'orderNumber', labelKey: 'tr_order_number' },
-        { key: 'date', labelKey: 'tr_report_col_date' },
-        { key: 'clientName', labelKey: 'tr_report_col_customer' },
-        { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
-        { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
-        { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
-        { key: 'installmentAmount', labelKey: 'tr_report_col_installment_amount', format: 'money' },
-        {
-          key: 'installmentProfitShare',
-          labelKey: 'tr_report_col_installment_profit_share',
-          format: 'money',
-        },
-        { key: 'tradingProfit', labelKey: 'tr_report_col_profit_recognized', format: 'money' },
-        {
-          key: 'potentialProfit',
-          labelKey: 'tr_report_col_potential_profit',
-          format: 'money',
-        },
-        { key: 'paymentStatus', labelKey: 'tr_status' },
-      ];
-      this.profitInvoiceRows = this.mapProfitInvoiceRows(res.profitByInvoice || [], t);
-      const invMeta = res.profitByInvoiceMeta;
-      this.profitInvoiceMeta = invMeta
-        ? {
-            totalCount: Number(invMeta.totalCount) || 0,
-            page: Number(invMeta.page) || this.profitInvoicePage,
-            limit: Number(invMeta.limit) || this.profitInvoiceLimit,
-          }
-        : {
-            totalCount: this.profitInvoiceRows.length,
-            page: this.profitInvoicePage,
-            limit: this.profitInvoiceLimit,
-          };
+      this.bindProfitReport(res, t);
       return;
     }
 
@@ -879,6 +793,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       'tr_report_card_trading_profit',
       'tr_report_card_trading_loss',
       'tr_report_card_installment_profit_collected',
+      'tr_report_card_cash_trading_profit',
+      'tr_report_card_down_payment_cost',
+      'tr_report_card_down_payment_profit',
+      'tr_report_card_financing_amount',
+      'tr_report_card_installment_recognized',
+      'tr_report_card_installment_remaining',
+      'tr_report_card_consolidated_trading',
       'tr_net_profit',
       'tr_net_loss',
       'tr_report_card_margin',
@@ -894,6 +815,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       'inventoryCapital',
       'tradingProfit',
       'installmentProfitShare',
+      'installmentProfit',
+      'installmentProfitPeriod',
+      'installmentProfitLifetime',
+      'downCost',
+      'downProfit',
+      'downPaymentProfit',
+      'financingAmount',
+      'cashTradingProfit',
+      'recognizedProfit',
+      'remainingProfit',
+      'potentialProfit',
       'lineTotal',
     ]);
     this.tableColumns = (this.tableColumns || []).filter((c) => !hideCol.has(c.key));
@@ -1109,55 +1041,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   private exportProfitExcel(): void {
-    const t = (key: string) => this.translate.instant(key);
     const filename = this.translate
       .instant(this.reportTitleKey)
       .replace(/\s+/g, '_')
       .toLowerCase();
-    const summaryRows = this.cards.map((c) => ({
-      [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
-      [t('tr_report_col_value')]: this.formatCardExportValue(c),
-    }));
-    const sheets: { name: string; rows: Record<string, unknown>[] }[] = [
-      { name: t('tr_report_sheet_summary'), rows: summaryRows },
-      {
-        name: t('tr_report_chart_profit_over_time'),
-        rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
-      },
-    ];
-    const invoiceCols =
-      this.profitInvoiceColumns.length > 0
-        ? this.profitInvoiceColumns
-        : [
-            { key: 'orderNumber', labelKey: 'tr_order_number' },
-            { key: 'date', labelKey: 'tr_report_col_date' },
-            { key: 'clientName', labelKey: 'tr_report_col_customer' },
-            { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
-            { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' as const },
-            { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' as const },
-            {
-              key: 'installmentAmount',
-              labelKey: 'tr_report_col_installment_amount',
-              format: 'money' as const,
-            },
-            {
-              key: 'installmentProfitShare',
-              labelKey: 'tr_report_col_installment_profit_share',
-              format: 'money' as const,
-            },
-            {
-              key: 'tradingProfit',
-              labelKey: 'tr_report_col_profit_recognized',
-              format: 'money' as const,
-            },
-            {
-              key: 'potentialProfit',
-              labelKey: 'tr_report_col_potential_profit',
-              format: 'money' as const,
-            },
-            { key: 'paymentStatus', labelKey: 'tr_status' },
-          ];
-
     this.reportsService
       .getProfitReport(
         this.mergeBranchScope({
@@ -1167,25 +1054,51 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res: any) => {
-          const invoiceRows = this.mapProfitInvoiceRows(res?.profitByInvoice || [], t);
-          if (invoiceRows.length > 0) {
-            sheets.push({
-              name: t('tr_report_profit_by_invoice'),
-              rows: this.mapRowsForExport(invoiceCols, invoiceRows),
-            });
-          }
-          this.exportService.exportToExcelMultiSheet(filename, sheets);
+          this.exportService.exportToExcelMultiSheet(filename, this.profitExcelSheets(res));
         },
         error: () => {
-          if (this.profitInvoiceRows.length > 0) {
-            sheets.push({
-              name: t('tr_report_profit_by_invoice'),
-              rows: this.mapRowsForExport(invoiceCols, this.profitInvoiceRows),
-            });
-          }
-          this.exportService.exportToExcelMultiSheet(filename, sheets);
+          this.exportService.exportToExcelMultiSheet(filename, this.profitExcelSheets(this.lastReportPayload || {}));
         },
       });
+  }
+
+  private profitExcelSheets(res: any): { name: string; rows: Record<string, unknown>[] }[] {
+    const t = (key: string, params?: object) => this.translate.instant(key, params);
+    const views = this.buildProfitViews(res || {}, t);
+    const cardRows = (cards: ReportCardVM[]) =>
+      cards.map((c) => ({
+        [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
+        [t('tr_report_col_value')]: this.formatCardExportValue(c),
+      }));
+    const sheet = (nameKey: string, rows: Record<string, unknown>[]) => ({
+      name: t(nameKey).replace(/[\\/?*[\]:]/g, ' ').slice(0, 31),
+      rows,
+    });
+    return [
+      sheet('tr_report_profit_tab_consolidated', cardRows(views.consolidated.cards)),
+      sheet('tr_report_profit_tab_cash', cardRows(views.cash.cards)),
+      sheet('tr_report_profit_tab_installment', cardRows(views.installment.cards)),
+      sheet(
+        'tr_report_chart_profit_over_time',
+        this.mapRowsForExport(views.consolidated.timeColumns, views.consolidated.timeRows)
+      ),
+      sheet(
+        'tr_report_profit_cash_over_time',
+        this.mapRowsForExport(views.cash.timeColumns, views.cash.timeRows)
+      ),
+      sheet(
+        'tr_report_profit_installment_over_time',
+        this.mapRowsForExport(views.installment.timeColumns, views.installment.timeRows)
+      ),
+      sheet(
+        'tr_report_profit_by_invoice_cash',
+        this.mapRowsForExport(views.cash.invoiceColumns, views.cash.invoiceRows)
+      ),
+      sheet(
+        'tr_report_profit_by_invoice_installment',
+        this.mapRowsForExport(views.installment.invoiceColumns, views.installment.invoiceRows)
+      ),
+    ];
   }
 
   async exportPdf(): Promise<void> {
@@ -1269,52 +1182,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
 
     if (this.reportType === 'profit') {
-      const sections: {
-        title: string;
-        columns: string[];
-        rows: Record<string, unknown>[];
-      }[] = [];
-      if (this.tableRows.length > 0) {
-        sections.push({
-          title: this.translate.instant('tr_report_chart_profit_over_time'),
-          columns: this.tableColumns.map((c) => this.translate.instant(c.labelKey)),
-          rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
-        });
-      }
-      const invoiceCols =
-        this.profitInvoiceColumns.length > 0
-          ? this.profitInvoiceColumns
-          : [
-              { key: 'orderNumber', labelKey: 'tr_order_number' },
-              { key: 'date', labelKey: 'tr_report_col_date' },
-              { key: 'clientName', labelKey: 'tr_report_col_customer' },
-              { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
-              { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' as const },
-              { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' as const },
-              {
-                key: 'installmentAmount',
-                labelKey: 'tr_report_col_installment_amount',
-                format: 'money' as const,
-              },
-              {
-                key: 'installmentProfitShare',
-                labelKey: 'tr_report_col_installment_profit_share',
-                format: 'money' as const,
-              },
-              {
-                key: 'tradingProfit',
-                labelKey: 'tr_report_col_profit_recognized',
-                format: 'money' as const,
-              },
-              {
-                key: 'potentialProfit',
-                labelKey: 'tr_report_col_potential_profit',
-                format: 'money' as const,
-              },
-              { key: 'paymentStatus', labelKey: 'tr_status' },
-            ];
+      let res: any = this.lastReportPayload || {};
       try {
-        const res: any = await this.reportsService
+        res = await this.reportsService
           .getProfitReport(
             this.mergeBranchScope({
               ...this.filters,
@@ -1322,40 +1192,57 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             })
           )
           .toPromise();
-        const invoiceRows = this.mapProfitInvoiceRows(
-          res?.profitByInvoice || [],
-          (key: string) => this.translate.instant(key)
-        );
-        if (invoiceRows.length > 0) {
-          sections.push({
-            title: this.translate.instant('tr_report_profit_by_invoice'),
-            columns: invoiceCols.map((c) => this.translate.instant(c.labelKey)),
-            rows: this.mapRowsForExport(invoiceCols, invoiceRows),
-          });
-        }
       } catch {
-        if (this.profitInvoiceRows.length > 0) {
-          sections.push({
-            title: this.translate.instant('tr_report_profit_by_invoice'),
-            columns: this.profitInvoiceColumns.map((c) => this.translate.instant(c.labelKey)),
-            rows: this.mapRowsForExport(this.profitInvoiceColumns, this.profitInvoiceRows),
+        res = this.lastReportPayload || {};
+      }
+      const t = (key: string, params?: object) => this.translate.instant(key, params);
+      const views = this.buildProfitViews(res, t);
+      const tabLabel: Record<ProfitTabId, string> = {
+        consolidated: t('tr_report_profit_tab_consolidated'),
+        cash: t('tr_report_profit_tab_cash'),
+        installment: t('tr_report_profit_tab_installment'),
+      };
+      const profitSummary = (['consolidated', 'cash', 'installment'] as ProfitTabId[]).reduce(
+        (rows: { label: string; value: string | number }[], tab) => {
+          views[tab].cards.forEach((c) => {
+            rows.push({
+              label: `${tabLabel[tab]} — ${this.translate.instant(c.titleKey, c.titleParams || {})}`,
+              value: this.formatCardExportValue(c),
+            });
           });
-        }
-      }
-      if (sections.length === 0) {
-        sections.push({
-          title: this.translate.instant('tr_report_sheet_summary'),
-          columns: [
-            this.translate.instant('tr_report_col_label'),
-            this.translate.instant('tr_report_col_value'),
-          ],
-          rows: summaryRows.map((r) => ({
-            [this.translate.instant('tr_report_col_label')]: r.label,
-            [this.translate.instant('tr_report_col_value')]: r.value,
-          })),
-        });
-      }
-      await this.exportService.exportMultiSectionPdf(title, summaryRows, sections);
+          return rows;
+        },
+        []
+      );
+      const sectionFor = (sectionTitle: string, columns: ReportColumnVM[], rows: any[]) => ({
+        title: sectionTitle,
+        columns: columns.map((c) => this.translate.instant(c.labelKey)),
+        rows: this.mapRowsForExport(columns, rows),
+      });
+      const sections = [
+        sectionFor(
+          t('tr_report_chart_profit_over_time'),
+          views.consolidated.timeColumns,
+          views.consolidated.timeRows
+        ),
+        sectionFor(t('tr_report_profit_cash_over_time'), views.cash.timeColumns, views.cash.timeRows),
+        sectionFor(
+          t('tr_report_profit_installment_over_time'),
+          views.installment.timeColumns,
+          views.installment.timeRows
+        ),
+        sectionFor(
+          t('tr_report_profit_by_invoice_cash'),
+          views.cash.invoiceColumns,
+          views.cash.invoiceRows
+        ),
+        sectionFor(
+          t('tr_report_profit_by_invoice_installment'),
+          views.installment.invoiceColumns,
+          views.installment.invoiceRows
+        ),
+      ];
+      await this.exportService.exportMultiSectionPdf(title, profitSummary, sections);
       return;
     }
 
@@ -1364,7 +1251,366 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
   }
 
-  private mapProfitInvoiceRows(
+  private bindProfitReport(res: any, t: (key: string, params?: object) => string): void {
+    this.profitViews = this.buildProfitViews(res, t);
+    this.applyProfitTab();
+  }
+
+  private buildProfitViews(
+    res: any,
+    t: (key: string, params?: object) => string
+  ): Record<ProfitTabId, ProfitTabView> {
+    const s = res.summary || {};
+    const cash = res.cash?.summary || {};
+    const inst = res.installment?.summary || {};
+    const bo = s.branchOverhead;
+    const lossBadge = t('tr_report_loss_badge');
+    const moneyLoss = (
+      value: number,
+      titleKey: string,
+      lossTitleKey: string,
+      hintKey?: string,
+      lossHintKey?: string
+    ): ReportCardVM => {
+      const n = Number(value) || 0;
+      const loss = n < 0;
+      return {
+        titleKey: loss ? lossTitleKey : titleKey,
+        value: loss ? Math.abs(n) : n,
+        money: true,
+        tone: loss ? 'loss' : undefined,
+        trendLabel: loss ? lossBadge : undefined,
+        trendPositive: loss ? false : undefined,
+        hintKey: loss ? lossHintKey || hintKey : hintKey,
+      };
+    };
+    const marginCard = (value: number, hintKey?: string): ReportCardVM => {
+      const n = Number(value) || 0;
+      const loss = n < 0;
+      return {
+        titleKey: loss ? 'tr_report_card_loss_margin' : 'tr_report_card_margin',
+        value: `${Math.abs(n).toFixed(2)}%`,
+        tone: loss ? 'loss' : undefined,
+        trendLabel: loss ? lossBadge : undefined,
+        trendPositive: loss ? false : undefined,
+        hintKey: loss ? 'tr_report_loss_margin_hint' : hintKey,
+      };
+    };
+
+    const consolidatedAsc = res.consolidated?.overTime || res.profitOverTime || [];
+    const cashAsc = res.cash?.overTime || [];
+    const installmentAsc = res.installment?.overTime || [];
+    const cashMeta = this.invoiceMetaFrom(res.cashInvoicesMeta, this.cashInvoicePage);
+    const installmentMeta = this.invoiceMetaFrom(
+      res.installmentInvoicesMeta,
+      this.installmentInvoicePage
+    );
+
+    return {
+      consolidated: {
+        cards: [
+          moneyLoss(
+            s.cashTradingProfit,
+            'tr_report_card_cash_trading_profit',
+            'tr_report_card_trading_loss',
+            'tr_report_card_cash_trading_hint',
+            'tr_report_trading_loss_hint'
+          ),
+          {
+            titleKey: 'tr_report_card_down_payment_profit',
+            value: s.downPaymentProfit ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_down_payment_profit_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_profit_collected',
+            value: s.installmentProfitCollected ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_installment_profit_collected_hint',
+          },
+          moneyLoss(
+            s.tradingProfit,
+            'tr_report_card_consolidated_trading',
+            'tr_report_card_trading_loss',
+            'tr_report_card_consolidated_trading_hint',
+            'tr_report_trading_loss_hint'
+          ),
+          {
+            titleKey: 'tr_report_card_branch_overhead',
+            value: s.branchOperatingCost ?? 0,
+            money: true,
+            hintKey: bo ? 'tr_report_branch_overhead_hint' : undefined,
+            hintParams: bo
+              ? {
+                  monthly: formatEgpMoney(bo.monthlyFixedTotal),
+                  daily: formatEgpMoney(bo.dailyRate),
+                  days: bo.daysInPeriod,
+                  divisor: bo.divisorDays,
+                }
+              : undefined,
+          },
+          {
+            titleKey: 'tr_report_card_daily_expenses',
+            value: s.dailyExpensesTotal ?? 0,
+            money: true,
+            hintKey: 'tr_report_daily_expenses_hint',
+            hintParams: { count: s.dailyExpensesCount ?? 0 },
+          },
+          moneyLoss(
+            s.netProfit,
+            'tr_net_profit',
+            'tr_net_loss',
+            undefined,
+            'tr_report_net_loss_hint'
+          ),
+          marginCard(s.profitMargin),
+        ],
+        timeColumns: this.consolidatedTimeColumns(),
+        timeRows: [...consolidatedAsc].reverse(),
+        chart: this.lineChart(t('tr_report_chart_profit_over_time'), consolidatedAsc.map((x: any) => x.period), [
+          {
+            name: t('tr_report_series_cash_trading'),
+            data: consolidatedAsc.map((x: any) => Number(x.cashTradingProfit || 0)),
+          },
+          {
+            name: t('tr_report_series_installment_recognized'),
+            data: consolidatedAsc.map(
+              (x: any) => Number(x.downPaymentProfit || 0) + Number(x.installmentProfit || 0)
+            ),
+          },
+          {
+            name: t('tr_report_series_net_after_branch'),
+            data: consolidatedAsc.map((x: any) => Number(x.netProfit || 0)),
+          },
+        ]),
+        invoiceColumns: [],
+        invoiceRows: [],
+        invoiceMeta: null,
+      },
+      cash: {
+        cards: [
+          { titleKey: 'tr_report_card_revenue', value: cash.totalRevenue ?? 0, money: true },
+          { titleKey: 'tr_report_card_cost', value: cash.totalCost ?? 0, money: true },
+          moneyLoss(
+            cash.tradingProfit,
+            'tr_report_card_trading_profit',
+            'tr_report_card_trading_loss',
+            'tr_report_card_cash_trading_hint',
+            'tr_report_trading_loss_hint'
+          ),
+          marginCard(cash.profitMargin, 'tr_report_cash_margin_hint'),
+        ],
+        timeColumns: this.cashTimeColumns(),
+        timeRows: [...cashAsc].reverse(),
+        chart: this.lineChart(t('tr_report_chart_profit_over_time'), cashAsc.map((x: any) => x.period), [
+          { name: t('tr_report_series_revenue'), data: cashAsc.map((x: any) => Number(x.revenue || 0)) },
+          { name: t('tr_report_series_cost'), data: cashAsc.map((x: any) => Number(x.cost || 0)) },
+          {
+            name: t('tr_report_series_cash_trading'),
+            data: cashAsc.map((x: any) => Number(x.tradingProfit || 0)),
+          },
+        ]),
+        invoiceColumns: this.cashInvoiceColumns(),
+        invoiceRows: this.mapCashProfitInvoiceRows(res.cashInvoices || [], t),
+        invoiceMeta: cashMeta,
+      },
+      installment: {
+        cards: [
+          {
+            titleKey: 'tr_report_card_down_payment_revenue',
+            value: inst.downPaymentRevenue ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_down_payment_revenue_hint',
+          },
+          {
+            titleKey: 'tr_report_card_down_payment_cost',
+            value: inst.downPaymentCost ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_down_payment_cost_hint',
+          },
+          {
+            titleKey: 'tr_report_card_down_payment_profit',
+            value: inst.downPaymentProfit ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_down_payment_profit_hint',
+          },
+          {
+            titleKey: 'tr_report_card_financing_amount',
+            value: inst.financingAmount ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_financing_amount_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_profit_collected',
+            value: inst.installmentProfitCollected ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_installment_profit_collected_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_collected_cash',
+            value: inst.collectedCash ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_installment_collected_cash_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_recognized',
+            value: inst.recognizedProfit ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_installment_recognized_hint',
+          },
+          {
+            titleKey: 'tr_report_card_installment_remaining',
+            value: inst.remainingProfit ?? 0,
+            money: true,
+            hintKey: 'tr_report_card_installment_remaining_hint',
+          },
+        ],
+        timeColumns: this.installmentTimeColumns(),
+        timeRows: [...installmentAsc].reverse(),
+        chart: this.lineChart(t('tr_report_chart_profit_over_time'), installmentAsc.map((x: any) => x.period), [
+          {
+            name: t('tr_report_series_down_profit'),
+            data: installmentAsc.map((x: any) => Number(x.downProfit || 0)),
+          },
+          {
+            name: t('tr_report_col_installment_profit_collected'),
+            data: installmentAsc.map((x: any) => Number(x.installmentProfit || 0)),
+          },
+          {
+            name: t('tr_report_series_installment_recognized'),
+            data: installmentAsc.map((x: any) => Number(x.recognizedProfit || 0)),
+          },
+        ]),
+        invoiceColumns: this.installmentInvoiceColumns(),
+        invoiceRows: this.mapInstallmentProfitInvoiceRows(res.installmentInvoices || []),
+        invoiceMeta: installmentMeta,
+      },
+    };
+  }
+
+  private applyProfitTab(): void {
+    const view = this.profitViews[this.profitTab];
+    if (!view) {
+      this.cards = [];
+      this.tableColumns = [];
+      this.tableRows = [];
+      this.chartOptions = null;
+      this.profitInvoiceColumns = [];
+      this.profitInvoiceRows = [];
+      this.profitInvoiceMeta = null;
+      return;
+    }
+    this.cards = view.cards.map((card) => ({ ...card }));
+    this.tableColumns = view.timeColumns.map((col) => ({ ...col }));
+    this.chartOptions = view.chart;
+    this.chartRedrawKey++;
+    this.profitInvoiceColumns = view.invoiceColumns.map((col) => ({ ...col }));
+    this.profitInvoiceRows = view.invoiceRows;
+    this.profitInvoiceMeta = view.invoiceMeta ? { ...view.invoiceMeta } : null;
+    this.applyProfitTimeSlice();
+  }
+
+  private applyProfitTimeSlice(): void {
+    const rows = this.profitViews[this.profitTab]?.timeRows || [];
+    const page = this.profitTimePage[this.profitTab] || 1;
+    const start = (page - 1) * this.profitTimeLimit;
+    this.tableRows = rows.slice(start, start + this.profitTimeLimit);
+  }
+
+  private invoiceMetaFrom(
+    meta: any,
+    fallbackPage: number
+  ): { totalCount: number; page: number; limit: number } {
+    return {
+      totalCount: Number(meta?.totalCount) || 0,
+      page: Number(meta?.page) || fallbackPage,
+      limit: Number(meta?.limit) || this.profitInvoiceLimit,
+    };
+  }
+
+  private consolidatedTimeColumns(): ReportColumnVM[] {
+    return [
+      { key: 'period', labelKey: 'tr_report_col_period' },
+      { key: 'cashTradingProfit', labelKey: 'tr_report_col_cash_trading', format: 'money' },
+      { key: 'downPaymentProfit', labelKey: 'tr_report_col_down_payment_profit', format: 'money' },
+      {
+        key: 'installmentProfit',
+        labelKey: 'tr_report_col_installment_profit_collected',
+        format: 'money',
+      },
+      { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
+      { key: 'branchOverheadAllocated', labelKey: 'tr_report_col_branch_overhead', format: 'money' },
+      { key: 'dailyExpenses', labelKey: 'tr_report_col_daily_expenses', format: 'money' },
+      { key: 'netProfit', labelKey: 'tr_report_col_net_profit_after_branch', format: 'money' },
+    ];
+  }
+
+  private cashTimeColumns(): ReportColumnVM[] {
+    return [
+      { key: 'period', labelKey: 'tr_report_col_period' },
+      { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
+      { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+      { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
+    ];
+  }
+
+  private installmentTimeColumns(): ReportColumnVM[] {
+    return [
+      { key: 'period', labelKey: 'tr_report_col_period' },
+      { key: 'downRevenue', labelKey: 'tr_report_col_down_payment_revenue', format: 'money' },
+      { key: 'downCost', labelKey: 'tr_report_col_down_payment_cost', format: 'money' },
+      { key: 'downProfit', labelKey: 'tr_report_col_down_payment_profit', format: 'money' },
+      { key: 'financingAmount', labelKey: 'tr_report_col_financing_amount', format: 'money' },
+      {
+        key: 'installmentProfit',
+        labelKey: 'tr_report_col_installment_profit_collected',
+        format: 'money',
+      },
+      { key: 'collectedCash', labelKey: 'tr_report_col_collected_cash', format: 'money' },
+      { key: 'recognizedProfit', labelKey: 'tr_report_col_recognized_profit', format: 'money' },
+    ];
+  }
+
+  private cashInvoiceColumns(): ReportColumnVM[] {
+    return [
+      { key: 'orderNumber', labelKey: 'tr_order_number' },
+      { key: 'date', labelKey: 'tr_report_col_date' },
+      { key: 'clientName', labelKey: 'tr_report_col_customer' },
+      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+      { key: 'revenue', labelKey: 'tr_report_col_revenue', format: 'money' },
+      { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+      { key: 'tradingProfit', labelKey: 'tr_report_col_trading_profit', format: 'money' },
+      { key: 'paymentStatus', labelKey: 'tr_status' },
+    ];
+  }
+
+  private installmentInvoiceColumns(): ReportColumnVM[] {
+    return [
+      { key: 'orderNumber', labelKey: 'tr_order_number' },
+      { key: 'date', labelKey: 'tr_report_col_date' },
+      { key: 'clientName', labelKey: 'tr_report_col_customer' },
+      { key: 'clientPhone', labelKey: 'tr_report_col_phone' },
+      { key: 'revenue', labelKey: 'tr_report_col_sale_total', format: 'money' },
+      { key: 'cost', labelKey: 'tr_report_col_cost', format: 'money' },
+      { key: 'downPayment', labelKey: 'tr_report_col_down_payment', format: 'money' },
+      { key: 'financingAmount', labelKey: 'tr_report_col_financing_amount', format: 'money' },
+      { key: 'downPaymentProfit', labelKey: 'tr_report_col_down_payment_profit', format: 'money' },
+      {
+        key: 'installmentProfitPeriod',
+        labelKey: 'tr_report_col_installment_profit_period',
+        format: 'money',
+      },
+      {
+        key: 'installmentProfitLifetime',
+        labelKey: 'tr_report_col_installment_profit_lifetime',
+        format: 'money',
+      },
+      { key: 'potentialProfit', labelKey: 'tr_report_col_potential_profit', format: 'money' },
+      { key: 'remainingProfit', labelKey: 'tr_report_col_remaining_profit', format: 'money' },
+    ];
+  }
+
+  private mapCashProfitInvoiceRows(
     rows: any[],
     t: (key: string) => string
   ): Record<string, unknown>[] {
@@ -1373,25 +1619,34 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       partial: 'tr_partial',
       unpaid: 'tr_unpaid',
     };
-    return (rows || []).map((x: any) => {
-      const isInstallment = !!x.isInstallment;
-      return {
-        orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
-        date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
-        clientName: x.clientName || '—',
-        clientPhone: x.clientPhoneNumber || '—',
-        revenue: x.revenue,
-        cost: x.cost,
-        installmentAmount: isInstallment ? x.installmentAmount ?? 0 : null,
-        installmentProfitShare: isInstallment ? x.installmentProfitShare ?? 0 : null,
-        tradingProfit: x.tradingProfit,
-        /** Full trading profit if all installments are collected (interest included). */
-        potentialProfit: isInstallment ? x.installmentTotalProfit ?? null : null,
-        paymentStatus: isInstallment
-          ? t('tr_report_status_installment')
-          : t(payStatusKey[x.paymentStatus] || 'tr_paid'),
-      };
-    });
+    return (rows || []).map((x: any) => ({
+      orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
+      date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
+      clientName: x.clientName || '—',
+      clientPhone: x.clientPhoneNumber || '—',
+      revenue: x.revenue,
+      cost: x.cost,
+      tradingProfit: x.tradingProfit,
+      paymentStatus: t(payStatusKey[x.paymentStatus] || 'tr_paid'),
+    }));
+  }
+
+  private mapInstallmentProfitInvoiceRows(rows: any[]): Record<string, unknown>[] {
+    return (rows || []).map((x: any) => ({
+      orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
+      date: x.createdAt ? new Date(x.createdAt).toLocaleDateString() : '—',
+      clientName: x.clientName || '—',
+      clientPhone: x.clientPhoneNumber || '—',
+      revenue: x.revenue,
+      cost: x.cost,
+      downPayment: x.downPayment ?? 0,
+      financingAmount: x.financingAmount ?? 0,
+      downPaymentProfit: x.downPaymentProfit ?? 0,
+      installmentProfitPeriod: x.installmentProfitPeriod ?? 0,
+      installmentProfitLifetime: x.installmentProfitLifetime ?? 0,
+      potentialProfit: x.potentialProfit ?? 0,
+      remainingProfit: x.remainingProfit ?? 0,
+    }));
   }
 
   private formatCardExportValue(c: ReportCardVM): string | number {

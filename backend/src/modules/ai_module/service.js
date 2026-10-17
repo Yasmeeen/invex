@@ -332,8 +332,8 @@ export const chat = async (req, res) => {
           : `Branch: ${branchMeta.branchName}\n`
         : '';
       const answer = ar
-        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nالإيرادات: ${s.totalRevenue || 0}\nالتكلفة: ${s.totalCost || 0}\nربح التشغيل: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nالمصروفات اليومية: ${s.dailyExpensesTotal || 0}\nصافي الربح: ${s.netProfit || 0}`
-        : `${branchLine}Range: ${rf} to ${rt}\nRevenue: ${s.totalRevenue || 0}\nCost: ${s.totalCost || 0}\nTrading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nDaily expenses: ${s.dailyExpensesTotal || 0}\nNet profit: ${s.netProfit || 0}`;
+        ? `${branchLine}الفترة: ${rf} إلى ${rt}\nكاش — الإيرادات: ${s.totalRevenue || 0}، التكلفة: ${s.totalCost || 0}، ربح التشغيل: ${s.cashTradingProfit || 0}\nتقسيط — إيراد المقدم: ${s.installmentDownPayment || 0}، مبلغ التمويل: ${s.financingAmount || 0}، ربح الأقساط المحصّل: ${s.installmentProfitCollected || 0}، الباقي: ${s.remainingProfit || 0}\nربح التشغيل المجمع: ${s.tradingProfit || 0}\nمصاريف الفرع (الفترة): ${s.branchOperatingCost || 0}\nالمصروفات اليومية: ${s.dailyExpensesTotal || 0}\nصافي الربح: ${s.netProfit || 0}`
+        : `${branchLine}Range: ${rf} to ${rt}\nCash — revenue: ${s.totalRevenue || 0}, cost: ${s.totalCost || 0}, trading profit: ${s.cashTradingProfit || 0}\nInstallments — down payment revenue: ${s.installmentDownPayment || 0}, financed amount: ${s.financingAmount || 0}, installment profit collected: ${s.installmentProfitCollected || 0}, remaining: ${s.remainingProfit || 0}\nCombined trading profit: ${s.tradingProfit || 0}\nBranch operating cost (range): ${s.branchOperatingCost || 0}\nDaily expenses: ${s.dailyExpensesTotal || 0}\nNet profit: ${s.netProfit || 0}`;
       return res.json({ answer, meta: { intent: i, role, range: { from: rf, to: rt }, branch: branchMeta } });
     }
 

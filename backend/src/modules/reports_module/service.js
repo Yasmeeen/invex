@@ -419,38 +419,46 @@ function productLineSumExpr(field) {
  */
 function downPaymentAmountExpr(p) {
   const field = (name) => `${p}.${name}`;
+  const noteIsDownPayment = {
+    $regexMatch: {
+      input: { $ifNull: [field('note'), ''] },
+      regex: 'مقدم|down payment|^Checkout',
+      options: 'i',
+    },
+  };
+  const methodIsCollectedCash = {
+    $and: [
+      {
+        $gt: [
+          { $strLenCP: { $trim: { input: { $ifNull: [field('method'), ''] } } } },
+          0,
+        ],
+      },
+      {
+        $not: {
+          $in: [
+            { $toLower: { $ifNull: [field('method'), ''] } },
+            ['credit', 'installment'],
+          ],
+        },
+      },
+    ],
+  };
   return {
     $cond: [
       {
         $and: [
           { $ne: [field('countsTowardInvoice'), false] },
+          { $ne: [field('earlySettlement'), true] },
           { $lte: [{ $strLenCP: { $ifNull: [field('feeForMethod'), ''] } }, 0] },
           { $lte: [{ $ifNull: [field('installmentProfit'), 0] }, 0.001] },
           {
-            $gt: [
-              { $strLenCP: { $trim: { input: { $ifNull: [field('method'), ''] } } } },
-              0,
-            ],
-          },
-          {
-            $not: {
-              $in: [
-                { $toLower: { $ifNull: [field('method'), ''] } },
-                ['credit', 'installment'],
-              ],
-            },
-          },
-          {
             $or: [
-              {
-                $regexMatch: {
-                  input: { $ifNull: [field('note'), ''] },
-                  regex: 'مقدم|down payment|^Checkout',
-                  options: 'i',
-                },
-              },
+              // Cashier down payments are sometimes stored with no method.
+              noteIsDownPayment,
               {
                 $and: [
+                  methodIsCollectedCash,
                   { $gte: [field('paidAt'), { $subtract: ['$createdAt', 5 * 60 * 1000] }] },
                   { $lte: [field('paidAt'), { $add: ['$createdAt', 5 * 60 * 1000] }] },
                 ],
@@ -494,11 +502,6 @@ const installmentEconomicsStages = [
     },
   },
 ];
-
-/** Orders with a customer installment schedule (profit is cash-basis on collection). */
-const hasInstallmentsExpr = {
-  $gt: [{ $size: { $ifNull: ['$installments', []] } }, 0],
-};
 
 /** Cash; credit; card (Visa / Mastercard / Meeza); everything else = apps & wallets (Valu, Instapay, etc.). */
 const salesPaymentCategoryExpr = {
@@ -677,6 +680,376 @@ export const getSalesReport = async (req, res) => {
   }
 };
 
+const paidInRangeExpr = (dateExpr, from, to) => ({
+  $and: [{ $gte: [dateExpr, from] }, { $lte: [dateExpr, to] }],
+});
+
+/** Profit share of one installment row (legacy rows without payment.installmentProfit). */
+const legacyInstallmentRowProfitExpr = {
+  $cond: [
+    {
+      $and: [
+        { $gt: [{ $ifNull: ['$$inst.paidAmount', 0] }, 0] },
+        { $gt: [{ $ifNull: ['$$inst.amount', 0] }, 0] },
+      ],
+    },
+    {
+      $multiply: [
+        {
+          $cond: [
+            { $gt: [{ $ifNull: ['$$inst.profitShare', 0] }, 0] },
+            { $ifNull: ['$$inst.profitShare', 0] },
+            {
+              $cond: [
+                { $gt: ['$installmentCount', 0] },
+                { $divide: ['$lineTradingProfit', '$installmentCount'] },
+                0,
+              ],
+            },
+          ],
+        },
+        {
+          $divide: [
+            { $ifNull: ['$$inst.paidAmount', 0] },
+            { $ifNull: ['$$inst.amount', 1] },
+          ],
+        },
+        { $subtract: [1, { $ifNull: ['$downProfitRatio', 0] }] },
+      ],
+    },
+    0,
+  ],
+};
+
+async function loadCashProfitInvoices({ match, unwindMatch, page, limit, all }) {
+  const skip = (Math.max(1, page) - 1) * limit;
+  const cap = 50000;
+  const [facet] = await Order.aggregate([
+    { $match: match },
+    { $unwind: '$products' },
+    ...(unwindMatch && Object.keys(unwindMatch).length ? [{ $match: unwindMatch }] : []),
+    {
+      $addFields: {
+        lineRevenue: { $multiply: ['$products.price', '$products.quantity'] },
+        lineCost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id',
+        orderNumber: { $first: '$orderNumber' },
+        createdAt: { $first: '$createdAt' },
+        clientName: { $first: '$clientName' },
+        clientPhoneNumber: { $first: '$clientPhoneNumber' },
+        paymentStatus: { $first: '$paymentStatus' },
+        revenue: { $sum: '$lineRevenue' },
+        cost: { $sum: '$lineCost' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        orderId: '$_id',
+        orderNumber: 1,
+        createdAt: 1,
+        clientName: 1,
+        clientPhoneNumber: 1,
+        paymentStatus: 1,
+        isInstallment: { $literal: false },
+        revenue: { $round: ['$revenue', 2] },
+        cost: { $round: ['$cost', 2] },
+        tradingProfit: { $round: [{ $subtract: ['$revenue', '$cost'] }, 2] },
+      },
+    },
+    { $sort: { createdAt: -1 } },
+    {
+      $facet: {
+        meta: [{ $count: 'totalCount' }],
+        rows: all ? [{ $limit: cap }] : [{ $skip: skip }, { $limit: limit }],
+      },
+    },
+  ]);
+  const rows = facet?.rows || [];
+  const totalCount = facet?.meta?.[0]?.totalCount || 0;
+  return {
+    rows,
+    meta: {
+      totalCount,
+      page: all ? 1 : page,
+      limit: all ? totalCount || rows.length : limit,
+      all: !!all,
+    },
+  };
+}
+
+/**
+ * Installment invoices with a down payment, a collection, or a zero-down origination in the period.
+ * Financing amount is goods cost minus the down payment (never negative).
+ */
+async function loadInstallmentProfitInvoices({ match, from, to, page, limit, all }) {
+  const skip = (Math.max(1, page) - 1) * limit;
+  const cap = 50000;
+  const [facet] = await Order.aggregate([
+    { $match: match },
+    ...installmentEconomicsStages,
+    {
+      $addFields: {
+        installmentCount: { $size: { $ifNull: ['$installments', []] } },
+        lineTradingProfit: { $subtract: ['$lineRevenue', '$lineCost'] },
+        trackedInstallmentProfit: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$payments', []] },
+              as: 'p',
+              in: { $ifNull: ['$$p.installmentProfit', 0] },
+            },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        downProfit: { $multiply: ['$lineTradingProfit', { $ifNull: ['$downProfitRatio', 0] }] },
+        financingAmount: { $max: [0, { $subtract: ['$lineCost', '$downPaymentTotal'] }] },
+        createdInPeriod: paidInRangeExpr('$createdAt', from, to),
+        downInPeriod: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$payments', []] },
+              as: 'p',
+              in: {
+                $cond: [
+                  paidInRangeExpr('$$p.paidAt', from, to),
+                  downPaymentAmountExpr('$$p'),
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        trackedProfitPeriod: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$payments', []] },
+              as: 'p',
+              in: {
+                $cond: [
+                  paidInRangeExpr('$$p.paidAt', from, to),
+                  { $ifNull: ['$$p.installmentProfit', 0] },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        trackedCashPeriod: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$payments', []] },
+              as: 'p',
+              in: {
+                $cond: [
+                  {
+                    $and: [
+                      paidInRangeExpr('$$p.paidAt', from, to),
+                      {
+                        $or: [
+                          { $gt: [{ $abs: { $ifNull: ['$$p.installmentProfit', 0] } }, 0.001] },
+                          { $eq: ['$$p.earlySettlement', true] },
+                        ],
+                      },
+                    ],
+                  },
+                  { $ifNull: ['$$p.amount', 0] },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        legacyProfitLifetime: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$installments', []] },
+              as: 'inst',
+              in: legacyInstallmentRowProfitExpr,
+            },
+          },
+        },
+        legacyProfitPeriod: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$installments', []] },
+              as: 'inst',
+              in: {
+                $cond: [
+                  paidInRangeExpr('$$inst.paidAt', from, to),
+                  legacyInstallmentRowProfitExpr,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+        legacyCashPeriod: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ['$installments', []] },
+              as: 'inst',
+              in: {
+                $cond: [
+                  {
+                    $and: [
+                      paidInRangeExpr('$$inst.paidAt', from, to),
+                      { $gt: [{ $ifNull: ['$$inst.paidAmount', 0] }, 0] },
+                    ],
+                  },
+                  { $ifNull: ['$$inst.paidAmount', 0] },
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        useTracked: {
+          $or: [
+            { $gt: [{ $abs: '$trackedInstallmentProfit' }, 0.001] },
+            { $eq: ['$earlySettlementClosed', true] },
+          ],
+        },
+      },
+    },
+    {
+      $addFields: {
+        installmentProfitLifetime: {
+          $cond: [
+            '$useTracked',
+            {
+              $multiply: [
+                '$trackedInstallmentProfit',
+                { $subtract: [1, { $ifNull: ['$downProfitRatio', 0] }] },
+              ],
+            },
+            '$legacyProfitLifetime',
+          ],
+        },
+        installmentProfitPeriod: {
+          $cond: [
+            '$useTracked',
+            {
+              $multiply: [
+                '$trackedProfitPeriod',
+                { $subtract: [1, { $ifNull: ['$downProfitRatio', 0] }] },
+              ],
+            },
+            '$legacyProfitPeriod',
+          ],
+        },
+        collectedCashPeriod: {
+          $cond: ['$useTracked', '$trackedCashPeriod', '$legacyCashPeriod'],
+        },
+        potentialProfit: {
+          $cond: [
+            { $gt: [{ $ifNull: ['$installmentTotalProfit', 0] }, 0] },
+            '$installmentTotalProfit',
+            '$lineTradingProfit',
+          ],
+        },
+      },
+    },
+    {
+      $addFields: {
+        remainingProfit: {
+          $cond: [
+            { $eq: ['$earlySettlementClosed', true] },
+            0,
+            {
+              $max: [
+                0,
+                {
+                  $subtract: [
+                    '$potentialProfit',
+                    { $add: ['$downProfit', '$installmentProfitLifetime'] },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $match: {
+        $expr: {
+          $or: [
+            { $gt: ['$downInPeriod', 0.001] },
+            { $gt: [{ $abs: '$installmentProfitPeriod' }, 0.001] },
+            { $gt: ['$collectedCashPeriod', 0.001] },
+            {
+              $and: ['$createdInPeriod', { $not: { $gt: ['$downPaymentTotal', 0] } }],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        orderId: '$_id',
+        orderNumber: 1,
+        createdAt: 1,
+        clientName: 1,
+        clientPhoneNumber: 1,
+        paymentStatus: 1,
+        isInstallment: { $literal: true },
+        revenue: { $round: ['$lineRevenue', 2] },
+        cost: { $round: ['$lineCost', 2] },
+        downPayment: { $round: ['$downPaymentTotal', 2] },
+        financingAmount: { $round: ['$financingAmount', 2] },
+        downPaymentProfit: { $round: ['$downProfit', 2] },
+        installmentProfitPeriod: { $round: ['$installmentProfitPeriod', 2] },
+        installmentProfitLifetime: { $round: ['$installmentProfitLifetime', 2] },
+        potentialProfit: { $round: ['$potentialProfit', 2] },
+        remainingProfit: { $round: ['$remainingProfit', 2] },
+        collectedCashPeriod: { $round: ['$collectedCashPeriod', 2] },
+      },
+    },
+    {
+      $facet: {
+        meta: [{ $count: 'totalCount' }],
+        totals: [
+          {
+            $group: {
+              _id: null,
+              remainingProfit: { $sum: '$remainingProfit' },
+            },
+          },
+        ],
+        rows: [
+          { $sort: { createdAt: -1 } },
+          ...(all ? [{ $limit: cap }] : [{ $skip: skip }, { $limit: limit }]),
+        ],
+      },
+    },
+  ]);
+  const rows = facet?.rows || [];
+  const totalCount = facet?.meta?.[0]?.totalCount || 0;
+  return {
+    rows,
+    remainingProfit: round2(facet?.totals?.[0]?.remainingProfit || 0),
+    meta: {
+      totalCount,
+      page: all ? 1 : page,
+      limit: all ? totalCount || rows.length : limit,
+      all: !!all,
+    },
+  };
+}
+
 export const getProfitReport = async (req, res) => {
   try {
     const f = parseCommonFilters(req.query);
@@ -744,7 +1117,11 @@ export const getProfitReport = async (req, res) => {
       {
         $match: {
           'payments.paidAt': { $gte: f.from, $lte: f.to },
-          'payments.installmentProfit': { $gt: 0 },
+          $or: [
+            { 'payments.installmentProfit': { $gt: 0 } },
+            { 'payments.installmentProfit': { $lt: 0 } },
+            { 'payments.earlySettlement': true },
+          ],
         },
       },
       {
@@ -758,9 +1135,17 @@ export const getProfitReport = async (req, res) => {
               ],
             },
           },
+          collectedCash: { $sum: { $ifNull: ['$payments.amount', 0] } },
         },
       },
-      { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          installmentProfit: { $round: ['$installmentProfit', 2] },
+          collectedCash: { $round: ['$collectedCash', 2] },
+        },
+      },
     ]);
 
     /**
@@ -811,7 +1196,16 @@ export const getProfitReport = async (req, res) => {
           installmentCount: { $size: { $ifNull: ['$installments', []] } },
         },
       },
-      { $match: { trackedInstallmentProfit: { $lte: 0.001 } } },
+      {
+        $match: {
+          $expr: {
+            $and: [
+              { $lte: [{ $abs: '$trackedInstallmentProfit' }, 0.001] },
+              { $ne: ['$earlySettlementClosed', true] },
+            ],
+          },
+        },
+      },
       { $unwind: '$installments' },
       {
         $match: {
@@ -886,21 +1280,33 @@ export const getProfitReport = async (req, res) => {
               ],
             },
           },
+          collectedCash: { $sum: { $ifNull: ['$installments.paidAmount', 0] } },
         },
       },
-      { $project: { _id: 0, period: '$_id', installmentProfit: { $round: ['$installmentProfit', 2] } } },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          installmentProfit: { $round: ['$installmentProfit', 2] },
+          collectedCash: { $round: ['$collectedCash', 2] },
+        },
+      },
     ]);
 
     const installmentByPeriod = new Map();
     for (const row of [...(installmentProfitFromPayments || []), ...(installmentProfitLegacy || [])]) {
       const key = String(row.period);
-      installmentByPeriod.set(
-        key,
-        round2((installmentByPeriod.get(key) || 0) + (Number(row.installmentProfit) || 0))
-      );
+      const prev = installmentByPeriod.get(key) || { profit: 0, collectedCash: 0 };
+      installmentByPeriod.set(key, {
+        profit: round2(prev.profit + (Number(row.installmentProfit) || 0)),
+        collectedCash: round2(prev.collectedCash + (Number(row.collectedCash) || 0)),
+      });
     }
     const installmentProfitCollected = round2(
-      [...installmentByPeriod.values()].reduce((s, n) => s + n, 0)
+      [...installmentByPeriod.values()].reduce((s, n) => s + n.profit, 0)
+    );
+    const installmentCollectedCash = round2(
+      [...installmentByPeriod.values()].reduce((s, n) => s + n.collectedCash, 0)
     );
 
     /**
@@ -929,6 +1335,7 @@ export const getProfitReport = async (req, res) => {
           downAmount: { $sum: '$downAmount' },
           lineRevenue: { $first: '$lineRevenue' },
           lineCost: { $first: '$lineCost' },
+          downPaymentTotal: { $first: '$downPaymentTotal' },
         },
       },
       {
@@ -940,6 +1347,18 @@ export const getProfitReport = async (req, res) => {
               0,
             ],
           },
+          financingSlice: {
+            $cond: [
+              { $gt: ['$downPaymentTotal', 0] },
+              {
+                $multiply: [
+                  { $max: [0, { $subtract: ['$lineCost', '$downPaymentTotal'] }] },
+                  { $min: [1, { $divide: ['$downAmount', '$downPaymentTotal'] }] },
+                ],
+              },
+              0,
+            ],
+          },
         },
       },
       {
@@ -947,6 +1366,7 @@ export const getProfitReport = async (req, res) => {
           _id: '$_id.period',
           downRevenue: { $sum: { $multiply: ['$lineRevenue', '$payRatio'] } },
           downCost: { $sum: { $multiply: ['$lineCost', '$payRatio'] } },
+          financingAmount: { $sum: '$financingSlice' },
         },
       },
       {
@@ -955,64 +1375,113 @@ export const getProfitReport = async (req, res) => {
           period: '$_id',
           downRevenue: { $round: ['$downRevenue', 2] },
           downCost: { $round: ['$downCost', 2] },
+          financingAmount: { $round: ['$financingAmount', 2] },
         },
       },
     ]);
 
     const downByPeriod = new Map();
+    const financingByPeriod = new Map();
     for (const row of downPaymentInPeriod || []) {
-      downByPeriod.set(String(row.period), {
+      const key = String(row.period);
+      downByPeriod.set(key, {
         downRevenue: Number(row.downRevenue) || 0,
         downCost: Number(row.downCost) || 0,
       });
+      financingByPeriod.set(key, Number(row.financingAmount) || 0);
     }
+
+    /** Installment sales with no down payment: the whole goods cost is financed, on the sale date. */
+    const zeroDownFinancing = await Order.aggregate([
+      {
+        $match: {
+          ...installmentOrderMatch,
+          createdAt: { $gte: f.from, $lte: f.to },
+        },
+      },
+      ...installmentEconomicsStages,
+      { $match: { downPaymentTotal: { $not: { $gt: 0 } } } },
+      {
+        $group: {
+          _id: getDateGroupExpr(f.groupBy),
+          financingAmount: { $sum: '$lineCost' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          financingAmount: { $round: ['$financingAmount', 2] },
+        },
+      },
+    ]);
+    for (const row of zeroDownFinancing || []) {
+      const key = String(row.period);
+      financingByPeriod.set(
+        key,
+        round2((financingByPeriod.get(key) || 0) + (Number(row.financingAmount) || 0))
+      );
+    }
+
     const installmentDownPayment = round2(
       [...downByPeriod.values()].reduce((s, row) => s + row.downRevenue, 0)
     );
     const installmentDownPaymentCost = round2(
       [...downByPeriod.values()].reduce((s, row) => s + row.downCost, 0)
     );
+    const downPaymentProfit = round2(installmentDownPayment - installmentDownPaymentCost);
+    const financingAmount = round2(
+      [...financingByPeriod.values()].reduce((s, n) => s + n, 0)
+    );
 
-    const nonInstallmentRevenue = aggSummary?.totalRevenue ?? 0;
-    const nonInstallmentCost = aggSummary?.totalCost ?? 0;
-    const totalRevenue = round2(nonInstallmentRevenue + installmentDownPayment);
-    const totalCost = round2(nonInstallmentCost + installmentDownPaymentCost);
-    const cashSalesTrading = round2(totalRevenue - totalCost);
-    const tradingProfit = round2(cashSalesTrading + installmentProfitCollected);
+    const cashRevenue = round2(aggSummary?.totalRevenue ?? 0);
+    const cashCost = round2(aggSummary?.totalCost ?? 0);
+    const cashTradingProfit = round2(cashRevenue - cashCost);
+    const installmentRecognizedProfit = round2(downPaymentProfit + installmentProfitCollected);
+    const consolidatedTrading = round2(cashTradingProfit + installmentRecognizedProfit);
     const dailyExpensesTotal = dailyExpenses.total;
     const netProfitAfterBranch = round2(
-      tradingProfit - branchOperatingCostTotal - dailyExpensesTotal
+      consolidatedTrading - branchOperatingCostTotal - dailyExpensesTotal
     );
+    const profitMarginBase = cashRevenue + installmentDownPayment + installmentProfitCollected;
     const profitMargin =
-      totalRevenue + installmentProfitCollected > 0
-        ? round2((netProfitAfterBranch / (totalRevenue + installmentProfitCollected)) * 100)
-        : 0;
+      profitMarginBase > 0 ? round2((netProfitAfterBranch / profitMarginBase) * 100) : 0;
+    const cashMargin = cashRevenue > 0 ? round2((cashTradingProfit / cashRevenue) * 100) : 0;
+
+    const branchOverhead = {
+      monthlyFixedTotal: round2(overhead.monthlyTotal),
+      dailyRate: round2(overhead.dailyRate),
+      daysInPeriod,
+      divisorDays: BRANCH_OVERHEAD_MONTHLY_DAYS,
+      breakdown: {
+        rent: round2(overhead.breakdown.rent),
+        employeesSalary: round2(overhead.breakdown.employeesSalary),
+        branchInvoices: round2(overhead.breakdown.branchInvoices),
+        expenses: round2(overhead.breakdown.expenses),
+      },
+      branchCount: overhead.branchCount,
+    };
 
     const summary = {
-      totalRevenue,
-      totalCost,
+      totalRevenue: cashRevenue,
+      totalCost: cashCost,
+      cashTradingProfit,
+      cashMargin,
       installmentDownPayment,
-      tradingProfit,
+      installmentDownPaymentCost,
+      downPaymentProfit,
+      financingAmount,
       installmentProfitCollected,
-      cashSalesTradingProfit: cashSalesTrading,
+      installmentCollectedCash,
+      installmentRecognizedProfit,
+      tradingProfit: consolidatedTrading,
+      cashSalesTradingProfit: cashTradingProfit,
       branchOperatingCost: round2(branchOperatingCostTotal),
       dailyExpensesTotal,
       dailyExpensesCount: dailyExpenses.count,
       netProfit: netProfitAfterBranch,
       profitMargin,
-      branchOverhead: {
-        monthlyFixedTotal: round2(overhead.monthlyTotal),
-        dailyRate: round2(overhead.dailyRate),
-        daysInPeriod,
-        divisorDays: BRANCH_OVERHEAD_MONTHLY_DAYS,
-        breakdown: {
-          rent: round2(overhead.breakdown.rent),
-          employeesSalary: round2(overhead.breakdown.employeesSalary),
-          branchInvoices: round2(overhead.breakdown.branchInvoices),
-          expenses: round2(overhead.breakdown.expenses),
-        },
-        branchCount: overhead.branchCount,
-      },
+      branchOverhead,
     };
 
     const profitOverTimeRaw = await Order.aggregate([
@@ -1045,30 +1514,59 @@ export const getProfitReport = async (req, res) => {
         ...salesByPeriod.keys(),
         ...installmentByPeriod.keys(),
         ...downByPeriod.keys(),
+        ...financingByPeriod.keys(),
         ...dailyExpenses.byPeriod.keys(),
       ]),
     ].sort();
 
-    const profitOverTime = allPeriods.map((period) => {
-      const row = salesByPeriod.get(period);
-      const down = downByPeriod.get(period);
-      const revenue = (Number(row?.revenue) || 0) + (Number(down?.downRevenue) || 0);
-      const cost = (Number(row?.cost) || 0) + (Number(down?.downCost) || 0);
-      const installmentProfit = installmentByPeriod.get(period) || 0;
-      const trading = round2(revenue - cost + installmentProfit);
-      let overheadAlloc = 0;
+    const overheadForPeriod = (period) => {
       if (f.groupBy === 'monthly') {
-        const d = daysInMonthOverlappingRange(period, f.from, f.to);
-        overheadAlloc = round2(overhead.dailyRate * d);
-      } else {
-        overheadAlloc = round2(overhead.dailyRate);
+        return round2(overhead.dailyRate * daysInMonthOverlappingRange(period, f.from, f.to));
       }
+      return round2(overhead.dailyRate);
+    };
+
+    const cashOverTime = [];
+    const installmentOverTime = [];
+    const consolidatedOverTime = allPeriods.map((period) => {
+      const row = salesByPeriod.get(period);
+      const down = downByPeriod.get(period) || { downRevenue: 0, downCost: 0 };
+      const inst = installmentByPeriod.get(period) || { profit: 0, collectedCash: 0 };
+      const cashRev = Number(row?.revenue) || 0;
+      const cashCst = Number(row?.cost) || 0;
+      const cashTrading = round2(cashRev - cashCst);
+      const downRev = Number(down.downRevenue) || 0;
+      const downCst = Number(down.downCost) || 0;
+      const downProfit = round2(downRev - downCst);
+      const instProfit = Number(inst.profit) || 0;
+      const trading = round2(cashTrading + downProfit + instProfit);
+      const overheadAlloc = overheadForPeriod(period);
       const periodDailyExpenses = dailyExpenses.byPeriod.get(period) || 0;
+      if (row) {
+        cashOverTime.push({
+          period,
+          revenue: round2(cashRev),
+          cost: round2(cashCst),
+          tradingProfit: cashTrading,
+        });
+      }
+      if (downByPeriod.has(period) || installmentByPeriod.has(period) || financingByPeriod.has(period)) {
+        installmentOverTime.push({
+          period,
+          downRevenue: round2(downRev),
+          downCost: round2(downCst),
+          downProfit,
+          financingAmount: round2(financingByPeriod.get(period) || 0),
+          installmentProfit: round2(instProfit),
+          collectedCash: round2(Number(inst.collectedCash) || 0),
+          recognizedProfit: round2(downProfit + instProfit),
+        });
+      }
       return {
         period,
-        revenue,
-        cost,
-        installmentProfit,
+        cashTradingProfit: cashTrading,
+        downPaymentProfit: downProfit,
+        installmentProfit: round2(instProfit),
         tradingProfit: trading,
         branchOverheadAllocated: overheadAlloc,
         dailyExpenses: periodDailyExpenses,
@@ -1076,204 +1574,83 @@ export const getProfitReport = async (req, res) => {
       };
     });
 
-    /** Invoices created in period (incl. installment — profit = recognized so far). */
-    const invoiceCreatedMatch = {
-      ...baseOrderMatch,
-      createdAt: { $gte: f.from, $lte: f.to },
-    };
-    const invoiceAll =
-      req.query.invoice_all === 'true' || req.query.invoice_all === true;
-    const invoicePage = Math.max(1, Number(req.query.invoice_page) || 1);
-    const invoiceLimit = Math.max(
+    const invoiceAll = req.query.invoice_all === 'true' || req.query.invoice_all === true;
+    const cashInvoicePage = Math.max(
       1,
-      Math.min(100, Number(req.query.invoice_limit) || 25)
+      Number(req.query.cash_invoice_page || req.query.invoice_page) || 1
     );
-    const invoiceSkip = (invoicePage - 1) * invoiceLimit;
-    const invoiceExportCap = 50000;
+    const cashInvoiceLimit = Math.max(
+      1,
+      Math.min(100, Number(req.query.cash_invoice_limit || req.query.invoice_limit) || 25)
+    );
+    const installmentInvoicePage = Math.max(
+      1,
+      Number(req.query.installment_invoice_page || req.query.invoice_page) || 1
+    );
+    const installmentInvoiceLimit = Math.max(
+      1,
+      Math.min(100, Number(req.query.installment_invoice_limit || req.query.invoice_limit) || 25)
+    );
 
-    const [invoiceFacet] = await Order.aggregate([
-      { $match: invoiceCreatedMatch },
-      { $unwind: '$products' },
-      { $match: unwindMatch },
-      {
-        $addFields: {
-          lineRevenue: { $multiply: ['$products.price', '$products.quantity'] },
-          lineCost: { $multiply: [{ $ifNull: ['$products.cost', 0] }, '$products.quantity'] },
-        },
-      },
-      {
-        $group: {
-          _id: '$_id',
-          orderNumber: { $first: '$orderNumber' },
-          createdAt: { $first: '$createdAt' },
-          clientName: { $first: '$clientName' },
-          clientPhoneNumber: { $first: '$clientPhoneNumber' },
-          paymentStatus: { $first: '$paymentStatus' },
-          paymentMethod: { $first: '$paymentMethod' },
-          totalPrice: { $first: '$totalPrice' },
-          installments: { $first: '$installments' },
-          installmentTotalProfit: { $first: '$installmentTotalProfit' },
-          revenue: { $sum: '$lineRevenue' },
-          cost: { $sum: '$lineCost' },
-        },
-      },
-      {
-        $addFields: {
-          isInstallment: hasInstallmentsExpr,
-          installmentCount: { $size: { $ifNull: ['$installments', []] } },
-          lineTradingProfit: { $subtract: ['$revenue', '$cost'] },
-          recognizedProfit: {
-            $sum: {
-              $map: {
-                input: { $ifNull: ['$installments', []] },
-                as: 'inst',
-                in: { $ifNull: ['$$inst.recognizedProfit', 0] },
-              },
-            },
-          },
-          installmentAmount: {
-            $ifNull: [{ $arrayElemAt: ['$installments.amount', 0] }, 0],
-          },
-          installmentProfitShare: {
-            $let: {
-              vars: {
-                firstShare: { $arrayElemAt: ['$installments.profitShare', 0] },
-                n: { $size: { $ifNull: ['$installments', []] } },
-              },
-              in: {
-                $cond: [
-                  { $gt: [{ $ifNull: ['$$firstShare', 0] }, 0] },
-                  '$$firstShare',
-                  {
-                    $cond: [
-                      { $gt: ['$$n', 0] },
-                      { $divide: [{ $subtract: ['$revenue', '$cost'] }, '$$n'] },
-                      0,
-                    ],
-                  },
-                ],
-              },
-            },
-          },
-        },
-      },
-      {
-        $addFields: {
-          /** Legacy rows: derive recognized from paidAmount when recognizedProfit unset. */
-          recognizedProfitResolved: {
-            $cond: [
-              '$isInstallment',
-              {
-                $cond: [
-                  { $gt: ['$recognizedProfit', 0.001] },
-                  '$recognizedProfit',
-                  {
-                    $sum: {
-                      $map: {
-                        input: { $ifNull: ['$installments', []] },
-                        as: 'inst',
-                        in: {
-                          $cond: [
-                            { $gt: [{ $ifNull: ['$$inst.amount', 0] }, 0] },
-                            {
-                              $multiply: [
-                                {
-                                  $cond: [
-                                    { $gt: [{ $ifNull: ['$$inst.profitShare', 0] }, 0] },
-                                    { $ifNull: ['$$inst.profitShare', 0] },
-                                    {
-                                      $cond: [
-                                        { $gt: ['$installmentCount', 0] },
-                                        {
-                                          $divide: ['$lineTradingProfit', '$installmentCount'],
-                                        },
-                                        0,
-                                      ],
-                                    },
-                                  ],
-                                },
-                                {
-                                  $divide: [
-                                    { $ifNull: ['$$inst.paidAmount', 0] },
-                                    { $ifNull: ['$$inst.amount', 1] },
-                                  ],
-                                },
-                              ],
-                            },
-                            0,
-                          ],
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-              '$lineTradingProfit',
-            ],
-          },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          orderId: '$_id',
-          orderNumber: 1,
-          createdAt: 1,
-          clientName: 1,
-          clientPhoneNumber: 1,
-          paymentStatus: 1,
-          paymentMethod: 1,
-          isInstallment: 1,
-          installmentAmount: { $round: [{ $ifNull: ['$installmentAmount', 0] }, 2] },
-          installmentProfitShare: {
-            $round: [{ $ifNull: ['$installmentProfitShare', 0] }, 2],
-          },
-          installmentTotalProfit: {
-            $round: [
-              {
-                $ifNull: ['$installmentTotalProfit', '$lineTradingProfit'],
-              },
-              2,
-            ],
-          },
-          totalPrice: { $round: [{ $ifNull: ['$totalPrice', 0] }, 2] },
-          revenue: { $round: ['$revenue', 2] },
-          cost: { $round: ['$cost', 2] },
-          tradingProfit: {
-            $round: [
-              {
-                $cond: ['$isInstallment', '$recognizedProfitResolved', '$lineTradingProfit'],
-              },
-              2,
-            ],
-          },
-        },
-      },
-      { $sort: { createdAt: -1 } },
-      {
-        $facet: {
-          meta: [{ $count: 'totalCount' }],
-          rows: invoiceAll
-            ? [{ $limit: invoiceExportCap }]
-            : [{ $skip: invoiceSkip }, { $limit: invoiceLimit }],
-        },
-      },
-    ]);
+    const cashInvoicesResult = await loadCashProfitInvoices({
+      match: nonInstallmentMatch,
+      unwindMatch,
+      page: cashInvoicePage,
+      limit: cashInvoiceLimit,
+      all: invoiceAll,
+    });
 
-    const profitByInvoice = invoiceFacet?.rows || [];
-    const invoiceTotalCount = invoiceFacet?.meta?.[0]?.totalCount || 0;
+    const installmentInvoicesResult = await loadInstallmentProfitInvoices({
+      match: {
+        ...installmentOrderMatch,
+        $or: [
+          { createdAt: { $gte: f.from, $lte: f.to } },
+          { 'payments.paidAt': { $gte: f.from, $lte: f.to } },
+          { 'installments.paidAt': { $gte: f.from, $lte: f.to } },
+        ],
+      },
+      from: f.from,
+      to: f.to,
+      page: installmentInvoicePage,
+      limit: installmentInvoiceLimit,
+      all: invoiceAll,
+    });
+
+    summary.remainingProfit = installmentInvoicesResult.remainingProfit;
 
     return res.json({
       filters: f,
       summary,
-      profitOverTime,
-      profitByInvoice,
-      profitByInvoiceMeta: {
-        totalCount: invoiceTotalCount,
-        page: invoiceAll ? 1 : invoicePage,
-        limit: invoiceAll ? invoiceTotalCount || profitByInvoice.length : invoiceLimit,
-        all: !!invoiceAll,
+      cash: {
+        summary: {
+          totalRevenue: cashRevenue,
+          totalCost: cashCost,
+          tradingProfit: cashTradingProfit,
+          profitMargin: cashMargin,
+        },
+        overTime: cashOverTime,
       },
+      installment: {
+        summary: {
+          downPaymentRevenue: installmentDownPayment,
+          downPaymentCost: installmentDownPaymentCost,
+          downPaymentProfit,
+          financingAmount,
+          installmentProfitCollected,
+          collectedCash: installmentCollectedCash,
+          recognizedProfit: installmentRecognizedProfit,
+          remainingProfit: installmentInvoicesResult.remainingProfit,
+        },
+        overTime: installmentOverTime,
+      },
+      consolidated: {
+        overTime: consolidatedOverTime,
+      },
+      profitOverTime: consolidatedOverTime,
+      cashInvoices: cashInvoicesResult.rows,
+      cashInvoicesMeta: cashInvoicesResult.meta,
+      installmentInvoices: installmentInvoicesResult.rows,
+      installmentInvoicesMeta: installmentInvoicesResult.meta,
     });
   } catch (error) {
     console.error('getProfitReport:', error);

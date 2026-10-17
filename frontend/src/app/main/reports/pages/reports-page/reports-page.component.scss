@@ -4,11 +4,6 @@
 
 .reports-page__head {
   display: flex;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.reports-page__head--profit {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
@@ -22,10 +17,6 @@
 
 .reports-page__title {
   margin: 0;
-  color: #5b21b6;
-}
-
-.reports-page--profit .reports-page__title {
   color: #111827;
   font-size: 1.5rem;
   font-weight: 800;
@@ -114,7 +105,8 @@
   flex-wrap: wrap;
 }
 
-.profit-table-panel {
+/* Shared table panel (all reports) */
+.report-table-panel {
   border: 1px solid #ece7ff;
   border-radius: 18px;
   background: #fff;
@@ -123,25 +115,7 @@
   max-width: 100%;
 }
 
-@media (max-width: 767px) {
-  .profit-table-panel__head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .profit-table-panel__search {
-    margin-inline-start: 0;
-    max-width: none;
-    width: 100%;
-    flex: 1 1 auto;
-  }
-
-  .profit-table-panel__pagination {
-    gap: 0.5rem;
-  }
-}
-
-.profit-table-panel__head {
+.report-table-panel__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -151,7 +125,7 @@
   border-bottom: 1px solid #f1eefe;
 }
 
-.profit-table-panel__title-wrap {
+.report-table-panel__title-wrap {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -159,7 +133,7 @@
   min-width: 0;
 }
 
-.profit-table-panel__icon {
+.report-table-panel__icon {
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -175,14 +149,14 @@
   }
 }
 
-.profit-table-panel__title {
+.report-table-panel__title {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
   color: #111827;
 }
 
-.profit-table-panel__badge {
+.report-table-panel__badge {
   display: inline-flex;
   align-items: center;
   min-height: 26px;
@@ -194,7 +168,7 @@
   font-weight: 700;
 }
 
-.profit-table-panel__search {
+.report-table-panel__search {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -227,13 +201,13 @@
   }
 }
 
-:host ::ng-deep .profit-table-panel .reports-table--panel {
+:host ::ng-deep .report-table-panel .reports-table--panel {
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
 
-.profit-table-panel__pagination {
+.report-table-panel__pagination {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -244,7 +218,7 @@
   background: #fcfbff;
 }
 
-.profit-table-panel__page-btn {
+.report-table-panel__page-btn {
   min-height: 34px;
   padding: 0.35rem 0.9rem;
   border-radius: 10px;
@@ -265,10 +239,28 @@
   }
 }
 
-.profit-table-panel__page-label {
+.report-table-panel__page-label {
   color: #6b7280;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .report-table-panel__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .report-table-panel__search {
+    margin-inline-start: 0;
+    max-width: none;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .report-table-panel__pagination {
+    gap: 0.5rem;
+  }
 }
 
 .reports-page__tabs {
@@ -294,7 +286,6 @@
   border-color: #5b21b6;
 }
 
-/* Fixed card width (~4 per row on wide layouts); single card no longer stretches full width. */
 .reports-page__cards {
   --report-card-width: 280px;
   display: grid;
@@ -309,6 +300,41 @@
   min-width: 0;
   width: 100%;
   max-width: var(--report-card-width);
+}
+
+.reports-page__cards--hero {
+  --report-card-width: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  justify-content: stretch;
+
+  app-report-card {
+    max-width: none;
+  }
+}
+
+.reports-page__cards--hero-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reports-page__cards--hero-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .reports-page__charts {
@@ -336,42 +362,12 @@
   margin-bottom: 0;
 }
 
-.reports-page__charts--split ::ng-deep .chart-title:empty {
+.reports-page__charts ::ng-deep .chart-title:empty {
   display: none;
 }
 
-.reports-page__cards--profit-hero {
-  --report-card-width: 1fr;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  justify-content: stretch;
-
-  app-report-card {
-    max-width: none;
-  }
-
-  @media (max-width: 1200px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.reports-page__cards--profit-hero-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-
-  @media (max-width: 1200px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.profit-details {
+/* Account details (profit only when metrics exist) */
+.report-details {
   background: #f5f3ff;
   border: 1px solid #ede9fe;
   border-radius: 14px;
@@ -379,7 +375,7 @@
   overflow: visible;
 }
 
-.profit-details__toggle {
+.report-details__toggle {
   width: 100%;
   display: flex;
   align-items: center;
@@ -394,7 +390,7 @@
   cursor: pointer;
 }
 
-.profit-details__grid {
+.report-details__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
@@ -414,7 +410,7 @@
   }
 }
 
-.profit-details__item {
+.report-details__item {
   position: relative;
   display: flex;
   align-items: center;
@@ -436,7 +432,7 @@
   }
 }
 
-.profit-details__icon {
+.report-details__icon {
   flex-shrink: 0;
   width: 2.35rem;
   height: 2.35rem;
@@ -447,57 +443,57 @@
   font-size: 0.95rem;
 }
 
-.profit-details__icon--green {
+.report-details__icon--green {
   background: #dcfce7;
   color: #15803d;
 }
 
-.profit-details__icon--purple {
+.report-details__icon--purple {
   background: #ede9fe;
   color: #5b21b6;
 }
 
-.profit-details__icon--blue {
+.report-details__icon--blue {
   background: #dbeafe;
   color: #1d4ed8;
 }
 
-.profit-details__icon--amber {
+.report-details__icon--amber {
   background: #fef3c7;
   color: #b45309;
 }
 
-.profit-details__icon--red {
+.report-details__icon--red {
   background: #fee2e2;
   color: #b91c1c;
 }
 
-.profit-details__meta {
+.report-details__meta {
   min-width: 0;
   flex: 1;
 }
 
-.profit-details__label-row {
+.report-details__label-row {
   display: flex;
   align-items: center;
   gap: 0.35rem;
   margin-bottom: 0.2rem;
 }
 
-.profit-details__label {
+.report-details__label {
   font-size: 0.8rem;
   color: #6b7280;
   font-weight: 600;
 }
 
-.profit-details__value {
+.report-details__value {
   font-size: 1.05rem;
   font-weight: 800;
   color: #111827;
   letter-spacing: -0.01em;
 }
 
-.profit-details__tip {
+.report-details__tip {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -511,15 +507,15 @@
     outline: none;
   }
 
-  &:hover .profit-details__tooltip,
-  &:focus .profit-details__tooltip {
+  &:hover .report-details__tooltip,
+  &:focus .report-details__tooltip {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
   }
 }
 
-.profit-details__tooltip {
+.report-details__tooltip {
   position: absolute;
   inset-inline-end: 0;
   bottom: calc(100% + 8px);
@@ -564,8 +560,7 @@
     display: none !important;
   }
 
-  .profit-details__tip {
+  .report-details__tip {
     display: none !important;
   }
 }
-

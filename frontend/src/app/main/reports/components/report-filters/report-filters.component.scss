@@ -1,15 +1,9 @@
 .report-filters {
-  padding: 1.4rem;
-  margin-bottom: 1rem;
-  border: 1px solid #e8ede9;
-  border-radius: 14px;
-  background: #fff;
-}
-
-.report-filters--profit {
   padding: 1.1rem 1.25rem;
-  border-color: #e8e8ef;
+  margin-bottom: 1rem;
+  border: 1px solid #e8e8ef;
   border-radius: 16px;
+  background: #fff;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
@@ -17,12 +11,10 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.75rem 1rem;
+  gap: 0.85rem 1.1rem;
 }
 
-.report-filters__row--profit {
-  align-items: flex-end;
-  gap: 0.85rem 1.1rem;
+.report-filters__row--primary {
   flex-wrap: nowrap;
 
   @media (max-width: 1100px) {
@@ -34,7 +26,7 @@
   margin-top: 0.75rem;
 }
 
-.report-filters__row--profit-extra {
+.report-filters__row--extra {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #f1f5f9;
@@ -42,9 +34,10 @@
 }
 
 .report-filters__field {
-  flex: 1 1 150px;
+  flex: 0 0 auto;
+  width: 150px;
   min-width: 140px;
-  max-width: 220px;
+  max-width: 160px;
 
   label {
     display: block;
@@ -53,45 +46,110 @@
     font-weight: 600;
     color: #6b7280;
   }
-}
-
-.report-filters--profit .report-filters__field {
-  flex: 0 1 auto;
-  min-width: 130px;
-  max-width: 180px;
 
   .s-control,
   .report-filters__select {
+    width: 100%;
     border-radius: 10px;
     border-color: #e5e7eb;
+    height: 42px;
     min-height: 42px;
+    max-height: 42px;
+    box-sizing: border-box;
+  }
+
+  select.s-control {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #9ca3af 50%),
+      linear-gradient(135deg, #9ca3af 50%, transparent 50%);
+    background-position: calc(100% - 16px) calc(50% - 3px), calc(100% - 11px) calc(50% - 3px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-inline-end: 1.75rem;
   }
 }
 
-.report-filters__field--wide {
-  flex: 1 1 200px;
-  max-width: 280px;
-}
-
-.report-filters--profit .report-filters__field--wide {
+/* Branch: same height as dates, slightly wider — never grow to fill the row. */
+.report-filters__field--branch {
+  width: 180px;
+  min-width: 160px;
   max-width: 200px;
+  flex: 0 0 auto;
 }
 
-.report-filters__field--categories,
-.report-filters--profit .report-filters__field--categories {
-  flex: 1 1 280px;
+.report-filters__field--wide {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 180px;
+  max-width: 220px;
+}
+
+.report-filters__field--categories {
+  flex: 0 1 auto;
+  width: auto;
   min-width: 260px;
   max-width: 360px;
 }
 
 .report-filters__field--sale-type {
   flex: 0 0 auto;
+  width: auto;
   min-width: 240px;
   max-width: none;
 }
 
 .report-filters__select {
   width: 100%;
+  display: block;
+}
+
+:host ::ng-deep .report-filters__select.ng-select {
+  display: block;
+  height: 42px;
+  /* Host also has .s-control border — keep only the inner container border. */
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+
+  &:hover,
+  &:focus,
+  &:active {
+    box-shadow: none !important;
+  }
+
+  .ng-select-container {
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    align-items: center;
+    box-shadow: none;
+  }
+
+  .ng-value-container {
+    min-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    align-items: center;
+  }
+
+  .ng-input {
+    top: 50% !important;
+    transform: translateY(-50%);
+    margin: 0 !important;
+  }
+
+  .ng-placeholder,
+  .ng-value {
+    line-height: 1.2;
+  }
+
+  &.ng-select-focused .ng-select-container {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 0 3px rgba(91, 33, 182, 0.08);
+  }
 }
 
 .report-filters__opt-code {
@@ -106,7 +164,7 @@
   font-weight: 500;
   cursor: pointer;
   margin: 0;
-  min-height: 38px;
+  min-height: 42px;
 
   input {
     cursor: pointer;
@@ -118,7 +176,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-inline-start: auto;
   flex: 0 0 auto;
 
   .s-btn {
@@ -127,7 +184,6 @@
 }
 
 .report-filters__actions--lead {
-  margin-inline-start: 0;
   margin-inline-end: 0.15rem;
   align-self: flex-end;
 }
@@ -151,6 +207,16 @@
     background: #4c1d95;
     border-color: #4c1d95;
   }
+}
+
+.report-filters__reset-btn {
+  min-height: 42px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  border-color: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+  background: #fff;
 }
 
 .report-filters__segment {
@@ -214,9 +280,12 @@
 
 @media (max-width: 767px) {
   .report-filters__field,
+  .report-filters__field--branch,
   .report-filters__field--wide,
-  .report-filters__field--sale-type {
+  .report-filters__field--sale-type,
+  .report-filters__field--categories {
     flex: 1 1 100%;
+    width: 100%;
     max-width: none;
     min-width: 0;
   }

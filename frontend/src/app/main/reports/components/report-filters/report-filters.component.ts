@@ -56,7 +56,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
   private productTypeaheadSub?: Subscription;
   selectedProductLabel = '';
 
-  /** Profit: collapse product / phone / seller / category / group into “additional filters”. */
+  /** Collapse secondary filters into “additional filters” (all report types). */
   showAdditionalFilters = false;
 
   filters: any = {
@@ -80,6 +80,35 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
 
   get isProfitReport(): boolean {
     return this.reportType === 'profit';
+  }
+
+  /** Desk purchases / treasury only need date + branch in the main bar. */
+  get hasAdditionalFilters(): boolean {
+    return this.reportType !== 'deskPurchases' && this.reportType !== 'treasury';
+  }
+
+  get productFilterVisible(): boolean {
+    return (
+      this.reportType !== 'deskPurchases' &&
+      this.reportType !== 'treasury' &&
+      this.reportType !== 'installments'
+    );
+  }
+
+  get phoneFilterVisible(): boolean {
+    return this.reportType !== 'deskPurchases' && this.reportType !== 'treasury';
+  }
+
+  get sellerFilterVisible(): boolean {
+    return this.reportType === 'sales' || this.reportType === 'profit';
+  }
+
+  get groupByFilterVisible(): boolean {
+    return (
+      this.reportType !== 'bookings' &&
+      this.reportType !== 'deskPurchases' &&
+      this.reportType !== 'treasury'
+    );
   }
 
   setProfitSaleType(type: 'consolidated' | 'cash' | 'installment'): void {
@@ -125,6 +154,7 @@ export class ReportFiltersComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['reportType']) {
+      this.showAdditionalFilters = false;
       this.ensureBookingUsersLoaded();
       this.ensureCollectorsLoaded();
       this.loadSalespeople();

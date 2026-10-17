@@ -229,14 +229,6 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  get profitTimeTotals(): Record<string, number> {
-    return this.sumMoneyColumns(this.tableColumns, this.tableRows);
-  }
-
-  get profitInvoiceTotals(): Record<string, number> {
-    return this.sumMoneyColumns(this.profitInvoiceColumns, this.filteredProfitInvoiceRows);
-  }
-
   get profitInvoiceCountLabel(): { count: number } {
     return { count: this.profitInvoiceMeta?.totalCount || this.profitInvoiceRows.length || 0 };
   }
@@ -245,16 +237,35 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     return { count: this.profitTimeTotalCount };
   }
 
-  private sumMoneyColumns(
-    columns: ReportColumnVM[],
-    rows: any[]
-  ): Record<string, number> {
-    const out: Record<string, number> = {};
-    for (const col of columns || []) {
-      if (col.format !== 'money') continue;
-      out[col.key] = (rows || []).reduce((sum, row) => sum + (Number(row?.[col.key]) || 0), 0);
+  /** Main non-profit table panel title. */
+  get mainTableTitleKey(): string {
+    switch (this.reportType) {
+      case 'products':
+        return 'tr_report_chart_top_products';
+      case 'treasury':
+        return 'tr_report_treasury_accounts_title';
+      case 'bookings':
+        return 'tr_report_title_bookings';
+      case 'sales':
+        return 'tr_report_chart_sales_over_time';
+      case 'stock':
+        return 'tr_report_title_stock';
+      case 'customers':
+        return 'tr_report_title_customers';
+      case 'deskPurchases':
+        return 'tr_report_desk_purchases_by_treasury';
+      case 'installments':
+        return 'tr_report_title_installments';
+      default:
+        return this.reportTitleKey;
     }
-    return out;
+  }
+
+  get mainTableBadgeCount(): number | null {
+    if (this.reportType === 'bookings') {
+      return this.bookingsMeta?.totalCount ?? this.tableRows.length;
+    }
+    return this.tableRows?.length || null;
   }
 
   setProfitTimePage(page: number): void {
@@ -423,10 +434,32 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'sales') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_card_total_sales', value: s.totalSales || 0, money: true },
-        { titleKey: 'tr_report_card_sold_qty', value: s.soldQty || 0 },
-        { titleKey: 'tr_report_card_total_orders', value: s.totalOrders || 0 },
-        { titleKey: 'tr_report_card_avg_order', value: s.averageOrderValue || 0, money: true },
+        {
+          titleKey: 'tr_report_card_total_sales',
+          value: s.totalSales || 0,
+          money: true,
+          iconClass: 'fa-line-chart',
+          iconTone: 'green',
+        },
+        {
+          titleKey: 'tr_report_card_sold_qty',
+          value: s.soldQty || 0,
+          iconClass: 'fa-cubes',
+          iconTone: 'blue',
+        },
+        {
+          titleKey: 'tr_report_card_total_orders',
+          value: s.totalOrders || 0,
+          iconClass: 'fa-file-text-o',
+          iconTone: 'purple',
+        },
+        {
+          titleKey: 'tr_report_card_avg_order',
+          value: s.averageOrderValue || 0,
+          money: true,
+          iconClass: 'fa-calculator',
+          iconTone: 'amber',
+        },
       ];
       this.tableColumns = [
         { key: 'period', labelKey: 'tr_report_col_period' },
@@ -487,20 +520,41 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           value: s.inventoryCapital ?? 0,
           hintKey: 'tr_report_inventory_capital_hint',
           money: true,
+          iconClass: 'fa-money',
+          iconTone: 'green',
         },
         {
           titleKey: 'tr_report_card_branches_inventory_capital',
           value: s.branchesInventoryCapital ?? 0,
           money: true,
+          iconClass: 'fa-building',
+          iconTone: 'purple',
         },
         {
           titleKey: 'tr_report_card_warehouse_inventory_capital',
           value: s.warehouseInventoryCapital ?? 0,
           money: true,
+          iconClass: 'fa-home',
+          iconTone: 'blue',
         },
-        { titleKey: 'tr_report_card_total_stock', value: s.totalStock || 0 },
-        { titleKey: 'tr_report_card_branches_stock', value: s.branchesStock || 0 },
-        { titleKey: 'tr_report_card_warehouse_stock', value: s.stockInWarehouse || 0 },
+        {
+          titleKey: 'tr_report_card_total_stock',
+          value: s.totalStock || 0,
+          iconClass: 'fa-cubes',
+          iconTone: 'amber',
+        },
+        {
+          titleKey: 'tr_report_card_branches_stock',
+          value: s.branchesStock || 0,
+          iconClass: 'fa-sitemap',
+          iconTone: 'purple',
+        },
+        {
+          titleKey: 'tr_report_card_warehouse_stock',
+          value: s.stockInWarehouse || 0,
+          iconClass: 'fa-archive',
+          iconTone: 'blue',
+        },
       ];
 
       const perBranch = res.stockPerBranch || [];
@@ -524,30 +578,43 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       ];
       this.tableRows = res.topSellingProducts || [];
 
+      const topProducts = res.topSellingProducts || [];
       if (perBranch.length > 0) {
         this.chartOptions = this.barChart(
           t('tr_report_chart_capital_by_branch'),
           perBranch.map((x: any) => x.branchName || '—'),
           perBranch.map((x: any) => Number(x.inventoryCapital || 0))
         );
+        this.secondaryChartOptions =
+          topProducts.length > 0
+            ? this.barChart(
+                t('tr_report_chart_top_products'),
+                topProducts.map((x: any) => x.productName),
+                topProducts.map((x: any) => Number(x.soldQty || 0))
+              )
+            : null;
       } else {
         this.chartOptions = this.barChart(
           t('tr_report_chart_top_products'),
-          (res.topSellingProducts || []).map((x: any) => x.productName),
-          (res.topSellingProducts || []).map((x: any) => Number(x.soldQty || 0))
+          topProducts.map((x: any) => x.productName),
+          topProducts.map((x: any) => Number(x.soldQty || 0))
         );
+        this.secondaryChartOptions = null;
       }
       return;
     }
 
     if (this.reportType === 'stock') {
       const summary = res.summaryByType || [];
-      this.cards = summary.map((x: any) => ({
+      const stockTones: Array<ReportCardVM['iconTone']> = ['purple', 'blue', 'amber', 'green', 'red'];
+      this.cards = summary.map((x: any, i: number) => ({
         titleKey: 'tr_report_movement_count',
         titleParams: { type: x.movementType },
         value: x.count,
         hintKey: 'tr_report_qty_hint',
         hintParams: { qty: x.totalQty },
+        iconClass: 'fa-exchange',
+        iconTone: stockTones[i % stockTones.length],
       }));
       this.tableColumns = [
         { key: 'movementType', labelKey: 'tr_report_col_type' },
@@ -566,7 +633,14 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
 
     if (this.reportType === 'customers') {
-      this.cards = [{ titleKey: 'tr_report_card_top_customers', value: (res.topCustomers || []).length }];
+      this.cards = [
+        {
+          titleKey: 'tr_report_card_top_customers',
+          value: (res.topCustomers || []).length,
+          iconClass: 'fa-users',
+          iconTone: 'purple',
+        },
+      ];
       this.tableColumns = [
         { key: 'customerName', labelKey: 'tr_report_col_customer' },
         { key: 'customerPhone', labelKey: 'tr_report_col_phone' },
@@ -586,8 +660,19 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'deskPurchases') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_desk_purchases_total_cost', value: s.totalAmount ?? 0, money: true },
-        { titleKey: 'tr_report_desk_purchases_intakes', value: s.totalIntakes ?? 0 },
+        {
+          titleKey: 'tr_report_desk_purchases_total_cost',
+          value: s.totalAmount ?? 0,
+          money: true,
+          iconClass: 'fa-shopping-cart',
+          iconTone: 'purple',
+        },
+        {
+          titleKey: 'tr_report_desk_purchases_intakes',
+          value: s.totalIntakes ?? 0,
+          iconClass: 'fa-download',
+          iconTone: 'blue',
+        },
       ];
       this.tableColumns = [
         { key: 'treasuryLabel', labelKey: 'tr_report_col_purchase_treasury' },
@@ -636,12 +721,48 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'treasury') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_report_card_spendable', value: s.spendableTotal ?? 0, money: true },
-        { titleKey: 'tr_treasury_type_cash', value: s.cashTotal ?? 0, money: true },
-        { titleKey: 'tr_treasury_type_bank', value: s.bankTotal ?? 0, money: true },
-        { titleKey: 'tr_treasury_type_wallet', value: s.walletTotal ?? 0, money: true },
-        { titleKey: 'tr_treasury_type_settlement', value: s.settlementTotal ?? 0, money: true },
-        { titleKey: 'tr_report_card_method_sales', value: s.orderSales ?? 0, money: true },
+        {
+          titleKey: 'tr_report_card_spendable',
+          value: s.spendableTotal ?? 0,
+          money: true,
+          iconClass: 'fa-check-circle',
+          iconTone: 'green',
+        },
+        {
+          titleKey: 'tr_treasury_type_cash',
+          value: s.cashTotal ?? 0,
+          money: true,
+          iconClass: 'fa-money',
+          iconTone: 'amber',
+        },
+        {
+          titleKey: 'tr_treasury_type_bank',
+          value: s.bankTotal ?? 0,
+          money: true,
+          iconClass: 'fa-university',
+          iconTone: 'blue',
+        },
+        {
+          titleKey: 'tr_treasury_type_wallet',
+          value: s.walletTotal ?? 0,
+          money: true,
+          iconClass: 'fa-mobile',
+          iconTone: 'purple',
+        },
+        {
+          titleKey: 'tr_treasury_type_settlement',
+          value: s.settlementTotal ?? 0,
+          money: true,
+          iconClass: 'fa-exchange',
+          iconTone: 'red',
+        },
+        {
+          titleKey: 'tr_report_card_method_sales',
+          value: s.orderSales ?? 0,
+          money: true,
+          iconClass: 'fa-line-chart',
+          iconTone: 'green',
+        },
       ];
 
       const typeLabel: Record<string, string> = {
@@ -756,14 +877,46 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'installments') {
       const s = res.summary || {};
       this.cards = [
-        { titleKey: 'tr_collections_total_installments', value: s.totalAmount || 0, money: true },
-        { titleKey: 'tr_collections_collected', value: s.collectedAmount || 0, money: true },
-        { titleKey: 'tr_report_card_remaining_amount', value: s.remainingAmount || 0, money: true },
-        { titleKey: 'tr_collections_overdue_amount', value: s.overdueAmount || 0, money: true },
-        { titleKey: 'tr_collections_due_soon', value: s.dueSoonAmount || 0, money: true },
+        {
+          titleKey: 'tr_collections_total_installments',
+          value: s.totalAmount || 0,
+          money: true,
+          iconClass: 'fa-calendar',
+          iconTone: 'purple',
+        },
+        {
+          titleKey: 'tr_collections_collected',
+          value: s.collectedAmount || 0,
+          money: true,
+          iconClass: 'fa-check-circle',
+          iconTone: 'green',
+        },
+        {
+          titleKey: 'tr_report_card_remaining_amount',
+          value: s.remainingAmount || 0,
+          money: true,
+          iconClass: 'fa-hourglass-half',
+          iconTone: 'amber',
+        },
+        {
+          titleKey: 'tr_collections_overdue_amount',
+          value: s.overdueAmount || 0,
+          money: true,
+          iconClass: 'fa-exclamation-triangle',
+          iconTone: 'red',
+        },
+        {
+          titleKey: 'tr_collections_due_soon',
+          value: s.dueSoonAmount || 0,
+          money: true,
+          iconClass: 'fa-clock-o',
+          iconTone: 'blue',
+        },
         {
           titleKey: 'tr_collections_rate',
           value: `${Number(s.collectionRate || 0).toFixed(1)}%`,
+          iconClass: 'fa-percent',
+          iconTone: 'purple',
         },
       ];
       this.tableColumns = [
@@ -906,13 +1059,49 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     const s = res.summary || ({} as BookingsReportResponse['summary']);
     this.bookingsMeta = res.meta || null;
     this.cards = [
-      { titleKey: 'tr_bookings_report_card_total', value: s.totalBookings || 0 },
-      { titleKey: 'tr_bookings_report_card_units', value: s.totalUnits || 0 },
-      { titleKey: 'tr_bookings_report_card_deposits', value: s.totalDeposits || 0, money: true },
-      { titleKey: 'tr_bookings_report_card_active', value: s.activeCount || 0 },
-      { titleKey: 'tr_bookings_report_card_cancelled', value: s.cancelledCount || 0 },
-      { titleKey: 'tr_bookings_report_card_confirmed', value: s.confirmedActive || 0 },
-      { titleKey: 'tr_bookings_report_card_pending_confirm', value: s.pendingConfirmation || 0 },
+      {
+        titleKey: 'tr_bookings_report_card_total',
+        value: s.totalBookings || 0,
+        iconClass: 'fa-bookmark',
+        iconTone: 'purple',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_units',
+        value: s.totalUnits || 0,
+        iconClass: 'fa-cubes',
+        iconTone: 'blue',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_deposits',
+        value: s.totalDeposits || 0,
+        money: true,
+        iconClass: 'fa-money',
+        iconTone: 'green',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_active',
+        value: s.activeCount || 0,
+        iconClass: 'fa-check-circle',
+        iconTone: 'green',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_cancelled',
+        value: s.cancelledCount || 0,
+        iconClass: 'fa-times-circle',
+        iconTone: 'red',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_confirmed',
+        value: s.confirmedActive || 0,
+        iconClass: 'fa-thumbs-up',
+        iconTone: 'blue',
+      },
+      {
+        titleKey: 'tr_bookings_report_card_pending_confirm',
+        value: s.pendingConfirmation || 0,
+        iconClass: 'fa-clock-o',
+        iconTone: 'amber',
+      },
     ];
     this.tableColumns = [
       { key: 'bookingDate', labelKey: 'tr_booking_date' },
@@ -1472,14 +1661,12 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             {
               name: t('tr_report_series_cash_trading'),
               data: consolidatedAsc.map((x: any) => Number(x.cashTradingProfit || 0)),
-              color: '#5b21b6',
             },
             {
               name: t('tr_report_series_installment_recognized'),
               data: consolidatedAsc.map(
                 (x: any) => Number(x.downPaymentProfit || 0) + Number(x.installmentProfit || 0)
               ),
-              color: '#c4b5fd',
             },
           ]
         ),
@@ -1549,12 +1736,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             {
               name: t('tr_report_series_revenue'),
               data: cashAsc.map((x: any) => Number(x.revenue || 0)),
-              color: '#5b21b6',
             },
             {
               name: t('tr_report_series_cash_trading'),
               data: cashAsc.map((x: any) => Number(x.tradingProfit || 0)),
-              color: '#c4b5fd',
             },
           ]
         ),
@@ -1651,12 +1836,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             {
               name: t('tr_report_card_installment_collected_cash'),
               data: installmentAsc.map((x: any) => Number(x.collectedCash || 0)),
-              color: '#5b21b6',
             },
             {
               name: t('tr_report_col_recognized_profit'),
               data: installmentAsc.map((x: any) => Number(x.recognizedProfit || 0)),
-              color: '#c4b5fd',
             },
           ]
         ),
@@ -1889,36 +2072,28 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     window.print();
   }
 
-  /** Purple theme (matches report cards / admin primary). */
+  /**
+   * Soft, distinguishable palette (indigo / teal / clay / slate / mauve / steel / sand).
+   * Avoids near-identical purples and neon accents.
+   */
   private readonly chartColors = [
-    '#4c1d95',
-    '#5b21b6',
-    '#6d28d9',
-    '#7c3aed',
-    '#8b5cf6',
-    '#a78bfa',
-    '#c026d3',
+    '#5b6bc0',
+    '#3d8b7a',
+    '#b57a5a',
+    '#6b7c8f',
+    '#8a6d9b',
+    '#5c8a9e',
+    '#9c7a4f',
+    '#7a8f6b',
   ];
 
-  /** Multi-series lines (profit): revenue (violet), cost (slate), net (teal — distinct from revenue). */
-  private readonly chartLineContrast = ['#5b21b6', '#64748b', '#0d9488'];
-
-  /** Light / dark mauve alternation for bookings-by-branch donut (readable contrast). */
-  private readonly bookingsDonutColors = [
-    '#e9d5ff',
-    '#5b21b6',
-    '#ddd6fe',
-    '#6d28d9',
-    '#f3e8ff',
-    '#4c1d95',
-    '#c4b5fd',
-    '#7e22ce',
-  ];
+  /** Multi-series lines: keep hue families clearly separated. */
+  private readonly chartLineContrast = ['#5b6bc0', '#b57a5a', '#3d8b7a', '#6b7c8f'];
 
   private chartTitleStyle(text: string): Highcharts.TitleOptions {
     return {
       text,
-      style: { color: '#5b21b6', fontSize: '16px', fontWeight: '600', fontFamily: 'inherit' },
+      style: { color: '#334155', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit' },
     };
   }
 
@@ -1953,7 +2128,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       credits: { enabled: false },
       legend: {
         itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
-        itemHoverStyle: { color: '#6d28d9' },
+        itemHoverStyle: { color: '#334155' },
       },
       xAxis: {
         categories,
@@ -1979,7 +2154,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       credits: { enabled: false },
       legend: {
         itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
-        itemHoverStyle: { color: '#6d28d9' },
+        itemHoverStyle: { color: '#334155' },
       },
       xAxis: {
         categories,
@@ -2019,7 +2194,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         align: 'left',
         verticalAlign: 'top',
         itemStyle: { color: '#475569', fontWeight: '500', fontFamily: 'inherit' },
-        itemHoverStyle: { color: '#6d28d9' },
+        itemHoverStyle: { color: '#334155' },
       },
       xAxis: {
         categories,
@@ -2103,12 +2278,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   }
 
   private pieChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
-    return this.donutChart(title, data, this.chartColors, '#6d28d9');
+    return this.donutChart(title, data, this.chartColors, '#334155');
   }
 
-  /** Bookings by branch — alternating mauve palette. */
   private bookingsBranchDonutChart(title: string, data: { name: string; y: number }[]): Highcharts.Options {
-    return this.donutChart(title, data, this.bookingsDonutColors, '#5b21b6');
+    return this.donutChart(title, data, this.chartColors, '#334155');
   }
 
   private prettyPayLabel(label: string | undefined, key: string | undefined): string {

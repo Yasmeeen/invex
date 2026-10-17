@@ -17,6 +17,7 @@ import {
   isEcommerceIntegrationFeatureAvailable,
 } from './feature.js';
 import { createCrmOrder, getCrmCatalog, getCrmOrder } from './crmOrders.js';
+import { listCrmClients } from './crmClients.js';
 
 const router = express.Router();
 
@@ -43,6 +44,7 @@ router.post('/ecommerce/orders/deliver', deliverOrderFromEcommerce);
 router.use('/crm', requireCrmIntegrationAuth);
 
 router.get('/crm/catalog', getCrmCatalog);
+router.get('/crm/clients', listCrmClients);
 router.post('/crm/orders', createCrmOrder);
 router.get('/crm/orders/:crmOrderId', getCrmOrder);
 

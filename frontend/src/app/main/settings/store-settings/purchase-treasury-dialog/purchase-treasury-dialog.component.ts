@@ -65,7 +65,7 @@ export class PurchaseTreasuryDialogComponent implements OnInit, OnDestroy {
   saving = false;
   listLoading = true;
   loadingBalances = false;
-  isFilterOpen = false;
+  isFilterOpen = true;
   searchQuery = '';
   channelFilter: '' | AccountKpiType = '';
   page = 1;

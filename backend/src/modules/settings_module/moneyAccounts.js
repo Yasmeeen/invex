@@ -38,14 +38,20 @@ export function moneyAccountAlwaysAllBranches(kind, key) {
 
 /**
  * True when the row is available for a branch.
- * Empty branchIds = all branches. Missing branchId (no filter) = show.
+ * Empty branchIds = all branches when emptyMeansAll (default).
+ * Passing emptyMeansAll: false requires an explicit branch link (treasury branch filter).
+ * Missing branchId (no filter) = show.
  */
-export function isAvailableForBranch(branchIds, branchId, { alwaysAll = false } = {}) {
+export function isAvailableForBranch(
+  branchIds,
+  branchId,
+  { alwaysAll = false, emptyMeansAll = true } = {}
+) {
   if (alwaysAll) return true;
   const ids = Array.isArray(branchIds) ? branchIds.map((x) => String(x)) : [];
-  if (!ids.length) return true;
   const bid = String(branchId || '').trim();
   if (!bid) return true;
+  if (!ids.length) return emptyMeansAll !== false;
   return ids.includes(bid);
 }
 

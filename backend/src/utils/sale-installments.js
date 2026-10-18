@@ -368,6 +368,9 @@ export function previewEarlySettlement(order, settlementAmount) {
   const profitAfter = settlementValid
     ? round2(collectedBefore + settlement - cost)
     : profitBefore;
+  const totalCollectedAfter = settlementValid
+    ? round2(collectedBefore + settlement)
+    : collectedBefore;
   let saleVerdict = "even";
   if (profitAfter > 0.005) saleVerdict = "gain";
   else if (profitAfter < -0.005) saleVerdict = "loss";
@@ -383,6 +386,8 @@ export function previewEarlySettlement(order, settlementAmount) {
     interestKept,
     interestShortfall,
     interestVerdict,
+    amountPaid: collectedBefore,
+    totalCollectedAfter,
     cost,
     profitBefore,
     profitAfter,

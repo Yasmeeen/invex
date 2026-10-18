@@ -242,6 +242,33 @@
         {{ 'tr_bookings_report_next' | translate }}
       </button>
     </div>
+    <div
+      class="report-table-panel__pagination"
+      *ngIf="reportType === 'installments' && installmentsMeta && installmentsMeta.totalCount > installmentsMeta.limit"
+    >
+      <button
+        type="button"
+        class="report-table-panel__page-btn"
+        [disabled]="installmentsMeta.page <= 1"
+        (click)="setInstallmentsPage(installmentsMeta.page - 1)"
+      >
+        {{ 'tr_bookings_report_prev' | translate }}
+      </button>
+      <span class="report-table-panel__page-label">
+        {{
+          'tr_bookings_report_page'
+            | translate : { page: installmentsMeta.page, total: installmentsTotalPages }
+        }}
+      </span>
+      <button
+        type="button"
+        class="report-table-panel__page-btn"
+        [disabled]="installmentsMeta.page >= installmentsTotalPages"
+        (click)="setInstallmentsPage(installmentsMeta.page + 1)"
+      >
+        {{ 'tr_bookings_report_next' | translate }}
+      </button>
+    </div>
   </section>
 
   <!-- Profit tables -->

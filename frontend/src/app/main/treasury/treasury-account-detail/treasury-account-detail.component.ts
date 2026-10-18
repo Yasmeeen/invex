@@ -180,7 +180,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
       key: this.accountKey,
       userId: uid,
     };
-    if (!this.canPickBranch && this.filterBranchId) {
+    if (this.filterBranchId) {
       params.branch = this.filterBranchId;
     }
     this.subscriptions.push(
@@ -262,6 +262,7 @@ export class TreasuryAccountDetailComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     this.page = 1;
+    this.loadHeader();
     this.loadLedger();
   }
 

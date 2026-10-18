@@ -382,6 +382,15 @@
                     <div class="single-option" (click)="createOrEditClient(true, client)">
                       {{ 'tr_action.edit' | translate }}
                     </div>
+                    <div
+                      class="single-option"
+                      *ngIf="canDeleteClient"
+                      (click)="adminDeleteClient(client)"
+                    >
+                      <div class="text-error">
+                        {{ 'tr_admin_delete_client' | translate }}
+                      </div>
+                    </div>
                   </div>
                 </span>
               </td>
@@ -434,6 +443,15 @@
                 </div>
                 <div class="single-option" (click)="createOrEditClient(true, client)">
                   {{ 'tr_action.edit' | translate }}
+                </div>
+                <div
+                  class="single-option"
+                  *ngIf="canDeleteClient"
+                  (click)="adminDeleteClient(client)"
+                >
+                  <div class="text-error">
+                    {{ 'tr_admin_delete_client' | translate }}
+                  </div>
                 </div>
               </div>
             </span>

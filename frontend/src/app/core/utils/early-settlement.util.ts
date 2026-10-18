@@ -29,6 +29,10 @@ export interface EarlySettlementPreview {
   interestKept: number;
   interestShortfall: number;
   interestVerdict: EarlySettlementInterestVerdict;
+  /** Cash already collected on the order (down payment + prior installments). */
+  amountPaid: number;
+  /** amountPaid + settlement after a valid early settlement. */
+  totalCollectedAfter: number;
   cost: number;
   profitBefore: number;
   profitAfter: number;
@@ -102,6 +106,9 @@ export function previewEarlySettlement(
   );
   const profitBefore = round2(amountPaid + due - cost);
   const profitAfter = settlementValid ? round2(amountPaid + settlement - cost) : profitBefore;
+  const totalCollectedAfter = settlementValid
+    ? round2(amountPaid + settlement)
+    : amountPaid;
   let saleVerdict: EarlySettlementSaleVerdict = 'even';
   if (profitAfter > 0.005) saleVerdict = 'gain';
   else if (profitAfter < -0.005) saleVerdict = 'loss';
@@ -117,6 +124,8 @@ export function previewEarlySettlement(
     interestKept,
     interestShortfall,
     interestVerdict,
+    amountPaid,
+    totalCollectedAfter,
     cost,
     profitBefore,
     profitAfter,

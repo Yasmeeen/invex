@@ -19,6 +19,10 @@
       <strong>{{ preview.unpaidCount }}</strong>
     </li>
     <li>
+      {{ 'tr_early_settlement_already_paid' | translate }}:
+      <strong>{{ preview.amountPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+    <li>
       {{ 'tr_early_settlement_cost' | translate }}:
       <strong>{{ preview.cost | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
     </li>
@@ -29,6 +33,9 @@
     <select class="s-control" [(ngModel)]="branchId">
       <option *ngFor="let b of branches" [value]="b._id">{{ b.name }}</option>
     </select>
+    <p class="early-settlement-dialog__field-hint">
+      {{ 'tr_client_payment_branch_hint' | translate }}
+    </p>
   </label>
 
   <label class="early-settlement-dialog__field">
@@ -131,12 +138,27 @@
         </span>
       </header>
       <p>
+        {{ 'tr_early_settlement_already_paid' | translate }}:
+        <strong>{{ preview.amountPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p>
+        {{ 'tr_early_settlement_total_collected' | translate }}:
+        <strong>{{ preview.totalCollectedAfter | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p>
+        {{ 'tr_early_settlement_cost' | translate }}:
+        <strong>{{ preview.cost | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p>
         {{ 'tr_early_settlement_sale_before' | translate }}:
         <strong>{{ preview.profitBefore | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
       </p>
       <p>
         {{ 'tr_early_settlement_sale_after' | translate }}:
         <strong>{{ preview.profitAfter | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+      </p>
+      <p class="early-settlement-dialog__verdict">
+        {{ 'tr_early_settlement_sale_formula' | translate }}
       </p>
       <p class="early-settlement-dialog__verdict" *ngIf="preview.saleVerdict === 'gain'">
         {{ 'tr_early_settlement_sale_gain' | translate:{ amount: (absAmount(preview.profitAfter) | number:'1.2-2') } }}

@@ -1,0 +1,62 @@
+<div class="admin-inst-dialog">
+  <h2 class="admin-inst-dialog__title">{{ 'tr_admin_delete_client' | translate }}</h2>
+
+  <p class="admin-inst-dialog__confirm">
+    <ng-container *ngIf="hasOpenInstallments; else noOpenConfirm">
+      {{ 'tr_admin_delete_client_confirm_with_installments' | translate }}
+    </ng-container>
+    <ng-template #noOpenConfirm>
+      {{ 'tr_admin_delete_client_confirm' | translate }}
+    </ng-template>
+  </p>
+
+  <ul class="admin-inst-dialog__details" *ngIf="data">
+    <li *ngIf="data.clientName">
+      {{ 'tr_client_name' | translate }}: <strong>{{ data.clientName }}</strong>
+    </li>
+    <li *ngIf="data.clientPhone">
+      {{ 'tr_phone_number' | translate }}: <strong>{{ data.clientPhone }}</strong>
+    </li>
+    <li *ngIf="hasOpenInstallments && data.openInstallmentSalesCount">
+      {{ 'tr_admin_delete_client_open_sales' | translate }}:
+      <strong>{{ data.openInstallmentSalesCount }}</strong>
+    </li>
+    <li *ngIf="hasOpenInstallments && data.openInstallmentsRemainingAmount != null">
+      {{ 'tr_admin_delete_client_open_remaining' | translate }}:
+      <strong>{{ data.openInstallmentsRemainingAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+    <li *ngIf="(data.installmentSalesCount || 0) > 0">
+      {{ 'tr_admin_delete_client_will_delete_sales' | translate }}:
+      <strong>{{ data.installmentSalesCount }}</strong>
+    </li>
+  </ul>
+
+  <p class="admin-inst-dialog__hint" *ngIf="(data?.installmentSalesCount || 0) > 0">
+    {{ 'tr_admin_delete_client_installments_hint' | translate }}
+  </p>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_admin_delete_reason' | translate }} <em>*</em></span>
+    <textarea
+      class="s-control"
+      rows="3"
+      name="reason"
+      [(ngModel)]="reason"
+      [placeholder]="'tr_admin_delete_reason_placeholder' | translate"
+    ></textarea>
+  </label>
+
+  <div class="admin-inst-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-danger"
+      [disabled]="!canSubmit"
+      (click)="submit()"
+    >
+      {{ 'tr_admin_delete_confirm_btn' | translate }}
+    </button>
+  </div>
+</div>

@@ -46,6 +46,10 @@ import {
   AdminDeleteSaleDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-delete-sale-dialog.component';
 import {
+  AdminDeleteClientDialogComponent,
+  AdminDeleteClientDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-delete-client-dialog.component';
+import {
   AdminEditInstallmentDialogComponent,
   AdminEditInstallmentDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-edit-installment-dialog.component';
@@ -96,6 +100,9 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   canEditInstallmentSaleNumber = false;
   /** Super Admin or Co Admin can set the minimum collection on a sale. */
   canEditMinimumCollection = false;
+  /** Super Admin or Co Admin can delete the client. */
+  canDeleteClient = false;
+  deletingClient = false;
 
   private routeSub?: Subscription;
 
@@ -120,6 +127,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     this.canAdminInstallments = role === 'Super Admin';
     this.canEditInstallmentSaleNumber = role === 'Super Admin' || role === 'Co Admin';
     this.canEditMinimumCollection = this.canEditInstallmentSaleNumber;
+    this.canDeleteClient = this.canEditInstallmentSaleNumber;
   }
 
   ngOnInit(): void {
@@ -199,6 +207,37 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   get installmentCount(): number {
     return this.installmentOrdersRows.length;
+  }
+
+  /** Installment sales that still have unpaid rows. */
+  get openInstallmentSalesCount(): number {
+    return this.installmentOrdersRows.filter((o) => this.orderHasOpenInstallments(o)).length;
+  }
+
+  get openInstallmentsRemainingAmount(): number {
+    const sum = this.installmentOrdersRows.reduce(
+      (acc, o) => acc + this.orderOpenInstallmentRemaining(o),
+      0
+    );
+    return Math.round(sum * 100) / 100;
+  }
+
+  private orderHasOpenInstallments(order: ClientHistoryOrderRow): boolean {
+    if ((Number(order?.unpaidInstallmentsCount) || 0) > 0) return true;
+    return this.orderOpenInstallmentRemaining(order) > 0.001;
+  }
+
+  private orderOpenInstallmentRemaining(order: ClientHistoryOrderRow): number {
+    const rows = Array.isArray(order?.installments) ? order.installments : [];
+    if (!rows.length) {
+      return Math.round((Number(order?.remaining) || 0) * 100) / 100;
+    }
+    let rem = 0;
+    for (const r of rows) {
+      if (r?.paid) continue;
+      rem += Math.max(0, (Number(r.amount) || 0) - (Number(r.paidAmount) || 0));
+    }
+    return Math.round(rem * 100) / 100;
   }
 
   get ordersCount(): number {
@@ -587,6 +626,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
 
   toggleInstallmentCollapse(order: ClientHistoryOrderRow, event?: Event): void {
     event?.stopPropagation();
+    this.closeInstallmentMoreMenus();
     const key = this.installmentOrderKey(order);
     if (!key) return;
     this.installmentCollapseState = {
@@ -737,6 +777,33 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return this.canPayOrder(order) && this.installmentUnpaidCount(order) > 0;
   }
 
+  /** Admin/secondary installment actions shown inside the ⋮ menu. */
+  hasInstallmentMoreActions(order: ClientHistoryOrderRow): boolean {
+    if (order?.status === 'restored') return false;
+    return (
+      this.canEditMinimumCollection ||
+      this.canEditInstallmentSaleNumber ||
+      this.canAdminInstallments
+    );
+  }
+
+  toggleInstallmentMoreMenu(event: Event): void {
+    event.stopPropagation();
+    const menu = (event.currentTarget as HTMLElement | null)?.closest(
+      '.installment-order-head__more'
+    ) as HTMLElement | null;
+    if (!menu) return;
+    const willOpen = !menu.classList.contains('active');
+    this.closeInstallmentMoreMenus();
+    if (willOpen) menu.classList.add('active');
+  }
+
+  closeInstallmentMoreMenus(): void {
+    document
+      .querySelectorAll('.installment-order-head__more.active')
+      .forEach((el) => el.classList.remove('active'));
+  }
+
   openEarlySettlement(order: ClientHistoryOrderRow, event?: Event): void {
     event?.stopPropagation();
     if (!this.canEarlySettle(order)) return;
@@ -834,6 +901,46 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   currentUserId(): string | null {
     const u = this.auth.getUserFromLocalStorage();
     return normalizeMongoId(u?._id || u?.id) || null;
+  }
+
+  adminDeleteClient(): void {
+    if (!this.canDeleteClient || this.deletingClient) return;
+    const clientId = normalizeMongoId(this.clientId || this.client?._id);
+    const userId = this.currentUserId();
+    if (!clientId || !userId) return;
+
+    const ref = this.dialog.open(AdminDeleteClientDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        clientName: this.clientTitle || this.client?.name,
+        clientPhone: this.client?.phoneNumber,
+        openInstallmentSalesCount: this.openInstallmentSalesCount,
+        openInstallmentsRemainingAmount: this.openInstallmentsRemainingAmount,
+        installmentSalesCount: this.installmentCount,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminDeleteClientDialogResult | false | undefined) => {
+      if (!result) return;
+      this.deletingClient = true;
+      this.userService.adminDeleteClient(clientId, { userId, reason: result.reason }).subscribe({
+        next: () => {
+          this.deletingClient = false;
+          this.notify.push(this.translate.instant('tr_admin_delete_client_ok'), 'success');
+          this.router.navigate(['/clients']);
+        },
+        error: (err) => {
+          this.deletingClient = false;
+          const msg =
+            err?.error?.error || err?.error?.message || this.translate.instant('tr_unexpected_error_message');
+          this.notify.push(msg, 'error');
+        },
+      });
+    });
   }
 
   adminDeleteInstallmentSale(order: ClientHistoryOrderRow, event?: Event): void {

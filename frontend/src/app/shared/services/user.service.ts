@@ -137,6 +137,14 @@ export class UserSerivce {
     return this.http.post(`${CLIENTS_URL}/${clientId}/pay-client`, payload);
   }
 
+  /** Super Admin / Co Admin: delete client + installment sales (reason required, audited). */
+  adminDeleteClient(
+    clientId: string,
+    payload: { userId: string; reason: string }
+  ): Observable<any> {
+    return this.http.post(`${CLIENTS_URL}/${clientId}/admin-delete`, payload);
+  }
+
   createUser(user: User): Observable<User> {
     return this.http.post<User>(USER_CREATE_URL, user).pipe(
       tap({

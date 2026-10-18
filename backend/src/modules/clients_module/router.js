@@ -39,7 +39,10 @@ router.post("/create", createClient);
 // UPDATE client
 router.put("/update/:id", updateClient);
 
-// DELETE client
+// Super Admin / Co Admin — delete client + installment sales (reason required)
+router.post("/:id/admin-delete", deleteClient);
+
+// Legacy delete route (same handler; prefers POST /:id/admin-delete)
 router.delete("/delete/:id", deleteClient);
 
 export default router;

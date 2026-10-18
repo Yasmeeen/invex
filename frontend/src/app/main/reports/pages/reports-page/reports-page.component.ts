@@ -88,6 +88,11 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   bookingsPage = 1;
   bookingsLimit = 100;
   bookingsMeta: { totalCount: number; page: number; limit: number } | null = null;
+
+  /** Installments / collections report table pagination. */
+  installmentsPage = 1;
+  installmentsLimit = 25;
+  installmentsMeta: { totalCount: number; page: number; limit: number } | null = null;
   topProductsColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
   topProductsRows: any[] = [];
   upcomingColumns: { key: string; labelKey: string; format?: 'money' }[] = [];
@@ -169,6 +174,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       this.reportType = d.reportType || 'sales';
       this.reportTitleKey = this.reportTitleKeys[this.reportType] || this.reportTitleKeys.sales;
       this.bookingsPage = 1;
+      this.installmentsPage = 1;
       this.resetProfitPages();
       this.secondaryChartOptions = null;
       // First paint: wait for report-filters to emit defaults (from/to/branch). Later navigations reuse `filters`.
@@ -187,6 +193,9 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'bookings') {
       this.bookingsPage = 1;
     }
+    if (this.reportType === 'installments') {
+      this.installmentsPage = 1;
+    }
     if (this.reportType === 'profit') {
       this.resetProfitPages();
     }
@@ -204,6 +213,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
   setBookingsPage(page: number): void {
     this.bookingsPage = Math.max(1, page);
+    if (Object.keys(this.filters || {}).length > 0) {
+      this.loadReport(this.filters);
+    }
+  }
+
+  setInstallmentsPage(page: number): void {
+    this.installmentsPage = Math.max(1, page);
     if (Object.keys(this.filters || {}).length > 0) {
       this.loadReport(this.filters);
     }
@@ -265,7 +281,16 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     if (this.reportType === 'bookings') {
       return this.bookingsMeta?.totalCount ?? this.tableRows.length;
     }
+    if (this.reportType === 'installments') {
+      return this.installmentsMeta?.totalCount ?? this.tableRows.length;
+    }
     return this.tableRows?.length || null;
+  }
+
+  get installmentsTotalPages(): number {
+    const m = this.installmentsMeta;
+    if (!m || !m.limit) return 1;
+    return Math.max(1, Math.ceil((m.totalCount || 0) / m.limit));
   }
 
   setProfitTimePage(page: number): void {
@@ -335,6 +360,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
           this.chartOptions = null;
           this.secondaryChartOptions = null;
           this.bookingsMeta = null;
+          this.installmentsMeta = null;
           this.topProductsRows = [];
           this.upcomingRows = [];
           this.salesPaymentColumns = [];
@@ -362,7 +388,13 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
             installment_invoice_page: this.installmentInvoicePage,
             installment_invoice_limit: this.profitInvoiceLimit,
           })
-        : this.mergeBranchScope({ ...filters });
+        : this.reportType === 'installments'
+          ? this.mergeBranchScope({
+              ...filters,
+              page: this.installmentsPage,
+              limit: this.installmentsLimit,
+            })
+          : this.mergeBranchScope({ ...filters });
     this.loading = true;
     const map: any = {
       sales: this.reportsService.getSalesReport.bind(this.reportsService),
@@ -395,6 +427,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         this.profitInvoiceColumns = [];
         this.profitInvoiceRows = [];
         this.profitInvoiceMeta = null;
+        this.installmentsMeta = null;
         this.deskPurchasesDetailColumns = [];
         this.deskPurchasesDetailRows = [];
         this.treasuryMethodColumns = [];
@@ -416,6 +449,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.profitInvoiceColumns = [];
     this.profitInvoiceRows = [];
     this.profitInvoiceMeta = null;
+    this.installmentsMeta = null;
     this.deskPurchasesDetailColumns = [];
     this.deskPurchasesDetailRows = [];
     this.treasuryMethodColumns = [];
@@ -876,6 +910,17 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
     if (this.reportType === 'installments') {
       const s = res.summary || {};
+      this.installmentsMeta = res.meta
+        ? {
+            totalCount: Number(res.meta.totalCount) || 0,
+            page: Number(res.meta.page) || this.installmentsPage,
+            limit: Number(res.meta.limit) || this.installmentsLimit,
+          }
+        : {
+            totalCount: (res.rows || []).length,
+            page: this.installmentsPage,
+            limit: this.installmentsLimit,
+          };
       this.cards = [
         {
           titleKey: 'tr_collections_total_installments',
@@ -934,30 +979,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         { key: 'statusLabel', labelKey: 'tr_status' },
         { key: 'promiseToPayAt', labelKey: 'tr_promise_to_pay' },
       ];
-      const statusKeyMap: Record<string, string> = {
-        paid: 'tr_paid',
-        overdue: 'tr_collections_status_overdue',
-        due_soon: 'tr_collections_due_soon',
-        promised: 'tr_collections_status_promised',
-        due: 'tr_collections_status_due',
-      };
-      this.tableRows = (res.rows || []).map((x: any) => ({
-        orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
-        clientName: x.clientName || '—',
-        clientPhone: x.clientPhone || '—',
-        collectorName: x.collectorName || '—',
-        branchName: x.branchName || '—',
-        planName: x.planName || (x.planMonths ? `${x.planMonths}` : '—'),
-        sequence: x.sequence ?? '—',
-        dueDate: x.dueDate ? new Date(x.dueDate).toLocaleDateString() : '—',
-        amount: x.amount,
-        paidAmount: x.paidAmount,
-        remaining: x.remaining,
-        statusLabel: t(statusKeyMap[x.status] || 'tr_collections_status_due'),
-        promiseToPayAt: x.promiseToPayAt
-          ? new Date(x.promiseToPayAt).toLocaleString()
-          : '—',
-      }));
+      this.tableRows = this.mapInstallmentReportRows(res.rows || [], t);
 
       this.salesPaymentColumns = [
         { key: 'collectorName', labelKey: 'tr_collector' },
@@ -1262,7 +1284,24 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     }
 
     if (this.reportType === 'installments') {
-      const t = (key: string) => this.translate.instant(key);
+      this.exportInstallmentsExcel(filename);
+      return;
+    }
+
+    if (this.reportType === 'profit') {
+      this.exportProfitExcel();
+      return;
+    }
+
+    this.exportService.exportToExcel(
+      filename,
+      this.mapRowsForExport(this.tableColumns, this.tableRows)
+    );
+  }
+
+  private exportInstallmentsExcel(filename: string): void {
+    const t = (key: string) => this.translate.instant(key);
+    const buildSheets = (detailRows: any[]) => {
       const summaryRows = this.cards.map((c) => ({
         [t('tr_report_col_label')]: this.translate.instant(c.titleKey, c.titleParams || {}),
         [t('tr_report_col_value')]: this.formatCardExportValue(c),
@@ -1278,21 +1317,57 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
       }
       sheets.push({
         name: t('tr_report_title_installments'),
-        rows: this.mapRowsForExport(this.tableColumns, this.tableRows),
+        rows: this.mapRowsForExport(this.tableColumns, detailRows),
       });
-      this.exportService.exportToExcelMultiSheet(filename, sheets);
-      return;
-    }
+      return sheets;
+    };
 
-    if (this.reportType === 'profit') {
-      this.exportProfitExcel();
-      return;
-    }
+    this.reportsService
+      .getInstallmentsReport(
+        this.mergeBranchScope({
+          ...this.filters,
+          rows_all: true,
+        })
+      )
+      .subscribe({
+        next: (res: any) => {
+          const rows = this.mapInstallmentReportRows(res?.rows || [], t);
+          this.exportService.exportToExcelMultiSheet(filename, buildSheets(rows));
+        },
+        error: () => {
+          this.exportService.exportToExcelMultiSheet(filename, buildSheets(this.tableRows));
+        },
+      });
+  }
 
-    this.exportService.exportToExcel(
-      filename,
-      this.mapRowsForExport(this.tableColumns, this.tableRows)
-    );
+  private mapInstallmentReportRows(
+    rows: any[],
+    t: (key: string, params?: object) => string
+  ): any[] {
+    const statusKeyMap: Record<string, string> = {
+      paid: 'tr_paid',
+      overdue: 'tr_collections_status_overdue',
+      due_soon: 'tr_collections_due_soon',
+      promised: 'tr_collections_status_promised',
+      due: 'tr_collections_status_due',
+    };
+    return (rows || []).map((x: any) => ({
+      orderNumber: x.orderNumber != null ? `#${x.orderNumber}` : '—',
+      clientName: x.clientName || '—',
+      clientPhone: x.clientPhone || '—',
+      collectorName: x.collectorName || '—',
+      branchName: x.branchName || '—',
+      planName: x.planName || (x.planMonths ? `${x.planMonths}` : '—'),
+      sequence: x.sequence ?? '—',
+      dueDate: x.dueDate ? new Date(x.dueDate).toLocaleDateString() : '—',
+      amount: x.amount,
+      paidAmount: x.paidAmount,
+      remaining: x.remaining,
+      statusLabel: t(statusKeyMap[x.status] || 'tr_collections_status_due'),
+      promiseToPayAt: x.promiseToPayAt
+        ? new Date(x.promiseToPayAt).toLocaleString()
+        : '—',
+    }));
   }
 
   private exportProfitExcel(): void {
@@ -1498,6 +1573,30 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         ),
       ];
       await this.exportService.exportMultiSectionPdf(title, profitSummary, sections);
+      return;
+    }
+
+    if (this.reportType === 'installments') {
+      let detailRows = this.tableRows;
+      try {
+        const res: any = await this.reportsService
+          .getInstallmentsReport(
+            this.mergeBranchScope({
+              ...this.filters,
+              rows_all: true,
+            })
+          )
+          .toPromise();
+        detailRows = this.mapInstallmentReportRows(
+          res?.rows || [],
+          (key: string, params?: object) => this.translate.instant(key, params)
+        );
+      } catch {
+        detailRows = this.tableRows;
+      }
+      const colLabels = this.tableColumns.map((c) => this.translate.instant(c.labelKey));
+      const pdfRows = this.mapRowsForExport(this.tableColumns, detailRows);
+      await this.exportService.exportToPdf(title, summaryRows, colLabels, pdfRows);
       return;
     }
 

@@ -1,6 +1,7 @@
 import Client from "../../DB/models/client.model.js";
 import Order from "../../DB/models/order.model.js";
 import ProductPurchaseRequest from "../../DB/models/productPurchaseRequest.model.js";
+import User from "../../DB/models/user.model.js";
 import {
   deferredDeskPurchaseRemaining,
   deskPurchaseLineTotal,
@@ -45,6 +46,7 @@ import {
   computeClientPayableBreakdown,
   payClientWithTreasury,
 } from "../../utils/client-pay-treasury.js";
+import { auditLog } from "../audit_module/audit.service.js";
 
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
@@ -1904,18 +1906,168 @@ export const addClientDeposit = async (req, res) => {
   }
 };
 
+function pickRequestUserId(req) {
+  return (
+    req?.body?.userId ||
+    req?.body?.user_id ||
+    req?.body?.actorUserId ||
+    req?.query?.userId ||
+    req?.headers?.["x-user-id"] ||
+    req?.user?._id ||
+    null
+  );
+}
+
+/** Super Admin or Co Admin — delete client (with related installment sales). */
+async function requireClientDeleteActor(req) {
+  const rawId = pickRequestUserId(req);
+  if (!rawId || !mongoose.Types.ObjectId.isValid(String(rawId))) {
+    return { status: 401, error: "userId is required" };
+  }
+  const user = await User.findById(String(rawId)).select("name role branch").lean();
+  if (!user) {
+    return { status: 401, error: "User not found" };
+  }
+  const role = String(user.role || "").trim();
+  if (role !== "Super Admin" && role !== "Co Admin") {
+    return {
+      status: 403,
+      error: "Only Super Admin or Co Admin can delete clients",
+    };
+  }
+  return { user };
+}
+
+/** Remaining unpaid amount on an installment sale (from installment rows). */
+function installmentSaleOpenRemaining(order) {
+  const rows = Array.isArray(order?.installments) ? order.installments : [];
+  let rem = 0;
+  for (const r of rows) {
+    if (r?.paid) continue;
+    rem += Math.max(
+      0,
+      (Number(r.amount) || 0) - (Number(r.paidAmount) || 0)
+    );
+  }
+  return Math.round(rem * 100) / 100;
+}
+
+function installmentSaleLabel(order) {
+  if (order?.installmentSaleNumber != null) {
+    return `تقسيط #${order.installmentSaleNumber}`;
+  }
+  if (order?.orderNumber != null) {
+    return `فاتورة #${order.orderNumber}`;
+  }
+  return String(order?._id || "");
+}
+
 /**
- * DELETE client
+ * POST /api/clients/:id/admin-delete
+ * Super Admin / Co Admin — delete client + related installment sales (audited).
+ * Body: { userId, reason }
+ *
+ * Always removes non-restored installment orders for the client, then the client.
+ * Other (non-installment) orders keep their invoice data with clientId cleared.
  */
 export const deleteClient = async (req, res) => {
   try {
-    const client = await Client.findByIdAndDelete(req.params.id);
+    const auth = await requireClientDeleteActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
 
+    const reason = String(req.body?.reason || "").trim();
+    if (reason.length < 3) {
+      return res
+        .status(400)
+        .json({ error: "Deletion reason is required (min 3 characters)" });
+    }
+
+    const clientId = req.params.id;
+    if (!clientId || !mongoose.Types.ObjectId.isValid(String(clientId))) {
+      return res.status(400).json({ error: "Invalid client id" });
+    }
+
+    const client = await Client.findById(clientId);
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
     }
 
-    res.json({ message: "✅ Client deleted" });
+    const installmentOrders = await Order.find({
+      clientId: client._id,
+      paymentMethod: "installment",
+      status: { $ne: "restored" },
+    }).lean();
+
+    let openInstallmentSalesCount = 0;
+    let openInstallmentsRemainingAmount = 0;
+    for (const o of installmentOrders) {
+      const rem = installmentSaleOpenRemaining(o);
+      if (rem > 0.001) {
+        openInstallmentSalesCount += 1;
+        openInstallmentsRemainingAmount += rem;
+      }
+    }
+    openInstallmentsRemainingAmount =
+      Math.round(openInstallmentsRemainingAmount * 100) / 100;
+
+    const installmentIds = installmentOrders.map((o) => o._id);
+    if (installmentIds.length) {
+      await Order.deleteMany({ _id: { $in: installmentIds } });
+    }
+
+    // Detach remaining non-installment invoices so they are not orphaned.
+    await Order.updateMany(
+      { clientId: client._id },
+      { $unset: { clientId: 1 } }
+    );
+
+    const clientSnapshot = {
+      _id: client._id,
+      name: client.name,
+      phoneNumber: client.phoneNumber,
+      address: client.address,
+      creditBalance: client.creditBalance,
+      openingDebitBalance: client.openingDebitBalance,
+      collectorId: client.collectorId,
+      source: client.source,
+    };
+
+    await Client.findByIdAndDelete(client._id);
+
+    const deletedSaleLabels = installmentOrders.map(installmentSaleLabel);
+
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: "delete",
+      module: "clients",
+      entityType: "Client",
+      entityId: client._id,
+      entityLabel: client.name || client.phoneNumber || String(client._id),
+      message: `${auth.user.role} deleted client ${
+        client.name || client.phoneNumber
+      } (${installmentIds.length} installment sale(s)): ${reason}`,
+      metadata: {
+        reason,
+        adminAction: "delete_client",
+        deletedInstallmentOrderIds: installmentIds,
+        deletedInstallmentSaleLabels: deletedSaleLabels,
+        openInstallmentSalesCount,
+        openInstallmentsRemainingAmount,
+        clientPhoneNumber: client.phoneNumber,
+      },
+      before: clientSnapshot,
+    });
+
+    res.json({
+      message: "✅ Client deleted",
+      deletedClientId: client._id,
+      deletedInstallmentOrdersCount: installmentIds.length,
+      openInstallmentSalesCount,
+      openInstallmentsRemainingAmount,
+      reason,
+    });
   } catch (error) {
     console.error("❌ Error deleting client:", error.message);
     res.status(500).json({ error: "Failed to delete client" });

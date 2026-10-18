@@ -1971,8 +1971,9 @@ export const getInstallmentsReport = async (req, res) => {
       .lean();
 
     if (hasCollectorFilter && !orders.length) {
+      const emptyLimit = Math.max(1, Math.min(200, Number(req.query.limit) || f.limit || 25));
       return res.json({
-        filters: { ...f, collectorId: collectorOid, status: statusKey },
+        filters: { ...f, collectorId: collectorOid, status: statusKey, page: f.page, limit: emptyLimit },
         summary: {
           totalAmount: 0,
           collectedAmount: 0,
@@ -1989,6 +1990,7 @@ export const getInstallmentsReport = async (req, res) => {
         byCollector: [],
         overTime: [],
         rows: [],
+        meta: { totalCount: 0, page: f.page, limit: emptyLimit, all: false },
       });
     }
 
@@ -2182,8 +2184,18 @@ export const getInstallmentsReport = async (req, res) => {
         ? Math.round((perfCollected / perfTarget) * 1000) / 10
         : 0;
 
+    const rowsAll =
+      String(req.query.rows_all || req.query.rowsAll || '').toLowerCase() === 'true' ||
+      req.query.rows_all === '1' ||
+      req.query.rowsAll === '1';
+    const page = f.page;
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit) || f.limit || 25));
+    const totalCount = rows.length;
+    const skip = (page - 1) * limit;
+    const pagedRows = rowsAll ? rows : rows.slice(skip, skip + limit);
+
     return res.json({
-      filters: { ...f, collectorId: collectorOid, status: statusKey },
+      filters: { ...f, collectorId: collectorOid, status: statusKey, page, limit },
       summary: {
         totalAmount,
         collectedAmount,
@@ -2199,7 +2211,13 @@ export const getInstallmentsReport = async (req, res) => {
       },
       byCollector,
       overTime,
-      rows: rows.slice(0, 500),
+      rows: pagedRows,
+      meta: {
+        totalCount,
+        page: rowsAll ? 1 : page,
+        limit: rowsAll ? totalCount || pagedRows.length : limit,
+        all: !!rowsAll,
+      },
     });
   } catch (error) {
     console.error('getInstallmentsReport:', error);

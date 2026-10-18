@@ -17,6 +17,10 @@ import {
   AdminMinimumCollectionDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-minimum-collection-dialog.component';
 import {
+  AdminDeleteClientDialogComponent,
+  AdminDeleteClientDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-delete-client-dialog.component';
+import {
   InstallmentPlan,
   InstallmentPlansService,
 } from '@shared/services/installment-plans.service';
@@ -64,6 +68,8 @@ export class ClientListComponent implements OnInit {
   viewMode: 'table' | 'cards' = 'cards';
   /** Super Admin or Co Admin can set the minimum collection on each sale. */
   canEditMinimumCollection = false;
+  /** Super Admin or Co Admin can delete clients. */
+  canDeleteClient = false;
   params: any = { page: 1, perPage: this.paginationPerPage, sortDir: 'desc' };
   /** Expanded installment detail blocks on cards (key = client id). Missing → collapsed when multiple sales. */
   private installmentCardExpanded: Record<string, boolean> = {};
@@ -88,6 +94,7 @@ export class ClientListComponent implements OnInit {
   ngOnInit(): void {
     const role = String(this.auth.getUserFromLocalStorage()?.role || '');
     this.canEditMinimumCollection = role === 'Super Admin' || role === 'Co Admin';
+    this.canDeleteClient = this.canEditMinimumCollection;
     const saved = localStorage.getItem('clients.viewMode');
     this.viewMode = saved === 'table' ? 'table' : 'cards';
     if (isBranchManager(this.globals.currentUser?.role) && this.globals.currentUser?.branch?._id) {
@@ -379,6 +386,51 @@ export class ClientListComponent implements OnInit {
   openClientHistory(client: Client): void {
     if (!client?._id) return;
     this.router.navigate(['/clients', client._id, 'history']);
+  }
+
+  adminDeleteClient(client: Client): void {
+    if (!this.canDeleteClient || !client?._id) return;
+    const clientId = normalizeMongoId(client._id);
+    const actor = this.auth.getUserFromLocalStorage();
+    const userId = normalizeMongoId(actor?._id || (actor as { id?: string })?.id);
+    if (!clientId || !userId) return;
+
+    const installmentSalesCount = this.clientInstallmentSales(client).length;
+    const ref = this.dialog.open(AdminDeleteClientDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        clientName: client.name,
+        clientPhone: client.phoneNumber,
+        openInstallmentSalesCount: this.clientOpenInstallmentSalesCount(client),
+        openInstallmentsRemainingAmount: this.clientOpenInstallmentRemainingTotal(client),
+        installmentSalesCount:
+          installmentSalesCount || (client.hasOpenInstallments ? 1 : 0),
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminDeleteClientDialogResult | false | undefined) => {
+      if (!result) return;
+      this.userSerivce.adminDeleteClient(clientId, { userId, reason: result.reason }).subscribe({
+        next: () => {
+          this.notificationService.push(
+            this.translate.instant('tr_admin_delete_client_ok'),
+            'success'
+          );
+          this.getClients();
+        },
+        error: (err) => {
+          const msg =
+            err?.error?.error ||
+            err?.error?.message ||
+            this.translate.instant('tr_unexpected_error_message');
+          this.notificationService.push(msg, 'error');
+        },
+      });
+    });
   }
 
   createOrEditClient(isEdit: boolean, client?: Client): void {

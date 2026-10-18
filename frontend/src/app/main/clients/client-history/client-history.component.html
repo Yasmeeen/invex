@@ -22,6 +22,15 @@
       >
         {{ 'tr_report_export_pdf' | translate }}
       </button>
+      <button
+        type="button"
+        class="s-btn btn-danger size-body"
+        *ngIf="canDeleteClient && !loading && (history || client)"
+        [disabled]="deletingClient"
+        (click)="adminDeleteClient()"
+      >
+        {{ 'tr_admin_delete_client' | translate }}
+      </button>
     </div>
   </h2>
 
@@ -359,6 +368,13 @@
               </span>
               <span
                 class="installment-order-head__meta-line"
+                *ngIf="(o.amountPaid || 0) > 0.005"
+              >
+                {{ 'tr_installment_collected_so_far' | translate }}:
+                <strong>{{ o.amountPaid | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+              </span>
+              <span
+                class="installment-order-head__meta-line"
                 *ngIf="(o.minimumCollectionAmount || 0) > 0"
               >
                 {{ 'tr_minimum_collection' | translate }}:
@@ -392,7 +408,7 @@
               type="button"
               class="s-btn btn-primary btn-sm installment-order-head__pay"
               *ngIf="canPayOrder(o)"
-              (click)="openPayOrderDialog(o)"
+              (click)="closeInstallmentMoreMenus(); openPayOrderDialog(o)"
             >
               {{ 'tr_add_payment' | translate }}
             </button>
@@ -400,38 +416,49 @@
               type="button"
               class="s-btn btn-sm installment-order-head__early"
               *ngIf="canEarlySettle(o)"
-              (click)="openEarlySettlement(o, $event)"
+              (click)="closeInstallmentMoreMenus(); openEarlySettlement(o, $event)"
             >
               {{ 'tr_early_settlement' | translate }}
             </button>
-            <button
-              type="button"
-              class="s-btn btn-secondary btn-sm installment-order-head__pay"
-              *ngIf="canEditMinimumCollection && o.status !== 'restored'"
-              (click)="editMinimumCollection(o, $event)"
+            <span
+              class="options-menu installment-order-head__more"
+              *ngIf="hasInstallmentMoreActions(o)"
             >
-              {{
-                ((o.minimumCollectionAmount || 0) > 0
-                  ? 'tr_minimum_collection_edit'
-                  : 'tr_minimum_collection_set') | translate
-              }}
-            </button>
-            <button
-              type="button"
-              class="s-btn btn-secondary btn-sm installment-order-head__pay"
-              *ngIf="canEditInstallmentSaleNumber && o.status !== 'restored'"
-              (click)="adminEditSaleNumber(o, $event)"
-            >
-              {{ 'tr_admin_edit_sale_number' | translate }}
-            </button>
-            <button
-              type="button"
-              class="s-btn btn-danger btn-sm installment-order-head__pay"
-              *ngIf="canAdminInstallments && o.status !== 'restored'"
-              (click)="adminDeleteInstallmentSale(o, $event)"
-            >
-              {{ 'tr_admin_delete_installment_sale' | translate }}
-            </button>
+              <i
+                class="fa fa-ellipsis-v"
+                aria-hidden="true"
+                (click)="toggleInstallmentMoreMenu($event)"
+              ></i>
+              <div class="options-menu-container p-0">
+                <div
+                  class="single-option"
+                  *ngIf="canEditMinimumCollection"
+                  (click)="editMinimumCollection(o, $event); closeInstallmentMoreMenus()"
+                >
+                  {{
+                    ((o.minimumCollectionAmount || 0) > 0
+                      ? 'tr_minimum_collection_edit'
+                      : 'tr_minimum_collection_set') | translate
+                  }}
+                </div>
+                <div
+                  class="single-option"
+                  *ngIf="canEditInstallmentSaleNumber"
+                  (click)="adminEditSaleNumber(o, $event); closeInstallmentMoreMenus()"
+                >
+                  {{ 'tr_admin_edit_sale_number' | translate }}
+                </div>
+                <div
+                  class="single-option"
+                  *ngIf="canAdminInstallments"
+                  (click)="adminDeleteInstallmentSale(o, $event); closeInstallmentMoreMenus()"
+                >
+                  <div class="text-error">
+                    {{ 'tr_admin_delete_installment_sale' | translate }}
+                  </div>
+                </div>
+              </div>
+            </span>
           </div>
         </div>
         <div class="table-container" *ngIf="!isInstallmentCollapsed(o)">

@@ -254,9 +254,8 @@ export class TreasuryAccountsListComponent implements OnInit, OnDestroy {
   }
 
   openAccount(acc: MoneyAccountBalance): void {
-    const isSettlement = acc?.kind === 'settlement';
     this.router.navigate(['/treasury', acc.key], {
-      queryParams: !isSettlement && this.filterBranchId ? { branch: this.filterBranchId } : {},
+      queryParams: this.filterBranchId ? { branch: this.filterBranchId } : {},
     });
   }
 

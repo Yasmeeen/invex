@@ -119,6 +119,7 @@ export const listTreasuryAccounts = async (req, res) => {
     }
     if (!resolved.allBranches && resolved.branchId) {
       const branchStr = String(resolved.branchId);
+      // Linked to this branch, or empty branchIds (= all branches). Cash/settlement always show.
       moneyAccounts = (moneyAccounts || []).filter((a) =>
         isAvailableForBranch(a.branchIds, branchStr, {
           alwaysAll: moneyAccountAlwaysAllBranches(a.kind, a.key),
@@ -126,27 +127,12 @@ export const listTreasuryAccounts = async (req, res) => {
       );
     }
     const keys = (moneyAccounts || []).map((a) => a.key);
-    const branchScopedKeys = (moneyAccounts || [])
-      .filter((a) => isBranchScopedMoneyAccount(a.key, a.kind))
-      .map((a) => a.key);
-    const companyKeys = (moneyAccounts || [])
-      .filter((a) => !isBranchScopedMoneyAccount(a.key, a.kind))
-      .map((a) => a.key);
-    const adminCompanyWideNonBranchScoped =
-      ADMIN_ROLES.includes(actor.role) && !resolved.allBranches;
 
-    let balances;
-    if (resolved.allBranches) {
-      balances = await computeAccountsExpectedBalancesAllBranches(keys, until);
-    } else if (adminCompanyWideNonBranchScoped) {
-      const [branchBal, companyBal] = await Promise.all([
-        computeAccountsExpectedBalances(resolved.branchId, branchScopedKeys, until),
-        computeAccountsExpectedBalancesAllBranches(companyKeys, until),
-      ]);
-      balances = new Map([...branchBal, ...companyBal]);
-    } else {
-      balances = await computeAccountsExpectedBalances(resolved.branchId, keys, until);
-    }
+    // Branch filter scopes every account (cash, bank, wallet, settlement, vault).
+    // Omit branch (= all branches for admins) for company-wide totals.
+    const balances = resolved.allBranches
+      ? await computeAccountsExpectedBalancesAllBranches(keys, until)
+      : await computeAccountsExpectedBalances(resolved.branchId, keys, until);
     const accounts = (moneyAccounts || []).map((acc) => {
       const bal = balances.get(acc.key) || {
         openingBalance: 0,
@@ -217,10 +203,7 @@ export const getTreasuryAccount = async (req, res) => {
     );
 
     const until = String(req.query.until || '').trim() || undefined;
-    const branchScoped = isBranchScopedMoneyAccount(key, acc.kind);
-    const companyWide =
-      resolved.allBranches || (ADMIN_ROLES.includes(actor.role) && !branchScoped);
-    const bal = companyWide
+    const bal = resolved.allBranches
       ? await computeAccountBalanceAllBranches(key, until)
       : await computeAccountExpectedBalance(resolved.branchId, key, until);
 

@@ -132,6 +132,8 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Refresh catalog/account map so branch-scoped methods match latest settings.
+    this.storeSettings.load();
     this.rebuildPaymentMethods();
     this.settingsSub = this.storeSettings.settings$.subscribe(() => this.rebuildPaymentMethods());
     this.ensureDefaultNetAmounts();
@@ -225,11 +227,16 @@ export class PaymentSplitsDialogComponent implements OnInit, OnDestroy {
   }
 
   private rebuildPaymentMethods(): void {
+    const snap = this.storeSettings.snapshot;
     const all = buildCashierPaymentMethods(
-      this.storeSettings.snapshot.paymentAppFeePercents,
+      snap.paymentAppFeePercents,
       this.translate,
-      this.storeSettings.snapshot.paymentMethodsCatalog,
-      this.branchId || undefined
+      snap.paymentMethodsCatalog,
+      this.branchId || undefined,
+      {
+        accountMap: snap.paymentMethodAccountMap,
+        moneyAccounts: snap.moneyAccounts,
+      }
     );
     this.paymentMethods =
       this.mode === 'installment' || this.mode === 'deposit'

@@ -4,11 +4,18 @@ import {
   PaymentMethodOption,
 } from '@shared/constants/payment-method-options';
 import {
+  MoneyAccount,
   PaymentAppFeePercent,
+  PaymentMethodAccountMapRow,
   PaymentMethodCatalogRow,
   RECEIPT_LANGUAGE_CODES,
   ReceiptLanguageCode,
 } from '@shared/services/store-settings.service';
+import {
+  isAvailableForBranch,
+  moneyAccountAlwaysAllBranches,
+  paymentMethodAlwaysAllBranches,
+} from '@shared/utils/branch-scope.util';
 
 export interface CashierPaymentMethod {
   id: string;
@@ -94,6 +101,12 @@ function showsInSale(showIn: string | undefined): boolean {
   return showIn === 'sale' || showIn === 'both' || !showIn;
 }
 
+export interface BuildCashierPaymentMethodsOptions {
+  /** When set with moneyAccounts, hide instant methods whose linked account is out of branch. */
+  accountMap?: PaymentMethodAccountMapRow[] | null;
+  moneyAccounts?: MoneyAccount[] | null;
+}
+
 /**
  * Cashier + lists: prefer unified catalog (sale/both), else fees + static fallback.
  * When branchId is set, catalog rows scoped to other branches are omitted.
@@ -102,21 +115,50 @@ export function buildCashierPaymentMethods(
   fees: PaymentAppFeePercent[] | undefined | null,
   translate: TranslateService,
   catalog?: PaymentMethodCatalogRow[] | null,
-  branchId?: string | null
+  branchId?: string | null,
+  options?: BuildCashierPaymentMethodsOptions | null
 ): CashierPaymentMethod[] {
   const seen = new Set<string>();
   const out: CashierPaymentMethod[] = [];
   const bid = String(branchId || '').trim();
+  const accountByKey = new Map(
+    (options?.moneyAccounts || []).map((a) => [String(a.key || '').toLowerCase(), a])
+  );
+  const mapByMethod = new Map(
+    (options?.accountMap || []).map((r) => [String(r.method || '').toLowerCase(), r])
+  );
 
   const catalogSale = (catalog || []).filter((r) => {
     if (!r?.key || HIDDEN_METHODS.has(r.key) || !showsInSale(r.showIn)) return false;
     if (!bid) return true;
-    const alwaysAll =
-      r.key === 'cash' || r.key === 'credit' || r.effectMode === 'settlement';
-    if (alwaysAll) return true;
-    const ids = (r.branchIds || []).map((id) => String(id)).filter(Boolean);
-    if (!ids.length) return true;
-    return ids.includes(bid);
+    if (
+      !isAvailableForBranch(
+        r.branchIds,
+        bid,
+        paymentMethodAlwaysAllBranches(r.key, r.effectMode)
+      )
+    ) {
+      return false;
+    }
+    // Instant methods: also require the linked spendable account for this branch.
+    if (r.effectMode === 'instant' && r.key !== 'cash') {
+      const mapRow = mapByMethod.get(String(r.key).toLowerCase());
+      const accountKey = String(mapRow?.accountKey || '').toLowerCase();
+      if (accountKey) {
+        const acc = accountByKey.get(accountKey);
+        if (
+          acc &&
+          !isAvailableForBranch(
+            acc.branchIds,
+            bid,
+            moneyAccountAlwaysAllBranches(acc.kind, acc.key)
+          )
+        ) {
+          return false;
+        }
+      }
+    }
+    return true;
   });
 
   if (catalogSale.length) {

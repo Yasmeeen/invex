@@ -151,6 +151,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return Boolean(this.storeSettings.snapshot.deliveryOrdersEnabled);
   }
 
+  get showCashierBranchPicker(): boolean {
+    return canPickBranchRole(this.curentUser?.role);
+  }
+
   /** Cash left in drawer from the last close (opening balance for today). */
   drawerOpeningBalance = 0;
   drawerPeriodAlreadyClosed = false;
@@ -261,11 +265,16 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private rebuildPaymentMethods(): void {
+    const snap = this.storeSettings.snapshot;
     this.paymentMethods = buildCashierPaymentMethods(
-      this.storeSettings.snapshot.paymentAppFeePercents,
+      snap.paymentAppFeePercents,
       this.translate,
-      this.storeSettings.snapshot.paymentMethodsCatalog,
-      this.cashierBranchId()
+      snap.paymentMethodsCatalog,
+      this.cashierBranchId(),
+      {
+        accountMap: snap.paymentMethodAccountMap,
+        moneyAccounts: snap.moneyAccounts,
+      }
     );
     this.cdr.markForCheck();
   }
@@ -558,11 +567,17 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private cashierBranchId(): string | null {
-    const id = canPickBranchRole(this.curentUser?.role)
-      ? this.adminSelectedBranchId
-      : (this.globals.currentUser?.branch as { _id?: string } | string | undefined);
-    if (!id) return null;
-    return typeof id === 'string' ? String(id).trim() : id?._id ? String(id._id).trim() : null;
+    if (canPickBranchRole(this.curentUser?.role)) {
+      const id = String(this.adminSelectedBranchId || '').trim();
+      return id || null;
+    }
+    const branch = this.globals.currentUser?.branch as
+      | { _id?: string }
+      | string
+      | undefined;
+    if (!branch) return null;
+    if (typeof branch === 'string') return String(branch).trim() || null;
+    return branch._id ? String(branch._id).trim() : null;
   }
 
   reopenLastDrawerClose(): void {
@@ -1231,18 +1246,32 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     }, 250);
   }
   getBranches() {
-    let params = {
-      'page': 1,
-     'limit': 1000
-    }
-   this.branchesServce.getBranchs(params).subscribe((response: any) => {
-      this.branches = response.branches
-      this.adminSelectedBranchId = this.branches[0]._id
+    const params = {
+      page: 1,
+      limit: 1000,
+    };
+    this.branchesServce.getBranchs(params).subscribe((response: any) => {
+      this.branches = response.branches || [];
+      const userBranch = this.globals.currentUser?.branch as
+        | { _id?: string }
+        | string
+        | undefined;
+      const userBranchId =
+        typeof userBranch === 'string'
+          ? String(userBranch).trim()
+          : userBranch?._id
+            ? String(userBranch._id).trim()
+            : '';
+      const preferred =
+        (userBranchId &&
+          this.branches.find((b) => String(b._id) === userBranchId)?._id) ||
+        this.branches[0]?._id;
+      this.adminSelectedBranchId = preferred ? String(preferred) : '';
       this.loadProducts();
       this.loadBranchSalespeople();
       this.syncOnlineOrdersBannerBranch();
       this.rebuildPaymentMethods();
-   })
+    });
   }
 
   onAdminBranchChange(): void {

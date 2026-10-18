@@ -4,7 +4,7 @@
     <div class="cashier-header__left flex flex-middle flex-wrap">
       <span class="cashier-header__title text-white">{{ "tr_cashier.TITLE" | translate }}</span>
       <!-- Branch Selection (Super Admin / Co Admin) -->
-      <div *ngIf="curentUser.role === 'Super Admin' || curentUser.role === 'Co Admin'" class="branch-selection max-300 width-100">
+      <div *ngIf="showCashierBranchPicker" class="branch-selection max-300 width-100">
         <div class="form-group mb-0">
           <label>{{ 'tr_branches' | translate }}</label>
           <div class="input-with-icon">

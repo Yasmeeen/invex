@@ -8,7 +8,11 @@ import {
   PaymentMethodEffectMode,
   PaymentMethodShowIn,
 } from '@shared/services/store-settings.service';
-import { paymentMethodAlwaysAllBranches } from '@shared/utils/branch-scope.util';
+import {
+  isAvailableForBranch,
+  moneyAccountAlwaysAllBranches,
+  paymentMethodAlwaysAllBranches,
+} from '@shared/utils/branch-scope.util';
 import { Subscription } from 'rxjs';
 
 export interface PaymentMethodFormData {
@@ -87,8 +91,14 @@ export class PaymentMethodFormDialogComponent implements OnInit, OnDestroy {
         ? 'none'
         : data.effectMode || 'instant';
     this.feePercent = Number(data.feePercent) || 0;
-    this.accountKey = this.isCash ? 'cash' : String(data.accountKey || '');
-    this.settlementBankAccountKey = String(data.settlementBankAccountKey || '');
+    this.accountKey = this.isCash
+      ? 'cash'
+      : String(data.accountKey || '')
+          .trim()
+          .toLowerCase();
+    this.settlementBankAccountKey = String(data.settlementBankAccountKey || '')
+      .trim()
+      .toLowerCase();
     this.onEffectChange();
   }
 
@@ -149,6 +159,24 @@ export class PaymentMethodFormDialogComponent implements OnInit, OnDestroy {
     return !this.isCash && (this.isCredit || this.effectMode !== 'none');
   }
 
+  /** Instant-link accounts available for every selected payment-method branch. */
+  get linkedAccountsForBranches(): MoneyAccount[] {
+    const filtered = this.accounts.filter((a) => this.accountMatchesSelectedBranches(a));
+    // Keep the currently linked account visible while editing (even before branches load).
+    const currentKey = String(this.accountKey || '')
+      .trim()
+      .toLowerCase();
+    if (currentKey && !filtered.some((a) => a.key === currentKey)) {
+      const current = this.accounts.find((a) => a.key === currentKey);
+      if (current) return [current, ...filtered];
+    }
+    return filtered;
+  }
+
+  onBranchesChange(): void {
+    this.pruneAccountIfOutsideBranches();
+  }
+
   onEffectChange(): void {
     if (this.isCash) {
       this.effectMode = 'instant';
@@ -182,8 +210,11 @@ export class PaymentMethodFormDialogComponent implements OnInit, OnDestroy {
       return;
     } else {
       this.settlementBankAccountKey = '';
-      if (!this.accounts.some((a) => a.key === this.accountKey)) {
-        this.accountKey = '';
+      // Restore linked account when switching back to instant (before branch filter applies).
+      if (!this.accountKey) {
+        this.accountKey = String(this.data.accountKey || '')
+          .trim()
+          .toLowerCase();
       }
     }
     if (this.showBranchPicker && this.branches.length && !this.selectedBranchIds.length) {
@@ -246,10 +277,34 @@ export class PaymentMethodFormDialogComponent implements OnInit, OnDestroy {
       return;
     }
     const existing = (this.data.branchIds || []).map((id) => String(id)).filter(Boolean);
-    if (existing.length) {
-      this.selectedBranchIds = existing;
-      return;
-    }
-    this.selectedBranchIds = this.branches.map((b) => String(b._id));
+    this.selectedBranchIds = existing.length
+      ? existing
+      : this.branches.map((b) => String(b._id));
+    // Do not clear the saved linked account on open — only when the user changes branches.
+  }
+
+  private accountMatchesSelectedBranches(account: MoneyAccount): boolean {
+    const alwaysAll = moneyAccountAlwaysAllBranches(account.kind, account.key);
+    if (alwaysAll) return true;
+    const selected = (this.selectedBranchIds || []).map((id) => String(id)).filter(Boolean);
+    // Before branches are chosen/loaded, show all linkable accounts.
+    if (!selected.length) return true;
+    return selected.every((bid) =>
+      isAvailableForBranch(account.branchIds, bid, alwaysAll)
+    );
+  }
+
+  private pruneAccountIfOutsideBranches(): void {
+    if (!this.needsAccountLink || this.isCash) return;
+    // Wait until branch selection exists before filtering out the linked account.
+    if (this.showBranchPicker && !this.selectedBranchIds.length) return;
+    const key = String(this.accountKey || '')
+      .trim()
+      .toLowerCase();
+    if (!key) return;
+    const stillValid = this.accounts.some(
+      (a) => a.key === key && this.accountMatchesSelectedBranches(a)
+    );
+    if (!stillValid) this.accountKey = '';
   }
 }

@@ -54,6 +54,24 @@
       <small class="pm-form__hint" *ngIf="isCredit">{{ 'tr_pay_credit_fee_hint' | translate }}</small>
     </label>
 
+    <label class="pm-form__field" *ngIf="showBranchPicker">
+      <span>{{ 'tr_branches' | translate }}</span>
+      <ng-select
+        class="s-control s-select"
+        name="pmBranches"
+        [items]="branches"
+        bindLabel="name"
+        bindValue="_id"
+        [multiple]="true"
+        [closeOnSelect]="false"
+        [(ngModel)]="selectedBranchIds"
+        (ngModelChange)="onBranchesChange()"
+        [placeholder]="'tr_money_account_branches_placeholder' | translate"
+      >
+      </ng-select>
+      <small class="pm-form__hint">{{ 'tr_payment_method_branches_hint' | translate }}</small>
+    </label>
+
     <label class="pm-form__field" *ngIf="needsAccountLink">
       <span>{{ 'tr_payment_linked_account' | translate }}</span>
       <select
@@ -63,7 +81,7 @@
         [disabled]="isCash"
       >
         <option value="">{{ 'tr_payment_account_map_none' | translate }}</option>
-        <option *ngFor="let a of accounts" [value]="a.key">
+        <option *ngFor="let a of linkedAccountsForBranches" [value]="a.key">
           {{ a.label }}
         </option>
       </select>
@@ -96,23 +114,6 @@
         <small class="pm-form__hint">{{ 'tr_payment_settlement_bank_hint' | translate }}</small>
       </label>
     </ng-container>
-
-    <label class="pm-form__field" *ngIf="showBranchPicker">
-      <span>{{ 'tr_branches' | translate }}</span>
-      <ng-select
-        class="s-control s-select"
-        name="pmBranches"
-        [items]="branches"
-        bindLabel="name"
-        bindValue="_id"
-        [multiple]="true"
-        [closeOnSelect]="false"
-        [(ngModel)]="selectedBranchIds"
-        [placeholder]="'tr_money_account_branches_placeholder' | translate"
-      >
-      </ng-select>
-      <small class="pm-form__hint">{{ 'tr_payment_method_branches_hint' | translate }}</small>
-    </label>
   </div>
 
   <div class="pm-form__actions">

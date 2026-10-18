@@ -84,6 +84,7 @@ export class EarlySettlementDialogComponent {
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: this.preview.settlement,
       mode: 'installment',
+      branchId,
     };
     this.dialog
       .open(PaymentSplitsDialogComponent, {

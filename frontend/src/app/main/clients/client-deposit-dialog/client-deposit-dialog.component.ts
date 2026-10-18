@@ -60,6 +60,9 @@ export class ClientDepositDialogComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.showBranchPicker) {
+      this.form.get('branchId')?.valueChanges.subscribe(() => {
+        this.confirmedPayment = null;
+      });
       this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
         next: (res: any) => {
           this.branches = res?.branches || [];
@@ -75,6 +78,10 @@ export class ClientDepositDialogComponent implements OnInit {
     }
   }
 
+  private selectedBranchId(): string {
+    return String(this.form.getRawValue().branchId || '').trim();
+  }
+
   paymentSummaryText(): string {
     if (!this.confirmedPayment) {
       return '';
@@ -85,9 +92,15 @@ export class ClientDepositDialogComponent implements OnInit {
   }
 
   openPaymentSplitsDialog(): void {
+    const branchId = this.selectedBranchId();
+    if (!branchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: 0,
       mode: 'deposit',
+      branchId,
       initialState: this.confirmedPayment
         ? {
             selectedPayMethods: this.confirmedPayment.paymentSplits.map((s) => s.method),
@@ -139,7 +152,7 @@ export class ClientDepositDialogComponent implements OnInit {
     if (!id) return;
 
     const v = this.form.getRawValue();
-    const branchId = String(v.branchId || '').trim();
+    const branchId = this.selectedBranchId();
     if (!branchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
       return;

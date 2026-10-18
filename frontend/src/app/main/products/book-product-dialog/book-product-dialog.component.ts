@@ -281,10 +281,30 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
     return this.translate.instant('tr_payment_splits_summary', { count: methods, total });
   }
 
+  /** Branch that receives the deposit (product branch when set, else actor branch). */
+  private paymentBranchId(): string {
+    const productBranch = this.product.branch as { _id?: string } | string | null | undefined;
+    const forcedBranchId =
+      typeof productBranch === 'object' && productBranch
+        ? productBranch._id
+        : productBranch
+          ? String(productBranch)
+          : null;
+    const user = this.auth.getUserFromLocalStorage();
+    const branchCtx = resolveActorBranchContext(user, forcedBranchId);
+    return String(branchCtx.branchId || '').trim();
+  }
+
   openPaymentSplitsDialog(): void {
+    const branchId = this.paymentBranchId();
+    if (!branchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: 0,
       mode: 'deposit',
+      branchId,
       initialState: this.confirmedPayment
         ? {
             selectedPayMethods: this.confirmedPayment.paymentSplits.map((s) => s.method),
@@ -454,14 +474,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const productBranch = this.product.branch as { _id?: string } | string | null | undefined;
-    const forcedBranchId =
-      typeof productBranch === 'object' && productBranch
-        ? productBranch._id
-        : productBranch
-          ? String(productBranch)
-          : null;
-    const branchCtx = resolveActorBranchContext(user, forcedBranchId);
+    const branchId = this.paymentBranchId() || undefined;
 
     this.saving = true;
     const urls = [...this.depositProofUrls];
@@ -484,7 +497,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
         depositTransferImageUrl: urls.length === 1 ? urls[0] : undefined,
         transferReferencePhone: refPhone,
         userId: uid,
-        branchId: branchCtx.branchId || undefined,
+        branchId,
       })
       .subscribe({
         next: (res) => {

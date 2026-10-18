@@ -34,5 +34,6 @@ python3 docs/generate_pdf.py
 - Sidebar menus by role: `frontend/src/app/shared/resources/siderbars.ts`
 - Backend API mount points: `backend/src/bootstrap.js`
 - AI behaviour and tool policy: `backend/src/modules/ai_module/`
+- Refactor backlog: [REFACTOR.md](./REFACTOR.md)
 
 For deployment and environment variables, see `backend/.env.example`.

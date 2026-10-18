@@ -109,6 +109,10 @@ export class PayOrderDialogComponent implements OnInit {
 
   ngOnInit(): void {
     if (this.showBranchPicker) {
+      this.form.get('branchId')?.valueChanges.subscribe((id) => {
+        this.paymentBranchId = id ? String(id) : null;
+        this.confirmedPayment = null;
+      });
       this.branchesService.getBranchs({ page: 1, limit: 1000 }).subscribe({
         next: (res: any) => {
           this.branches = res?.branches || [];
@@ -136,6 +140,12 @@ export class PayOrderDialogComponent implements OnInit {
       this.form.patchValue({ branchId: this.paymentBranchId });
       this.form.get('branchId')?.disable();
     }
+  }
+
+  private selectedBranchId(): string {
+    return String(
+      this.form.getRawValue().branchId || this.paymentBranchId || ''
+    ).trim();
   }
 
   private buildUnpaidInstallments(): UnpaidInstallmentOption[] {
@@ -198,9 +208,15 @@ export class PayOrderDialogComponent implements OnInit {
   }
 
   openPaymentSplitsDialog(): void {
+    const branchId = this.selectedBranchId();
+    if (!branchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
     const data: PaymentSplitsDialogData = {
       invoiceNetTotal: this.remaining,
       mode: 'installment',
+      branchId,
       initialState: this.confirmedPayment
         ? {
             selectedPayMethods: this.confirmedPayment.paymentSplits.map((s) => s.method),
@@ -252,9 +268,7 @@ export class PayOrderDialogComponent implements OnInit {
       return;
     }
 
-    const branchId = String(
-      this.form.getRawValue().branchId || this.paymentBranchId || ''
-    ).trim();
+    const branchId = this.selectedBranchId();
     if (!branchId) {
       this.notify.push(this.translate.instant('tr_branch_required'), 'error');
       return;

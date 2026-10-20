@@ -751,17 +751,17 @@ export const createOrder = async (req, res) => {
       .filter((id) => mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id));
 
-    const [settingsDoc, productDocsList, lastOrder] = await Promise.all([
-      q(StoreSettings.findOne().sort({ updatedAt: -1 })).lean(),
+    // MongoDB forbids concurrent ops on one transaction session (error 251 /
+    // "active transaction number is -1"). Keep these reads sequential whenever
+    // createOrder may use a session (exchange / supplier / booking deposit).
+    const productSelect =
+      'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId';
+    const settingsDoc = await q(StoreSettings.findOne().sort({ updatedAt: -1 })).lean();
+    const productDocsList =
       uniqueProductIds.length > 0
-        ? q(
-            Product.find({ _id: { $in: uniqueProductIds } }).select(
-              'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
-            )
-          )
-        : Promise.resolve([]),
-      q(Order.findOne().sort({ orderNumber: -1 }).select('orderNumber')).lean(),
-    ]);
+        ? await q(Product.find({ _id: { $in: uniqueProductIds } }).select(productSelect))
+        : [];
+    const lastOrder = await q(Order.findOne().sort({ orderNumber: -1 }).select('orderNumber')).lean();
     const weightSalesEnabled = !!settingsDoc?.weightSalesEnabled;
     const cutFromSourceEnabled = isCutFromSourceEnabled(settingsDoc);
     const productById = new Map(productDocsList.map((p) => [String(p._id), p]));

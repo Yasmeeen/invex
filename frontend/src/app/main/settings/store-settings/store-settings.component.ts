@@ -46,6 +46,7 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
     cutFromSourceEnabled: false,
     deliveryOrdersEnabled: false,
     cashierPurchaseExchangeEnabled: true,
+    drawerVaultTransferMode: 'manual',
     ecommerceIntegrationFeatureAvailable: false,
     ecommerceIntegrationEnabled: false,
     ecommerceBaseUrl: '',
@@ -140,6 +141,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         cutFromSourceEnabled: Boolean(v.cutFromSourceEnabled),
         deliveryOrdersEnabled: Boolean(v.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: v.cashierPurchaseExchangeEnabled !== false,
+        drawerVaultTransferMode:
+          v.drawerVaultTransferMode === 'automatic' ? 'automatic' : 'manual',
         ecommerceIntegrationFeatureAvailable: Boolean(v.ecommerceIntegrationFeatureAvailable),
         ecommerceIntegrationEnabled: Boolean(v.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: v.ecommerceBaseUrl || '',
@@ -220,6 +223,8 @@ export class StoreSettingsComponent implements OnInit, OnDestroy {
         cutFromSourceEnabled: Boolean(this.form.cutFromSourceEnabled),
         deliveryOrdersEnabled: Boolean(this.form.deliveryOrdersEnabled),
         cashierPurchaseExchangeEnabled: this.form.cashierPurchaseExchangeEnabled !== false,
+        drawerVaultTransferMode:
+          this.form.drawerVaultTransferMode === 'automatic' ? 'automatic' : 'manual',
         ecommerceIntegrationEnabled: Boolean(this.form.ecommerceIntegrationEnabled),
         ecommerceBaseUrl: this.form.ecommerceBaseUrl?.trim() || '',
         ecommerceSharedKey: this.form.ecommerceSharedKey?.trim() || '',

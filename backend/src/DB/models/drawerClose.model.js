@@ -57,6 +57,11 @@ const drawerCloseSchema = new mongoose.Schema(
     retainedCash: { type: Number, required: true, default: 0 },
     /** Amount removed from drawer (to safe/treasury). */
     depositedCash: { type: Number, required: true, default: 0 },
+    /**
+     * Vault moneyAccounts.key credited when store setting drawerVaultTransferMode is automatic.
+     * Empty when manual mode or nothing was deposited.
+     */
+    vaultAccountKey: { type: String, default: '', trim: true, maxlength: 40 },
     closedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

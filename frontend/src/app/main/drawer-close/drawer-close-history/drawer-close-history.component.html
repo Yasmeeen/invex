@@ -74,6 +74,7 @@
             <th>{{ 'tr_drawer_close_actual_cash' | translate }}</th>
             <th>{{ 'tr_drawer_close_col_retained' | translate }}</th>
             <th>{{ 'tr_drawer_close_col_deposited' | translate }}</th>
+            <th>{{ 'tr_drawer_close_col_vault' | translate }}</th>
             <th>{{ 'tr_drawer_close_variance' | translate }}</th>
             <th>{{ 'tr_drawer_close_shortage_reason' | translate }}</th>
             <th>{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
@@ -88,6 +89,7 @@
             <td>{{ row.actualCashCounted | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td>{{ (row.retainedCash ?? 0) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td>{{ (row.depositedCash ?? row.actualCashCounted) | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
+            <td>{{ vaultLabel(row) }}</td>
             <td>{{ row.variance | currency : 'EGP ' : 'symbol' : '1.2-2' }}</td>
             <td class="drawer-close-history__notes">{{ row.shortageReason || '—' }}</td>
             <td>{{ row.closedBy?.name || row.closedBy?.email || '—' }}</td>

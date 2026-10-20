@@ -147,6 +147,22 @@
         </label>
         <p class="store-settings-card__hint">{{ 'tr_cashier_purchase_exchange_enabled_hint' | translate }}</p>
       </div>
+
+      <div class="store-settings-card__field">
+        <label class="store-settings-card__label" for="drawerVaultTransferMode">
+          {{ 'tr_drawer_vault_transfer_mode' | translate }}
+        </label>
+        <select
+          id="drawerVaultTransferMode"
+          class="s-control"
+          name="drawerVaultTransferMode"
+          [(ngModel)]="form.drawerVaultTransferMode"
+        >
+          <option value="manual">{{ 'tr_drawer_vault_transfer_mode_manual' | translate }}</option>
+          <option value="automatic">{{ 'tr_drawer_vault_transfer_mode_automatic' | translate }}</option>
+        </select>
+        <p class="store-settings-card__hint">{{ 'tr_drawer_vault_transfer_mode_hint' | translate }}</p>
+      </div>
     </ng-container>
 
     <!-- Policies -->

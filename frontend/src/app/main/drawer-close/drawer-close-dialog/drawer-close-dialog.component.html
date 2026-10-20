@@ -352,6 +352,28 @@
             <span>{{ 'tr_drawer_close_deposited_amount' | translate }}</span>
             <strong>{{ depositedAmount() | currency : 'EGP ' : 'symbol' : '1.2-2' }}</strong>
           </div>
+
+          <div class="form-group mt-2" *ngIf="showVaultPicker()">
+            <label>{{ 'tr_drawer_close_vault_select' | translate }}</label>
+            <div class="input-with-icon" *ngIf="branchVaults.length">
+              <ng-select
+                class="s-control s-select"
+                [items]="branchVaults"
+                bindLabel="label"
+                bindValue="key"
+                [clearable]="false"
+                [ngModel]="selectedVaultKey"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="selectedVaultKey = $event"
+                placeholder="{{ 'tr_drawer_close_vault_select' | translate }}"
+              >
+              </ng-select>
+              <i class="fa fa-caret-down input-icon"></i>
+            </div>
+            <p class="drawer-close-dialog__note" *ngIf="!branchVaults.length">
+              {{ 'tr_drawer_close_vault_none' | translate }}
+            </p>
+          </div>
         </div>
       </form>
     </div>

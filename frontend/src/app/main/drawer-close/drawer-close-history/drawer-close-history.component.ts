@@ -10,6 +10,7 @@ import {
   DrawerCloseRecord,
   DrawerCloseService,
 } from '@shared/services/drawer-close.service';
+import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { Subscription } from 'rxjs';
 import { canPickBranchRole } from '@core/utils/role-utils';
 import {
@@ -54,10 +55,12 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     private branchesService: BranchesServce,
     private notify: AppNotificationService,
     private translate: TranslateService,
+    private storeSettings: StoreSettingsService,
     public globals: Globals
   ) {}
 
   ngOnInit(): void {
+    this.storeSettings.load();
     const uid = this.globals.currentUser?._id;
     this.params = {
       page: 1,
@@ -90,6 +93,17 @@ export class DrawerCloseHistoryComponent implements OnInit, OnDestroy {
     const end = row.periodEndDate || row.businessDate;
     if (start === end) return end;
     return `${start} → ${end}`;
+  }
+
+  vaultLabel(row: DrawerCloseRecord): string {
+    const key = String(row.vaultAccountKey || '')
+      .trim()
+      .toLowerCase();
+    if (!key) return '—';
+    const acc = (this.storeSettings.snapshot.moneyAccounts || []).find(
+      (a) => String(a.key || '').trim().toLowerCase() === key
+    );
+    return (acc?.label || key).trim() || '—';
   }
 
   applyFilters(): void {

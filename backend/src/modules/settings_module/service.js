@@ -88,6 +88,8 @@ function serializeSettings(doc) {
     cutFromSourceEnabled: Boolean(doc.cutFromSourceEnabled),
     deliveryOrdersEnabled: Boolean(doc.deliveryOrdersEnabled),
     cashierPurchaseExchangeEnabled: doc.cashierPurchaseExchangeEnabled !== false,
+    drawerVaultTransferMode:
+      doc.drawerVaultTransferMode === 'automatic' ? 'automatic' : 'manual',
     ecommerceIntegrationFeatureAvailable: featureAvailable,
     ecommerceIntegrationEnabled: featureAvailable && Boolean(doc.ecommerceIntegrationEnabled),
     ecommerceBaseUrl: featureAvailable ? doc.ecommerceBaseUrl || '' : '',
@@ -144,6 +146,7 @@ export const updateStoreSettings = async (req, res) => {
       cutFromSourceEnabled,
       deliveryOrdersEnabled,
       cashierPurchaseExchangeEnabled,
+      drawerVaultTransferMode,
       ecommerceIntegrationEnabled,
       ecommerceBaseUrl,
       ecommerceSharedKey,
@@ -431,6 +434,14 @@ export const updateStoreSettings = async (req, res) => {
     ) {
       return res.status(400).json({ error: 'cashierPurchaseExchangeEnabled must be a boolean' });
     }
+    if (drawerVaultTransferMode !== undefined) {
+      const mode = String(drawerVaultTransferMode || '')
+        .trim()
+        .toLowerCase();
+      if (mode !== 'manual' && mode !== 'automatic') {
+        return res.status(400).json({ error: 'drawerVaultTransferMode must be manual or automatic' });
+      }
+    }
 
     const update = {};
     if (storeName !== undefined) update.storeName = storeName.trim().slice(0, 200);
@@ -466,6 +477,12 @@ export const updateStoreSettings = async (req, res) => {
     }
     if (cashierPurchaseExchangeEnabled !== undefined) {
       update.cashierPurchaseExchangeEnabled = cashierPurchaseExchangeEnabled;
+    }
+    if (drawerVaultTransferMode !== undefined) {
+      update.drawerVaultTransferMode =
+        String(drawerVaultTransferMode).trim().toLowerCase() === 'automatic'
+          ? 'automatic'
+          : 'manual';
     }
     if (rolesHiddenFromCostPrice !== undefined) {
       update.rolesHiddenFromCostPrice = normalizeRolesHiddenFromCostPrice(rolesHiddenFromCostPrice);

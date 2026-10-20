@@ -179,6 +179,16 @@ const storeSettingsSchema = new mongoose.Schema(
     deliveryOrdersEnabled: { type: Boolean, default: false },
     /** Master switch: desk product purchase + exchange at cashier. Default on for existing stores. */
     cashierPurchaseExchangeEnabled: { type: Boolean, default: true },
+    /**
+     * Drawer close → vault deposit:
+     * manual = cash out of drawer only (transfer to vault done separately in treasury);
+     * automatic = credit a selected vault account in the branch on close.
+     */
+    drawerVaultTransferMode: {
+      type: String,
+      enum: ['manual', 'automatic'],
+      default: 'manual',
+    },
 
     /** E-commerce storefront integration (gated by ECOMMERCE_INTEGRATION_FEATURE env). */
     ecommerceIntegrationEnabled: { type: Boolean, default: false },

@@ -1,8 +1,9 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { formatDate } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
+import { Subscription } from 'rxjs';
 import { Branch } from '@core/models/products.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { canPickBranchRole } from '@core/utils/role-utils';
@@ -13,8 +14,9 @@ import {
   DrawerClosePreview,
   DrawerCloseService,
 } from '@shared/services/drawer-close.service';
-import { StoreSettingsService } from '@shared/services/store-settings.service';
+import { MoneyAccount, StoreSettingsService } from '@shared/services/store-settings.service';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
+import { isAvailableForBranch, moneyAccountAlwaysAllBranches } from '@shared/utils/branch-scope.util';
 
 export interface DrawerCloseDialogData {
   userId: string;
@@ -31,7 +33,7 @@ function round2(n: number): number {
   templateUrl: './drawer-close-dialog.component.html',
   styleUrls: ['./drawer-close-dialog.component.scss'],
 })
-export class DrawerCloseDialogComponent implements OnInit {
+export class DrawerCloseDialogComponent implements OnInit, OnDestroy {
   step: 1 | 2 = 1;
   preview: DrawerClosePreview | null = null;
   previewLoading = false;
@@ -41,6 +43,7 @@ export class DrawerCloseDialogComponent implements OnInit {
   branches: Branch[] = [];
   showBranchPicker = false;
   private fixedBranchId: string | null = null;
+  private settingsSub?: Subscription;
 
   businessDateStr = '';
 
@@ -50,6 +53,10 @@ export class DrawerCloseDialogComponent implements OnInit {
   /** deposit_all | retain (then retainMode: all | partial) */
   cashAction: 'deposit' | 'retain' = 'deposit';
   retainMode: 'all' | 'partial' = 'all';
+
+  /** Branch vaults for automatic drawer→vault deposit. */
+  branchVaults: MoneyAccount[] = [];
+  selectedVaultKey = '';
 
   constructor(
     private fb: FormBuilder,
@@ -99,6 +106,9 @@ export class DrawerCloseDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.storeSettings.load();
+    this.settingsSub = this.storeSettings.settings$.subscribe(() => {
+      this.refreshBranchVaults();
+    });
     if (this.fixedBranchId) {
       this.countForm.patchValue({ branchId: this.fixedBranchId });
       this.countForm.get('branchId')?.disable();
@@ -112,6 +122,7 @@ export class DrawerCloseDialogComponent implements OnInit {
           if (first && !this.countForm.get('branchId')?.value) {
             this.countForm.patchValue({ branchId: first });
           }
+          this.refreshBranchVaults();
           this.loadPreview();
         },
         error: () => {
@@ -127,7 +138,45 @@ export class DrawerCloseDialogComponent implements OnInit {
       return;
     }
 
+    this.refreshBranchVaults();
     this.loadPreview();
+  }
+
+  ngOnDestroy(): void {
+    this.settingsSub?.unsubscribe();
+  }
+
+  get isAutomaticVaultTransfer(): boolean {
+    return this.storeSettings.snapshot.drawerVaultTransferMode === 'automatic';
+  }
+
+  /** Show vault picker when automatic mode and some cash will leave the drawer. */
+  showVaultPicker(): boolean {
+    return this.isAutomaticVaultTransfer && this.depositedAmount() > 0.005;
+  }
+
+  refreshBranchVaults(): void {
+    const branchId = this.effectiveBranchId();
+    const accounts = this.storeSettings.snapshot.moneyAccounts || [];
+    this.branchVaults = accounts.filter(
+      (a) =>
+        a.kind === 'vault' &&
+        a.enabled !== false &&
+        isAvailableForBranch(
+          a.branchIds,
+          branchId,
+          moneyAccountAlwaysAllBranches(a.kind, a.key)
+        )
+    );
+    if (
+      this.selectedVaultKey &&
+      !this.branchVaults.some((v) => v.key === this.selectedVaultKey)
+    ) {
+      this.selectedVaultKey = '';
+    }
+    if (!this.selectedVaultKey && this.branchVaults.length === 1) {
+      this.selectedVaultKey = this.branchVaults[0].key;
+    }
   }
 
   effectiveBranchId(): string {
@@ -150,6 +199,7 @@ export class DrawerCloseDialogComponent implements OnInit {
       return;
     }
 
+    this.refreshBranchVaults();
     this.previewLoading = true;
     this.previewError = false;
     this.preview = null;
@@ -280,6 +330,7 @@ export class DrawerCloseDialogComponent implements OnInit {
     this.step = 2;
     this.cashAction = 'deposit';
     this.retainMode = 'all';
+    this.refreshBranchVaults();
     const exp = this.preview.expectedCashInDrawer;
     this.shortageReasonForm.patchValue({
       actualCashCounted: round2(exp),
@@ -435,6 +486,19 @@ export class DrawerCloseDialogComponent implements OnInit {
 
     if (disposition === 'retain_partial') {
       payload.retainedCash = this.retainedAmount();
+    }
+
+    if (this.showVaultPicker()) {
+      if (!this.branchVaults.length) {
+        this.notify.push(this.translate.instant('tr_drawer_close_vault_none'), 'error');
+        return;
+      }
+      const vaultKey = String(this.selectedVaultKey || '').trim();
+      if (!vaultKey || !this.branchVaults.some((v) => v.key === vaultKey)) {
+        this.notify.push(this.translate.instant('tr_drawer_close_vault_required'), 'error');
+        return;
+      }
+      payload.vaultAccountKey = vaultKey;
     }
 
     this.saving = true;

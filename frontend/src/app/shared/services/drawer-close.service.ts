@@ -89,6 +89,8 @@ export interface DrawerCloseRecord {
   cashDisposition?: CashDisposition;
   retainedCash?: number;
   depositedCash?: number;
+  /** Vault money account key when automatic vault transfer was used. */
+  vaultAccountKey?: string;
   closedBy?: { _id: string; name?: string; email?: string; role?: string };
   createdAt?: string;
   updatedAt?: string;
@@ -115,6 +117,8 @@ export interface CloseDrawerPayload {
   shortageReason?: string;
   cashDisposition: CashDisposition;
   retainedCash?: number;
+  /** Required when store setting drawerVaultTransferMode is automatic and depositing. */
+  vaultAccountKey?: string;
 }
 
 @Injectable({ providedIn: 'root' })

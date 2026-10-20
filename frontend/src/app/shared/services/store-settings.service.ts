@@ -101,6 +101,11 @@ export interface StoreSettings {
   deliveryOrdersEnabled: boolean;
   /** Master switch for desk product purchase + exchange at cashier. */
   cashierPurchaseExchangeEnabled: boolean;
+  /**
+   * Drawer close deposit to vault:
+   * manual = cash out only; automatic = credit a branch vault on close.
+   */
+  drawerVaultTransferMode: 'manual' | 'automatic';
   /** Env-gated e-commerce integration. */
   ecommerceIntegrationFeatureAvailable?: boolean;
   ecommerceIntegrationEnabled?: boolean;
@@ -151,6 +156,7 @@ const DEFAULTS: StoreSettings = {
   cutFromSourceEnabled: false,
   deliveryOrdersEnabled: false,
   cashierPurchaseExchangeEnabled: true,
+  drawerVaultTransferMode: 'manual',
   ecommerceIntegrationFeatureAvailable: false,
   ecommerceIntegrationEnabled: false,
   ecommerceBaseUrl: '',
@@ -408,6 +414,8 @@ export class StoreSettingsService {
           cutFromSourceEnabled: Boolean(data.cutFromSourceEnabled),
           deliveryOrdersEnabled: Boolean(data.deliveryOrdersEnabled),
           cashierPurchaseExchangeEnabled: data.cashierPurchaseExchangeEnabled !== false,
+          drawerVaultTransferMode:
+            data.drawerVaultTransferMode === 'automatic' ? 'automatic' : 'manual',
           ecommerceIntegrationFeatureAvailable: Boolean(data.ecommerceIntegrationFeatureAvailable),
           ecommerceIntegrationEnabled: Boolean(data.ecommerceIntegrationEnabled),
           ecommerceBaseUrl: data.ecommerceBaseUrl ?? '',

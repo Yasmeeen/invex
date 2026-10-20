@@ -18,6 +18,11 @@ import { sumClientCashDrawerInflows } from '../../utils/client-cash-drawer.js';
 import { refundAllocationFromReturnRecord, salesReturnTreasuryRefundLines } from '../../utils/order-return.js';
 import { refundTreasuryCashFromReturnRecord } from '../../utils/purchase-return.js';
 import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
+import StoreSettings from '../../DB/models/storeSettings.model.js';
+import {
+  getEffectiveMoneyAccountsFromDb,
+  isAvailableForBranch,
+} from '../settings_module/moneyAccounts.js';
 import {
   recordTreasuryLedgerEntry,
   safeTreasuryPost,
@@ -212,7 +217,45 @@ function normalizeDrawerCloseRow(row) {
     cashDisposition: row.cashDisposition || 'deposit_all',
     retainedCash: round2(Number(row.retainedCash ?? 0)),
     depositedCash: round2(Number(row.depositedCash ?? actual)),
+    vaultAccountKey: String(row.vaultAccountKey || '')
+      .trim()
+      .toLowerCase(),
   };
+}
+
+async function getDrawerVaultTransferMode() {
+  const doc = await StoreSettings.findOne().sort({ updatedAt: -1 }).select('drawerVaultTransferMode').lean();
+  return doc?.drawerVaultTransferMode === 'automatic' ? 'automatic' : 'manual';
+}
+
+/**
+ * Resolve vault account for automatic drawer→vault deposit.
+ * Returns { vaultKey } or { error }.
+ */
+async function resolveVaultForDrawerDeposit(branchId, vaultAccountKeyRaw) {
+  const vaultKey = String(vaultAccountKeyRaw || '')
+    .trim()
+    .toLowerCase();
+  if (!vaultKey) {
+    return { error: 'Vault account is required when automatic vault transfer is enabled' };
+  }
+  const { moneyAccounts } = await getEffectiveMoneyAccountsFromDb();
+  const acc = (moneyAccounts || []).find((a) => a.key === vaultKey);
+  if (!acc || acc.kind !== 'vault') {
+    return { error: 'Selected vault account was not found' };
+  }
+  if (acc.enabled === false) {
+    return { error: 'Selected vault account is disabled' };
+  }
+  if (
+    !isAvailableForBranch(acc.branchIds, branchId, {
+      alwaysAll: false,
+      emptyMeansAll: true,
+    })
+  ) {
+    return { error: 'Selected vault is not available in this branch' };
+  }
+  return { vaultKey };
 }
 
 async function computeDrawerPreviewWithPeriod(branchOid, targetDateStr) {
@@ -861,6 +904,7 @@ export const closeDrawer = async (req, res) => {
       shortageReason,
       cashDisposition,
       retainedCash: retainedCashRaw,
+      vaultAccountKey: vaultAccountKeyRaw,
     } = req.body || {};
 
     const actor = await loadActor(userId);
@@ -897,6 +941,17 @@ export const closeDrawer = async (req, res) => {
     }
 
     const branchOid = new mongoose.Types.ObjectId(String(branch));
+    const vaultTransferMode = await getDrawerVaultTransferMode();
+    const autoVaultTransfer = vaultTransferMode === 'automatic';
+    let vaultAccountKey = '';
+    if (autoVaultTransfer && cashResult.deposited > 0) {
+      const vaultResolved = await resolveVaultForDrawerDeposit(String(branch), vaultAccountKeyRaw);
+      if (vaultResolved.error) {
+        return res.status(400).json({ error: vaultResolved.error });
+      }
+      vaultAccountKey = vaultResolved.vaultKey;
+    }
+
     const period = await resolveClosePeriod(branchOid, dateStr);
 
     if (period.periodAlreadyClosed) {
@@ -952,6 +1007,7 @@ export const closeDrawer = async (req, res) => {
         cashDisposition: cashResult.disposition,
         retainedCash: cashResult.retained,
         depositedCash: cashResult.deposited,
+        vaultAccountKey,
         closedBy: userId,
       });
     } catch (e) {
@@ -970,19 +1026,7 @@ export const closeDrawer = async (req, res) => {
 
     const closeOccurredAt = period.bounds?.end || new Date();
     await safeTreasuryPost('drawer_close', async () => {
-      if (cashResult.deposited > 0) {
-        await recordTreasuryLedgerEntry({
-          branchId: branchOid,
-          accountKey: 'cash',
-          direction: 'out',
-          amount: cashResult.deposited,
-          occurredAt: closeOccurredAt,
-          sourceType: 'drawer_close',
-          sourceId: doc._id,
-          note: 'إيداع من الدرج',
-          createdBy: userId,
-        });
-      }
+      // Align cash ledger with counted amount before depositing (needed for auto vault credit).
       if (Math.abs(variance) > VARIANCE_EPS) {
         await recordTreasuryLedgerEntry({
           branchId: branchOid,
@@ -995,6 +1039,45 @@ export const closeDrawer = async (req, res) => {
           note: reasonTrim.slice(0, 2000),
           createdBy: userId,
         });
+      }
+      if (cashResult.deposited > 0) {
+        if (autoVaultTransfer && vaultAccountKey) {
+          const transferGroupId = new mongoose.Types.ObjectId();
+          const common = {
+            branchId: branchOid,
+            amount: cashResult.deposited,
+            occurredAt: closeOccurredAt,
+            sourceType: 'drawer_close',
+            sourceId: doc._id,
+            transferGroupId,
+            note: 'إيداع من الدرج',
+            createdBy: userId,
+          };
+          await recordTreasuryLedgerEntry({
+            ...common,
+            accountKey: 'cash',
+            direction: 'out',
+            counterAccountKey: vaultAccountKey,
+          });
+          await recordTreasuryLedgerEntry({
+            ...common,
+            accountKey: vaultAccountKey,
+            direction: 'in',
+            counterAccountKey: 'cash',
+          });
+        } else {
+          await recordTreasuryLedgerEntry({
+            branchId: branchOid,
+            accountKey: 'cash',
+            direction: 'out',
+            amount: cashResult.deposited,
+            occurredAt: closeOccurredAt,
+            sourceType: 'drawer_close',
+            sourceId: doc._id,
+            note: 'إيداع من الدرج',
+            createdBy: userId,
+          });
+        }
       }
     });
 

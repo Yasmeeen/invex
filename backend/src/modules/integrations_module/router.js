@@ -10,6 +10,7 @@ import {
   confirmOrderFromEcommerce,
   deliverOrderFromEcommerce,
   getCatalog,
+  getEcommerceStatus,
   pushCatalogNow,
 } from './ecommerceInbound.js';
 import {
@@ -34,6 +35,7 @@ router.post('/ecommerce/push-catalog', pushCatalogNow);
 
 router.use('/ecommerce', requireEcommerceIntegrationAuth);
 
+router.get('/ecommerce/status', getEcommerceStatus);
 router.get('/ecommerce/catalog', getCatalog);
 router.post('/ecommerce/orders/reserve', reserveFromEcommerce);
 router.post('/ecommerce/orders/cancel', cancelReservationFromEcommerce);

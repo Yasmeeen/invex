@@ -536,23 +536,39 @@ export const updateStoreSettings = async (req, res) => {
       }
     }
 
+    let ecommerceModeSync = null;
     if (doc.ecommerceIntegrationEnabled && (shouldPushMode || shouldPushCatalog)) {
       const mode = normalizeEcommerceCatalogMode(doc.ecommerceCatalogMode);
-      setImmediate(() => {
-        if (shouldPushMode) {
-          pushCatalogMode(mode).catch((err) =>
-            console.error('[settings] push catalog mode after save', err.message)
-          );
+      // Await mode push so “orders only” unlocks product CRUD on the website immediately.
+      if (shouldPushMode) {
+        try {
+          ecommerceModeSync = await pushCatalogMode(mode);
+          if (!ecommerceModeSync?.ok && !ecommerceModeSync?.skipped) {
+            console.error('[settings] push catalog mode after save', ecommerceModeSync);
+          }
+        } catch (err) {
+          ecommerceModeSync = { ok: false, error: err.message };
+          console.error('[settings] push catalog mode after save', err.message);
         }
-        if (shouldPushCatalog && mode !== 'orders_only') {
+      }
+      if (shouldPushCatalog && mode !== 'orders_only') {
+        setImmediate(() => {
           pushFullCatalog().catch((err) =>
             console.error('[settings] push catalog after save', err.message)
           );
-        }
-      });
+        });
+      }
     }
 
-    res.status(200).json(serializeSettings(doc));
+    const payload = serializeSettings(doc);
+    if (ecommerceModeSync) {
+      payload.ecommerceModeSync = {
+        ok: Boolean(ecommerceModeSync.ok || ecommerceModeSync.skipped),
+        skipped: Boolean(ecommerceModeSync.skipped),
+        error: ecommerceModeSync.error || ecommerceModeSync.data?.message || null,
+      };
+    }
+    res.status(200).json(payload);
   } catch (error) {
     console.error('updateStoreSettings:', error);
     res.status(500).json({ error: 'Failed to update store settings' });

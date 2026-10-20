@@ -654,6 +654,19 @@ export async function deliverOrderFromEcommerce(req, res) {
   }
 }
 
+export async function getEcommerceStatus(req, res) {
+  try {
+    const cfg = await getIntegrationConfig();
+    return res.json({
+      ok: true,
+      enabled: Boolean(cfg.enabled),
+      catalogMode: cfg.catalogMode || 'all',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 export async function getCatalog(req, res) {
   try {
     const payload = await buildCatalogPayload();

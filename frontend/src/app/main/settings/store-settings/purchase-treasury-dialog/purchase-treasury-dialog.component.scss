@@ -162,7 +162,11 @@
 }
 
 .money-accounts-table__col-actions {
-  width: 3.5rem;
+  width: 6.75rem;
+}
+
+.money-accounts-table thead th:last-child {
+  white-space: nowrap;
 }
 
 .money-accounts-table__account-cell {
@@ -223,7 +227,7 @@
 .money-accounts-table__actions {
   white-space: nowrap;
   text-align: start;
-  width: 3rem;
+  width: 6.75rem;
 }
 
 .money-accounts-table__actions .options-menu {

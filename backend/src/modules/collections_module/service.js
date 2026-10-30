@@ -38,6 +38,38 @@ function hasUnpaidInstallmentBefore(order, fromDate, timezone) {
   return false;
 }
 
+function overdueItemKey(item) {
+  const clientId = String(item?.clientId || "");
+  if (clientId) return `client:${clientId}`;
+  return `order:${String(item?.orderId || "")}`;
+}
+
+function isEarlierDue(a, b) {
+  const da = new Date(a?.dueDate || 0).getTime();
+  const db = new Date(b?.dueDate || 0).getTime();
+  if (da !== db) return da < db;
+  return (Number(a?.sequence) || 0) < (Number(b?.sequence) || 0);
+}
+
+/** One row per client: the oldest overdue installment still inside the filtered set. */
+function keepEarliestOverduePerClient(items) {
+  const indexByClient = new Map();
+  const kept = [];
+  for (const item of items) {
+    const key = overdueItemKey(item);
+    const prevIndex = indexByClient.get(key);
+    if (prevIndex === undefined) {
+      indexByClient.set(key, kept.length);
+      kept.push(item);
+      continue;
+    }
+    if (isEarlierDue(item, kept[prevIndex])) {
+      kept[prevIndex] = item;
+    }
+  }
+  return kept;
+}
+
 /** Same overdue rule as the due-installments list (promise wins over overdue). */
 function isListedOverdue(inst, now, timezone) {
   if (installmentRemaining(inst) <= 0.001) return false;
@@ -199,6 +231,8 @@ async function computeCollectorWorkload() {
  *        are omitted until the range includes that earlier due date.
  *        promiseFrom, promiseTo (promiseToPayAt),
  *        installmentSaleNumber (exact),
+ *        overdueGrouping=all|earliest (overdue status only; earliest keeps the
+ *        oldest overdue installment per client),
  *        page, limit, sortBy=remaining|saleNumber|date, sortDir=asc|desc
  */
 export const listCollectionsDue = async (req, res) => {
@@ -212,6 +246,7 @@ export const listCollectionsDue = async (req, res) => {
       promiseFrom,
       promiseTo,
       installmentSaleNumber = "",
+      overdueGrouping = "all",
       page = 1,
       limit = 50,
       sortBy = "",
@@ -221,6 +256,9 @@ export const listCollectionsDue = async (req, res) => {
     const pageLimit = Math.max(1, Math.min(200, Number(limit) || 50));
     const skip = (Math.max(1, Number(page) || 1) - 1) * pageLimit;
     const statusKey = String(status || "all").trim().toLowerCase();
+    const groupingKey = String(overdueGrouping || "all").trim().toLowerCase();
+    const showEarliestOverdueOnly =
+      statusKey === "overdue" && groupingKey === "earliest";
 
     const hasBranchFilter =
       branchId && mongoose.Types.ObjectId.isValid(String(branchId));
@@ -430,10 +468,20 @@ export const listCollectionsDue = async (req, res) => {
       }
     }
 
+    let visibleItems = items;
+    if (showEarliestOverdueOnly) {
+      visibleItems = keepEarliestOverduePerClient(items);
+      overdueCount = visibleItems.length;
+      dueAmount = 0;
+      for (const item of visibleItems) {
+        dueAmount = round2(dueAmount + (Number(item.remaining) || 0));
+      }
+    }
+
     const sortKey = String(sortBy || "").trim().toLowerCase();
     const dir = String(sortDir || "asc").trim().toLowerCase() === "desc" ? -1 : 1;
 
-    items.sort((a, b) => {
+    visibleItems.sort((a, b) => {
       if (sortKey === "remaining") {
         const diff = (Number(a.remaining) || 0) - (Number(b.remaining) || 0);
         if (diff !== 0) return diff * dir;
@@ -457,8 +505,8 @@ export const listCollectionsDue = async (req, res) => {
       return da - db;
     });
 
-    const totalCount = items.length;
-    const pageRows = items.slice(skip, skip + pageLimit);
+    const totalCount = visibleItems.length;
+    const pageRows = visibleItems.slice(skip, skip + pageLimit);
     const totalPages = Math.ceil(totalCount / pageLimit) || 0;
 
     res.json({

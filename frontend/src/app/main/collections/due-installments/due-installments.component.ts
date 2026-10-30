@@ -47,6 +47,8 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
   selectedBranchId = '';
   selectedCollectorId = '';
   statusFilter: 'all' | 'due' | 'overdue' | 'promised' = 'due';
+  /** all = every overdue installment; earliest = oldest overdue row per client. */
+  overdueGrouping: 'all' | 'earliest' = 'earliest';
   fromDate: Date | null = null;
   toDate: Date | null = null;
   promiseFromDate: Date | null = null;
@@ -184,6 +186,17 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     this.load(1);
+  }
+
+  onStatusChange(): void {
+    this.applyFilters();
+  }
+
+  onOverdueGroupingChange(): void {
+    if (this.overdueGrouping === 'earliest') {
+      this.statusFilter = 'overdue';
+    }
+    this.applyFilters();
   }
 
   clearDateFilters(): void {
@@ -431,6 +444,8 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
       promiseFrom: this.formatDate(this.promiseFromDate),
       promiseTo: this.formatDate(this.promiseToDate),
       installmentSaleNumber,
+      overdueGrouping:
+        this.statusFilter === 'overdue' ? this.overdueGrouping : undefined,
       page,
       limit,
       sortBy,

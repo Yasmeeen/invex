@@ -2,6 +2,12 @@
   flex-wrap: wrap;
 }
 
+.cdash-filters__field--grouping {
+  flex: 1.6 1 260px;
+  min-width: 240px;
+  max-width: 320px;
+}
+
 .cdash-export {
   border: none;
   border-radius: 999px;

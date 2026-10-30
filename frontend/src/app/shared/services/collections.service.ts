@@ -152,6 +152,7 @@ export class CollectionsService {
     promiseFrom?: string;
     promiseTo?: string;
     installmentSaleNumber?: number;
+    overdueGrouping?: 'all' | 'earliest';
     page?: number;
     limit?: number;
     sortBy?: string;

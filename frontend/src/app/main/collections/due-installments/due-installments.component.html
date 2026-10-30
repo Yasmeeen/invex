@@ -98,11 +98,19 @@
 
     <div class="cdash-filters__field">
       <label class="cdash-filters__label">{{ 'tr_status' | translate }}</label>
-      <select class="s-control" [(ngModel)]="statusFilter" (ngModelChange)="applyFilters()">
+      <select class="s-control" [(ngModel)]="statusFilter" (ngModelChange)="onStatusChange()">
         <option value="all">{{ 'tr_collections_all_statuses' | translate }}</option>
         <option value="due">{{ 'tr_collections_due' | translate }}</option>
         <option value="overdue">{{ 'tr_collections_overdue' | translate }}</option>
         <option value="promised">{{ 'tr_collections_promised' | translate }}</option>
+      </select>
+    </div>
+
+    <div class="cdash-filters__field cdash-filters__field--grouping">
+      <label class="cdash-filters__label">{{ 'tr_overdue_grouping' | translate }}</label>
+      <select class="s-control" [(ngModel)]="overdueGrouping" (ngModelChange)="onOverdueGroupingChange()">
+        <option value="all">{{ 'tr_overdue_grouping_all' | translate }}</option>
+        <option value="earliest">{{ 'tr_overdue_grouping_earliest' | translate }}</option>
       </select>
     </div>
 

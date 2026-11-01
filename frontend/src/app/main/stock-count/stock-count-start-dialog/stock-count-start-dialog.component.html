@@ -1,0 +1,79 @@
+<div class="stock-count-start-dialog">
+  <h2 class="stock-count-start-dialog__title">{{ 'tr_stock_count_add' | translate }}</h2>
+  <p class="stock-count-start-dialog__lead">{{ 'tr_stock_count_hint' | translate }}</p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="form-group" *ngIf="showLocationPicker">
+      <label>{{ 'tr_stock_count_location' | translate }}</label>
+      <div class="stock-count-start-dialog__radios">
+        <label>
+          <input type="radio" formControlName="locationType" value="branch" />
+          {{ 'tr_branch' | translate }}
+        </label>
+        <label>
+          <input type="radio" formControlName="locationType" value="warehouse" />
+          {{ 'tr_warehouse' | translate }}
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branch' | translate }}</label>
+      <div class="input-with-icon">
+        <ng-select
+          class="s-control s-select"
+          formControlName="branchId"
+          [items]="branches"
+          bindLabel="name"
+          bindValue="_id"
+          [clearable]="false"
+          placeholder="{{ 'tr_branch' | translate }}"
+        ></ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+    </div>
+
+    <p class="text-muted size-caption" *ngIf="!showLocationPicker && fixedBranchName">
+      {{ 'tr_branch' | translate }}: {{ fixedBranchName }}
+    </p>
+
+    <div class="form-group">
+      <label>{{ 'tr_stock_count_categories' | translate }}</label>
+      <div class="input-with-icon">
+        <ng-select
+          class="s-control s-select"
+          formControlName="categoryIds"
+          [items]="categories"
+          bindLabel="name"
+          bindValue="_id"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          [clearable]="true"
+          placeholder="{{ 'tr_stock_count_categories' | translate }}"
+        ></ng-select>
+        <i class="fa fa-caret-down input-icon"></i>
+      </div>
+      <p class="text-muted size-caption" *ngIf="hiddenWeight">{{ 'tr_stock_count_weight_hint' | translate }}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{ 'tr_stock_count_note' | translate }}</label>
+      <textarea
+        class="s-control width-100"
+        rows="2"
+        formControlName="note"
+        maxlength="500"
+        [placeholder]="'tr_stock_count_note_placeholder' | translate"
+      ></textarea>
+    </div>
+
+    <div class="stock-count-start-dialog__actions">
+      <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving">
+        {{ 'tr_cancel' | translate }}
+      </button>
+      <button type="submit" class="s-btn btn-primary" [disabled]="saving || loading">
+        {{ 'tr_stock_count_start' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

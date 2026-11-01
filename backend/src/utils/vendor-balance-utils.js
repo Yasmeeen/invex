@@ -43,10 +43,13 @@ export async function computeSupplierOwesFromOrdersByVendorIds(vendorIds) {
   return map;
 }
 
-/** Unpaid balances on supplier sales + opening debit (مدين — المورد عليه). */
+/** Unpaid balances on supplier sales + opening debit + unapplied goods returns (مدين — المورد عليه). */
 export async function computeSupplierOwesUs(vendorId) {
   const owesFromOrders = await computeSupplierOwesFromOrders(vendorId);
-  const vendor = await Vendor.findById(vendorId).select('openingDebitBalance').lean();
+  const vendor = await Vendor.findById(vendorId)
+    .select('openingDebitBalance goodsReturnDebitBalance')
+    .lean();
   const opening = Math.round((Number(vendor?.openingDebitBalance) || 0) * 100) / 100;
-  return Math.round((owesFromOrders + opening) * 100) / 100;
+  const goodsReturn = Math.round((Number(vendor?.goodsReturnDebitBalance) || 0) * 100) / 100;
+  return Math.round((owesFromOrders + opening + goodsReturn) * 100) / 100;
 }

@@ -108,6 +108,23 @@ body[dir=rtl] {
   max-height: none;
 }
 
+.cdk-overlay-backdrop.stock-count-start-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.stock-count-start-dialog-panel {
+  box-shadow: none;
+  overflow: visible;
+}
+
+.stock-count-start-dialog-panel .mat-dialog-container,
+.stock-count-start-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible;
+}
+
 .cdk-overlay-backdrop.vendor-deferred-payment-dialog-backdrop {
   background: rgba(15, 23, 42, 0.22);
 }
@@ -189,6 +206,30 @@ body[dir=rtl] {
 
 .vendor-pay-supplier-dialog-panel .mat-dialog-content,
 .vendor-pay-supplier-dialog-panel .mat-mdc-dialog-content {
+  margin: 0;
+  padding: 0;
+  max-height: none;
+}
+
+.cdk-overlay-backdrop.vendor-goods-return-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.vendor-goods-return-dialog-panel {
+  box-shadow: none;
+}
+
+.vendor-goods-return-dialog-panel .mat-dialog-container,
+.vendor-goods-return-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: hidden;
+  transform: none !important;
+}
+
+.vendor-goods-return-dialog-panel .mat-dialog-content,
+.vendor-goods-return-dialog-panel .mat-mdc-dialog-content {
   margin: 0;
   padding: 0;
   max-height: none;

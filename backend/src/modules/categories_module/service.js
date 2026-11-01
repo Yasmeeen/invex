@@ -122,7 +122,7 @@ export const getCategories = async (req, res) => {
     // Fetch categories and total count in parallel
     const categoryQuery = Category.find(query).skip(skip).limit(Number(limit));
     if (lite) {
-      categoryQuery.select('name code imageUrl').sort({ name: 1 });
+      categoryQuery.select('name code imageUrl sellByWeight').sort({ name: 1 });
     }
     const [categories, total] = await Promise.all([
       categoryQuery,

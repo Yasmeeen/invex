@@ -77,6 +77,37 @@ export function formatCairoDateTime(value: string | Date | null | undefined): st
   return `${day}/${month}/${year} ${hour}:${minute}`;
 }
 
+/** dd/MM/yyyy h:mm ص|م in Cairo time. */
+export function formatCairoDateTime12(value: string | Date | null | undefined): string {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CAIRO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const day = parts.find((p) => p.type === 'day')?.value || '';
+  const month = parts.find((p) => p.type === 'month')?.value || '';
+  const year = parts.find((p) => p.type === 'year')?.value || '';
+  const hourRaw = parts.find((p) => p.type === 'hour')?.value || '';
+  const minute = parts.find((p) => p.type === 'minute')?.value || '';
+  if (!day || !month || !year || !minute) return '';
+
+  let hourNum = Number(hourRaw);
+  if (!Number.isFinite(hourNum) || hourNum === 24) hourNum = 0;
+  const marker = hourNum >= 12 ? 'م' : 'ص';
+  let hour12 = hourNum % 12;
+  if (hour12 === 0) hour12 = 12;
+  return `${day}/${month}/${year} ${hour12}:${minute} ${marker}`;
+}
+
 /** Whole days elapsed since a date (for invoice age warnings). */
 export function daysSince(value: string | Date | null | undefined): number {
   if (!value) return 0;

@@ -30,6 +30,11 @@ export const AdminSidebar = [
         icon: 'fa fa-barcode icon',
       },
       {
+        name: 'tr_stock_count',
+        routerLink: '/stock-count',
+        icon: 'fa fa-check-square-o icon',
+      },
+      {
         name: 'tr_branch_transfers_pending',
         routerLink: '/products/branch-transfers',
         icon: 'fa fa-exchange icon',
@@ -97,6 +102,11 @@ export const AdminSidebar = [
         name: 'tr_purchases',
         routerLink: '/purchasing',
         icon: 'fa fa-file-text-o icon',
+      },
+      {
+        name: 'tr_vendor_goods_returns_menu',
+        routerLink: '/suppliers/returns',
+        icon: 'fa fa-undo icon',
       },
     ],
   },
@@ -244,6 +254,11 @@ export const Cashier = [
     icon: 'fa fa-credit-card icon',
   },
   {
+    name: 'tr_stock_count',
+    routerLink: '/stock-count',
+    icon: 'fa fa-check-square-o icon',
+  },
+  {
     name: 'tr_daily_expenses_menu',
     routerLink: '/expenses',
     icon: 'fa fa-money icon',
@@ -305,6 +320,11 @@ export const Warehouse = [
     name: 'tr_branch_transfers_pending',
     routerLink: '/products/branch-transfers',
     icon: 'fa fa-exchange icon',
+  },
+  {
+    name: 'tr_stock_count',
+    routerLink: '/stock-count',
+    icon: 'fa fa-check-square-o icon',
   },
 ];
 

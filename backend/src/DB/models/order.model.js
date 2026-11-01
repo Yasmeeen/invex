@@ -38,6 +38,9 @@ const orderSchema = new mongoose.Schema(
 
     sellerName: { type: String, trim: true },
 
+    /** Staff-only note. Never printed on the customer receipt. */
+    internalNote: { type: String, trim: true, default: '', maxlength: 500 },
+
     /** Cashier delivery invoice (optional delivery person). */
     isDelivery: { type: Boolean, default: false },
     deliveryPersonName: { type: String, trim: true },

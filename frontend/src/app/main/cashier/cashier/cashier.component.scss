@@ -118,26 +118,44 @@
     }
   }
   .products-table-casheier{
+    table-layout: fixed;
+    width: 100%;
+
     td{
       font-size: 14px;
+    }
+
+    /* Name takes the leftover width so long titles wrap on a few lines, not one letter per line. */
+    th:nth-child(1),
+    td:nth-child(1){
+      width: auto;
+      text-align: start;
     }
 
     /* Qty: compact — weight lines use an inline unit suffix inside the same control */
     th:nth-child(2),
     td:nth-child(2){
       width: 6.5rem;
-      min-width: 6.5rem;
-      max-width: 7rem;
       white-space: nowrap;
       padding-left: 0.25rem;
       padding-right: 0.25rem;
     }
 
+    th:nth-child(3),
+    td:nth-child(3){
+      width: 9.25rem;
+      white-space: nowrap;
+    }
+
     th:nth-child(4),
     td:nth-child(4){
       width: 7.5rem;
-      min-width: 7.5rem;
       white-space: nowrap;
+    }
+
+    th:nth-child(5),
+    td:nth-child(5){
+      width: 2.4rem;
     }
   }
   .cashier-opening-balance {
@@ -613,7 +631,8 @@
 
   /* Products Panel */
   .products-panel {
-    flex: 2;
+    flex: 1.55 1 0;
+    min-width: 0;
     min-height: 0;
     padding: 0.75rem 1rem;
     display: flex;
@@ -844,7 +863,8 @@
   
   /* Order Panel */
   .order-panel {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     background: #ecf0f1;
     padding: 1rem 1rem 2.5rem;
     display: flex;
@@ -904,25 +924,37 @@
         border-bottom: 1px solid #bdc3c7;
       }
 
+      th:nth-child(1),
+      td:nth-child(1) {
+        text-align: start;
+      }
+
       .order-line-product {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 0.5rem;
-        justify-content: center;
-        flex-wrap: wrap;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        width: 100%;
+        text-align: start;
       }
 
       .order-line-product__text {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        text-align: center;
+        align-items: flex-start;
+        text-align: start;
         gap: 2px;
         min-width: 0;
+        flex: 1 1 auto;
       }
 
       .order-line-product__name {
         font-weight: 600;
+        line-height: 1.35;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: break-word;
 
         &--clickable {
           cursor: pointer;
@@ -1020,6 +1052,19 @@
           color: #1e8449;
           background: #eafaf1;
         }
+
+        &--below-cost {
+          border-style: solid;
+          border-color: #c0392b;
+          color: #922b21;
+          background: #fdedec;
+
+          &:hover {
+            background: #fadbd8;
+            border-color: #a93226;
+            color: #922b21;
+          }
+        }
       }
 
       .order-line-price-input {
@@ -1029,6 +1074,13 @@
         font-size: 0.85rem;
         text-align: center;
         margin: 0 auto;
+
+        &--below-cost {
+          border-color: #c0392b;
+          color: #922b21;
+          background: #fdedec;
+          box-shadow: 0 0 0 1px #c0392b;
+        }
       }
 
       th {
@@ -1067,6 +1119,13 @@
         min-width: 0;
         font-size: 0.95rem;
         font-weight: normal;
+      }
+
+      .cashier-internal-note textarea {
+        height: 4.2rem;
+        min-height: 4.2rem;
+        resize: vertical;
+        font-weight: 500;
       }
   
       .pay-btn {

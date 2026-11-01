@@ -6,6 +6,8 @@ import { VendorsListComponent } from './vendors-list/vendors-list.component';
 import { VendorHistoryComponent } from './vendor-history/vendor-history.component';
 import { VendorDepositDialogComponent } from './vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from './vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
+import { VendorGoodsReturnDialogComponent } from './vendor-goods-return-dialog/vendor-goods-return-dialog.component';
+import { VendorGoodsReturnsListComponent } from './vendor-goods-returns-list/vendor-goods-returns-list.component';
 import { VendorPaySupplierDialogModule } from './vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.module';
 import { VendorDeferredPaymentDialogModule } from './vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.module';
 import { VendorInstallmentPaymentDialogModule } from './vendor-installment-payment-dialog/vendor-installment-payment-dialog.module';
@@ -24,6 +26,8 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     VendorHistoryComponent,
     VendorDepositDialogComponent,
     VendorOpeningDebitDialogComponent,
+    VendorGoodsReturnDialogComponent,
+    VendorGoodsReturnsListComponent,
   ],
   imports: [
     CommonModule,

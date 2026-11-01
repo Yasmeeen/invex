@@ -4,7 +4,7 @@ const stockMovementSchema = new mongoose.Schema(
   {
     movementType: {
       type: String,
-      enum: ['transfer', 'sale', 'return', 'purchase'],
+      enum: ['transfer', 'sale', 'return', 'purchase', 'supplier_return'],
       required: true,
     },
     productId: {

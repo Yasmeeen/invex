@@ -1,0 +1,63 @@
+:host {
+  display: block;
+  overflow: visible;
+}
+
+.stock-count-start-dialog {
+  display: block;
+  overflow: visible;
+  padding: 1.15rem 1.25rem 1.1rem;
+  min-width: min(100%, 440px);
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e8ede9;
+  box-shadow:
+    0 4px 24px rgba(30, 77, 43, 0.08),
+    0 12px 40px rgba(15, 23, 42, 0.1);
+}
+
+/* Keep the menu under the field. appendTo="body" fights the shared ng-select placement. */
+.input-with-icon {
+  overflow: visible;
+
+  ::ng-deep ng-select.ng-select-opened {
+    z-index: 60 !important;
+  }
+
+  ::ng-deep ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
+  }
+}
+
+.stock-count-start-dialog__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.stock-count-start-dialog__lead {
+  margin: 0 0 0.9rem;
+  color: #6b7280;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.stock-count-start-dialog__radios {
+  display: flex;
+  gap: 1rem;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+  }
+}
+
+.stock-count-start-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}

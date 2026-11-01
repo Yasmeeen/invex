@@ -405,6 +405,9 @@
                   {{ 'tr_installment_sale_number' | translate }} #{{ order.installmentSaleNumber }}
                 </div>
                 <div>{{ order.orderNumber }}</div>
+                <div class="order-internal-note" *ngIf="order.internalNote">
+                  {{ order.internalNote }}
+                </div>
               </td>
               <td>
                 <span
@@ -553,6 +556,9 @@
                 <span class="settled-badge" *ngIf="isPayLaterSettledOrder(order)">
                   {{ payLaterSettledLabelKey(order) | translate }}
                 </span>
+              </div>
+              <div class="order-internal-note" *ngIf="order.internalNote">
+                {{ order.internalNote }}
               </div>
               <div class="order-card__client">
                 <button

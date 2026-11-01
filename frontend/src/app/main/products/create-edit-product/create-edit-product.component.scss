@@ -4,15 +4,27 @@
   overflow: visible;
 }
 
+::ng-deep .complex-modal .modal-wrapper:has(.ng-select-opened) .modal-body {
+  overflow: visible;
+}
+
 ::ng-deep .complex-modal .input-with-icon {
   ng-select.ng-select {
     position: relative;
     z-index: 3;
   }
 
-  /* Global `.s-select` forces `position: static` on the container, which breaks appendTo body placement (cashier uses the same override). */
+  ng-select.ng-select.ng-select-opened {
+    z-index: 60 !important;
+  }
+
+  /* Keep the menu under the field. appendTo on the modal root opens it as a floating popover. */
   ng-select.ng-select .ng-select-container {
     position: relative !important;
+  }
+
+  ng-select.ng-select .ng-dropdown-panel {
+    z-index: 70 !important;
   }
 
   .input-icon {

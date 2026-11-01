@@ -1,0 +1,150 @@
+<div class="vendor-goods-return-dialog bg-white">
+  <h2 mat-dialog-title class="vendor-goods-return-dialog__title">
+    {{ 'tr_vendor_goods_return_title' | translate }}
+    <span *ngIf="selectedVendor?.name as vendorName">— {{ vendorName }}</span>
+  </h2>
+
+  <div mat-dialog-content class="vendor-goods-return-dialog__body">
+    <p class="size-small text-muted">{{ 'tr_vendor_goods_return_hint' | translate }}</p>
+
+    <div class="form-group" *ngIf="showBranchPicker">
+      <label>{{ 'tr_branches' | translate }}</label>
+      <ng-select
+        class="s-control s-select"
+        [items]="branches"
+        bindLabel="name"
+        bindValue="_id"
+        [clearable]="false"
+        [ngModel]="branchId"
+        (ngModelChange)="onBranchChange($event)"
+        placeholder="{{ 'tr_branches' | translate }}"
+      >
+      </ng-select>
+    </div>
+
+    <div class="form-group" *ngIf="!vendorLocked">
+      <label>{{ 'tr_supplier' | translate }}</label>
+      <input
+        class="s-control width-100"
+        type="text"
+        [ngModel]="vendorSearchTerm"
+        (ngModelChange)="onVendorSearchInput($event)"
+        [placeholder]="'tr_vendor_goods_return_pick_supplier' | translate"
+      />
+      <p class="size-small text-muted m-0" *ngIf="vendorSearching">{{ 'tr_loading' | translate }}</p>
+      <div class="vendor-goods-return-dialog__results" *ngIf="vendorResults.length">
+        <button
+          type="button"
+          class="vendor-goods-return-dialog__result"
+          *ngFor="let vendor of vendorResults"
+          (mousedown)="$event.preventDefault(); pickVendor(vendor)"
+        >
+          <span>{{ vendor.name }}</span>
+          <span class="text-muted" *ngIf="vendor.nameOfcompany">{{ vendor.nameOfcompany }}</span>
+          <span class="text-muted" *ngIf="vendor.phone">{{ vendor.phone }}</span>
+        </button>
+      </div>
+      <p class="vendor-goods-return-dialog__picked" *ngIf="selectedVendor">
+        {{ selectedVendor.name }}
+        <span *ngIf="selectedVendor.nameOfcompany"> — {{ selectedVendor.nameOfcompany }}</span>
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label>{{ 'tr_vendor_goods_return_search' | translate }}</label>
+      <input
+        class="s-control width-100"
+        type="text"
+        [ngModel]="searchTerm"
+        (ngModelChange)="onSearchInput($event)"
+        [placeholder]="'tr_vendor_goods_return_search' | translate"
+      />
+    </div>
+
+    <p class="size-small text-muted m-0" *ngIf="searching">{{ 'tr_loading' | translate }}</p>
+
+    <div class="vendor-goods-return-dialog__results" *ngIf="results.length">
+      <button
+        type="button"
+        class="vendor-goods-return-dialog__result"
+        *ngFor="let product of results"
+          (mousedown)="$event.preventDefault(); pick(product)"
+      >
+        <span>{{ product.name }}</span>
+        <span class="text-muted" *ngIf="product.code">{{ product.code }}</span>
+        <span>{{ 'tr_vendor_goods_return_stock' | translate }}: {{ availableOf(product) }}</span>
+      </button>
+    </div>
+
+    <div class="vendor-goods-return-dialog__draft" *ngIf="draft">
+      <div class="size-small mb-2">
+        <strong>{{ draft.name }}</strong>
+        <span class="text-muted" *ngIf="draft.code"> — {{ draft.code }}</span>
+        <span class="text-muted">
+          ({{ 'tr_vendor_goods_return_stock' | translate }}: {{ availableOf(draft) }})
+        </span>
+      </div>
+      <div class="vendor-goods-return-dialog__draft-fields">
+        <div class="form-group m-0">
+          <label>{{ 'tr_vendor_goods_return_qty' | translate }}</label>
+          <input class="s-control width-100" type="number" min="0.001" step="1" [(ngModel)]="draftQty" />
+        </div>
+        <div class="form-group m-0">
+          <label>{{ 'tr_vendor_goods_return_unit_price' | translate }}</label>
+          <input class="s-control width-100" type="number" min="0.01" step="0.01" [(ngModel)]="draftPrice" />
+        </div>
+      </div>
+      <div class="flex gap-2 mt-2">
+        <button type="button" class="s-btn btn-primary" (click)="addLine()">
+          {{ 'tr_vendor_goods_return_add' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-secondary" (click)="clearDraft()">
+          {{ 'tr_cancel' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <div class="vendor-goods-return-lines mt-3" *ngIf="lines.length">
+      <div class="vendor-goods-return-lines__head">
+        <span>{{ 'tr_product_name' | translate }}</span>
+        <span>{{ 'tr_vendor_goods_return_qty' | translate }}</span>
+        <span>{{ 'tr_vendor_goods_return_unit_price' | translate }}</span>
+        <span>{{ 'tr_total' | translate }}</span>
+        <span></span>
+      </div>
+      <div class="vendor-goods-return-line" *ngFor="let line of lines">
+        <div class="vendor-goods-return-line__product">
+          <strong>{{ line.name }}</strong>
+          <span class="text-muted" *ngIf="line.code">{{ line.code }}</span>
+        </div>
+        <span class="vendor-goods-return-line__num">{{ line.quantity }}</span>
+        <span class="vendor-goods-return-line__num">{{ line.unitPrice | number:'1.2-2' }}</span>
+        <span class="vendor-goods-return-line__num">{{ lineTotal(line) | number:'1.2-2' }}</span>
+        <button type="button" class="s-btn btn-secondary btn-sm vendor-goods-return-line__remove" (click)="removeLine(line.productId)">
+          {{ 'tr_action.delete' | translate }}
+        </button>
+      </div>
+    </div>
+
+    <p class="size-small text-muted" *ngIf="!lines.length">{{ 'tr_vendor_goods_return_empty' | translate }}</p>
+
+    <div class="vendor-goods-return-dialog__summary" *ngIf="lines.length">
+      {{ 'tr_vendor_goods_return_total' | translate }}:
+      <strong>{{ total | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </div>
+
+    <div class="form-group mt-3">
+      <label>{{ 'tr_payment_note' | translate }}</label>
+      <textarea class="s-control width-100" rows="2" [(ngModel)]="note"></textarea>
+    </div>
+  </div>
+
+  <div class="vendor-goods-return-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()" [disabled]="saving">
+      {{ 'tr_cancel' | translate }}
+    </button>
+    <button type="button" class="s-btn btn-primary" (click)="submit()" [disabled]="saving || !lines.length || !selectedVendor">
+      {{ 'tr_vendor_goods_return' | translate }}
+    </button>
+  </div>
+</div>

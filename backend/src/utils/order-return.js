@@ -7,9 +7,11 @@ import { isClientCreditOrder } from './client-order-utils.js';
 import {
   buildSalesRefundPaymentSplits,
   finalizeSalesRefundSplits,
+  normalizeCustomRefundSplits,
   salesCreditAdjustment,
   salesRefundCashDue,
 } from './return-refund-mirror.js';
+import { assertRefundMethodsLinkedToAccounts } from './treasury-ledger.js';
 import { getEffectivePurchaseTreasuryMethodsFromDb, treasuryMethodMap } from '../modules/settings_module/treasuryMethods.js';
 import { netSettlementFeesOnPaymentSplits } from './treasury-ledger.js';
 import {
@@ -409,13 +411,28 @@ export async function processOrderReturn(order, body = {}) {
   const tMap = treasuryMethodMap(treasuryMethods);
   const cashViaRaw = String(body.cashRefundVia || 'drawer').toLowerCase();
   const cashTreasuryKey = String(body.cashTreasuryKey || '').trim().toLowerCase();
+  const customSplits = normalizeCustomRefundSplits(body.refundPaymentSplits);
+
+  if (customSplits) {
+    if (cashRefundDue <= 0.001) {
+      throw new Error('Nothing to refund in cash on this invoice');
+    }
+    const splitSum = round2(customSplits.reduce((a, s) => a + s.amount, 0));
+    if (Math.abs(splitSum - cashRefundDue) > 0.02) {
+      throw new Error('Refund allocation must equal the refund total');
+    }
+    await assertRefundMethodsLinkedToAccounts(customSplits.map((s) => s.method));
+    refundPaymentSplits = customSplits.map((s) => ({ method: s.method, amount: s.amount }));
+    refundTreasurySplits = undefined;
+    cashRefundVia = 'drawer';
+  }
 
   if (creditOrder) {
     const currentTotal = round2(Number(order.totalPrice) || 0);
     const newTotal = round2(Math.max(0, currentTotal - refundTotal));
     const alreadyPaid = round2(Number(order.amountPaid) || 0);
 
-    if (cashRefundDue > 0.001) {
+    if (!customSplits && cashRefundDue > 0.001) {
       const baseSplits = await netSettlementFeesOnPaymentSplits(
         buildSalesRefundPaymentSplits(order, cashRefundDue),
         order.payments
@@ -429,6 +446,8 @@ export async function processOrderReturn(order, body = {}) {
       refundPaymentSplits = finalized.refundPaymentSplits || [];
       refundTreasurySplits = finalized.refundTreasurySplits;
       cashRefundVia = finalized.cashRefundVia;
+    }
+    if (cashRefundDue > 0.001) {
       order.amountPaid = round2(alreadyPaid - cashRefundDue);
     }
 
@@ -437,7 +456,7 @@ export async function processOrderReturn(order, body = {}) {
       order.subtotalPrice = round2(Math.max(0, Number(order.subtotalPrice) - refundTotal));
     }
     recalcPaymentStatus(order);
-  } else {
+  } else if (!customSplits) {
     const baseSplits = await netSettlementFeesOnPaymentSplits(
       buildSalesRefundPaymentSplits(order, refundTotal),
       order.payments
@@ -460,6 +479,11 @@ export async function processOrderReturn(order, body = {}) {
       throw new Error('Refund allocation must equal the refund total');
     }
 
+    order.totalPrice = round2(Math.max(0, (Number(order.totalPrice) || 0) - refundTotal));
+    if (order.subtotalPrice != null) {
+      order.subtotalPrice = round2(Math.max(0, Number(order.subtotalPrice) - refundTotal));
+    }
+  } else {
     order.totalPrice = round2(Math.max(0, (Number(order.totalPrice) || 0) - refundTotal));
     if (order.subtotalPrice != null) {
       order.subtotalPrice = round2(Math.max(0, Number(order.subtotalPrice) - refundTotal));

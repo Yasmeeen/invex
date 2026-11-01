@@ -616,6 +616,23 @@ export async function postPaymentMethodInflows({
   return created;
 }
 
+/** Reject refund methods that would not hit a cash drawer or linked money account. */
+export async function assertRefundMethodsLinkedToAccounts(methods) {
+  const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
+  for (const method of methods || []) {
+    const key = String(method || '')
+      .trim()
+      .toLowerCase();
+    if (!key || key === 'cash') continue;
+    const accountKey = spendAccountKeyForSplit(key, moneyAccounts, paymentMethodAccountMap);
+    if (!accountKey) {
+      const err = new Error(`Refund method is not linked to a money account: ${key}`);
+      err.status = 400;
+      throw err;
+    }
+  }
+}
+
 function spendAccountKeyForSplit(splitKey, moneyAccounts, paymentMethodAccountMap) {
   const key = String(splitKey || '')
     .trim()
@@ -1114,8 +1131,7 @@ export async function postRefundPaymentLinesToLedger({
   occurredAt,
 } = {}) {
   if (!branchId || !Array.isArray(refundPaymentSplits) || !refundPaymentSplits.length) return [];
-  const { paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
-  const map = paymentMethodToAccountMap(paymentMethodAccountMap);
+  const { moneyAccounts, paymentMethodAccountMap } = await getEffectiveMoneyAccountsFromDb();
   const created = [];
   for (const s of refundPaymentSplits) {
     const method = String(s?.method || '')
@@ -1123,7 +1139,7 @@ export async function postRefundPaymentLinesToLedger({
       .toLowerCase();
     const amt = round2(s?.amount);
     if (!method || method === 'credit' || amt <= 0) continue;
-    const accountKey = method === 'cash' ? 'cash' : map.get(method);
+    const accountKey = spendAccountKeyForSplit(method, moneyAccounts, paymentMethodAccountMap);
     if (!accountKey) continue;
     const entry = await recordTreasuryLedgerEntry({
       branchId,

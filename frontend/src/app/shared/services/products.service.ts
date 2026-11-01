@@ -145,6 +145,14 @@ constructor(
 getProducts(params: any) {
   return this.http.get(PRODUCTS_URL, { params: params });
 }
+
+/** True when this unit price is at or below the product purchase cost. Does not return the cost. */
+checkSaleAgainstPurchase(productId: string, unitPrice: number): Observable<{ atOrBelowPurchase: boolean }> {
+  return this.http.post<{ atOrBelowPurchase: boolean }>(`${PRODUCTS_URL}/sale-price-check`, {
+    productId,
+    unitPrice,
+  });
+}
   /**
    * Next suggested code(s) for the category (e.g. ELEC-001).
    * With count > 1 returns `{ codes }`; otherwise `{ code }`.

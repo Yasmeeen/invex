@@ -10,6 +10,14 @@
     <div class="btn-group flex flex-middle gap-sm">
       <button
         type="button"
+        class="s-btn btn-primary size-body"
+        *ngIf="!loading && vendor"
+        (click)="openGoodsReturnDialog()"
+      >
+        {{ 'tr_vendor_goods_return' | translate }}
+      </button>
+      <button
+        type="button"
         class="s-btn btn-secondary size-body"
         *ngIf="!loading && history"
         [disabled]="exportingPdf"
@@ -116,6 +124,10 @@
             <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromSales || 0) > 0">
               {{ 'tr_vendor_debit_from_sales' | translate }}:
               {{ history.owesFromSales | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
+            </p>
+            <p class="size-small text-muted m-0 mt-1" *ngIf="(history.owesFromGoodsReturns || 0) > 0">
+              {{ 'tr_vendor_debit_from_goods_return' | translate }}:
+              {{ history.owesFromGoodsReturns | currency:'EGP':'symbol':'1.2-2':'en-EG' }}
             </p>
           </div>
         </div>

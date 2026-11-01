@@ -22,6 +22,7 @@ import {
     getProductHistory,
     getProductSerialTrack,
     getProductsInventoryAudit,
+    checkSalePriceAgainstPurchase,
     getEcommerceVariantGroup,
     joinEcommerceVariantGroup,
     leaveEcommerceVariantGroup,
@@ -55,6 +56,7 @@ router.post('/:id/ecommerce-variant-group/re-suggest', reSuggestEcommerceVariant
 router.get('/:id', getProductById);        // GET one by ID
 router.post('/createProduct', createProduct);           // POST create
 router.post('/import-excel', importProductsFromExcelRows);
+router.post('/sale-price-check', checkSalePriceAgainstPurchase);
 router.put('/:id', updateProduct);         // PUT update
 router.patch('/:id/price', updateProductPrice);
 router.delete('/deleteProduct/:id', deleteProduct);      // DELETE product

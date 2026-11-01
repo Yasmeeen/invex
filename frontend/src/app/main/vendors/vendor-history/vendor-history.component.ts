@@ -22,6 +22,7 @@ import { normalizeMongoId } from '@core/utils/mongo-id.util';
 import { isPayLaterMethod, orderDisplayRemaining } from '@core/utils/order-display.util';
 import { VendorDepositDialogComponent } from '../vendor-deposit-dialog/vendor-deposit-dialog.component';
 import { VendorOpeningDebitDialogComponent } from '../vendor-opening-debit-dialog/vendor-opening-debit-dialog.component';
+import { VendorGoodsReturnDialogComponent } from '../vendor-goods-return-dialog/vendor-goods-return-dialog.component';
 import { VendorPaySupplierDialogComponent } from '../vendor-pay-supplier-dialog/vendor-pay-supplier-dialog.component';
 import { VendorDeferredPaymentDialogComponent } from '../vendor-deferred-payment-dialog/vendor-deferred-payment-dialog.component';
 import { VendorInstallmentPaymentDialogComponent } from '../vendor-installment-payment-dialog/vendor-installment-payment-dialog.component';
@@ -349,6 +350,30 @@ export class VendorHistoryComponent implements OnInit, OnDestroy {
     });
   }
 
+  openGoodsReturnDialog(): void {
+    if (!this.vendor) return;
+    if (!this.paymentBranchId) {
+      this.notify.push(this.translate.instant('tr_branch_required'), 'error');
+      return;
+    }
+    this.dialog
+      .open(VendorGoodsReturnDialogComponent, {
+        width: '560px',
+        maxWidth: '96vw',
+        panelClass: 'vendor-goods-return-dialog-panel',
+        backdropClass: 'vendor-goods-return-dialog-backdrop',
+        data: {
+          vendor: this.vendor,
+          branchId: this.paymentBranchId,
+        },
+        disableClose: true,
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) this.afterBalanceChange();
+      });
+  }
+
   openDepositDialog(): void {
     if (!this.vendor) return;
     if (!this.paymentBranchId) {
@@ -396,6 +421,8 @@ export class VendorHistoryComponent implements OnInit, OnDestroy {
         return this.translate.instant('tr_vendor_ledger_deferred');
       case 'purchase_deferred_paid':
         return this.translate.instant('tr_vendor_ledger_deferred_paid');
+      case 'goods_return':
+        return this.translate.instant('tr_vendor_ledger_goods_return');
       default:
         return type;
     }

@@ -78,6 +78,12 @@ const vendorSchema = new mongoose.Schema(
      */
     openingDebitBalance: { type: Number, default: 0, min: 0 },
 
+    /**
+     * Goods returned to the supplier that could not be applied to purchase payables.
+     * Supplier owes us this amount (مدين). Reduced by balance settlement.
+     */
+    goodsReturnDebitBalance: { type: Number, default: 0, min: 0 },
+
     /** Audit trail: deposits, settlements, order payments. */
     ledgerEntries: [
       {
@@ -94,6 +100,7 @@ const vendorSchema = new mongoose.Schema(
             'purchase_installment_paid',
             'purchase_deferred',
             'purchase_deferred_paid',
+            'goods_return',
           ],
           required: true,
         },

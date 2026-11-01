@@ -151,8 +151,7 @@ restoreOrder(
     cashRefundVia?: 'drawer' | 'treasury';
     cashTreasuryKey?: string;
     cashTreasuryLabel?: string;
-    /** @deprecated Server computes refund splits from original payment. */
-    refundPaymentSplits?: { method: string; amount: number }[];
+    refundPaymentSplits?: { method: string; amount: number; label?: string }[];
   } = {}
 ): Observable<any> {
   return this.http.put(`${ORDERS_URL}/${orderId}/restore`, payload);

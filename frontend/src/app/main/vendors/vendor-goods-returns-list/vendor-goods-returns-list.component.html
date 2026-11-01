@@ -1,0 +1,115 @@
+<div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">
+      <span class="text-primary">{{ totalCount }}-</span>
+      {{ 'tr_vendor_goods_returns_menu' | translate }}
+    </span>
+    <div class="btn-group">
+      <button type="button" class="s-btn btn-primary" (click)="openGoodsReturnDialog()">
+        {{ 'tr_vendor_goods_return' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary" aria-hidden="true"></i>
+      </button>
+    </div>
+  </h2>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="vendor-returns-filters">
+      <div class="vendor-returns-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_supplier' | translate }}</label>
+          <input
+            class="s-control width-100"
+            [(ngModel)]="searchTerm"
+            (keyup.enter)="applyFilters()"
+            [placeholder]="'tr_search' | translate"
+          />
+        </div>
+      </div>
+      <div class="vendor-returns-filters__field" *ngIf="showBranchPicker">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_branches' | translate }}</label>
+          <ng-select
+            class="s-control s-select"
+            [items]="branches"
+            bindLabel="name"
+            bindValue="_id"
+            [clearable]="true"
+            [(ngModel)]="filterBranchId"
+            [placeholder]="'tr_branches' | translate"
+          ></ng-select>
+        </div>
+      </div>
+      <div class="vendor-returns-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_from' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateFrom" />
+        </div>
+      </div>
+      <div class="vendor-returns-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_to' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateTo" />
+        </div>
+      </div>
+      <div class="vendor-returns-filters__actions">
+        <button type="button" class="s-btn btn-secondary" (click)="applyFilters()">
+          {{ 'tr_apply' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-secondary" (click)="clearFilters()">
+          {{ 'tr_clear' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4 mt-4" *ngIf="!loading">
+    <div class="table-container vendor-returns-table" *ngIf="rows.length">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_date' | translate }}</th>
+            <th>{{ 'tr_supplier' | translate }}</th>
+            <th>{{ 'tr_branches' | translate }}</th>
+            <th>{{ 'tr_vendor_goods_return_total' | translate }}</th>
+            <th>{{ 'tr_vendor_goods_returns_items' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of rows">
+            <td class="vendor-returns-nowrap">{{ formatWhen(row.createdAt) }}</td>
+            <td>
+              <a [routerLink]="['/suppliers', row.vendorId, 'history']">{{ vendorLabel(row) }}</a>
+            </td>
+            <td>{{ row.branchName || '—' }}</td>
+            <td class="vendor-returns-nowrap">{{ row.amount | number:'1.2-2' }}</td>
+            <td class="vendor-returns-details">
+              <div *ngFor="let line of row.lines">
+                {{ line.name }} × {{ line.quantity }}
+              </div>
+              <p class="text-muted size-small m-0" *ngIf="row.note">{{ row.note }}</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state-here text-center ptb-8" *ngIf="rows.length === 0">
+      <i class="fa fa-folder-open empty-icon text-primary"></i>
+      <p>{{ 'tr_vendor_goods_returns_empty' | translate }}</p>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      ></pagination>
+    </div>
+  </div>
+
+  <div *ngIf="loading">
+    <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
+  </div>
+</div>

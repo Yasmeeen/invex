@@ -222,6 +222,35 @@ export function salesRefundCashDue(order, refundTotal) {
   return round2(Math.max(0, alreadyPaid - newTotal));
 }
 
+const BLOCKED_REFUND_METHODS = new Set(['credit', 'installment', 'deferred', 'mixed']);
+
+/**
+ * Cashier-chosen refund lines. Returns null when the client did not send a split
+ * (caller keeps the original-payment mirror).
+ * @returns {{ method: string, label: string, amount: number }[] | null}
+ */
+export function normalizeCustomRefundSplits(raw) {
+  if (!Array.isArray(raw) || !raw.length) return null;
+  const byMethod = new Map();
+  for (const row of raw) {
+    const method = normalizePayMethod(row?.method || row?.key);
+    const amount = round2(row?.amount);
+    if (!method || amount <= 0) continue;
+    if (BLOCKED_REFUND_METHODS.has(method)) {
+      throw new Error('Credit and installment cannot be used as refund methods');
+    }
+    const label = String(row?.label || '').trim();
+    const prev = byMethod.get(method);
+    byMethod.set(method, {
+      method,
+      label: label || prev?.label || method,
+      amount: round2((prev?.amount || 0) + amount),
+    });
+  }
+  const splits = [...byMethod.values()];
+  return splits.length ? splits : null;
+}
+
 export function salesCreditAdjustment(order, refundTotal) {
   if (!isClientCreditOrder(order)) return 0;
   const currentTotal = round2(Number(order.totalPrice) || 0);

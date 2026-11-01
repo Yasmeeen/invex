@@ -1,0 +1,292 @@
+<div class="stock-session" not-authorized [notAuthorized]="isNotAuthorized">
+  <header class="stock-session__head" *ngIf="count">
+    <div class="stock-session__identity">
+      <h2>{{ 'tr_stock_count_title' | translate }}</h2>
+      <p class="stock-session__crumb">
+        <a routerLink="/stock-count">{{ 'tr_stock_count_crumb_inventory' | translate }}</a>
+        <span>/</span>
+        <a routerLink="/stock-count">{{ 'tr_stock_count_crumb_list' | translate }}</a>
+      </p>
+      <div class="stock-session__meta">
+        <span class="stock-session__status" [class.stock-session__status--open]="isOpen">
+          <i></i>
+          {{ (isOpen ? 'tr_stock_count_status_open' : 'tr_stock_count_status_completed') | translate }}
+        </span>
+        <span class="stock-session__meta-text">{{ formatSessionWhen(count.startedAt) }}</span>
+        <span class="stock-session__meta-text">
+          <i class="fa fa-archive" aria-hidden="true"></i>
+          {{ locationLabel() }}
+        </span>
+      </div>
+      <p class="stock-session__note" *ngIf="count.note">{{ count.note }}</p>
+      <p class="stock-session__closed" *ngIf="!isOpen">{{ 'tr_stock_count_closed_banner' | translate }}</p>
+    </div>
+
+    <div class="stock-session__actions" *ngIf="!isOpen">
+      <a class="stock-session__back" routerLink="/stock-count">
+        <i class="fa fa-arrow-left rtl-rotate" aria-hidden="true"></i>
+        {{ 'tr_stock_count_back' | translate }}
+      </a>
+    </div>
+    <div class="stock-session__actions" *ngIf="isOpen">
+      <button type="button" class="stock-session__finish" (click)="confirmFinish()">
+        <i class="fa fa-check" aria-hidden="true"></i>
+        {{ 'tr_stock_count_finish' | translate }}
+      </button>
+      <button type="button" class="stock-session__draft" (click)="saveDraft()">
+        <i class="fa fa-save" aria-hidden="true"></i>
+        {{ 'tr_stock_count_save_draft' | translate }}
+      </button>
+      <div class="stock-session__more">
+        <button type="button" class="stock-session__more-btn" (click)="toggleMenu($event)" [attr.aria-label]="'tr_stock_count_more' | translate">
+          <i class="fa fa-ellipsis-h" aria-hidden="true"></i>
+        </button>
+        <div class="stock-session__menu" *ngIf="menuOpen" (click)="$event.stopPropagation()">
+          <button type="button" (click)="confirmDelete()">{{ 'tr_stock_count_delete' | translate }}</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div *ngIf="count">
+    <div class="stock-session__stats">
+      <article class="stat-card">
+        <div>
+          <span>{{ 'tr_stock_count_expected' | translate }}</span>
+          <strong>{{ count.summary?.expectedUnits || 0 }}</strong>
+        </div>
+        <i class="fa fa-cube stat-card__icon stat-card__icon--system" aria-hidden="true"></i>
+      </article>
+      <article class="stat-card">
+        <div>
+          <span>{{ 'tr_stock_count_counted' | translate }}</span>
+          <strong>{{ count.summary?.countedUnits || 0 }}</strong>
+        </div>
+        <i class="fa fa-qrcode stat-card__icon stat-card__icon--scanned" aria-hidden="true"></i>
+      </article>
+      <article class="stat-card">
+        <div>
+          <span>{{ 'tr_stock_count_shortage' | translate }}</span>
+          <strong class="stat-card__num--shortage">{{ count.summary?.shortageUnits || 0 }}</strong>
+        </div>
+        <i class="fa fa-exclamation-triangle stat-card__icon stat-card__icon--shortage" aria-hidden="true"></i>
+      </article>
+      <article class="stat-card">
+        <div>
+          <span>{{ 'tr_stock_count_surplus' | translate }}</span>
+          <strong class="stat-card__num--surplus">{{ count.summary?.surplusUnits || 0 }}</strong>
+        </div>
+        <i class="fa fa-plus-circle stat-card__icon stat-card__icon--surplus" aria-hidden="true"></i>
+      </article>
+    </div>
+
+    <section class="progress-card">
+      <div class="progress-card__top">
+        <span>{{ 'tr_stock_count_progress' | translate }}</span>
+        <strong>{{ progressPercent }}%</strong>
+      </div>
+      <div class="progress-card__track" aria-hidden="true">
+        <div class="progress-card__fill" [style.width.%]="progressPercent"></div>
+      </div>
+      <p>
+        {{
+          'tr_stock_count_progress_of'
+            | translate: { counted: count.summary?.countedUnits || 0, expected: count.summary?.expectedUnits || 0 }
+        }}
+      </p>
+    </section>
+
+    <section class="scan-card" *ngIf="isOpen">
+      <div class="scan-card__head">
+        <h3>{{ 'tr_stock_count_scan_title' | translate }}</h3>
+        <i class="fa fa-barcode" aria-hidden="true"></i>
+      </div>
+      <form (ngSubmit)="submitScan()">
+        <div class="scan-card__row">
+          <input
+            id="stock-count-scan"
+            #scanInput
+            type="text"
+            name="scanCode"
+            [(ngModel)]="scanCode"
+            [placeholder]="'tr_stock_count_scan_placeholder' | translate"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            (input)="onScanInput()"
+          />
+          <button type="submit" [disabled]="scanning">Enter</button>
+        </div>
+      </form>
+      <p class="scan-card__ok" *ngIf="feedback?.tone === 'ok'">
+        <i class="fa fa-check-circle" aria-hidden="true"></i>
+        {{ feedback?.text }}
+      </p>
+      <p class="scan-card__warn" *ngIf="feedback && feedback.tone !== 'ok'">{{ feedback?.text }}</p>
+    </section>
+
+    <section class="lines-card">
+      <div class="lines-card__tabs" role="tablist">
+        <button type="button" [class.is-active]="section === 'all'" (click)="setSection('all')">
+          {{ 'tr_stock_count_all' | translate }}
+          <span>({{ count.summary?.expectedUnits || 0 }})</span>
+        </button>
+        <button type="button" [class.is-active]="section === 'scanned'" (click)="setSection('scanned')">
+          {{ 'tr_stock_count_tab_scanned' | translate }}
+          <span>({{ count.summary?.countedUnits || 0 }})</span>
+        </button>
+        <button type="button" class="is-shortage" [class.is-active]="section === 'shortage'" (click)="setSection('shortage')">
+          {{ 'tr_stock_count_tab_shortage' | translate }}
+          <span>({{ count.summary?.shortageUnits || 0 }})</span>
+        </button>
+        <button type="button" class="is-surplus" [class.is-active]="section === 'surplus'" (click)="setSection('surplus')">
+          {{ 'tr_stock_count_tab_surplus' | translate }}
+          <span>({{ count.summary?.surplusUnits || 0 }})</span>
+        </button>
+      </div>
+
+      <div class="lines-card__tools">
+        <label class="lines-search">
+          <i class="fa fa-search" aria-hidden="true"></i>
+          <input
+            type="search"
+            name="lineSearch"
+            [(ngModel)]="search"
+            [placeholder]="'tr_stock_count_search' | translate"
+            (input)="onSearchInput()"
+          />
+        </label>
+        <div class="lines-filter">
+          <button type="button" (click)="toggleFilter($event)">
+            <i class="fa fa-filter" aria-hidden="true"></i>
+            {{ 'tr_stock_count_filter' | translate }}
+          </button>
+          <div class="lines-filter__menu" *ngIf="filterOpen" (click)="$event.stopPropagation()">
+            <button type="button" [class.is-on]="!categoryFilter" (click)="setCategory('')">
+              {{ 'tr_stock_count_filter_all' | translate }}
+            </button>
+            <button
+              type="button"
+              *ngFor="let category of count.categories"
+              [class.is-on]="categoryFilter === category.name"
+              (click)="setCategory(category.name)"
+            >
+              {{ category.name }}
+            </button>
+          </div>
+        </div>
+        <button type="button" class="lines-export" (click)="exportLines()" [disabled]="exporting">
+          <i class="fa fa-download" aria-hidden="true"></i>
+          {{ 'tr_stock_count_export' | translate }}
+        </button>
+      </div>
+
+      <div class="lines-table-wrap" *ngIf="!loading && lines.length > 0" [class.is-busy]="loadingLines">
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th>{{ 'tr_stock_count_product' | translate }}</th>
+              <th>{{ 'tr_stock_count_code' | translate }}</th>
+              <th>{{ 'tr_stock_count_categories' | translate }}</th>
+              <th *ngIf="showQtyColumns">{{ 'tr_stock_count_qty_expected' | translate }}</th>
+              <th *ngIf="showQtyColumns">{{ 'tr_stock_count_qty_scanned' | translate }}</th>
+              <th *ngIf="showQtyColumns">{{ 'tr_stock_count_qty_diff' | translate }}</th>
+              <th *ngIf="section === 'surplus'">{{ 'tr_stock_count_reason' | translate }}</th>
+              <th *ngIf="!showQtyColumns">{{ 'tr_stock_count_scanned_at' | translate }}</th>
+              <th>{{ 'tr_stock_count_actions' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of lines">
+              <td>
+                <div class="device-cell">
+                  <img *ngIf="line.imageUrl" [src]="line.imageUrl" alt="" />
+                  <span class="device-cell__fallback" *ngIf="!line.imageUrl">
+                    <i class="fa fa-mobile" aria-hidden="true"></i>
+                  </span>
+                  <span>
+                    <strong>{{ line.name || line.rawCode || '—' }}</strong>
+                    <small *ngIf="line.subtitle">{{ line.subtitle }}</small>
+                  </span>
+                </div>
+              </td>
+              <td class="lines-code">{{ line.code || line.rawCode || '—' }}</td>
+              <td><span class="cat-pill">{{ line.categoryName || '—' }}</span></td>
+              <td *ngIf="showQtyColumns">{{ line.expectedQty }}</td>
+              <td *ngIf="showQtyColumns">{{ line.scannedQty }}</td>
+              <td *ngIf="showQtyColumns">
+                <div class="diff" [class.diff--down]="lineDiff(line) < 0" [class.diff--up]="lineDiff(line) > 0">
+                  <span>{{ lineDiff(line) }}</span>
+                  <em *ngIf="lineDiff(line) < 0">{{ 'tr_stock_count_badge_shortage' | translate }}</em>
+                  <em *ngIf="lineDiff(line) > 0" class="diff__up">{{ 'tr_stock_count_badge_surplus' | translate }}</em>
+                </div>
+              </td>
+              <td *ngIf="section === 'surplus'">{{ reasonLabel(line.reason) }}</td>
+              <td *ngIf="!showQtyColumns">{{ formatWhen(line.scannedAt) }}</td>
+              <td>
+                <div class="line-actions">
+                  <a
+                    *ngIf="canTrack && (line.code || line.rawCode)"
+                    class="line-actions__view"
+                    [routerLink]="['/products/serial-track']"
+                    [queryParams]="{ code: line.code || line.rawCode }"
+                  >
+                    <i class="fa fa-eye" aria-hidden="true"></i>
+                    {{ 'tr_stock_count_view_serials' | translate }}
+                  </a>
+                  <button
+                    type="button"
+                    class="line-actions__remove"
+                    *ngIf="isOpen && line.scanId"
+                    (click)="removeScan(line)"
+                  >
+                    {{ 'tr_stock_count_remove_scan' | translate }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="lines-empty" *ngIf="!loading && lines.length === 0">
+        <p>{{ emptyKey() | translate }}</p>
+      </div>
+
+      <footer class="lines-foot" *ngIf="paginationData && paginationData.totalCount > 0">
+        <p class="lines-foot__note">
+          <i class="fa fa-info-circle" aria-hidden="true"></i>
+          {{ 'tr_stock_count_live_note' | translate }}
+        </p>
+        <div class="lines-foot__pager" *ngIf="paginationData.totalPages > 1">
+          <button type="button" (click)="paginationUpdate(page - 1)" [disabled]="page <= 1">
+            <i class="fa fa-angle-right" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            *ngFor="let n of pageList"
+            [class.is-on]="n === page"
+            (click)="paginationUpdate(n)"
+          >
+            {{ n }}
+          </button>
+          <button
+            type="button"
+            (click)="paginationUpdate(page + 1)"
+            [disabled]="page >= paginationData.totalPages"
+          >
+            <i class="fa fa-angle-left" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p class="lines-foot__range">
+          {{ 'tr_stock_count_range' | translate: { from: rangeFrom, to: rangeTo, total: paginationData.totalCount } }}
+        </p>
+      </footer>
+    </section>
+  </div>
+
+  <div *ngIf="loading">
+    <app-ghost-line [length]="10" [type]="'table'"></app-ghost-line>
+  </div>
+</div>

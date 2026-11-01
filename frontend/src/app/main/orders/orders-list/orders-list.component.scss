@@ -284,6 +284,20 @@
   background: rgba(204, 251, 241, 0.95);
 }
 
+.order-internal-note {
+  margin-top: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #6d4c41;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .order-installment-meta {
   margin-top: 0.25rem;
   font-size: 11px;

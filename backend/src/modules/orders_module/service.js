@@ -529,7 +529,7 @@ export const getOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .select(
-          'orderNumber installmentSaleNumber partyType vendorId clientId clientName clientPhoneNumber clientAddress sellerName isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt source ecommerceOrderId ecommerceOrderNumber returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
+          'orderNumber installmentSaleNumber partyType vendorId clientId clientName clientPhoneNumber clientAddress sellerName internalNote isDelivery deliveryPersonName paymentMethod subtotalPrice invoiceDiscountAmount totalPrice creditFeePercent creditFeeAmount amountPaid paymentStatus numberOfProducts status createdAt source ecommerceOrderId ecommerceOrderNumber returns products.productId products.name products.code products.quantity products.saleUnit products.weightUnit products.returnedQuantity products.price products.showProductCodeOnInvoice products.invoiceAttributes installmentPlanId installmentPlanSnapshot installmentStartDate installmentPrincipal installmentInterestAmount installments.amount installments.paid installments.paidAmount'
         )
         .populate('branch', 'name')
         .sort(sortSpec)
@@ -582,6 +582,7 @@ export const createOrder = async (req, res) => {
     clientName,
     clientPhoneNumber,
     sellerName,
+    internalNote: internalNoteRaw,
     clientAddress,
     paymentMethod,
     branch,
@@ -1438,6 +1439,9 @@ export const createOrder = async (req, res) => {
           clientPhoneNumber: saleClientPhone,
           clientAddress: saleClientAddress,
           sellerName: resolvedSellerName,
+          ...(String(internalNoteRaw || '').trim()
+            ? { internalNote: String(internalNoteRaw).trim().slice(0, 500) }
+            : {}),
           ...(isDelivery
             ? {
                 isDelivery: true,
@@ -2199,6 +2203,7 @@ export const restoreOrder = async (req, res) => {
         cashRefundVia: body.cashRefundVia,
         cashTreasuryKey: body.cashTreasuryKey,
         cashTreasuryLabel: body.cashTreasuryLabel,
+        refundPaymentSplits: body.refundPaymentSplits,
       });
     } else {
       result = await processFullOrderRestore(order, {
@@ -2258,7 +2263,19 @@ export const restoreOrder = async (req, res) => {
   } catch (error) {
     console.error('❌ Error restoring order:', error);
     const msg = error?.message || 'Server error restoring order';
-    const status = msg.includes('not found') ? 404 : msg.includes('already') ? 400 : 500;
+    const status =
+      Number(error?.status) ||
+      (msg.includes('not found')
+        ? 404
+        : msg.includes('already') ||
+            msg.includes('must equal') ||
+            msg.includes('cannot') ||
+            msg.includes('Invalid') ||
+            msg.includes('Nothing') ||
+            msg.includes('Valid') ||
+            msg.includes('Refund')
+          ? 400
+          : 500);
     res.status(status).json({ error: msg, details: error.message });
   }
 };

@@ -13,6 +13,8 @@ import {
   recordVendorDeferredPurchasePayment,
   recordVendorInstallmentPurchasePayment,
   payVendorSupplier,
+  returnGoodsToVendor,
+  listVendorGoodsReturns,
   createVendor,
   updateVendor,
   deleteVendor,
@@ -29,6 +31,8 @@ router.post('/:id/opening-debit-payment', payVendorOpeningDebitBalance);
 router.post('/:id/deferred-payment', recordVendorDeferredPurchasePayment);
 router.post('/:id/installment-payment', recordVendorInstallmentPurchasePayment);
 router.post('/:id/pay-supplier', payVendorSupplier);
+router.get('/goods-returns', listVendorGoodsReturns);
+router.post('/:id/goods-return', returnGoodsToVendor);
 router.get('/:id', getVendorById);
 router.post('/createVendor', createVendor);
 router.put('/updateVendor/:id', updateVendor);

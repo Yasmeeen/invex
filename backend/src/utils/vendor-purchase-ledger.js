@@ -426,6 +426,66 @@ export async function applyInstallmentSettlementCredit(request, payAmount, { use
   return applied;
 }
 
+/**
+ * Apply a supplier goods-return credit to unpaid purchase payables (deferred, then installments).
+ * Does not write payment ledger rows — the goods-return entry is the audit record.
+ * @returns {Promise<{ applied: number, deferredRequestIds: string[] }>}
+ */
+export async function applyGoodsReturnAgainstPayables(vendorId, amount, { session } = {}) {
+  let remaining = Math.round(Number(amount) * 100) / 100;
+  if (remaining <= 0) return { applied: 0, deferredRequestIds: [] };
+
+  const q = (query) => (session ? query.session(session) : query);
+  const requests = await q(
+    PurchasingRequest.find({
+      supplier: vendorId,
+      paymentStatus: { $in: ['Deferred', 'Installments'] },
+    }).sort({ requestDate: 1 })
+  );
+
+  let totalApplied = 0;
+  const deferredRequestIds = [];
+
+  for (const req of requests) {
+    if (remaining <= 0) break;
+    if (req.paymentStatus !== 'Deferred') continue;
+    const due = deferredPurchaseRemaining(req);
+    const applied = Math.min(remaining, due);
+    if (applied <= 0) continue;
+    req.amountPaid = Math.round(((Number(req.amountPaid) || 0) + applied) * 100) / 100;
+    await req.save(session ? { session } : undefined);
+    deferredRequestIds.push(String(req._id));
+    remaining = Math.round((remaining - applied) * 100) / 100;
+    totalApplied = Math.round((totalApplied + applied) * 100) / 100;
+  }
+
+  for (const req of requests) {
+    if (remaining <= 0) break;
+    if (req.paymentStatus !== 'Installments') continue;
+
+    let changed = false;
+    for (const inst of req.installments || []) {
+      if (remaining <= 0) break;
+      if (inst.paid) continue;
+      const instAmount = Math.round((Number(inst.amount) || 0) * 100) / 100;
+      if (instAmount <= 0) continue;
+      const applied = Math.min(remaining, instAmount);
+      const next = Math.round((instAmount - applied) * 100) / 100;
+      inst.amount = next <= 0.001 ? 0 : next;
+      if (next <= 0.001) inst.paid = true;
+      changed = true;
+      remaining = Math.round((remaining - applied) * 100) / 100;
+      totalApplied = Math.round((totalApplied + applied) * 100) / 100;
+    }
+    if (changed) {
+      req.markModified('installments');
+      await req.save(session ? { session } : undefined);
+    }
+  }
+
+  return { applied: totalApplied, deferredRequestIds };
+}
+
 /** Reduce purchase payables (deferred + installments) via settlement netting. */
 export async function applyPurchasePayableSettlement(vendorId, amount, { userId, note } = {}) {
   let remaining = Math.round(Number(amount) * 100) / 100;

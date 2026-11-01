@@ -10,16 +10,16 @@ import { OrdersSerivce } from '@shared/services/orders.service';
 import { ProductPurchaseRequestsService } from '@shared/services/product-purchase-requests.service';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import {
-  applyCashViaToPreview,
+  buildCashierPaymentMethods,
+  CashierPaymentMethod,
+  paymentMethodDisplayLabel,
+} from '@shared/utils/cashier-payment-methods.util';
+import {
   buildPurchaseRefundPreview,
   buildSalesRefundPreview,
-  CashRefundVia,
-  purchaseCashPortionAmount,
   RefundAllocationRow,
-  salesCashPortionAmount,
 } from '@shared/utils/invoice-return-refund.util';
 import { daysSince } from '@core/utils/date-tz.util';
-import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { Subscription } from 'rxjs';
 
 export type InvoiceReturnDialogMode = 'sales' | 'purchase';
@@ -70,10 +70,12 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
   selectedUnitCodes = new Set<string>();
 
   refundPreview: RefundAllocationRow[] = [];
-  cashRefundVia: CashRefundVia = 'drawer';
-  cashTreasuryKey = '';
+  refundMethodOptions: CashierPaymentMethod[] = [];
+  selectedRefundMethods: string[] = [];
+  refundAmounts: Record<string, number> = {};
+  private splitsDirty = false;
+  private lastAllocatable = -1;
   treasuryMethodOptions: { key: string; label: string }[] = [];
-  alternateTreasuryOptions: { key: string; label: string }[] = [];
   showAgeWarning = false;
   invoiceAgeDays = 0;
 
@@ -144,30 +146,27 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
     this.subscriptions.forEach((s) => s.unsubscribe());
   }
 
-  get showRefundPlan(): boolean {
-    return this.refundTotal > 0 && this.refundPreview.length > 0;
+  get lockedRefundRows(): RefundAllocationRow[] {
+    return this.refundPreview.filter((row) => row.kind === 'credit' || row.kind === 'deferred');
   }
 
-  get cashPortionAmount(): number {
-    return this.mode === 'sales'
-      ? salesCashPortionAmount(this.refundPreview)
-      : purchaseCashPortionAmount(this.refundPreview);
+  get allocatableAmount(): number {
+    const locked = this.lockedRefundRows.reduce((sum, row) => sum + row.amount, 0);
+    return Math.round(Math.max(0, this.refundTotal - locked) * 100) / 100;
   }
 
-  get showCashChoice(): boolean {
-    return this.cashPortionAmount > 0.005;
+  get showRefundMethods(): boolean {
+    return this.allocatableAmount > 0.005;
   }
 
-  get displayRefundPreview(): RefundAllocationRow[] {
-    if (!this.showCashChoice || this.cashRefundVia === 'drawer') {
-      return this.refundPreview;
-    }
-    return applyCashViaToPreview(
-      this.refundPreview,
-      this.cashRefundVia,
-      this.cashTreasuryKey,
-      this.treasuryOptionLabel(this.cashTreasuryKey)
-    );
+  get refundAllocated(): number {
+    return Math.round(
+      this.selectedRefundMethods.reduce((sum, id) => sum + (Number(this.refundAmounts[id]) || 0), 0) * 100
+    ) / 100;
+  }
+
+  get refundAllocationMismatch(): boolean {
+    return this.showRefundMethods && Math.abs(this.refundAllocated - this.allocatableAmount) > 0.02;
   }
 
   lineTotal(qty: number, price: number): number {
@@ -277,20 +276,40 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
       );
     } else if (this.mode === 'purchase' && this.purchase) {
       this.refundPreview = buildPurchaseRefundPreview(this.purchase, this.refundTotal, (key, fallback) =>
-        this.treasuryOptionLabel(key, fallback)
+        this.refundMethodLabel(key, fallback)
       );
     }
+    this.syncRefundSplitDefaults();
   }
 
-  onCashRefundViaChange(): void {
-    if (this.cashRefundVia === 'treasury' && !this.cashTreasuryKey) {
-      const first = this.alternateTreasuryOptions[0];
-      this.cashTreasuryKey = first?.key || '';
+  onSelectedRefundMethodsChange(ids: string[]): void {
+    this.splitsDirty = true;
+    const next = (ids || []).map((id) => String(id || '').trim().toLowerCase()).filter(Boolean);
+    const amounts: Record<string, number> = {};
+    for (const id of next) {
+      amounts[id] = Number(this.refundAmounts[id]) || 0;
+    }
+    this.selectedRefundMethods = next;
+    this.refundAmounts = amounts;
+    if (next.length === 1) {
+      this.refundAmounts = { [next[0]]: this.allocatableAmount };
     }
   }
 
-  onCashTreasuryChange(key: string): void {
-    this.cashTreasuryKey = String(key || '').trim().toLowerCase();
+  onRefundAmountChange(): void {
+    this.splitsDirty = true;
+  }
+
+  refundMethodLabel(key: string, fallback?: string): string {
+    const id = String(key || '').trim().toLowerCase();
+    const fromPay = this.refundMethodOptions.find((m) => m.id === id);
+    if (fromPay) return fromPay.label;
+    return (
+      paymentMethodDisplayLabel(id, this.storeSettings.snapshot.paymentAppFeePercents, this.translate) ||
+      this.treasuryMethodOptions.find((o) => o.key === id)?.label ||
+      fallback ||
+      id
+    );
   }
 
   toggleUnitCode(id: string): void {
@@ -304,7 +323,8 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
   }
 
   private syncTreasuryOptions(): void {
-    const m = this.storeSettings.snapshot.purchaseTreasuryMethods;
+    const snap = this.storeSettings.snapshot;
+    const m = snap.purchaseTreasuryMethods;
     const raw = Array.isArray(m) && m.length ? m : [{ key: 'cash', label: 'Cash' }];
     this.treasuryMethodOptions = raw
       .map((x) => ({
@@ -312,15 +332,81 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
         label: String(x.label || x.key || '').trim(),
       }))
       .filter((o) => o.key && o.key !== 'deferred');
-    this.alternateTreasuryOptions = this.treasuryMethodOptions.filter((o) => o.key !== 'cash');
 
-    if (!this.cashTreasuryKey || !this.alternateTreasuryOptions.some((o) => o.key === this.cashTreasuryKey)) {
-      this.cashTreasuryKey = this.alternateTreasuryOptions[0]?.key || '';
+    this.refundMethodOptions = buildCashierPaymentMethods(
+      snap.paymentAppFeePercents,
+      this.translate,
+      snap.paymentMethodsCatalog,
+      this.paymentBranchId,
+      {
+        accountMap: snap.paymentMethodAccountMap,
+        moneyAccounts: snap.moneyAccounts,
+      }
+    ).filter((method) => method.id !== 'credit' && method.id !== 'installment');
+    this.ensureSelectedRefundMethodsListed();
+  }
+
+  private syncRefundSplitDefaults(): void {
+    const alloc = this.allocatableAmount;
+    if (this.splitsDirty && Math.abs(alloc - this.lastAllocatable) <= 0.009) return;
+    this.applyMirrorPrefill();
+    this.splitsDirty = false;
+    this.lastAllocatable = alloc;
+  }
+
+  private applyMirrorPrefill(): void {
+    if (this.allocatableAmount <= 0.005) {
+      this.selectedRefundMethods = [];
+      this.refundAmounts = {};
+      return;
+    }
+    const rows = this.refundPreview.filter((row) => row.kind === 'payment' || row.kind === 'treasury');
+    const allowed = new Set(this.refundMethodOptions.map((method) => method.id));
+    allowed.add('cash');
+    const amounts: Record<string, number> = {};
+    let placed = 0;
+    for (const row of rows) {
+      const key = String(row.key || '').trim().toLowerCase();
+      if (!key || !allowed.has(key)) continue;
+      const amount = Math.round(row.amount * 100) / 100;
+      if (amount <= 0) continue;
+      amounts[key] = Math.round(((amounts[key] || 0) + amount) * 100) / 100;
+      placed = Math.round((placed + amount) * 100) / 100;
+    }
+    const leftover = Math.round((this.allocatableAmount - placed) * 100) / 100;
+    if (leftover > 0.009) {
+      amounts.cash = Math.round(((amounts.cash || 0) + leftover) * 100) / 100;
+    }
+    const ids = Object.keys(amounts).filter((key) => amounts[key] > 0);
+    this.selectedRefundMethods = ids.length ? ids : ['cash'];
+    this.refundAmounts = ids.length ? amounts : { cash: this.allocatableAmount };
+    this.ensureSelectedRefundMethodsListed();
+  }
+
+  private ensureSelectedRefundMethodsListed(): void {
+    const known = new Set(this.refundMethodOptions.map((m) => m.id));
+    const extras: CashierPaymentMethod[] = [];
+    for (const id of this.selectedRefundMethods) {
+      if (known.has(id)) continue;
+      extras.push({
+        id,
+        label: this.refundMethodLabel(id),
+        logo: 'assets/images/payment/cash.svg',
+      });
+    }
+    if (extras.length) {
+      this.refundMethodOptions = this.refundMethodOptions.concat(extras);
     }
   }
 
-  treasuryOptionLabel(key: string, fallback?: string): string {
-    return this.treasuryMethodOptions.find((o) => o.key === key)?.label || fallback || key;
+  private buildRefundSplits(): { method: string; label: string; amount: number }[] {
+    return this.selectedRefundMethods
+      .map((id) => ({
+        method: id,
+        label: this.refundMethodLabel(id),
+        amount: Math.round((Number(this.refundAmounts[id]) || 0) * 100) / 100,
+      }))
+      .filter((row) => row.method && row.amount > 0);
   }
 
   private buildSalesItemsPayload():
@@ -339,11 +425,10 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
     return { returnAll: false, items };
   }
 
-  private validateCashChoice(): boolean {
-    if (!this.showCashChoice) return true;
-    if (this.cashRefundVia === 'drawer') return true;
-    if (!this.cashTreasuryKey || this.cashTreasuryKey === 'cash') {
-      this.notify.push(this.translate.instant('tr_invoice_return_cash_treasury_required'), 'error');
+  private validateRefundSplits(): boolean {
+    if (!this.showRefundMethods) return true;
+    if (!this.selectedRefundMethods.length || this.refundAllocationMismatch) {
+      this.notify.push(this.translate.instant('tr_invoice_return_refund_mismatch'), 'error');
       return false;
     }
     return true;
@@ -355,19 +440,10 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
       this.notify.push(this.translate.instant('tr_invoice_return_nothing_selected'), 'error');
       return;
     }
-    if (!this.validateCashChoice()) return;
+    if (!this.validateRefundSplits()) return;
 
     const u = this.auth.getUserFromLocalStorage();
-    const cashPayload = this.showCashChoice
-      ? {
-          cashRefundVia: this.cashRefundVia,
-          cashTreasuryKey: this.cashRefundVia === 'treasury' ? this.cashTreasuryKey : undefined,
-          cashTreasuryLabel:
-            this.cashRefundVia === 'treasury'
-              ? this.treasuryOptionLabel(this.cashTreasuryKey)
-              : undefined,
-        }
-      : {};
+    const splits = this.showRefundMethods ? this.buildRefundSplits() : [];
 
     if (this.mode === 'sales') {
       const payload = this.buildSalesItemsPayload();
@@ -383,7 +459,7 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
           branchId: this.paymentBranchId || undefined,
           note: this.note,
           ...payload,
-          ...cashPayload,
+          refundPaymentSplits: splits.length ? splits : undefined,
         })
         .subscribe({
           next: () => {
@@ -422,7 +498,9 @@ export class InvoiceReturnDialogComponent implements OnInit, OnDestroy {
         returnAll: this.returnAll,
         quantity: this.returnAll ? undefined : this.purchaseQty,
         unitRefundPrice: this.purchaseUnitPrice,
-        ...cashPayload,
+        refundTreasurySplits: splits.length
+          ? splits.map((row) => ({ key: row.method, label: row.label, amount: row.amount }))
+          : undefined,
         returnedProductIds:
           this.unitCodeOptions.length > 1 && !this.returnAll
             ? Array.from(this.selectedUnitCodes)

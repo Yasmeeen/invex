@@ -467,20 +467,19 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
 
   private async writeDueWorkbook(items: CollectionDueItem[]): Promise<void> {
     const showCollector = this.showCollectorColumn;
-    const showDays = this.showDaysOverdue;
+    const showOverdueCount = this.showDaysOverdue;
+    const showStatus = this.statusFilter === 'all';
     const t = (key: string) => this.translate.instant(key);
     const headers: string[] = [
-      t('tr_client_name'),
       t('tr_installment_sale_number'),
+      t('tr_client_name'),
       t('tr_client_phone'),
+      t('tr_installment_due_date'),
     ];
+    if (showOverdueCount) headers.push(t('tr_overdue_installments_col'));
+    headers.push(t('tr_remaining'), t('tr_minimum_collection'));
     if (showCollector) headers.push(t('tr_collector'));
-    headers.push(t('tr_installment_due_date'));
-    if (showDays) {
-      headers.push(t('tr_collections_days_overdue'));
-      headers.push(t('tr_overdue_installments_col'));
-    }
-    headers.push(t('tr_remaining'), t('tr_minimum_collection'), t('tr_status'));
+    if (showStatus) headers.push(t('tr_status'));
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'INVEX';
@@ -505,16 +504,12 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
     const phoneCol = 3;
     for (const item of items) {
       const rowValues: Array<string | number> = [
-        item.clientName || '',
         item.installmentSaleNumber != null ? Number(item.installmentSaleNumber) : '',
+        item.clientName || '',
         '',
+        this.formatDisplayDate(item.dueDate),
       ];
-      if (showCollector) {
-        rowValues.push(item.collectorName || t('tr_unassigned_collector'));
-      }
-      rowValues.push(this.formatDisplayDate(item.dueDate));
-      if (showDays) {
-        rowValues.push(item.status === 'overdue' ? Number(item.daysOverdue) || 0 : '');
+      if (showOverdueCount) {
         rowValues.push(
           item.status === 'overdue' ? Number(item.overdueInstallmentCount) || 0 : ''
         );
@@ -525,7 +520,12 @@ export class DueInstallmentsComponent implements OnInit, OnDestroy {
           ? Number(item.minimumCollectionAmount)
           : ''
       );
-      rowValues.push(t(this.statusLabelKey(item.status)));
+      if (showCollector) {
+        rowValues.push(item.collectorName || t('tr_unassigned_collector'));
+      }
+      if (showStatus) {
+        rowValues.push(t(this.statusLabelKey(item.status)));
+      }
 
       const row = ws.addRow(rowValues);
       const phoneCell = row.getCell(phoneCol);

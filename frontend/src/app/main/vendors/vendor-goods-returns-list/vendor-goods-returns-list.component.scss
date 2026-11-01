@@ -1,0 +1,36 @@
+.vendor-returns-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+}
+
+.vendor-returns-filters__field {
+  flex: 1 1 11rem;
+  min-width: 11rem;
+}
+
+.vendor-returns-filters__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 2px;
+}
+
+.vendor-returns-table {
+  min-height: 0;
+}
+
+.vendor-returns-table .s-table {
+  word-break: normal;
+}
+
+.vendor-returns-nowrap {
+  white-space: nowrap;
+}
+
+.vendor-returns-details {
+  white-space: normal;
+  min-width: 16rem;
+  line-height: 1.45;
+}

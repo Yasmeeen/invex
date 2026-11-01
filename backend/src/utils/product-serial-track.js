@@ -155,6 +155,33 @@ function overallStockStatus(matches, exists) {
 }
 
 /**
+ * Live product rows whose code matches a scanned barcode (full code or suffix).
+ * Same matching rules as serial track.
+ */
+export async function findLiveProductsByScannedCode(rawCode) {
+  const code = String(rawCode || '').trim();
+  if (!code) return [];
+
+  const normalized = normalizeCode(code);
+  const scannedSuffix = normalized.replace(/^-/, '');
+  const exactRe = new RegExp(`^${escapeRegex(normalized)}$`, 'i');
+  const suffixRe = scannedSuffix
+    ? new RegExp(`-${escapeRegex(scannedSuffix)}$`, 'i')
+    : null;
+
+  const liveFilter = suffixRe
+    ? { $or: [{ code: exactRe }, { code: suffixRe }] }
+    : { code: exactRe };
+
+  const liveProducts = await Product.find(liveFilter)
+    .populate('category', 'name code sellByWeight')
+    .populate('branch', 'name')
+    .lean();
+
+  return (liveProducts || []).filter((p) => codeMatchesStored(p.code, code));
+}
+
+/**
  * Resolve a unit/serial code to product details + history.
  * Works even when the product row was hard-deleted (sold / returned / manual delete).
  */

@@ -666,6 +666,7 @@
                 *ngIf="editingPriceIndex === i"
                 type="number"
                 class="order-line-price-input s-control"
+                [class.order-line-price-input--below-cost]="editingPriceAtOrBelowPurchase()"
                 min="0"
                 step="0.01"
                 [(ngModel)]="editingPriceValue"
@@ -679,7 +680,8 @@
                 *ngIf="editingPriceIndex !== i"
                 type="button"
                 class="order-line-price-btn"
-                [class.order-line-price-btn--overridden]="item.priceOverridden"
+                [class.order-line-price-btn--overridden]="item.priceOverridden && !item.saleAtOrBelowPurchase && !item.salePriceFloorPending"
+                [class.order-line-price-btn--below-cost]="item.saleAtOrBelowPurchase"
                 [attr.title]="'tr_cashier.EDIT_PRICE_HINT' | translate"
                 (click)="startEditLinePrice(i)"
               >
@@ -750,6 +752,19 @@
           >
             {{ "tr_invoice_surcharge_derived_percent" | translate }}:
             {{ invoiceDiscountPercentEquivalent() | number:'1.2-2' }}%
+          </div>
+          <div class="form-group mb-0 mt-2 cashier-internal-note">
+            <label class="size-small">{{ "tr_invoice_internal_note" | translate }}</label>
+            <textarea
+              class="s-control width-100"
+              rows="2"
+              maxlength="500"
+              [(ngModel)]="invoiceInternalNote"
+              [placeholder]="'tr_invoice_internal_note_ph' | translate"
+            ></textarea>
+            <div class="size-small text-muted mt-1">
+              {{ "tr_invoice_internal_note_hint" | translate }}
+            </div>
           </div>
           <div class="weight-bold mt-2">
             {{ "tr_final_after_extra_discount" | translate }}:

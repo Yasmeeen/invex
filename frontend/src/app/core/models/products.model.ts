@@ -209,6 +209,8 @@ export interface Order {
   clientName: string;
   clientPhoneNumber: string;
   sellerName: string;
+  /** Staff-only. Not printed on the customer receipt. */
+  internalNote?: string;
   clientAddress: string
   /** Cashier delivery invoice. */
   isDelivery?: boolean;
@@ -320,7 +322,8 @@ export interface VendorLedgerEntry {
     | 'purchase'
     | 'purchase_installment_paid'
     | 'purchase_deferred'
-    | 'purchase_deferred_paid';
+    | 'purchase_deferred_paid'
+    | 'goods_return';
   amount: number;
   orderId?: string;
   orderNumber?: number;
@@ -452,6 +455,8 @@ export interface VendorHistoryResponse {
   owesFromSales?: number;
   /** Pre-system credit sales debt (opening debit). */
   owesFromOpeningBalance?: number;
+  /** Unapplied supplier goods-return credit (supplier owes us). */
+  owesFromGoodsReturns?: number;
   /** Total credit = prepaid + purchase payables (for display and netting). */
   weOweSupplier: number;
   /** Prepaid we paid supplier (subset of weOweSupplier). */

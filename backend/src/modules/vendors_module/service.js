@@ -3,7 +3,9 @@ import Vendor from "../../DB/models/vendor.model.js";
 import Order from "../../DB/models/order.model.js";
 import PurchasingRequest from "../../DB/models/purchasingRequest.model.js";
 import ProductPurchaseRequest from "../../DB/models/productPurchaseRequest.model.js";
+import StockMovement from "../../DB/models/stockMovement.model.js";
 import mongoose from "mongoose";
+import moment from "moment-timezone";
 import { buildPhoneSearchCandidates, digitsOnly } from "../../utils/phone-utils.js";
 import {
   computeSupplierOwesFromOrders,
@@ -49,6 +51,7 @@ import {
   postPaymentMethodOutflows,
   safeTreasuryPost,
 } from "../../utils/treasury-ledger.js";
+import { processVendorGoodsReturn } from "../../utils/vendor-goods-return.js";
 
 // 📌 Create Vendor
 export const createVendor = async (req, res) => {
@@ -147,8 +150,10 @@ export const getVendors = async (req, res) => {
         const owesFromSales = owesFromSalesMap.get(id) || 0;
         const openingDebit =
           Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+        const goodsReturnDebit =
+          Math.round((Number(vendor.goodsReturnDebitBalance) || 0) * 100) / 100;
         const supplierOwesUs =
-          Math.round((owesFromSales + openingDebit) * 100) / 100;
+          Math.round((owesFromSales + openingDebit + goodsReturnDebit) * 100) / 100;
         const prepaidBalance =
           Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
         const buyerPrepaidBalance =
@@ -306,7 +311,11 @@ export const getVendorHistory = async (req, res) => {
     const owesFromSales = await computeSupplierOwesFromOrders(vendor._id);
     const owesFromOpeningBalance =
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
-    const supplierOwesUs = Math.round((owesFromSales + owesFromOpeningBalance) * 100) / 100;
+    const owesFromGoodsReturns =
+      Math.round((Number(vendor.goodsReturnDebitBalance) || 0) * 100) / 100;
+    const supplierOwesUs = Math.round(
+      (owesFromSales + owesFromOpeningBalance + owesFromGoodsReturns) * 100
+    ) / 100;
     const prepaidBalance = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const buyerPrepaidBalance =
       Math.round((Number(vendor.buyerPrepaidBalance) || 0) * 100) / 100;
@@ -446,6 +455,7 @@ export const getVendorHistory = async (req, res) => {
       supplierOwesUs,
       owesFromSales,
       owesFromOpeningBalance,
+      owesFromGoodsReturns,
       weOweSupplier,
       prepaidBalance,
       buyerPrepaidBalance,
@@ -542,6 +552,14 @@ export const settleVendorBalances = async (req, res) => {
       remaining = Math.round((remaining - fromOpening) * 100) / 100;
     }
 
+    if (remaining > 0) {
+      const goodsBefore =
+        Math.round((Number(vendor.goodsReturnDebitBalance) || 0) * 100) / 100;
+      const fromGoods = Math.min(remaining, goodsBefore);
+      vendor.goodsReturnDebitBalance = Math.round((goodsBefore - fromGoods) * 100) / 100;
+      remaining = Math.round((remaining - fromGoods) * 100) / 100;
+    }
+
     let creditToReduce = settleAmount;
     const fromBuyerPrepaid = Math.min(creditToReduce, buyerPrepaidBefore);
     vendor.buyerPrepaidBalance = Math.round((buyerPrepaidBefore - fromBuyerPrepaid) * 100) / 100;
@@ -571,6 +589,8 @@ export const settleVendorBalances = async (req, res) => {
     const newOwesFromSales = await computeSupplierOwesFromOrders(vendor._id);
     const newOwesFromOpening =
       Math.round((Number(vendor.openingDebitBalance) || 0) * 100) / 100;
+    const newOwesFromGoodsReturns =
+      Math.round((Number(vendor.goodsReturnDebitBalance) || 0) * 100) / 100;
     const newSupplierOwesUs = await computeSupplierOwesUs(vendor._id);
     const newPrepaid = Math.round((Number(vendor.creditBalance) || 0) * 100) / 100;
     const newBuyerPrepaid =
@@ -590,6 +610,7 @@ export const settleVendorBalances = async (req, res) => {
       supplierOwesUs: newSupplierOwesUs,
       owesFromSales: newOwesFromSales,
       owesFromOpeningBalance: newOwesFromOpening,
+      owesFromGoodsReturns: newOwesFromGoodsReturns,
       weOweSupplier: newWeOwe,
       prepaidBalance: newPrepaid,
       buyerPrepaidBalance: newBuyerPrepaid,
@@ -1110,6 +1131,170 @@ export const addVendorReceivedDeposit = async (req, res) => {
   } catch (error) {
     console.error('Error adding vendor received deposit:', error);
     res.status(500).json({ message: 'Server error while recording received deposit' });
+  }
+};
+
+const GOODS_RETURN_TZ = 'Africa/Cairo';
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function cairoDayBound(value, endOfDay) {
+  const raw = value != null ? String(value).trim() : '';
+  if (!raw) return null;
+  const day = moment.tz(raw, ['YYYY-MM-DD', moment.ISO_8601], true, GOODS_RETURN_TZ);
+  if (!day.isValid()) return null;
+  return (endOfDay ? day.endOf('day') : day.startOf('day')).toDate();
+}
+
+/** GET supplier goods returns, newest first. */
+export const listVendorGoodsReturns = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.perPage || req.query.limit, 10) || 15));
+    const search = String(req.query.search || '').trim().slice(0, 80);
+    const branchRaw = String(req.query.branchId || '').trim();
+    const from = cairoDayBound(req.query.from, false);
+    const to = cairoDayBound(req.query.to, true);
+
+    const match = { 'ledgerEntries.type': 'goods_return' };
+    if (branchRaw && mongoose.Types.ObjectId.isValid(branchRaw)) {
+      match['ledgerEntries.branch'] = new mongoose.Types.ObjectId(branchRaw);
+    }
+    if (from || to) {
+      match['ledgerEntries.createdAt'] = {};
+      if (from) match['ledgerEntries.createdAt'].$gte = from;
+      if (to) match['ledgerEntries.createdAt'].$lte = to;
+    }
+
+    const pipeline = [{ $unwind: '$ledgerEntries' }, { $match: match }];
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { name: rx },
+            { nameOfcompany: rx },
+            { phone: rx },
+            { 'ledgerEntries.note': rx },
+          ],
+        },
+      });
+    }
+
+    pipeline.push(
+      { $sort: { 'ledgerEntries.createdAt': -1, _id: -1 } },
+      {
+        $facet: {
+          rows: [
+            { $skip: (page - 1) * perPage },
+            { $limit: perPage },
+            {
+              $lookup: {
+                from: 'branches',
+                localField: 'ledgerEntries.branch',
+                foreignField: '_id',
+                as: 'branchDoc',
+              },
+            },
+            { $unwind: { path: '$branchDoc', preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                vendorId: '$_id',
+                vendorName: '$name',
+                vendorCompany: '$nameOfcompany',
+                vendorPhone: '$phone',
+                entryId: '$ledgerEntries._id',
+                amount: '$ledgerEntries.amount',
+                note: '$ledgerEntries.note',
+                createdAt: '$ledgerEntries.createdAt',
+                branchId: '$ledgerEntries.branch',
+                branchName: '$branchDoc.name',
+              },
+            },
+          ],
+          total: [{ $count: 'count' }],
+        },
+      }
+    );
+
+    const [agg] = await Vendor.aggregate(pipeline);
+    const rows = agg?.rows || [];
+    const totalCount = agg?.total?.[0]?.count || 0;
+
+    if (rows.length) {
+      const vendorIds = [...new Set(rows.map((row) => String(row.vendorId)))].filter((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+      );
+      const times = rows
+        .map((row) => new Date(row.createdAt).getTime())
+        .filter((time) => Number.isFinite(time));
+      if (vendorIds.length && times.length) {
+        const movements = await StockMovement.find({
+          movementType: 'supplier_return',
+          referenceType: 'vendor_goods_return',
+          referenceId: { $in: vendorIds.map((id) => new mongoose.Types.ObjectId(id)) },
+          createdAt: {
+            $gte: new Date(Math.min(...times) - 15000),
+            $lte: new Date(Math.max(...times) + 15000),
+          },
+        })
+          .select('productName quantity unitPrice totalValue referenceId createdAt')
+          .lean();
+        const used = new Set();
+        for (const row of rows) {
+          const at = new Date(row.createdAt).getTime();
+          const lines = movements.filter((movement) => {
+            const id = String(movement._id);
+            if (used.has(id)) return false;
+            if (String(movement.referenceId) !== String(row.vendorId)) return false;
+            return Math.abs(new Date(movement.createdAt).getTime() - at) <= 15000;
+          });
+          lines.forEach((movement) => used.add(String(movement._id)));
+          row.lines = lines.map((movement) => ({
+            name: movement.productName || '',
+            quantity: movement.quantity,
+            unitPrice: movement.unitPrice,
+            lineTotal: movement.totalValue,
+          }));
+        }
+      }
+    }
+
+    const totalPages = Math.ceil(totalCount / perPage) || 0;
+    res.json({
+      returns: rows.map((row) => ({
+        ...row,
+        lines: Array.isArray(row.lines) ? row.lines : [],
+      })),
+      meta: {
+        currentPage: page,
+        nextPage: page < totalPages ? page + 1 : null,
+        prevPage: page > 1 ? page - 1 : null,
+        totalCount,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error('Error listing vendor goods returns:', error);
+    res.status(500).json({ message: 'تعذر تحميل مرتجعات الموردين' });
+  }
+};
+
+/** POST return in-stock goods to the supplier on account (no cash). */
+export const returnGoodsToVendor = async (req, res) => {
+  try {
+    const result = await processVendorGoodsReturn(req.params.id, req.body || {});
+    res.json(result);
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    if (status >= 500) {
+      console.error('Error returning goods to vendor:', error);
+    }
+    res.status(status).json({
+      message: error?.message || 'Server error while recording supplier goods return',
+    });
   }
 };
 

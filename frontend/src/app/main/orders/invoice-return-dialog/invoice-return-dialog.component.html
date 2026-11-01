@@ -125,63 +125,63 @@
         <span>{{ refundTotal | currency:'EGP ':'symbol':'1.2-2' }}</span>
       </div>
 
-      <div class="invoice-return-dialog__refund-plan mb-3" *ngIf="showRefundPlan">
-        <div class="invoice-return-dialog__refund-plan-title">
-          {{ 'tr_invoice_return_mirror_payment_title' | translate }}
-        </div>
-        <p class="invoice-return-dialog__hint mb-2">
-          {{ 'tr_invoice_return_mirror_payment_hint' | translate }}
-        </p>
-        <div class="invoice-return-dialog__refund-row" *ngFor="let row of displayRefundPreview">
+      <div class="invoice-return-dialog__refund-plan mb-3" *ngIf="lockedRefundRows.length">
+        <div class="invoice-return-dialog__refund-row" *ngFor="let row of lockedRefundRows">
           <span>{{ row.label }}</span>
           <span>{{ row.amount | currency:'EGP ':'symbol':'1.2-2' }}</span>
         </div>
+        <p class="invoice-return-dialog__hint mb-0 mt-2" *ngIf="mode === 'sales'">
+          {{ 'tr_invoice_return_credit_hint' | translate }}
+        </p>
+        <p class="invoice-return-dialog__hint mb-0 mt-2" *ngIf="mode === 'purchase'">
+          {{ 'tr_invoice_return_purchase_deferred_hint' | translate }}
+        </p>
       </div>
 
-      <div class="invoice-return-dialog__cash-choice mb-3" *ngIf="showCashChoice">
+      <div class="invoice-return-dialog__refund-methods mb-3" *ngIf="showRefundMethods">
         <label class="size-small weight-bold d-block mb-2">
-          {{ 'tr_invoice_return_cash_choice_title' | translate : { amount: cashPortionAmount | number:'1.2-2' } }}
+          {{ 'tr_invoice_return_refund_methods' | translate }}
         </label>
-        <div class="d-flex flex-column gap-2">
-          <label class="d-flex align-items-center gap-2">
-            <input
-              type="radio"
-              name="cashRefundVia"
-              value="drawer"
-              [(ngModel)]="cashRefundVia"
-              (ngModelChange)="onCashRefundViaChange()"
-            />
-            {{ 'tr_invoice_return_cash_via_drawer' | translate }}
-          </label>
-          <label class="d-flex align-items-center gap-2">
-            <input
-              type="radio"
-              name="cashRefundVia"
-              value="treasury"
-              [(ngModel)]="cashRefundVia"
-              (ngModelChange)="onCashRefundViaChange()"
-            />
-            {{ 'tr_invoice_return_cash_via_treasury' | translate }}
-          </label>
-        </div>
-        <div class="form-group mt-2 mb-0" *ngIf="cashRefundVia === 'treasury'">
-          <label>{{ 'tr_receipt_purchase_treasury' | translate }}</label>
+        <p class="invoice-return-dialog__hint">
+          {{ 'tr_invoice_return_split_hint' | translate }}
+        </p>
+        <div class="form-group mb-2">
           <div class="input-with-icon">
             <ng-select
               class="s-control s-select"
-              [items]="alternateTreasuryOptions"
+              [items]="refundMethodOptions"
               bindLabel="label"
-              bindValue="key"
-              [clearable]="false"
+              bindValue="id"
+              [multiple]="true"
+              [closeOnSelect]="false"
+              [clearable]="true"
               [searchable]="true"
-              name="returnCashTreasury"
+              name="returnRefundMethods"
               [ngModelOptions]="{ standalone: true }"
-              [(ngModel)]="cashTreasuryKey"
-              (ngModelChange)="onCashTreasuryChange($event)"
+              [ngModel]="selectedRefundMethods"
+              (ngModelChange)="onSelectedRefundMethodsChange($event)"
             >
             </ng-select>
             <i class="fa fa-caret-down input-icon"></i>
           </div>
+        </div>
+        <div class="invoice-return-dialog__split-row" *ngFor="let mid of selectedRefundMethods">
+          <span class="invoice-return-dialog__split-label">{{ refundMethodLabel(mid) }}</span>
+          <input
+            class="s-control invoice-return-dialog__split-amount"
+            type="number"
+            min="0"
+            step="0.01"
+            [(ngModel)]="refundAmounts[mid]"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="onRefundAmountChange()"
+          />
+        </div>
+        <div class="size-small mt-2" [class.text-error]="refundAllocationMismatch">
+          {{ 'tr_invoice_return_allocated' | translate }}:
+          <strong>{{ refundAllocated | currency:'EGP ':'symbol':'1.2-2' }}</strong>
+          /
+          <strong>{{ allocatableAmount | currency:'EGP ':'symbol':'1.2-2' }}</strong>
         </div>
       </div>
 

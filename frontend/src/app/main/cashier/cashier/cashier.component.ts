@@ -109,6 +109,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   orderItems: any[] = [];
   /** Index of order line whose unit price is being edited; null when not editing. */
   editingPriceIndex: number | null = null;
+  private salePriceCheckToken = 0;
   /** Draft unit price while editing (invoice-only; does not update catalog). */
   editingPriceValue: number | string = '';
   todayDate = new Date();
@@ -120,6 +121,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   invoiceDiscountMode: 'percent' | 'amount' | 'final' = 'percent';
   /** Meaning depends on `invoiceDiscountMode` (see `appliedInvoiceDiscount`). */
   invoiceExtraValue = 0;
+  /** Staff-only. Saved on the order and omitted from the customer receipt. */
+  invoiceInternalNote = '';
   /** Confirmed split payment from dialog (net splits + fee allocations). */
   confirmedPayment: PaymentSplitsResult | null = null;
   private confirmedPaymentForTotal: number | null = null;
@@ -2401,9 +2404,76 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     item.price = v;
     item.isApplyDiscount = false;
     item.priceOverridden = true;
+    this.applySalePriceFloor(item, v);
     this.cancelEditLinePrice();
     this.refreshExchangePaymentDefaults();
     this.focusBarcodeInput();
+  }
+
+  /** Purchase cost on the line when the API included it. Hidden roles do not get this number. */
+  linePurchasePrice(item: any): number | null {
+    const raw = item?.netPrice ?? item?.cost;
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.round(n * 100) / 100;
+  }
+
+  /** Live red border while the price box is open and the draft is at or below purchase cost. */
+  editingPriceAtOrBelowPurchase(): boolean {
+    if (this.editingPriceIndex == null) return false;
+    const item = this.orderItems[this.editingPriceIndex];
+    const cost = this.linePurchasePrice(item);
+    if (cost == null) return false;
+    const v = Number(this.editingPriceValue);
+    if (!Number.isFinite(v)) return false;
+    return Math.round(v * 100) / 100 <= cost;
+  }
+
+  private applySalePriceFloor(item: any, unitPrice: number): void {
+    const token = ++this.salePriceCheckToken;
+    item._salePriceCheckToken = token;
+    const price = Math.round(unitPrice * 100) / 100;
+    const cost = this.linePurchasePrice(item);
+    if (cost != null) {
+      item.salePriceFloorPending = false;
+      item.saleAtOrBelowPurchase = price <= cost;
+      if (item.saleAtOrBelowPurchase) this.notifySaleAtOrBelowPurchase(item);
+      return;
+    }
+
+    item.saleAtOrBelowPurchase = false;
+    const productId = this.orderLineProductId(item);
+    if (!productId) {
+      item.salePriceFloorPending = false;
+      return;
+    }
+    item.salePriceFloorPending = true;
+    this.productsSerivce
+      .checkSaleAgainstPurchase(productId, price)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          if (item._salePriceCheckToken !== token) return;
+          item.salePriceFloorPending = false;
+          item.saleAtOrBelowPurchase = !!res?.atOrBelowPurchase;
+          if (item.saleAtOrBelowPurchase) this.notifySaleAtOrBelowPurchase(item);
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          if (item._salePriceCheckToken !== token) return;
+          item.salePriceFloorPending = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  private notifySaleAtOrBelowPurchase(item: any): void {
+    const name = item?.name || item?.code || '';
+    this.appNotificationService.push(
+      this.translate.instant('tr_cashier_sale_at_or_below_purchase', { name }),
+      'warning'
+    );
   }
 
   cancelEditLinePrice(): void {
@@ -2752,6 +2822,11 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       invoiceDiscountAmount: this.appliedInvoiceDiscount(),
     };
 
+    const internalNote = String(this.invoiceInternalNote || '').trim().slice(0, 500);
+    if (internalNote) {
+      orderData.internalNote = internalNote;
+    }
+
     if (this.selectedSellerName) {
       orderData.sellerName = this.selectedSellerName;
     }
@@ -2899,6 +2974,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         this.resetPaymentLinesAfterCheckout();
         this.invoiceDiscountMode = 'percent';
         this.invoiceExtraValue = 0;
+        this.invoiceInternalNote = '';
         this.clearClientInformationAfterCheckout();
 
         const snap = this.pendingExchangePurchaseReceipt;

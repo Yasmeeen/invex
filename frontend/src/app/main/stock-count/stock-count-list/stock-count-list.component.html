@@ -1,0 +1,142 @@
+<div class="content-shadow bg-white mb-5" not-authorized [notAuthorized]="isNotAuthorized">
+  <h2 class="size-body title-with-btn plr-4 ptb-4">
+    <span class="page-title">{{ 'tr_stock_count_title' | translate }}</span>
+    <div class="btn-group flex flex-middle gap-sm">
+      <button type="button" class="s-btn btn-primary size-body" (click)="openAddDialog()">
+        {{ 'tr_stock_count_add' | translate }}
+      </button>
+      <button type="button" class="s-btn btn-secondary size-body" (click)="isFilterOpen = !isFilterOpen">
+        <i class="fa fa-filter text-primary"></i>
+      </button>
+    </div>
+  </h2>
+  <p class="plr-4 text-muted size-caption stock-count-hint">{{ 'tr_stock_count_hint' | translate }}</p>
+
+  <div class="filters-card bg-secondary plr-4 ptb-2 mb-7" *ngIf="isFilterOpen">
+    <div class="stock-count-filters">
+      <div class="stock-count-filters__field" *ngIf="showLocationFilter">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_stock_count_location' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [(ngModel)]="filterLocation"
+              [items]="locationOptions"
+              bindLabel="label"
+              bindValue="value"
+              [clearable]="false"
+            ></ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stock-count-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_stock_count_categories' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [(ngModel)]="filterCategoryId"
+              [items]="categoryOptions"
+              bindLabel="label"
+              bindValue="value"
+              [clearable]="false"
+            ></ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stock-count-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_stock_count_status' | translate }}</label>
+          <div class="input-with-icon">
+            <ng-select
+              class="s-control s-select"
+              [(ngModel)]="filterStatus"
+              [items]="statusOptions"
+              bindLabel="label"
+              bindValue="value"
+              [clearable]="false"
+            ></ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="stock-count-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_from' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateFrom" />
+        </div>
+      </div>
+      <div class="stock-count-filters__field">
+        <div class="form-group mb-0">
+          <label>{{ 'tr_daily_expenses_date_to' | translate }}</label>
+          <input class="s-control width-100" type="date" [(ngModel)]="dateTo" />
+        </div>
+      </div>
+      <div class="stock-count-filters__actions">
+        <button type="button" class="s-btn btn-secondary" (click)="applyFilters()">
+          {{ 'tr_apply' | translate }}
+        </button>
+        <button type="button" class="s-btn btn-secondary" (click)="clearFilters()">
+          {{ 'tr_clear' | translate }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="plr-4 mt-4" *ngIf="!loading">
+    <div class="table-container" *ngIf="counts.length > 0">
+      <table class="s-table table">
+        <thead>
+          <tr>
+            <th>{{ 'tr_stock_count_started_at' | translate }}</th>
+            <th>{{ 'tr_stock_count_location' | translate }}</th>
+            <th>{{ 'tr_stock_count_categories' | translate }}</th>
+            <th>{{ 'tr_stock_count_status' | translate }}</th>
+            <th>{{ 'tr_stock_count_expected' | translate }}</th>
+            <th>{{ 'tr_stock_count_shortage' | translate }}</th>
+            <th>{{ 'tr_stock_count_surplus' | translate }}</th>
+            <th>{{ 'tr_stock_count_by' | translate }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of counts" class="stock-count-row" (click)="openCount(row)">
+            <td>{{ formatWhen(row.startedAt) }}</td>
+            <td>{{ locationLabel(row) }}</td>
+            <td>{{ categoriesLabel(row) }}</td>
+            <td>
+              <span class="stock-count-status" [class.stock-count-status--open]="row.status === 'open'">
+                {{ statusLabel(row) }}
+              </span>
+            </td>
+            <td>{{ row.summary?.expectedUnits || 0 }}</td>
+            <td [class.stock-count-num--shortage]="(row.summary?.shortageUnits || 0) > 0">
+              {{ row.summary?.shortageUnits || 0 }}
+            </td>
+            <td [class.stock-count-num--surplus]="(row.summary?.surplusUnits || 0) > 0">
+              {{ row.summary?.surplusUnits || 0 }}
+            </td>
+            <td>{{ row.createdBy?.name || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="empty-state-here text-center ptb-8" *ngIf="counts.length === 0">
+      <p>{{ 'tr_stock_count_list_empty' | translate }}</p>
+    </div>
+
+    <div class="plr-4 ptb-4" *ngIf="paginationData && paginationData.totalCount > 0">
+      <pagination
+        [paginationData]="paginationData"
+        [perPage]="paginationPerPage"
+        (paginationUpdate)="paginationUpdate($event)"
+      ></pagination>
+    </div>
+  </div>
+
+  <div *ngIf="loading">
+    <app-ghost-line [length]="12" [type]="'table'"></app-ghost-line>
+  </div>
+</div>

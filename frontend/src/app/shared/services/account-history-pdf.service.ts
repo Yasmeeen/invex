@@ -62,6 +62,12 @@ export class AccountHistoryPdfService {
         value: helpers.formatMoney(history.owesFromSales || 0),
       });
     }
+    if ((history.owesFromGoodsReturns || 0) > 0) {
+      summaryRows.push({
+        label: t('tr_vendor_debit_from_goods_return'),
+        value: helpers.formatMoney(history.owesFromGoodsReturns || 0),
+      });
+    }
 
     summaryRows.push({
       label: t('tr_vendor_credit_balance'),

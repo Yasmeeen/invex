@@ -139,7 +139,6 @@ export class ProductPurchaseRequestsService {
       cashRefundVia?: 'drawer' | 'treasury';
       cashTreasuryKey?: string;
       cashTreasuryLabel?: string;
-      /** @deprecated Server computes treasury splits from original payment. */
       refundTreasurySplits?: PurchaseTreasurySplit[];
       returnedProductIds?: string[];
     }

@@ -140,6 +140,20 @@ const routes: Routes = [
         },
       },
       {
+        path: 'stock-count',
+        loadChildren: () => import('./stock-count/stock-count.module').then((m) => m.StockCountModule),
+        canActivate: [RoleGuard],
+        data: {
+          allowedRoles: [
+            'Super Admin',
+            'Co Admin',
+            'Branch Manager',
+            'Cashier',
+            ...WAREHOUSE,
+          ],
+        },
+      },
+      {
         path: 'clients',
         loadChildren:() => import('./clients/clients.module').then(m => m.ClientsModule),
         canActivate: [RoleGuard],

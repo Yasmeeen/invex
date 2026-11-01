@@ -80,7 +80,7 @@
         <span>{{ ret.deferredAdjustmentAmount | currency:'EGP ':'symbol':'1.2-2' }}</span>
       </div>
 
-      <div class="invoice-return-details-dialog__row" *ngIf="ret.cashRefundVia">
+      <div class="invoice-return-details-dialog__row" *ngIf="ret.cashRefundVia === 'treasury'">
         <span>{{ 'tr_invoice_return_details_cash_via' | translate }}</span>
         <span>{{ cashViaLabel(ret.cashRefundVia) }}</span>
       </div>

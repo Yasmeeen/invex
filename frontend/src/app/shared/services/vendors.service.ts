@@ -161,4 +161,34 @@ payVendorSupplier(
   return this.http.post(`${VENDORS_URL}/${vendorId}/pay-supplier`, payload);
 }
 
+getGoodsReturns(params: {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  branchId?: string;
+  from?: string;
+  to?: string;
+}): Observable<any> {
+  const query: Record<string, string> = {};
+  if (params.page) query.page = String(params.page);
+  if (params.perPage) query.perPage = String(params.perPage);
+  if (params.search) query.search = params.search;
+  if (params.branchId) query.branchId = params.branchId;
+  if (params.from) query.from = params.from;
+  if (params.to) query.to = params.to;
+  return this.http.get(`${VENDORS_URL}/goods-returns`, { params: query });
+}
+
+returnGoodsToVendor(
+  vendorId: string,
+  payload: {
+    branchId: string;
+    userId?: string;
+    note?: string;
+    lines: Array<{ productId: string; quantity: number; unitPrice: number }>;
+  }
+): Observable<any> {
+  return this.http.post(`${VENDORS_URL}/${vendorId}/goods-return`, payload);
+}
+
 }

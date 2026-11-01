@@ -31,7 +31,11 @@ import {
   purchaseHasDeferredTreasury,
 } from '../../utils/purchase-treasury-splits.js';
 import { enrichPurchasesAcquiredFromDisplay } from '../../utils/enrich-purchase-acquired-from.js';
-import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
+import {
+  postTreasurySplitInflows,
+  postTreasurySplitOutflows,
+  safeTreasuryPost,
+} from '../../utils/treasury-ledger.js';
 import { parseBarcodeInstallmentPlans } from '../../utils/product-barcode-installments.js';
 
 function ecommerceCatalogFieldsFromSource(src) {
@@ -2623,6 +2627,23 @@ export const returnProductPurchaseRequest = async (req, res) => {
       cashRefundVia: body.cashRefundVia,
       cashTreasuryKey: body.cashTreasuryKey,
       cashTreasuryLabel: body.cashTreasuryLabel,
+      refundTreasurySplits: body.refundTreasurySplits,
+      refundPaymentSplits: body.refundPaymentSplits,
+    });
+
+    await safeTreasuryPost('purchase_return', async () => {
+      const branchForLedger = result.purchase?.branch || body.branchId;
+      const splits = result.returnRecord?.refundTreasurySplits || [];
+      if (!branchForLedger || !splits.length) return;
+      await postTreasurySplitInflows({
+        branchId: branchForLedger,
+        splits,
+        occurredAt: result.returnRecord?.returnedAt || new Date(),
+        sourceType: 'purchase_return',
+        sourceId: result.purchase._id,
+        note: 'Purchase return',
+        createdBy: body.userId,
+      });
     });
 
     await auditLog(req, {
@@ -2651,7 +2672,15 @@ export const returnProductPurchaseRequest = async (req, res) => {
         ? 400
         : msg.includes('not found')
           ? 404
-          : msg.includes('cannot') || msg.includes('already') || msg.includes('Only') || msg.includes('Invalid') || msg.includes('Select')
+          : msg.includes('cannot') ||
+              msg.includes('already') ||
+              msg.includes('Only') ||
+              msg.includes('Invalid') ||
+              msg.includes('Select') ||
+              msg.includes('must equal') ||
+              msg.includes('Nothing') ||
+              msg.includes('Refund') ||
+              msg.includes('not linked')
             ? 400
             : 500);
     console.error('returnProductPurchaseRequest:', error);

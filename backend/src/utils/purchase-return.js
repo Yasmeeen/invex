@@ -23,7 +23,9 @@ import {
 import {
   buildPurchaseNonDeferredRefundSplits,
   finalizePurchaseRefundSplits,
+  normalizeCustomRefundSplits,
 } from './return-refund-mirror.js';
+import { assertRefundMethodsLinkedToAccounts } from './treasury-ledger.js';
 
 function round2(n) {
   return Math.round(Number(n || 0) * 100) / 100;
@@ -356,34 +358,49 @@ export async function processPurchaseReturn(purchase, body = {}) {
   const cashViaRaw = String(body.cashRefundVia || 'drawer').toLowerCase();
   const cashTreasuryKey = String(body.cashTreasuryKey || '').trim().toLowerCase();
 
-  const { refundTreasurySplits: baseTreasurySplits } = buildPurchaseNonDeferredRefundSplits(
-    purchase,
-    refundTotal,
-    tMap
-  );
-
-  const finalized = finalizePurchaseRefundSplits(baseTreasurySplits, {
-    cashRefundVia: cashViaRaw,
-    cashTreasuryKey,
-    cashTreasuryLabel: body.cashTreasuryLabel,
-    tMap,
-  });
-  let refundTreasurySplits = finalized.refundTreasurySplits;
-  const cashRefundVia = finalized.cashRefundVia;
-
-  if (refundTreasurySplits.some((s) => isDeferredPurchaseTreasury(s.key))) {
-    throw new Error('Deferred treasury cannot be used for purchase returns');
-  }
-
-  const splitSum = round2(refundTreasurySplits.reduce((a, s) => a + s.amount, 0));
-  const { deferredAdjustmentAmount: mirroredDeferred } = buildPurchaseNonDeferredRefundSplits(
-    purchase,
-    refundTotal,
-    tMap
-  );
+  const { refundTreasurySplits: baseTreasurySplits, deferredAdjustmentAmount: mirroredDeferred } =
+    buildPurchaseNonDeferredRefundSplits(purchase, refundTotal, tMap);
   const expectedTreasury = round2(refundTotal - mirroredDeferred);
-  if (Math.abs(splitSum - expectedTreasury) > 0.02) {
-    throw new Error('Refund treasury splits must equal the refundable treasury total');
+  const customSplits = normalizeCustomRefundSplits(
+    body.refundTreasurySplits || body.refundPaymentSplits
+  );
+
+  let refundTreasurySplits;
+  let cashRefundVia;
+
+  if (customSplits) {
+    if (expectedTreasury <= 0.001) {
+      throw new Error('Nothing to refund outside the deferred balance');
+    }
+    const splitSum = round2(customSplits.reduce((a, s) => a + s.amount, 0));
+    if (Math.abs(splitSum - expectedTreasury) > 0.02) {
+      throw new Error('Refund treasury splits must equal the refundable treasury total');
+    }
+    await assertRefundMethodsLinkedToAccounts(customSplits.map((s) => s.method));
+    refundTreasurySplits = customSplits.map((s) => ({
+      key: s.method,
+      label: s.label || String(tMap.get(s.method) || s.method),
+      amount: s.amount,
+    }));
+    cashRefundVia = customSplits.some((s) => s.method === 'cash') ? 'drawer' : 'treasury';
+  } else {
+    const finalized = finalizePurchaseRefundSplits(baseTreasurySplits, {
+      cashRefundVia: cashViaRaw,
+      cashTreasuryKey,
+      cashTreasuryLabel: body.cashTreasuryLabel,
+      tMap,
+    });
+    refundTreasurySplits = finalized.refundTreasurySplits;
+    cashRefundVia = finalized.cashRefundVia;
+
+    if (refundTreasurySplits.some((s) => isDeferredPurchaseTreasury(s.key))) {
+      throw new Error('Deferred treasury cannot be used for purchase returns');
+    }
+
+    const splitSum = round2(refundTreasurySplits.reduce((a, s) => a + s.amount, 0));
+    if (Math.abs(splitSum - expectedTreasury) > 0.02) {
+      throw new Error('Refund treasury splits must equal the refundable treasury total');
+    }
   }
 
   const returnedProductIds = Array.isArray(body.returnedProductIds)

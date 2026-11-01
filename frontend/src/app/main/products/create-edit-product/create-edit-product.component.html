@@ -128,7 +128,6 @@
                           bindLabel="name"
                           [compareWith]="categoryCompare"
                           [clearable]="!isEdit"
-                          appendTo="#create-edit-product-modal-root"
                           [(ngModel)]="selectedCategory"
                           (ngModelChange)="onProductCategoryChange($event)"
                           #category="ngModel"

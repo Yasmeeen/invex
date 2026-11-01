@@ -1546,6 +1546,36 @@ export const getProducts = async (req, res) => {
   }
 };
 
+/**
+ * Cashier price guard. Returns only whether the unit price is at or below
+ * purchase cost — never the cost itself — so roles that cannot see netPrice
+ * still get the warning.
+ */
+export const checkSalePriceAgainstPurchase = async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || '').trim();
+    const unitPrice = Number(req.body?.unitPrice);
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ error: 'productId required' });
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return res.status(400).json({ error: 'unitPrice required' });
+    }
+    const product = await Product.findById(productId).select('netPrice').lean();
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const cost = Number(product.netPrice);
+    const price = Math.round(unitPrice * 100) / 100;
+    const atOrBelowPurchase =
+      Number.isFinite(cost) && price <= Math.round(cost * 100) / 100;
+    return res.json({ atOrBelowPurchase });
+  } catch (error) {
+    console.error('❌ Error checking sale price:', error.message);
+    return res.status(500).json({ error: 'Failed to check sale price' });
+  }
+};
+
 
 // Get product by ID
 export const getProductById = async (req, res) => {

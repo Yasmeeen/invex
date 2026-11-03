@@ -11,7 +11,7 @@ import { formatDate } from '@angular/common';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AbstractControl, ValidationErrors } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
-import { EMPTY, Observable, of, Subject, Subscription } from 'rxjs';
+import { EMPTY, forkJoin, Observable, of, Subject, Subscription } from 'rxjs';
 import { debounceTime, switchMap, catchError, takeUntil, distinctUntilChanged, tap, map, expand, reduce } from 'rxjs/operators';
 import { Globals } from '@core/globals';
 import {
@@ -2213,7 +2213,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addProduct(product: any) {
-    if (this.freeSellableQty(product) <= 0) return;
+    if (this.displayStock(product) <= 0) return;
 
     if (this.isWeightProduct(product)) {
       this.orderItems.push({
@@ -2627,6 +2627,157 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
 
+    this.confirmSellingForeignReservation(() => this.proceedToPayment());
+  }
+
+  /** Units on this line that are held by a customer other than the checkout client. */
+  private foreignReservedUnits(item: any): number {
+    const pid = this.orderLineProductId(item);
+    if (!pid) return 0;
+    const loaded = Object.prototype.hasOwnProperty.call(this.productReservationsById, pid);
+    if (loaded) {
+      return this.foreignReservationsForProduct(pid).reduce(
+        (sum, b) => sum + Math.max(0, Number(b.quantity) || 0),
+        0
+      );
+    }
+    const all = Math.max(0, Number(item?.bookedQuantity) || 0);
+    const matched = (this.clientActiveBookings || [])
+      .filter((b) => String(b.productId) === pid && this.isBookingMatchedToCurrentClient(b))
+      .reduce((sum, b) => sum + Math.max(0, Number(b.quantity) || 0), 0);
+    return Math.max(0, all - matched);
+  }
+
+  /** True when this line's quantity uses stock held for another customer. */
+  private lineConsumesForeignReservation(item: any): boolean {
+    const foreignQty = this.foreignReservedUnits(item);
+    if (foreignQty <= 0) return false;
+    const safe = Math.max(0, this.displayStock(item) - foreignQty);
+    if (this.isWeightLine(item)) {
+      return (Number(item?.quantity) || 0) > safe + 0.0001;
+    }
+    return Math.floor(Number(item?.quantity) || 0) > safe;
+  }
+
+  private loadMissingCartReservations(): Observable<void> {
+    const ids: string[] = [];
+    for (const item of this.orderItems || []) {
+      const pid = this.orderLineProductId(item);
+      if (!pid || !this.hasActiveBookingSignal(item)) continue;
+      if (Object.prototype.hasOwnProperty.call(this.productReservationsById, pid)) continue;
+      if (!ids.includes(pid)) ids.push(pid);
+    }
+    if (!ids.length) return of(undefined);
+    return forkJoin(
+      ids.map((id) =>
+        this.productBookings.getActiveReservationsForProduct(id).pipe(
+          tap((res) => {
+            this.productReservationsById = {
+              ...this.productReservationsById,
+              [id]: Array.isArray(res?.bookings) ? res.bookings : [],
+            };
+          }),
+          catchError(() => of(null))
+        )
+      )
+    ).pipe(map(() => undefined));
+  }
+
+  private foreignSaleConfirmOpen = false;
+
+  /** Ask before selling stock that is reserved for a different customer. */
+  private confirmSellingForeignReservation(onConfirmed: () => void): void {
+    if (this.foreignSaleConfirmOpen) return;
+    this.foreignSaleConfirmOpen = true;
+    this.loadMissingCartReservations()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          const lines = this.foreignReservationSaleImpacts();
+          if (!lines.length) {
+            this.foreignSaleConfirmOpen = false;
+            onConfirmed();
+            return;
+          }
+          const details = lines.map((line) =>
+            this.translate.instant(
+              line.deposit > 0
+                ? 'tr_cashier_sell_reserved_line_deposit'
+                : 'tr_cashier_sell_reserved_line',
+              { ...line, deposit: line.deposit.toFixed(2) }
+            )
+          );
+          details.push(this.translate.instant('tr_cashier_sell_reserved_fate'));
+          if (lines.some((line) => line.deposit > 0)) {
+            details.push(this.translate.instant('tr_cashier_sell_reserved_deposit_note'));
+          }
+          const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+            width: '520px',
+            maxWidth: '95vw',
+            disableClose: true,
+            panelClass: 'cashier-sell-reserved-dialog-panel',
+            backdropClass: 'cashier-sell-reserved-dialog-backdrop',
+            data: {
+              title: this.translate.instant('tr_cashier_sell_reserved_title'),
+              message: this.translate.instant('tr_cashier_sell_reserved_message'),
+              details,
+              buttons: [
+                {
+                  label: this.translate.instant('tr_action.cancel'),
+                  actionCallback: 'cancel',
+                  type: 'btn-secondary',
+                },
+                {
+                  label: this.translate.instant('tr_cashier_sell_reserved_confirm'),
+                  actionCallback: 'confirm',
+                  type: 'btn-danger',
+                },
+              ],
+            },
+          });
+          dialogRef.afterClosed().subscribe((result) => {
+            this.foreignSaleConfirmOpen = false;
+            if (result === 'confirm') onConfirmed();
+          });
+        },
+        error: () => {
+          this.foreignSaleConfirmOpen = false;
+        },
+      });
+  }
+
+  private foreignReservationSaleImpacts(): Array<{
+    product: string;
+    name: string;
+    phone: string;
+    deposit: number;
+  }> {
+    const out: Array<{ product: string; name: string; phone: string; deposit: number }> = [];
+    const seen = new Set<string>();
+    for (const item of this.orderItems || []) {
+      if (!this.lineConsumesForeignReservation(item)) continue;
+      const pid = this.orderLineProductId(item);
+      if (!pid || seen.has(pid)) continue;
+      seen.add(pid);
+      const foreign = this.foreignReservationsForProduct(pid);
+      const deposit = foreign.reduce((sum, b) => sum + (Number(b.depositAmount) || 0), 0);
+      const names = foreign
+        .map((b) => String(b.customerName || '').trim())
+        .filter(Boolean);
+      const phones = foreign
+        .map((b) => String(b.customerPhone || '').trim())
+        .filter(Boolean);
+      out.push({
+        product: String(item?.name || '').trim() || '—',
+        name: names.join('، ') || '—',
+        phone: phones.join('، ') || '—',
+        deposit: Math.round(deposit * 100) / 100,
+      });
+    }
+    return out;
+  }
+
+  private proceedToPayment(): void {
     if (this.hasExchangeTradeIn()) {
       const storeOwes = this.exchangeStoreOwesCustomer();
       if (storeOwes > 0.01) {

@@ -702,6 +702,22 @@ body[dir=rtl] {
   }
 }
 
+.cdk-overlay-backdrop.cashier-sell-reserved-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.cdk-overlay-pane.cashier-sell-reserved-dialog-panel {
+  box-shadow: none;
+}
+
+.cashier-sell-reserved-dialog-panel .mat-dialog-container,
+.cashier-sell-reserved-dialog-panel .mat-mdc-dialog-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  overflow: visible !important;
+}
+
 @media (min-width: 992px){
     @import 'desktop_styles';
 }

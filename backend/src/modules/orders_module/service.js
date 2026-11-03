@@ -101,35 +101,6 @@ function bookingBelongsToSaleClient(booking, finalClientId, saleClientPhone) {
   return true;
 }
 
-/**
- * Units reserved for this checkout client (website/POS booking).
- * Those units must be sellable to the same customer at cashier.
- */
-async function clientReservedQtyByProductId({
-  session,
-  partyType,
-  finalClientId,
-  saleClientPhone,
-  productIds,
-}) {
-  const map = new Map();
-  if (partyType !== 'client' || !productIds.length) return map;
-  const oids = productIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
-  if (!oids.length) return map;
-  const bookingsQ = ProductBooking.find({
-    product: { $in: oids.map((id) => new mongoose.Types.ObjectId(String(id))) },
-    status: 'active',
-  });
-  const bookings = await (session ? bookingsQ.session(session) : bookingsQ).lean();
-  for (const b of bookings) {
-    if (!bookingBelongsToSaleClient(b, finalClientId, saleClientPhone)) continue;
-    const pid = String(b.product);
-    const qty = Math.max(1, Math.floor(Number(b.quantity) || 1));
-    map.set(pid, (map.get(pid) || 0) + qty);
-  }
-  return map;
-}
-
 /** Build receipt lines from product snapshot + category attributeDefs.showOnInvoice */
 function buildInvoiceAttributesSnapshot(productDoc, categoryDoc) {
   const out = [];
@@ -413,6 +384,7 @@ export const getOrders = async (req, res) => {
       perPage,
       search = '',
       searchBranch = '',
+      branch: branchId = '',
       status,
       paymentMethod,
       installmentPlanMonths,
@@ -483,8 +455,11 @@ export const getOrders = async (req, res) => {
       }
     }
 
-    // ✅ 3. Search by branch name (works independently)
-    if (searchBranch) {
+    // ✅ 3. Branch: exact id from the invoice select, or legacy name search
+    const branchParam = String(branchId || '').trim();
+    if (branchParam && mongoose.Types.ObjectId.isValid(branchParam)) {
+      query.branch = new mongoose.Types.ObjectId(branchParam);
+    } else if (searchBranch) {
       const branch = await Branch.findOne({
         name: { $regex: searchBranch, $options: 'i' },
       });
@@ -806,14 +781,6 @@ export const createOrder = async (req, res) => {
 
     const dirtyProductIds = new Set();
 
-    const clientReservedByProduct = await clientReservedQtyByProductId({
-      session,
-      partyType,
-      finalClientId,
-      saleClientPhone,
-      productIds: uniqueProductIds,
-    });
-
     for (const item of validLineItems) {
       const selected = item.selectedProduct;
       const productDoc = productById.get(String(selected._id));
@@ -849,18 +816,13 @@ export const createOrder = async (req, res) => {
       }
       const stockDoc = sourceId ? productById.get(sourceId) : productDoc;
       const stockTransferReserved = Number(stockDoc.transferReservedQuantity) || 0;
-      const stockBookedQty = Number(stockDoc.bookedQuantity) || 0;
       const stockEcomReserved = Number(stockDoc.ecommerceReservedQuantity) || 0;
-      const stockClientReserved = Math.min(
-        stockBookedQty,
-        clientReservedByProduct.get(String(stockDoc._id)) || 0
-      );
-      const stockOthersBooked = Math.max(0, stockBookedQty - stockClientReserved);
+      // Another customer's product booking does not block the sale. Cashier asks
+      // for confirmation first; reconcileBookingsToStock releases the hold after
+      // the invoice when remaining stock no longer covers it.
       const maxSellable = isWeight
-        ? roundWeight(
-            Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved
-          )
-        : Number(stockDoc.stock) - stockTransferReserved - stockOthersBooked - stockEcomReserved;
+        ? roundWeight(Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved)
+        : Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved;
       if (maxSellable < quantity - (isWeight ? 0.0001 : 0)) {
         throw new Error(`Not enough stock for ${productDoc.name}`);
       }

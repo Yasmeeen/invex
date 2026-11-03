@@ -97,6 +97,8 @@ export class OrdersListComponent implements OnInit {
   listFromDate: Date | null = null;
   listToDate: Date | null = null;
   selectedBranchId: string | null;
+  /** Invoice list branch filter (admins). Separate from the stats branch picker. */
+  listBranchId: string | null = null;
   branches:Branch[] =[]
   /** null = no filter (all payment methods) */
   selectedPaymentMethod: string | null = null;
@@ -327,8 +329,16 @@ export class OrdersListComponent implements OnInit {
 
   getOrders() {
    this.curentUser = this.authenticationService.getUserFromLocalStorage();
+   delete this.params.searchBranch;
    if (this.curentUser.role === 'Cashier' || this.curentUser.role === 'Branch Manager') {
-    this.params.searchBranch = this.curentUser.branch?.name;
+    const ownBranch = this.curentUser.branch?._id || this.curentUser.branch;
+    if (ownBranch) {
+      this.params.branch = String(ownBranch);
+    }
+   } else if (this.listBranchId) {
+    this.params.branch = this.listBranchId;
+   } else {
+    delete this.params.branch;
    }
    if(this.selectedStatus){
     this.params['status'] = this.selectedStatus
@@ -396,6 +406,11 @@ export class OrdersListComponent implements OnInit {
     }))
   }
 
+
+  onListBranchFilterChange(): void {
+    this.params.page = 1;
+    this.getOrders();
+  }
 
   onSettlementFilterChange(): void {
     if (this.settlementFilter !== 'open' && this.settlementFilter !== 'settled') {

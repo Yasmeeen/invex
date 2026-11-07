@@ -57,6 +57,14 @@ export class DailyExpensesService {
     return this.http.post<DailyExpenseDto>(DAILY_EXPENSES_URL, payload);
   }
 
+  remove(id: string, userId: string): Observable<{ ok: boolean; refundedAmount?: number }> {
+    const params = new HttpParams().set('userId', userId);
+    return this.http.delete<{ ok: boolean; refundedAmount?: number }>(
+      `${DAILY_EXPENSES_URL}/${id}`,
+      { params }
+    );
+  }
+
   list(params: {
     viewerUserId: string;
     page?: number;

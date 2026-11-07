@@ -8,6 +8,8 @@ import { AdminDeleteClientDialogComponent } from './admin-delete-client-dialog.c
 import { AdminEditInstallmentDialogComponent } from './admin-edit-installment-dialog.component';
 import { AdminEditSaleNumberDialogComponent } from './admin-edit-sale-number-dialog.component';
 import { AdminMinimumCollectionDialogComponent } from './admin-minimum-collection-dialog.component';
+import { AdminDeleteInstallmentDialogComponent } from './admin-delete-installment-dialog.component';
+import { AdminReverseInstallmentDialogComponent } from './admin-reverse-installment-dialog.component';
 
 @NgModule({
   declarations: [
@@ -16,6 +18,8 @@ import { AdminMinimumCollectionDialogComponent } from './admin-minimum-collectio
     AdminEditInstallmentDialogComponent,
     AdminEditSaleNumberDialogComponent,
     AdminMinimumCollectionDialogComponent,
+    AdminDeleteInstallmentDialogComponent,
+    AdminReverseInstallmentDialogComponent,
   ],
   imports: [CommonModule, FormsModule, SharedModule, MatDialogModule],
   exports: [
@@ -24,6 +28,8 @@ import { AdminMinimumCollectionDialogComponent } from './admin-minimum-collectio
     AdminEditInstallmentDialogComponent,
     AdminEditSaleNumberDialogComponent,
     AdminMinimumCollectionDialogComponent,
+    AdminDeleteInstallmentDialogComponent,
+    AdminReverseInstallmentDialogComponent,
   ],
 })
 export class AdminInstallmentDialogsModule {}

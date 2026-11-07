@@ -2,13 +2,26 @@ import mongoose from 'mongoose';
 import DailyExpense from '../../DB/models/dailyExpense.model.js';
 import User from '../../DB/models/user.model.js';
 import Branch from '../../DB/models/branch.model.js';
+import DrawerClose from '../../DB/models/drawerClose.model.js';
+import TreasuryLedgerEntry from '../../DB/models/treasuryLedgerEntry.model.js';
 import {
   getEffectivePurchaseTreasuryMethodsFromDb,
   treasuryMethodMap,
 } from '../settings_module/treasuryMethods.js';
-import { normalizeTreasurySplitsInput } from '../../utils/purchase-treasury-splits.js';
-import { postTreasurySplitOutflows, safeTreasuryPost } from '../../utils/treasury-ledger.js';
-import { dailyExpenseCategoryMatch } from '../../utils/daily-expense-categories.js';
+import {
+  cashAmountFromTreasurySplits,
+  normalizeTreasurySplitsInput,
+  resolveExpenseTreasurySplits,
+} from '../../utils/purchase-treasury-splits.js';
+import {
+  businessDateStr,
+  postTreasurySplitOutflows,
+  safeTreasuryPost,
+} from '../../utils/treasury-ledger.js';
+import {
+  NON_OPERATING_DAILY_EXPENSE_TYPES,
+  dailyExpenseCategoryMatch,
+} from '../../utils/daily-expense-categories.js';
 
 const ADMIN_ROLES = ['Super Admin', 'Co Admin'];
 
@@ -243,5 +256,102 @@ export const listDailyExpenses = async (req, res) => {
   } catch (err) {
     console.error('❌ listDailyExpenses:', err.message);
     res.status(500).json({ error: 'Failed to list expenses' });
+  }
+};
+
+/** True when a drawer close already includes this business day (cash was counted). */
+async function drawerCloseCoversDate(branchId, dateStr) {
+  if (!branchId || !dateStr) return false;
+  const hit = await DrawerClose.findOne({
+    branch: branchId,
+    $or: [
+      {
+        periodStartDate: { $lte: dateStr },
+        periodEndDate: { $gte: dateStr },
+      },
+      {
+        periodStartDate: { $exists: false },
+        businessDate: dateStr,
+      },
+    ],
+  })
+    .select('_id')
+    .lean();
+  return Boolean(hit);
+}
+
+/**
+ * Super Admin deletes an operating expense and puts the amount back
+ * on the treasuries it was taken from (removes the original ledger outflows).
+ */
+export const deleteDailyExpense = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { id } = req.params;
+    const userId = req.query?.userId || req.body?.userId;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid expense id' });
+    }
+
+    const actor = await loadActor(userId);
+    if (!actor || actor.role !== 'Super Admin') {
+      return res.status(403).json({
+        error: 'Not allowed to delete expenses',
+        code: 'forbidden',
+      });
+    }
+
+    session.startTransaction();
+    const doc = await DailyExpense.findById(id).session(session);
+    if (!doc) {
+      await session.abortTransaction();
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    const typeTrim = String(doc.expenseType || '').trim();
+    if (NON_OPERATING_DAILY_EXPENSE_TYPES.includes(typeTrim)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        error: 'This cash movement is linked to another payment and cannot be deleted here',
+        code: 'system_movement',
+      });
+    }
+
+    const splits = resolveExpenseTreasurySplits(doc);
+    const cashPart = cashAmountFromTreasurySplits(splits);
+    if (cashPart > 0) {
+      const dateStr = businessDateStr(doc.createdAt || new Date());
+      const closed = await drawerCloseCoversDate(doc.branch, dateStr);
+      if (closed) {
+        await session.abortTransaction();
+        return res.status(409).json({
+          error: 'Drawer already closed for this expense date',
+          code: 'drawer_closed',
+        });
+      }
+    }
+
+    const removedLedger = await TreasuryLedgerEntry.deleteMany(
+      { sourceType: 'daily_expense', sourceId: doc._id },
+      { session }
+    );
+    await DailyExpense.deleteOne({ _id: doc._id }, { session });
+    await session.commitTransaction();
+
+    res.json({
+      ok: true,
+      refundedAmount: round2(doc.amount),
+      refundedSplits: splits,
+      ledgerEntriesRemoved: removedLedger?.deletedCount || 0,
+    });
+  } catch (err) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    console.error('❌ deleteDailyExpense:', err.message);
+    res.status(500).json({ error: 'Failed to delete expense' });
+  } finally {
+    session.endSession();
   }
 };

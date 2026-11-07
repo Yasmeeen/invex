@@ -103,6 +103,7 @@ export interface ClientHistoryOrderRow {
   createdAt?: string;
   sellerName?: string;
   /** Effective collector: sale assignment, otherwise the client's collector. */
+  collectorId?: string | null;
   collectorName?: string;
   branch?: { _id?: string; name?: string };
   remaining?: number;

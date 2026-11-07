@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const SOURCE_TYPES = [
   'order_payment',
   'order_refund',
+  'installment_payment_reversal',
   'client_deposit',
   'client_payout',
   'booking_deposit',

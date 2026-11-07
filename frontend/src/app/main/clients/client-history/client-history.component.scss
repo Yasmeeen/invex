@@ -172,7 +172,7 @@
 .installment-order-block {
   border: 1px solid #e8edf2;
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
 }
 
@@ -363,6 +363,82 @@
   margin: 0;
   border: 0;
   border-radius: 0;
+  overflow: visible;
+  min-height: 0;
+}
+
+.installment-order-block .s-table td.installment-row-actions,
+.installment-order-block .s-table th:last-child {
+  width: 1%;
+  min-width: 15.5rem;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  text-align: end;
+  vertical-align: middle;
+}
+
+.installment-row-actions {
+  position: relative;
+}
+
+.installment-row-actions__bar {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: max-content;
+}
+
+.installment-row-actions__bar .s-btn {
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.installment-row-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.installment-order-block .s-table,
+.installment-order-block .s-table tbody,
+.installment-order-block .s-table tr {
+  overflow: visible;
+}
+
+.installment-order-block .s-table tbody tr:has(.installment-row-menu.active) {
+  position: relative;
+  z-index: 40;
+}
+
+.installment-order-block .s-table tr:has(.installment-row-menu.active) > td.installment-row-actions {
+  position: relative;
+  z-index: 40;
+}
+
+.installment-row-menu.active {
+  z-index: 40;
+}
+
+.installment-row-menu .options-menu-container {
+  inset-inline-end: 0;
+  inset-inline-start: auto;
+  z-index: 50;
+  min-width: 11rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.installment-row-menu.active .options-menu-container {
+  z-index: 50;
 }
 
 .s-btn.installment-order-head__early {
@@ -419,10 +495,16 @@
   color: #991b1b;
 }
 
-.installment-row--paid:hover > td,
-.installment-row--overdue:hover > td,
+.installment-row--paid:hover > td {
+  background: #d1fae5;
+}
+
+.installment-row--overdue:hover > td {
+  background: #fee2e2;
+}
+
 .installment-row--early:hover > td {
-  filter: brightness(0.98);
+  background: #ffedd5;
 }
 
 .early-settlement-badge {

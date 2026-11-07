@@ -24,14 +24,14 @@
   <p class="assign-collector-dialog__hint">{{ 'tr_assign_collector_workload_hint' | translate }}</p>
 
   <footer class="assign-collector-dialog__actions">
-    <button type="button" class="btn btn-light" (click)="cancel()">
-      {{ 'tr_cancel' | translate }}
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_action.cancel' | translate }}
     </button>
-    <button type="button" class="btn btn-outline-secondary" (click)="clear()">
+    <button type="button" class="s-btn btn-secondary" (click)="clear()">
       {{ 'tr_unassign_collector' | translate }}
     </button>
-    <button type="button" class="btn btn-primary" (click)="submit()">
-      {{ 'tr_save' | translate }}
+    <button type="button" class="s-btn btn-primary" (click)="submit()">
+      {{ 'tr_action.save' | translate }}
     </button>
   </footer>
 </div>

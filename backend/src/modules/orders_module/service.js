@@ -37,6 +37,7 @@ import {
 } from '../product_bookings_module/service.js';
 import {
   postOrderPaymentLinesToLedger,
+  postPaymentMethodOutflows,
   postRefundPaymentLinesToLedger,
   postTreasurySplitOutflows,
   safeTreasuryPost,
@@ -2927,5 +2928,355 @@ export const adminUpdateInstallmentRow = async (req, res) => {
   } catch (err) {
     console.error('❌ adminUpdateInstallmentRow:', err.message);
     res.status(500).json({ error: 'Failed to update installment' });
+  }
+};
+
+/**
+ * POST /api/orders/:orderId/installments/:installmentId/admin-delete
+ * Super Admin — remove one unpaid installment. Collected rows stay locked.
+ * Body: { userId, reason }
+ */
+export const adminDeleteInstallmentRow = async (req, res) => {
+  try {
+    const auth = await requireInstallmentAdminActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    if (reason.length < 3) {
+      return res.status(400).json({ error: 'Deletion reason is required (min 3 characters)' });
+    }
+
+    const { orderId, installmentId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    if (!installmentId || !mongoose.Types.ObjectId.isValid(String(installmentId))) {
+      return res.status(400).json({ error: 'Invalid installment id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales support this action' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot edit a restored invoice' });
+    }
+    if (!Array.isArray(order.installments) || !order.installments.length) {
+      return res.status(400).json({ error: 'Order has no installments' });
+    }
+    if (order.installments.length <= 1) {
+      return res.status(400).json({
+        error: 'Delete the installment sale instead of its only installment',
+        code: 'INSTALLMENT_DELETE_LAST',
+      });
+    }
+
+    const row =
+      order.installments.id(installmentId) ||
+      order.installments.find((r) => String(r._id) === String(installmentId));
+    if (!row) return res.status(404).json({ error: 'Installment not found' });
+
+    const paidAmt = roundMoney2(row.paidAmount);
+    if (row.paid === true || row.earlySettlement === true || paidAmt > 0.005) {
+      return res.status(400).json({
+        error: 'Cannot delete an installment that already has a payment',
+        code: 'INSTALLMENT_DELETE_PAID',
+      });
+    }
+
+    const beforeTotal = order.totalPrice;
+    const beforePaymentStatus = order.paymentStatus;
+    const beforeAmountPaid = order.amountPaid;
+    const removed = {
+      _id: row._id,
+      sequence: row.sequence,
+      dueDate: row.dueDate,
+      amount: row.amount,
+      paid: row.paid,
+      paidAmount: row.paidAmount,
+    };
+
+    order.installments.pull(row._id);
+    const sumInstallments = roundMoney2(
+      (order.installments || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
+    );
+    const paid = roundMoney2(order.amountPaid);
+    if (paid > sumInstallments + 0.005) {
+      return res.status(400).json({
+        error: 'Collected amount would exceed the remaining installments',
+        code: 'INSTALLMENT_DELETE_COLLECTED_EXCEEDS',
+      });
+    }
+
+    order.totalPrice = sumInstallments;
+    if (paid >= sumInstallments - 0.005) {
+      order.paymentStatus = sumInstallments <= 0.005 && paid <= 0.005 ? 'unpaid' : 'paid';
+    } else if (paid > 0) {
+      order.paymentStatus = 'partial';
+    } else {
+      order.paymentStatus = 'unpaid';
+    }
+    order.markModified('installments');
+    await order.save();
+
+    const saleLabel =
+      order.installmentSaleNumber != null
+        ? `تقسيط #${order.installmentSaleNumber}`
+        : order.orderNumber != null
+          ? `فاتورة #${order.orderNumber}`
+          : String(order._id);
+
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'delete',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: `${saleLabel} · قسط #${removed.sequence}`,
+      message: `${auth.user.role} deleted installment #${removed.sequence} on ${saleLabel}: ${reason}`,
+      metadata: {
+        reason,
+        adminAction: 'delete_installment_row',
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        installmentId: removed._id,
+        installmentSequence: removed.sequence,
+      },
+      before: {
+        installment: removed,
+        totalPrice: beforeTotal,
+        amountPaid: beforeAmountPaid,
+        paymentStatus: beforePaymentStatus,
+      },
+      after: {
+        totalPrice: order.totalPrice,
+        amountPaid: order.amountPaid,
+        paymentStatus: order.paymentStatus,
+        installmentCount: order.installments.length,
+      },
+    });
+
+    res.json({
+      message: '✅ Installment deleted',
+      orderId: order._id,
+      installmentId: removed._id,
+      installmentSequence: removed.sequence,
+      totalPrice: order.totalPrice,
+      paymentStatus: order.paymentStatus,
+      reason,
+    });
+  } catch (err) {
+    console.error('❌ adminDeleteInstallmentRow:', err.message);
+    res.status(500).json({ error: 'Failed to delete installment' });
+  }
+};
+
+/**
+ * POST /api/orders/:orderId/installments/:installmentId/admin-reverse-payment
+ * Super Admin — reopen an installment that was marked paid by mistake.
+ * Body: { userId, reason, reverseDrawer?: boolean }
+ * reverseDrawer true: treasury outflow today (book correction, not a customer refund).
+ * reverseDrawer false: leave the drawer and hold the amount as client credit.
+ * Profit correction is posted today so a closed day is not rewritten.
+ */
+export const adminReverseInstallmentPayment = async (req, res) => {
+  try {
+    const auth = await requireInstallmentAdminActor(req);
+    if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+    const reason = String(req.body?.reason || '').trim();
+    if (reason.length < 3) {
+      return res.status(400).json({ error: 'Reversal reason is required (min 3 characters)' });
+    }
+    const reverseDrawer = req.body?.reverseDrawer !== false;
+
+    const { orderId, installmentId } = req.params;
+    if (!orderId || !mongoose.Types.ObjectId.isValid(String(orderId))) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    if (!installmentId || !mongoose.Types.ObjectId.isValid(String(installmentId))) {
+      return res.status(400).json({ error: 'Invalid installment id' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (String(order.paymentMethod || '').toLowerCase() !== 'installment') {
+      return res.status(400).json({ error: 'Only installment sales support this action' });
+    }
+    if (String(order.status || '') === 'restored') {
+      return res.status(400).json({ error: 'Cannot edit a restored invoice' });
+    }
+
+    const row =
+      order.installments?.id?.(installmentId) ||
+      (order.installments || []).find((r) => String(r._id) === String(installmentId));
+    if (!row) return res.status(404).json({ error: 'Installment not found' });
+    if (row.earlySettlement === true) {
+      return res.status(400).json({
+        error: 'Early settlement rows cannot be reversed from here',
+        code: 'INSTALLMENT_REVERSE_EARLY',
+      });
+    }
+
+    const recordedPaid = roundMoney2(row.paidAmount);
+    const reversedAmount =
+      recordedPaid > 0.005 ? recordedPaid : row.paid === true ? roundMoney2(row.amount) : 0;
+    if (reversedAmount <= 0.005) {
+      return res.status(400).json({
+        error: 'This installment has no payment to reverse',
+        code: 'INSTALLMENT_REVERSE_NONE',
+      });
+    }
+    if (!reverseDrawer && !order.clientId) {
+      return res.status(400).json({
+        error: 'This sale has no client to hold the credit',
+        code: 'INSTALLMENT_REVERSE_NO_CLIENT',
+      });
+    }
+    const creditClient = !reverseDrawer ? await Client.findById(order.clientId) : null;
+    if (!reverseDrawer && !creditClient) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    const reversedProfit = roundMoney2(row.recognizedProfit);
+    const method = String(row.paymentMethod || 'cash').trim().toLowerCase() || 'cash';
+    const beforePaid = roundMoney2(order.amountPaid);
+    const beforeStatus = order.paymentStatus;
+
+    row.paid = false;
+    row.paidAmount = 0;
+    row.recognizedProfit = 0;
+    row.paidAt = undefined;
+    row.paymentMethod = '';
+    row.paidByUserId = undefined;
+
+    const nextPaid = roundMoney2(Math.max(0, beforePaid - reversedAmount));
+    order.amountPaid = nextPaid;
+    const total = roundMoney2(order.totalPrice);
+    if (nextPaid >= total - 0.005 && total > 0.005) {
+      order.paymentStatus = 'paid';
+    } else if (nextPaid > 0.005) {
+      order.paymentStatus = 'partial';
+    } else {
+      order.paymentStatus = 'unpaid';
+    }
+
+    const now = new Date();
+    const note = reverseDrawer
+      ? `تصحيح سداد قسط #${row.sequence} بالغلط — خروج من الدرج، بدون رد فلوس للعميل. ${reason}`
+      : `تصحيح سداد قسط #${row.sequence} بالغلط — الفلوس فضلت في الدرج وتحولت رصيد للعميل. ${reason}`;
+    order.payments = order.payments || [];
+    if (reversedProfit > 0.005) {
+      order.payments.push({
+        amount: 0,
+        paidAt: now,
+        paidByUserId: auth.user._id,
+        ...(order.branch ? { branch: order.branch } : {}),
+        method: method === 'mixed' ? 'cash' : method,
+        countsTowardInvoice: false,
+        installmentProfit: roundMoney2(-reversedProfit),
+        note: note.slice(0, 500),
+      });
+    }
+    order.markModified('installments');
+    order.markModified('payments');
+    await order.save();
+
+    let clientCreditBalance = null;
+    if (!reverseDrawer) {
+      const client = creditClient;
+      client.creditBalance = roundMoney2((Number(client.creditBalance) || 0) + reversedAmount);
+      client.ledgerEntries = client.ledgerEntries || [];
+      client.ledgerEntries.push({
+        type: 'deposit',
+        amount: reversedAmount,
+        paymentMethod: method === 'mixed' ? 'cash' : method,
+        note: note.slice(0, 500),
+        affectsCashDrawer: false,
+        ...(order.branch ? { branch: order.branch } : {}),
+        createdAt: now,
+        createdByUserId: auth.user._id,
+      });
+      await client.save();
+      clientCreditBalance = client.creditBalance;
+    } else {
+      const branchForLedger =
+        order.branch ||
+        (await resolveBranchForCashDrawer({ userId: auth.user._id }));
+      const outflowMethod = method === 'mixed' ? 'cash' : method;
+      await safeTreasuryPost('installment_payment_reversal', async () => {
+        if (!branchForLedger) return;
+        await postPaymentMethodOutflows({
+          branchId: branchForLedger,
+          methodAmounts: [{ method: outflowMethod, amount: reversedAmount }],
+          occurredAt: now,
+          sourceType: 'installment_payment_reversal',
+          sourceId: order._id,
+          note: note.slice(0, 500),
+          createdBy: auth.user._id,
+        });
+      });
+    }
+
+    const saleLabel =
+      order.installmentSaleNumber != null
+        ? `تقسيط #${order.installmentSaleNumber}`
+        : order.orderNumber != null
+          ? `فاتورة #${order.orderNumber}`
+          : String(order._id);
+
+    await auditLog(req, {
+      actorUserId: auth.user._id,
+      actorName: auth.user.name,
+      actorRole: auth.user.role,
+      action: 'update',
+      module: 'orders',
+      entityType: 'Order',
+      entityId: order._id,
+      entityLabel: `${saleLabel} · قسط #${row.sequence}`,
+      message: `${auth.user.role} reversed installment #${row.sequence} payment on ${saleLabel}: ${reason}`,
+      metadata: {
+        reason,
+        adminAction: 'reverse_installment_payment',
+        reverseDrawer,
+        reversedAmount,
+        reversedProfit,
+        method,
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        installmentId: row._id,
+        installmentSequence: row.sequence,
+      },
+      before: {
+        amountPaid: beforePaid,
+        paymentStatus: beforeStatus,
+        paidAmount: reversedAmount,
+        recognizedProfit: reversedProfit,
+      },
+      after: {
+        amountPaid: order.amountPaid,
+        paymentStatus: order.paymentStatus,
+        paidAmount: 0,
+        clientCreditBalance,
+      },
+    });
+
+    res.json({
+      message: '✅ Installment payment reversed',
+      orderId: order._id,
+      installmentId: row._id,
+      installmentSequence: row.sequence,
+      reversedAmount,
+      reverseDrawer,
+      amountPaid: order.amountPaid,
+      paymentStatus: order.paymentStatus,
+      clientCreditBalance,
+      reason,
+    });
+  } catch (err) {
+    console.error('❌ adminReverseInstallmentPayment:', err.message);
+    res.status(500).json({ error: 'Failed to reverse installment payment' });
   }
 };

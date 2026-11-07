@@ -107,6 +107,7 @@
             <th>{{ 'tr_daily_expense_type' | translate }}</th>
             <th>{{ 'tr_daily_expense_notes' | translate }}</th>
             <th *ngIf="showRecordedByColumn">{{ 'tr_daily_expenses_recorded_by' | translate }}</th>
+            <th *ngIf="canDeleteExpenses" class="expenses-actions-col">{{ 'tr_actions' | translate }}</th>
           </tr>
         </thead>
         <tbody>
@@ -118,6 +119,16 @@
             <td>{{ expenseTypeLabel(row) }}</td>
             <td class="expenses-notes">{{ row.notes || '—' }}</td>
             <td *ngIf="showRecordedByColumn">{{ row.recordedBy?.name || row.recordedBy?.email || '—' }}</td>
+            <td *ngIf="canDeleteExpenses">
+              <button
+                type="button"
+                class="s-btn btn-danger btn-sm"
+                (click)="confirmDelete(row)"
+                [disabled]="deletingId === row._id"
+              >
+                {{ 'tr_daily_expense_delete' | translate }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>

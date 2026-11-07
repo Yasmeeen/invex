@@ -432,6 +432,13 @@
               <div class="options-menu-container p-0">
                 <div
                   class="single-option"
+                  *ngIf="canAssignSaleCollector"
+                  (click)="changeSaleCollector(o, $event); closeInstallmentMoreMenus()"
+                >
+                  {{ 'tr_change_sale_collector' | translate }}
+                </div>
+                <div
+                  class="single-option"
                   *ngIf="canEditMinimumCollection"
                   (click)="editMinimumCollection(o, $event); closeInstallmentMoreMenus()"
                 >
@@ -516,31 +523,51 @@
                     </ul>
                   </div>
                 </td>
-                <td>
-                  <button
-                    type="button"
-                    class="s-btn btn-primary btn-sm mr-1"
-                    *ngIf="canPayInstallmentRow(o, row)"
-                    (click)="openPayOrderDialog(o, row._id)"
-                  >
-                    {{ 'tr_pay_installment' | translate }}
-                  </button>
-                  <button
-                    type="button"
-                    class="s-btn btn-secondary btn-sm mr-1"
-                    *ngIf="canPayInstallmentRow(o, row)"
-                    (click)="setInstallmentPromise(o, row)"
-                  >
-                    {{ 'tr_promise_to_pay' | translate }}
-                  </button>
-                  <button
-                    type="button"
-                    class="s-btn btn-secondary btn-sm"
-                    *ngIf="canAdminInstallments && o.status !== 'restored' && canAdminEditInstallmentRow(row)"
-                    (click)="adminEditInstallmentRow(o, row)"
-                  >
-                    {{ 'tr_admin_edit_installment' | translate }}
-                  </button>
+                <td class="installment-row-actions">
+                  <div class="installment-row-actions__bar">
+                    <button
+                      type="button"
+                      class="s-btn btn-primary btn-sm"
+                      *ngIf="canPayInstallmentRow(o, row)"
+                      (click)="openPayOrderDialog(o, row._id)"
+                    >
+                      {{ 'tr_pay_installment' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="s-btn btn-secondary btn-sm"
+                      *ngIf="canPayInstallmentRow(o, row)"
+                      (click)="setInstallmentPromise(o, row)"
+                    >
+                      {{ 'tr_promise_to_pay' | translate }}
+                    </button>
+                    <span class="options-menu installment-row-menu" *ngIf="hasInstallmentRowMenuActions(o, row)">
+                      <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+                      <div class="options-menu-container p-0">
+                        <div
+                          class="single-option"
+                          *ngIf="canAdminEditInstallmentRowAction(o, row)"
+                          (click)="adminEditInstallmentRow(o, row)"
+                        >
+                          {{ 'tr_admin_edit_installment' | translate }}
+                        </div>
+                        <div
+                          class="single-option"
+                          *ngIf="canReverseInstallmentPayment(o, row)"
+                          (click)="adminReverseInstallmentPayment(o, row)"
+                        >
+                          {{ 'tr_admin_reverse_installment' | translate }}
+                        </div>
+                        <div
+                          class="single-option"
+                          *ngIf="canDeleteInstallmentRow(o, row)"
+                          (click)="adminDeleteInstallmentRow(o, row)"
+                        >
+                          <div class="text-error">{{ 'tr_admin_delete_installment' | translate }}</div>
+                        </div>
+                      </div>
+                    </span>
+                  </div>
                 </td>
               </tr>
             </tbody>

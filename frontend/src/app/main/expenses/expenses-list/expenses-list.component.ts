@@ -4,6 +4,7 @@ import { Globals } from '@core/globals';
 import { PaginationData } from '@core/models/users-interfaces.model';
 import { Branch } from '@core/models/products.model';
 import { TranslateService } from '@ngx-translate/core';
+import { ConfirmationDialogComponent } from '@shared/components/confirmation-dialog/confirmation-dialog.component';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
 import {
@@ -37,6 +38,7 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
   paginationPerPage = 15;
   /** Sum of filtered expenses (all matching pages). */
   totalAmount = 0;
+  deletingId = '';
 
   activeTab: ExpensesTab = 'operating';
 
@@ -97,6 +99,11 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
 
   get showRecordedByColumn(): boolean {
     return this.globals.currentUser?.role !== 'Cashier';
+  }
+
+  /** Operating expenses only. Cash-movement rows belong to another payment. */
+  get canDeleteExpenses(): boolean {
+    return this.globals.currentUser?.role === 'Super Admin' && !this.isCashMovementsTab;
   }
 
   get isCashMovementsTab(): boolean {
@@ -208,6 +215,81 @@ export class ExpensesListComponent implements OnInit, OnDestroy {
           this.params.page = 1;
           this.load();
         }
+      })
+    );
+  }
+
+  confirmDelete(row: DailyExpenseDto): void {
+    if (!this.canDeleteExpenses || !row?._id || this.deletingId) return;
+
+    const amount = Number(row.amount);
+    const amountStr = Number.isFinite(amount)
+      ? new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+      : '0.00';
+
+    const confirmationData = {
+      title: this.translate.instant('tr_daily_expense_delete_confirm_title'),
+      message: this.translate.instant('tr_daily_expense_delete_confirm_message'),
+      details: [
+        `${this.translate.instant('tr_daily_expense_amount')}: EGP ${amountStr}`,
+        `${this.translate.instant('tr_daily_expense_treasury')}: ${this.expenseTreasuryDisplay(row)}`,
+        `${this.translate.instant('tr_daily_expense_type')}: ${this.expenseTypeLabel(row)}`,
+      ],
+      buttons: [
+        {
+          label: this.translate.instant('tr_action.cancel'),
+          actionCallback: 'cancel',
+          type: 'btn-secondary',
+        },
+        {
+          label: this.translate.instant('tr_daily_expense_delete'),
+          actionCallback: 'delete',
+          type: 'btn-danger',
+        },
+      ],
+    };
+
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '450px',
+      data: confirmationData,
+      disableClose: true,
+    });
+
+    this.subscriptions.push(
+      dialogRef.afterClosed().subscribe((result) => {
+        if (result !== 'delete') return;
+        this.deleteExpense(row);
+      })
+    );
+  }
+
+  private deleteExpense(row: DailyExpenseDto): void {
+    const userId = this.globals.currentUser?._id;
+    if (!userId || !row?._id) return;
+    this.deletingId = row._id;
+    this.subscriptions.push(
+      this.dailyExpenses.remove(row._id, userId).subscribe({
+        next: () => {
+          this.deletingId = '';
+          this.notify.push(this.translate.instant('tr_daily_expense_deleted'), 'success');
+          if (this.expenses.length === 1 && this.params.page > 1) {
+            this.params.page -= 1;
+          }
+          this.load();
+        },
+        error: (err) => {
+          this.deletingId = '';
+          const code = err?.error?.code;
+          let msg = err?.error?.error || this.translate.instant('tr_unexpected_error_message');
+          if (code === 'drawer_closed') {
+            msg = this.translate.instant('tr_daily_expense_delete_drawer_closed');
+          } else if (code === 'system_movement') {
+            msg = this.translate.instant('tr_daily_expense_delete_system');
+          } else if (err?.status === 403) {
+            msg = this.translate.instant('tr_daily_expense_delete_forbidden');
+          }
+          this.notify.push(msg, 'error');
+        },
       })
     );
   }

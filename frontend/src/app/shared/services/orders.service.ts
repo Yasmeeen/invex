@@ -140,6 +140,30 @@ adminUpdateInstallmentRow(
   );
 }
 
+/** Super Admin: reopen a mistakenly paid installment. reverseDrawer posts a drawer outflow (not a customer refund). */
+adminReverseInstallmentPayment(
+  orderId: string,
+  installmentId: string,
+  payload: { userId: string; reason: string; reverseDrawer: boolean }
+): Observable<any> {
+  return this.http.post(
+    `${ORDERS_URL}/${orderId}/installments/${installmentId}/admin-reverse-payment`,
+    payload
+  );
+}
+
+/** Super Admin: delete one unpaid installment with required reason (audited). */
+adminDeleteInstallmentRow(
+  orderId: string,
+  installmentId: string,
+  payload: { userId: string; reason: string }
+): Observable<any> {
+  return this.http.post(
+    `${ORDERS_URL}/${orderId}/installments/${installmentId}/admin-delete`,
+    payload
+  );
+}
+
 restoreOrder(
   orderId: string,
   payload: {

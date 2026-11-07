@@ -1,0 +1,60 @@
+<div class="admin-inst-dialog">
+  <h2 class="admin-inst-dialog__title">{{ 'tr_admin_reverse_installment' | translate }}</h2>
+
+  <p class="admin-inst-dialog__confirm">
+    {{ 'tr_admin_reverse_installment_confirm' | translate }}
+  </p>
+
+  <ul class="admin-inst-dialog__details" *ngIf="data">
+    <li *ngIf="data.sequence != null">
+      {{ 'tr_installments' | translate }}: <strong>#{{ data.sequence }}</strong>
+    </li>
+    <li *ngIf="data.paidAmount != null">
+      {{ 'tr_paid' | translate }}:
+      <strong>{{ data.paidAmount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+    <li *ngIf="data.paymentMethod">
+      {{ 'tr_payment_method' | translate }}: <strong>{{ data.paymentMethod }}</strong>
+    </li>
+    <li *ngIf="data.clientName">
+      {{ 'tr_client_name' | translate }}: <strong>{{ data.clientName }}</strong>
+    </li>
+  </ul>
+
+  <label class="admin-inst-dialog__check">
+    <input type="radio" name="reverseMoney" value="drawer" [(ngModel)]="moneyChoice" />
+    <span>{{ 'tr_admin_reverse_installment_drawer' | translate }}</span>
+  </label>
+  <p class="admin-inst-dialog__hint">{{ 'tr_admin_reverse_installment_drawer_hint' | translate }}</p>
+
+  <label class="admin-inst-dialog__check">
+    <input type="radio" name="reverseMoney" value="keep" [(ngModel)]="moneyChoice" />
+    <span>{{ 'tr_admin_reverse_installment_keep' | translate }}</span>
+  </label>
+  <p class="admin-inst-dialog__hint">{{ 'tr_admin_reverse_installment_keep_hint' | translate }}</p>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_admin_reverse_reason' | translate }} <em>*</em></span>
+    <textarea
+      class="s-control"
+      rows="3"
+      name="reason"
+      [(ngModel)]="reason"
+      [placeholder]="'tr_admin_delete_reason_placeholder' | translate"
+    ></textarea>
+  </label>
+
+  <div class="admin-inst-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-primary"
+      [disabled]="!canSubmit"
+      (click)="submit()"
+    >
+      {{ 'tr_admin_reverse_installment_confirm_btn' | translate }}
+    </button>
+  </div>
+</div>

@@ -1,0 +1,52 @@
+<div class="admin-inst-dialog">
+  <h2 class="admin-inst-dialog__title">{{ 'tr_admin_delete_installment' | translate }}</h2>
+
+  <p class="admin-inst-dialog__confirm">
+    {{ 'tr_admin_delete_installment_confirm' | translate }}
+  </p>
+
+  <ul class="admin-inst-dialog__details" *ngIf="data">
+    <li *ngIf="data.sequence != null">
+      {{ 'tr_installments' | translate }}: <strong>#{{ data.sequence }}</strong>
+    </li>
+    <li *ngIf="data.dueDate">
+      {{ 'tr_installment_due_date' | translate }}:
+      <strong>{{ data.dueDate | date:'dd/MM/yyyy' }}</strong>
+    </li>
+    <li *ngIf="data.amount != null">
+      {{ 'tr_amount' | translate }}:
+      <strong>{{ data.amount | currency:'EGP':'symbol':'1.2-2':'en-EG' }}</strong>
+    </li>
+    <li *ngIf="data.installmentSaleNumber != null">
+      {{ 'tr_installment_sale_number' | translate }}: <strong>#{{ data.installmentSaleNumber }}</strong>
+    </li>
+    <li *ngIf="data.clientName">
+      {{ 'tr_client_name' | translate }}: <strong>{{ data.clientName }}</strong>
+    </li>
+  </ul>
+
+  <label class="admin-inst-dialog__field">
+    <span>{{ 'tr_admin_delete_reason' | translate }} <em>*</em></span>
+    <textarea
+      class="s-control"
+      rows="3"
+      name="reason"
+      [(ngModel)]="reason"
+      [placeholder]="'tr_admin_delete_reason_placeholder' | translate"
+    ></textarea>
+  </label>
+
+  <div class="admin-inst-dialog__actions">
+    <button type="button" class="s-btn btn-secondary" (click)="cancel()">
+      {{ 'tr_action.cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      class="s-btn btn-danger"
+      [disabled]="!canSubmit"
+      (click)="submit()"
+    >
+      {{ 'tr_admin_delete_confirm_btn' | translate }}
+    </button>
+  </div>
+</div>

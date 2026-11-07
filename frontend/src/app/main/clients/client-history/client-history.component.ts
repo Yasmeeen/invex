@@ -22,6 +22,7 @@ import {
 } from '@core/models/users-interfaces.model';
 import { AuthenticationService } from '@core/services/authentication.service';
 import { resolveActorBranchContext } from '@core/utils/branch-utils';
+import { canPickBranchRole, isBranchManager } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { AccountHistoryPdfService } from '@shared/services/account-history-pdf.service';
@@ -46,6 +47,14 @@ import {
   AdminDeleteSaleDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-delete-sale-dialog.component';
 import {
+  AdminDeleteInstallmentDialogComponent,
+  AdminDeleteInstallmentDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-delete-installment-dialog.component';
+import {
+  AdminReverseInstallmentDialogComponent,
+  AdminReverseInstallmentDialogResult,
+} from '@shared/components/admin-installment-dialogs/admin-reverse-installment-dialog.component';
+import {
   AdminDeleteClientDialogComponent,
   AdminDeleteClientDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-delete-client-dialog.component';
@@ -62,6 +71,11 @@ import {
   AdminMinimumCollectionDialogResult,
 } from '@shared/components/admin-installment-dialogs/admin-minimum-collection-dialog.component';
 import { EarlySettlementDialogComponent } from '@shared/components/early-settlement-dialog/early-settlement-dialog.component';
+import {
+  AssignCollectorDialogComponent,
+  AssignCollectorDialogResult,
+} from '@shared/components/assign-collector-dialog/assign-collector-dialog.component';
+import { CollectionsService, CollectorUser } from '@shared/services/collections.service';
 import { Subscription } from 'rxjs';
 
 export type ClientHistoryTab = 'overview' | 'credit' | 'installments' | 'orders' | 'purchases' | 'ledger';
@@ -102,6 +116,8 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   canEditMinimumCollection = false;
   /** Super Admin or Co Admin can delete the client. */
   canDeleteClient = false;
+  /** Admins and branch managers can reassign the collector on this sale only. */
+  canAssignSaleCollector = false;
   deletingClient = false;
 
   private routeSub?: Subscription;
@@ -109,6 +125,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
   constructor(
     private userService: UserSerivce,
     private orders: OrdersSerivce,
+    private collections: CollectionsService,
     private branchesService: BranchesServce,
     private auth: AuthenticationService,
     private translate: TranslateService,
@@ -128,6 +145,7 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     this.canEditInstallmentSaleNumber = role === 'Super Admin' || role === 'Co Admin';
     this.canEditMinimumCollection = this.canEditInstallmentSaleNumber;
     this.canDeleteClient = this.canEditInstallmentSaleNumber;
+    this.canAssignSaleCollector = canPickBranchRole(role) || isBranchManager(role);
   }
 
   ngOnInit(): void {
@@ -783,7 +801,8 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     return (
       this.canEditMinimumCollection ||
       this.canEditInstallmentSaleNumber ||
-      this.canAdminInstallments
+      this.canAdminInstallments ||
+      this.canAssignSaleCollector
     );
   }
 
@@ -835,6 +854,49 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     row: { _id?: string; paid?: boolean; amount?: number; paidAmount?: number }
   ): boolean {
     return this.canPayOrder(order) && this.installmentRowRemaining(row) > 0.005;
+  }
+
+  canAdminEditInstallmentRowAction(
+    order: ClientHistoryOrderRow,
+    row: { paid?: boolean; amount?: number; paidAmount?: number; earlySettlement?: boolean }
+  ): boolean {
+    return (
+      this.canAdminInstallments &&
+      order?.status !== 'restored' &&
+      !row?.earlySettlement &&
+      this.canAdminEditInstallmentRow(row)
+    );
+  }
+
+  canDeleteInstallmentRow(
+    order: ClientHistoryOrderRow,
+    row: { paid?: boolean; amount?: number; paidAmount?: number; earlySettlement?: boolean }
+  ): boolean {
+    return this.canAdminEditInstallmentRowAction(order, row) && (order.installments || []).length > 1;
+  }
+
+  canReverseInstallmentPayment(
+    order: ClientHistoryOrderRow,
+    row: { paid?: boolean; amount?: number; paidAmount?: number; earlySettlement?: boolean }
+  ): boolean {
+    if (!this.canAdminInstallments || order?.status === 'restored' || row?.earlySettlement) {
+      return false;
+    }
+    const paidAmt = Number(row?.paidAmount) || 0;
+    if (paidAmt > 0.005) return true;
+    return row?.paid === true && (Number(row?.amount) || 0) > 0.005;
+  }
+
+  /** Edit, reverse, and delete stay inside the row ⋮ menu. Pay and promise are buttons. */
+  hasInstallmentRowMenuActions(
+    order: ClientHistoryOrderRow,
+    row: { paid?: boolean; amount?: number; paidAmount?: number; earlySettlement?: boolean }
+  ): boolean {
+    return (
+      this.canAdminEditInstallmentRowAction(order, row) ||
+      this.canDeleteInstallmentRow(order, row) ||
+      this.canReverseInstallmentPayment(order, row)
+    );
   }
 
   /** Admin may edit only unpaid installments (client-paid rows are locked). */
@@ -978,6 +1040,181 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
           this.notify.push(msg, 'error');
         },
       });
+    });
+  }
+
+  adminReverseInstallmentPayment(
+    order: ClientHistoryOrderRow,
+    row: {
+      _id?: string;
+      sequence?: number;
+      dueDate?: string | Date;
+      paidAmount?: number;
+      paymentMethod?: string;
+      earlySettlement?: boolean;
+    }
+  ): void {
+    if (!this.canReverseInstallmentPayment(order, row)) return;
+    const orderId = normalizeMongoId(order._id);
+    const installmentId = normalizeMongoId(row._id);
+    const userId = this.currentUserId();
+    if (!orderId || !installmentId || !userId) return;
+
+    const ref = this.dialog.open(AdminReverseInstallmentDialogComponent, {
+      width: '520px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        sequence: row.sequence,
+        dueDate: row.dueDate,
+        paidAmount: row.paidAmount,
+        paymentMethod: row.paymentMethod,
+        installmentSaleNumber: order.installmentSaleNumber,
+        clientName: this.clientTitle,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminReverseInstallmentDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders
+        .adminReverseInstallmentPayment(orderId, installmentId, {
+          userId,
+          reason: result.reason,
+          reverseDrawer: result.reverseDrawer,
+        })
+        .subscribe({
+          next: () => {
+            this.notify.push(this.translate.instant('tr_admin_reverse_installment_ok'), 'success');
+            this.afterBalanceChange();
+          },
+          error: (err) => {
+            const code = err?.error?.code;
+            const msg =
+              code === 'INSTALLMENT_REVERSE_NONE'
+                ? this.translate.instant('tr_admin_reverse_installment_none')
+                : code === 'INSTALLMENT_REVERSE_EARLY'
+                  ? this.translate.instant('tr_admin_reverse_installment_early')
+                  : err?.error?.error ||
+                    err?.error?.message ||
+                    this.translate.instant('tr_unexpected_error_message');
+            this.notify.push(msg, 'error');
+          },
+        });
+    });
+  }
+
+  adminDeleteInstallmentRow(
+    order: ClientHistoryOrderRow,
+    row: {
+      _id?: string;
+      sequence?: number;
+      dueDate?: string | Date;
+      amount?: number;
+      paid?: boolean;
+      paidAmount?: number;
+      earlySettlement?: boolean;
+    }
+  ): void {
+    if (!this.canDeleteInstallmentRow(order, row)) return;
+    const orderId = normalizeMongoId(order._id);
+    const installmentId = normalizeMongoId(row._id);
+    const userId = this.currentUserId();
+    if (!orderId || !installmentId || !userId) return;
+
+    const ref = this.dialog.open(AdminDeleteInstallmentDialogComponent, {
+      width: '480px',
+      maxWidth: '95vw',
+      panelClass: 'admin-installment-dialog-panel',
+      backdropClass: 'admin-installment-dialog-backdrop',
+      data: {
+        sequence: row.sequence,
+        dueDate: row.dueDate,
+        amount: row.amount,
+        installmentSaleNumber: order.installmentSaleNumber,
+        orderNumber: order.orderNumber,
+        clientName: this.clientTitle,
+      },
+      disableClose: true,
+    });
+
+    ref.afterClosed().subscribe((result: AdminDeleteInstallmentDialogResult | false | undefined) => {
+      if (!result) return;
+      this.orders.adminDeleteInstallmentRow(orderId, installmentId, { userId, reason: result.reason }).subscribe({
+        next: () => {
+          this.notify.push(this.translate.instant('tr_admin_delete_installment_ok'), 'success');
+          this.afterBalanceChange();
+        },
+        error: (err) => {
+          this.notify.push(this.installmentDeleteError(err), 'error');
+        },
+      });
+    });
+  }
+
+  private installmentDeleteError(err: any): string {
+    const code = err?.error?.code;
+    if (code === 'INSTALLMENT_DELETE_PAID') {
+      return this.translate.instant('tr_admin_delete_installment_paid');
+    }
+    if (code === 'INSTALLMENT_DELETE_LAST') {
+      return this.translate.instant('tr_admin_delete_installment_last');
+    }
+    if (code === 'INSTALLMENT_DELETE_COLLECTED_EXCEEDS') {
+      return this.translate.instant('tr_admin_delete_installment_paid_exceeds');
+    }
+    return (
+      err?.error?.error ||
+      err?.error?.message ||
+      this.translate.instant('tr_unexpected_error_message')
+    );
+  }
+
+  changeSaleCollector(order: ClientHistoryOrderRow, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.canAssignSaleCollector) return;
+    if (order?.status === 'restored') return;
+    const orderId = normalizeMongoId(order._id);
+    if (!orderId) return;
+
+    const openDialog = (collectors: CollectorUser[]) => {
+      const ref = this.dialog.open(AssignCollectorDialogComponent, {
+        width: '440px',
+        maxWidth: '95vw',
+        panelClass: 'assign-collector-dialog-panel',
+        backdropClass: 'assign-collector-dialog-backdrop',
+        data: {
+          orderNumber: order.installmentSaleNumber ?? order.orderNumber,
+          clientName: this.clientTitle,
+          collectorId: order.collectorId || null,
+          collectors,
+        },
+        disableClose: true,
+      });
+      ref.afterClosed().subscribe((result: AssignCollectorDialogResult | undefined) => {
+        if (result === false || result === undefined) return;
+        this.collections.assignOrderCollector(orderId, result).subscribe({
+          next: () => {
+            this.notify.push(this.translate.instant('tr_assign_collector_ok'), 'success');
+            this.loadHistory();
+          },
+          error: (err) => {
+            const msg =
+              err?.error?.error ||
+              err?.error?.message ||
+              this.translate.instant('tr_unexpected_error_message');
+            this.notify.push(msg, 'error');
+          },
+        });
+      });
+    };
+
+    this.collections.listCollectors({ withWorkload: true }).subscribe({
+      next: (res) => openDialog(res?.collectors || []),
+      error: () => {
+        this.notify.push(this.translate.instant('tr_unexpected_error_message'), 'error');
+      },
     });
   }
 

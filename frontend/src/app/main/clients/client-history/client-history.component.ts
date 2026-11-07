@@ -767,11 +767,10 @@ export class ClientHistoryComponent implements OnInit, OnDestroy {
     amount?: number;
     paidAmount?: number;
   }): number {
-    if (row?.paid) return 0;
-    return Math.max(
-      0,
-      Math.round(((Number(row?.amount) || 0) - (Number(row?.paidAmount) || 0)) * 100) / 100
-    );
+    const amount = Number(row?.amount) || 0;
+    const paidAmt = Number(row?.paidAmount) || 0;
+    if (row?.paid && paidAmt + 0.005 >= amount && amount > 0.005) return 0;
+    return Math.max(0, Math.round((amount - paidAmt) * 100) / 100);
   }
 
   /** paid = settled, overdue = unpaid past due, upcoming = unpaid not yet due. */

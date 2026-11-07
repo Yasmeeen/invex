@@ -2977,10 +2977,12 @@ export const adminDeleteInstallmentRow = async (req, res) => {
       order.installments.find((r) => String(r._id) === String(installmentId));
     if (!row) return res.status(404).json({ error: 'Installment not found' });
 
+    const rowAmount = roundMoney2(row.amount);
     const paidAmt = roundMoney2(row.paidAmount);
-    if (row.paid === true || row.earlySettlement === true || paidAmt > 0.005) {
+    const coveredByPayment = rowAmount > 0.005 && paidAmt >= rowAmount - 0.005;
+    if (row.earlySettlement === true || coveredByPayment) {
       return res.status(400).json({
-        error: 'Cannot delete an installment that already has a payment',
+        error: 'Cannot delete an installment that is already settled',
         code: 'INSTALLMENT_DELETE_PAID',
       });
     }
@@ -3001,7 +3003,8 @@ export const adminDeleteInstallmentRow = async (req, res) => {
     const sumInstallments = roundMoney2(
       (order.installments || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
     );
-    const paid = roundMoney2(order.amountPaid);
+    const collectedOnRow = Math.min(paidAmt, rowAmount);
+    const paid = roundMoney2(Math.max(0, roundMoney2(order.amountPaid) - collectedOnRow));
     if (paid > sumInstallments + 0.005) {
       return res.status(400).json({
         error: 'Collected amount would exceed the remaining installments',
@@ -3010,6 +3013,7 @@ export const adminDeleteInstallmentRow = async (req, res) => {
     }
 
     order.totalPrice = sumInstallments;
+    order.amountPaid = paid;
     if (paid >= sumInstallments - 0.005) {
       order.paymentStatus = sumInstallments <= 0.005 && paid <= 0.005 ? 'unpaid' : 'paid';
     } else if (paid > 0) {

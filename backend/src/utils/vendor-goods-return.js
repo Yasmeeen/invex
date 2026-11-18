@@ -37,7 +37,8 @@ function availableQty(product) {
   const reserved =
     (Number(product?.transferReservedQuantity) || 0) +
     (Number(product?.bookedQuantity) || 0) +
-    (Number(product?.ecommerceReservedQuantity) || 0);
+    (Number(product?.ecommerceReservedQuantity) || 0) +
+    (Number(product?.serviceHoldQuantity) || 0);
   return Math.max(0, stock - reserved);
 }
 

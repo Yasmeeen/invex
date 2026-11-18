@@ -3,6 +3,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  NgZone,
   OnDestroy,
   OnInit,
   ViewChild,
@@ -98,14 +99,25 @@ import { IsolatedReceiptPrintHandle, printIsolatedReceipt } from '@shared/utils/
 })
 export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('barcodeInput') barcodeInput!: ElementRef;
+  @ViewChild('productsGrid') productsGrid?: ElementRef<HTMLElement>;
 
   products: Product[] = [];
   /** Infinite-scroll product list (first page + append on scroll). */
   readonly productsPageSize = 20;
+  private productsGridScrollBound = false;
   productsLoading = false;
   productsHasMore = true;
   private productsPage = 1;
   private productsLoadToken = 0;
+  /**
+   * Pages pulled only to fill an empty viewport. User scrolling loads the rest.
+   * Without this cap, a grid that never grows a scrollbar keeps requesting
+   * every in-stock page and the tab locks (Chrome "Page Unresponsive").
+   */
+  private autoFillPasses = 0;
+  private readonly maxAutoFillPasses = 4;
+  /** Ignore scroll-triggered loads right after we append, so scroll anchoring cannot chain the whole catalog. */
+  private ignoreProductScrollUntil = 0;
   orderItems: any[] = [];
   /** Index of order line whose unit price is being edited; null when not editing. */
   editingPriceIndex: number | null = null;
@@ -203,6 +215,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   private foreignBookingToastShown = new Set<string>();
   private listedOnlineToastShown = new Set<string>();
   private readonly destroy$ = new Subject<void>();
+  private destroyed = false;
 
   /** Built from store settings; refreshed on settings$ updates (receipt labels). */
   paymentMethods: CashierPaymentMethod[] = [];
@@ -231,7 +244,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     private productPurchaseRequests: ProductPurchaseRequestsService,
     private collectionsService: CollectionsService,
     private cdr: ChangeDetectorRef,
-    private onlineOrdersAlert: OnlineOrdersAlertService
+    private onlineOrdersAlert: OnlineOrdersAlertService,
+    private ngZone: NgZone
   ) {
     this.curentUser = this.authenticationService.getUserFromLocalStorage();
     this.loadAllCategories();
@@ -256,6 +270,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    this.unbindProductsGridScroll();
     this.destroy$.next();
     this.destroy$.complete();
     this.settingsSub?.unsubscribe();
@@ -1834,6 +1850,8 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngAfterViewInit() {
     this.focusBarcodeInput();
+    this.bindProductsGridScroll();
+    this.fillProductsGridIfNeeded();
     this.loadInvoiceQr();
   }
 
@@ -1889,6 +1907,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       this.productsPage = 1;
       this.productsHasMore = true;
       this.products = [];
+      this.autoFillPasses = 0;
       if (options?.refreshDrawer !== false) {
         this.loadDrawerOpeningBalance();
       }
@@ -1906,7 +1925,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       params['categoryId'] = this.selectedCategoryId;
     }
 
-    this.productsSerivce.getProducts(params).subscribe({
+    this.productsSerivce
+      .getProducts(params)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (res: any) => {
         if (token !== this.productsLoadToken) {
           return;
@@ -1921,7 +1943,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
         this.productsLoading = false;
         this.cdr.markForCheck();
         // If the grid has no scrollbar yet, keep filling until it can scroll or pages end.
-        setTimeout(() => this.fillProductsGridIfNeeded(), 0);
+        setTimeout(() => {
+          if (this.destroyed) return;
+          this.fillProductsGridIfNeeded();
+        }, 0);
       },
       error: () => {
         if (token !== this.productsLoadToken) {
@@ -1933,30 +1958,79 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  /** When products don't overflow the grid, scroll never fires — load next page until they do. */
+  /** When products don't overflow the grid, scroll never fires — load a few pages until they do. */
   private fillProductsGridIfNeeded(): void {
     if (this.productsLoading || !this.productsHasMore) {
       return;
     }
-    const el = document.querySelector('.cashier .products-grid') as HTMLElement | null;
-    if (!el) {
+    if (this.autoFillPasses >= this.maxAutoFillPasses) {
+      return;
+    }
+    const el =
+      this.productsGrid?.nativeElement ||
+      (document.querySelector('.cashier .products-grid') as HTMLElement | null);
+    if (!el || el.clientHeight < 40) {
       return;
     }
     if (el.scrollHeight <= el.clientHeight + 4) {
+      this.autoFillPasses += 1;
+      this.ignoreProductScrollUntil = Date.now() + 500;
       this.loadProducts(false);
     }
   }
 
-  /** Near bottom of products grid → fetch next page (does not touch search / barcode / branch UI). */
-  onProductsScroll(event: Event): void {
+  /**
+   * Scroll stays outside Angular. A trackpad fling otherwise change-detects
+   * every product card and can lock the tab (Chrome "Page Unresponsive").
+   */
+  private bindProductsGridScroll(): void {
+    const el = this.productsGrid?.nativeElement;
+    if (!el || this.productsGridScrollBound) {
+      return;
+    }
+    this.productsGridScrollBound = true;
+    this.ngZone.runOutsideAngular(() => {
+      el.addEventListener('scroll', this.onProductsGridScroll, { passive: true });
+    });
+  }
+
+  private unbindProductsGridScroll(): void {
+    this.productsGrid?.nativeElement?.removeEventListener('scroll', this.onProductsGridScroll);
+    this.productsGridScrollBound = false;
+  }
+
+  private readonly onProductsGridScroll = (event: Event): void => {
+    if (Date.now() < this.ignoreProductScrollUntil) {
+      return;
+    }
     const el = event.target as HTMLElement | null;
     if (!el || this.productsLoading || !this.productsHasMore) {
       return;
     }
     const threshold = 140;
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+      this.ngZone.run(() => this.onProductsScroll(event));
+    }
+  };
+
+  /** Near bottom of products grid → fetch next page (does not touch search / barcode / branch UI). */
+  onProductsScroll(event: Event): void {
+    if (Date.now() < this.ignoreProductScrollUntil) {
+      return;
+    }
+    const el = event.target as HTMLElement | null;
+    if (!el || this.productsLoading || !this.productsHasMore) {
+      return;
+    }
+    const threshold = 140;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+      this.ignoreProductScrollUntil = Date.now() + 500;
       this.loadProducts(false);
     }
+  }
+
+  trackProduct(_index: number, product: Product): string {
+    return String(product?._id || product?.code || _index);
   }
 
   filteredProducts() {
@@ -2021,7 +2095,12 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return !!this.storeSettings.snapshot.cutFromSourceEnabled;
   }
 
-  sourceStockProduct(product: Product | any): { stock?: number; name?: string } | null {
+  sourceStockProduct(product: Product | any): {
+    stock?: number;
+    name?: string;
+    serviceHoldQuantity?: number;
+    serviceHoldReason?: string;
+  } | null {
     if (!this.cutFromSourceEnabled()) return null;
     const populated = product?.sourceProduct;
     if (populated && typeof populated === 'object') return populated;
@@ -2033,12 +2112,39 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   displayStock(product: Product | any): number {
     const src = this.sourceStockProduct(product);
     if (src && src.stock != null) {
-      return Math.max(0, Number(src.stock) || 0);
+      const hold = Math.max(0, Number(src.serviceHoldQuantity) || 0);
+      return Math.max(0, (Number(src.stock) || 0) - hold);
     }
+    const hold = Math.max(0, Number(product?.serviceHoldQuantity) || 0);
     if (this.isWeightProduct(product)) {
-      return Math.max(0, roundWeight(Number(product?.stock ?? 0)));
+      return Math.max(0, roundWeight((Number(product?.stock) || 0) - hold));
     }
-    return Math.max(0, Number(product?.stock ?? 0));
+    return Math.max(0, (Number(product?.stock) || 0) - hold);
+  }
+
+  /** Held unit with nothing left to sell (maintenance or with the agent). */
+  private serviceHoldBlocksSale(product: Product | any): boolean {
+    const src = this.sourceStockProduct(product);
+    const hold =
+      src && src.stock != null
+        ? Number(src.serviceHoldQuantity) || 0
+        : Number(product?.serviceHoldQuantity) || 0;
+    return hold > 0 && this.displayStock(product) <= 0;
+  }
+
+  saleHoldLabel(product: Product | any): string {
+    const src = this.sourceStockProduct(product);
+    const heldOnSource = !!(src && src.stock != null && Number(src.serviceHoldQuantity) > 0);
+    const qty = heldOnSource
+      ? Number(src?.serviceHoldQuantity) || 0
+      : Number(product?.serviceHoldQuantity) || 0;
+    if (qty <= 0) return '';
+    const raw = String(
+      (heldOnSource ? src?.serviceHoldReason : product?.serviceHoldReason) || ''
+    ).trim();
+    if (raw === 'maintenance') return this.translate.instant('tr_product_hold_maintenance');
+    if (raw === 'at_agent') return this.translate.instant('tr_product_hold_agent');
+    return raw || this.translate.instant('tr_product_hold_badge');
   }
 
   weightSalesEnabled(): boolean {
@@ -2137,6 +2243,37 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
     return !!product?.imageUrl && !this.brokenProductImageIds.has(String(product?._id));
   }
 
+  /**
+   * Card/cart thumbs. Full Cloudinary originals (phone photos) decode on the
+   * cashier PC and are a common reason the tab stops responding.
+   */
+  cashierCardImageUrl(url: string | null | undefined): string {
+    const raw = String(url || '').trim();
+    const marker = '/image/upload/';
+    const idx = raw.indexOf(marker);
+    if (idx === -1 || !raw.includes('res.cloudinary.com')) {
+      return raw;
+    }
+    const rest = raw.slice(idx + marker.length);
+    const first = rest.split('/')[0] || '';
+    if (first && !/^v\d+$/.test(first)) {
+      return raw;
+    }
+    return `${raw.slice(0, idx + marker.length)}c_fill,w_240,h_160,q_auto,f_auto/${rest}`;
+  }
+
+  trackByBookingBar(_index: number, bar: { productId: string }): string {
+    return bar.productId;
+  }
+
+  trackByTradeInLine(
+    index: number,
+    line: { productPayload?: { _id?: string; code?: string; name?: string } }
+  ): string {
+    const payload = line?.productPayload;
+    return String(payload?._id || payload?.code || payload?.name || index);
+  }
+
   private validateOrderItemsForCheckout(): string | null {
     for (const item of this.orderItems) {
       if (this.isWeightLine(item)) {
@@ -2213,6 +2350,14 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   addProduct(product: any) {
+    if (this.serviceHoldBlocksSale(product)) {
+      this.appNotificationService.push(
+        this.translate.instant('tr_product_service_hold_blocked'),
+        'error'
+      );
+      this.focusBarcodeInput();
+      return;
+    }
     if (this.displayStock(product) <= 0) return;
 
     if (this.isWeightProduct(product)) {
@@ -2236,7 +2381,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       if (item?.isApplyDiscount == null) {
         item.isApplyDiscount = Number(item?.discount) > 0;
       }
-      const maxStock = Math.max(0, Math.floor(Number(product.stock ?? item.stock ?? 0)));
+      const maxStock = this.displayStock(product);
       if (item.quantity >= maxStock) {
         this.focusBarcodeInput();
         return;
@@ -2312,7 +2457,7 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
   increaseQty(i: number) {
     const item = this.orderItems[i];
     if (this.isWeightLine(item)) return;
-    const maxStock = Math.max(0, Math.floor(Number(item.stock ?? 0)));
+    const maxStock = this.displayStock(item);
     if (item.quantity >= maxStock) {
       this.focusBarcodeInput();
       return;

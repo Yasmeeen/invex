@@ -47,7 +47,8 @@ export class TransferProductBranchDialogComponent implements OnInit {
     const stock = Math.max(0, Number(this.product.stock) || 0);
     const booked = Math.max(0, Math.floor(Number(this.product.bookedQuantity) || 0));
     const reserved = Math.max(0, Math.floor(Number(this.product.transferReservedQuantity) || 0));
-    const free = Math.max(0, stock - booked - reserved);
+    const hold = Math.max(0, Number(this.product.serviceHoldQuantity) || 0);
+    const free = Math.max(0, stock - booked - reserved - hold);
     const extra = (this.product.remotePickupTransfers || []).find(
       (x) => String(x.branchId) === toId
     );

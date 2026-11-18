@@ -18,6 +18,11 @@ export interface Product {
   stock: number;
   /** Units reserved for pending branch-to-branch transfers */
   transferReservedQuantity?: number;
+  /** Units kept on the books but blocked from sale and booking. */
+  serviceHoldQuantity?: number;
+  serviceHoldReason?: string | null;
+  serviceHoldNote?: string;
+  ecommerceReservedQuantity?: number;
   price: number;
   netPrice: number;
   discount: number;

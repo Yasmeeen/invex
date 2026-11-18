@@ -696,10 +696,18 @@ export const createProductBooking = async (req, res) => {
     const pid = product._id;
     const alreadyBooked = await sumActiveBookedQuantity(pid);
     const transferReserved = Number(product.transferReservedQuantity) || 0;
-    const capacity = Math.max(0, Number(product.stock) - transferReserved);
+    const serviceHold = Number(product.serviceHoldQuantity) || 0;
+    const capacity = Math.max(0, Number(product.stock) - transferReserved - serviceHold);
     if (alreadyBooked + quantity > capacity) {
+      const left = Math.max(0, capacity - alreadyBooked);
+      if (serviceHold > 0 && left <= 0) {
+        return res.status(400).json({
+          error: 'Product is held and cannot be booked',
+          code: 'SERVICE_HOLD',
+        });
+      }
       return res.status(400).json({
-        error: `Only ${Math.max(0, capacity - alreadyBooked)} unit(s) available to book`,
+        error: `Only ${left} unit(s) available to book`,
       });
     }
 
@@ -878,7 +886,7 @@ export const confirmProductBooking = async (req, res) => {
     }
 
     const productForStock = await Product.findById(booking.product)
-      .select('stock transferReservedQuantity')
+      .select('stock transferReservedQuantity serviceHoldQuantity')
       .lean();
     if (!productForStock) {
       return res.status(404).json({ error: 'Product not found' });
@@ -886,7 +894,8 @@ export const confirmProductBooking = async (req, res) => {
     const totalBookedQty = await sumActiveBookedQuantity(booking.product);
     const stock = Math.max(0, Number(productForStock.stock) || 0);
     const transferReserved = Number(productForStock.transferReservedQuantity) || 0;
-    const capacity = Math.max(0, stock - transferReserved);
+    const serviceHold = Number(productForStock.serviceHoldQuantity) || 0;
+    const capacity = Math.max(0, stock - transferReserved - serviceHold);
     if (totalBookedQty > capacity) {
       return res.status(400).json({
         error: 'Not enough stock to confirm bookings for this product',
@@ -1058,7 +1067,7 @@ export const getBookingByProductId = async (req, res) => {
     }
 
     const product = await Product.findById(productId)
-      .select('stock name code branch inWarehouse transferReservedQuantity')
+      .select('stock name code branch inWarehouse transferReservedQuantity serviceHoldQuantity')
       .lean();
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -1085,7 +1094,8 @@ export const getBookingByProductId = async (req, res) => {
     ]);
 
     const transferReserved = Number(product.transferReservedQuantity) || 0;
-    const capacity = Math.max(0, (product.stock || 0) - transferReserved);
+    const serviceHold = Number(product.serviceHoldQuantity) || 0;
+    const capacity = Math.max(0, (product.stock || 0) - transferReserved - serviceHold);
     const availableToBook = Math.max(0, capacity - totalBookedQty);
 
     return res.json({

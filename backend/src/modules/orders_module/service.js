@@ -518,7 +518,8 @@ export const getOrders = async (req, res) => {
 
     const totalPages = Math.ceil(total / pageLimit);
 
-    // ✅ 5. Respond
+    // ✅ 5. Respond. Don't let a transient 403 get cached and replayed as "not allowed".
+    res.set('Cache-Control', 'private, no-store');
     res.json({
       orders,
       meta: {
@@ -732,7 +733,7 @@ export const createOrder = async (req, res) => {
     // "active transaction number is -1"). Keep these reads sequential whenever
     // createOrder may use a session (exchange / supplier / booking deposit).
     const productSelect =
-      'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId';
+      'name code stock transferReservedQuantity serviceHoldQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId';
     const settingsDoc = await q(StoreSettings.findOne().sort({ updatedAt: -1 })).lean();
     const productDocsList =
       uniqueProductIds.length > 0
@@ -754,7 +755,7 @@ export const createOrder = async (req, res) => {
       if (extraSourceIds.length) {
         const extraDocs = await q(
           Product.find({ _id: { $in: extraSourceIds } }).select(
-            'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
+            'name code stock transferReservedQuantity serviceHoldQuantity bookedQuantity ecommerceReservedQuantity category netPrice sellByWeightOverride attributes removedWhenOutOfStock branch inWarehouse addedBy price sourceProductId'
           )
         );
         for (const doc of extraDocs) {
@@ -818,12 +819,13 @@ export const createOrder = async (req, res) => {
       const stockDoc = sourceId ? productById.get(sourceId) : productDoc;
       const stockTransferReserved = Number(stockDoc.transferReservedQuantity) || 0;
       const stockEcomReserved = Number(stockDoc.ecommerceReservedQuantity) || 0;
+      const stockServiceHold = Number(stockDoc.serviceHoldQuantity) || 0;
       // Another customer's product booking does not block the sale. Cashier asks
       // for confirmation first; reconcileBookingsToStock releases the hold after
       // the invoice when remaining stock no longer covers it.
       const maxSellable = isWeight
-        ? roundWeight(Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved)
-        : Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved;
+        ? roundWeight(Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved - stockServiceHold)
+        : Number(stockDoc.stock) - stockTransferReserved - stockEcomReserved - stockServiceHold;
       if (maxSellable < quantity - (isWeight ? 0.0001 : 0)) {
         throw new Error(`Not enough stock for ${productDoc.name}`);
       }

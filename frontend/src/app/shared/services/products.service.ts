@@ -256,6 +256,22 @@ updateProductPrice(productId: string, price: number): Observable<{ message: stri
   );
 }
 
+setProductServiceHold(
+  productId: string,
+  payload: {
+    userId: string;
+    active: boolean;
+    reason?: string;
+    note?: string;
+    quantity?: number;
+  }
+): Observable<{ message: string; product: Product; code?: string }> {
+  return this.http.patch<{ message: string; product: Product; code?: string }>(
+    `${PRODUCTS_URL}/${productId}/service-hold`,
+    payload
+  );
+}
+
 getEcommerceVariantGroup(productId: string): Observable<EcommerceVariantGroupSnapshot> {
   return this.http.get<EcommerceVariantGroupSnapshot>(
     `${PRODUCTS_URL}/${productId}/ecommerce-variant-group`

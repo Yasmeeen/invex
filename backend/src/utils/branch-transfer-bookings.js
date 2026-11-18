@@ -26,12 +26,19 @@ export function bookingPickupBranchName(booking) {
   return String(booking?.shippingAddress || '').trim();
 }
 
-export function transferAvailableQty({ stock, bookedTotal, transferReserved, bookedForDestination }) {
+export function transferAvailableQty({
+  stock,
+  bookedTotal,
+  transferReserved,
+  bookedForDestination,
+  serviceHold = 0,
+}) {
   const st = Math.max(0, Number(stock) || 0);
   const booked = Math.max(0, Number(bookedTotal) || 0);
   const reserved = Math.max(0, Number(transferReserved) || 0);
+  const hold = Math.max(0, Number(serviceHold) || 0);
   const extra = Math.max(0, Number(bookedForDestination) || 0);
-  const free = Math.max(0, st - booked - reserved);
+  const free = Math.max(0, st - booked - reserved - hold);
   return free + extra;
 }
 

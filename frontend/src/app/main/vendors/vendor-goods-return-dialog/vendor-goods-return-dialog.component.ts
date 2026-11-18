@@ -22,6 +22,7 @@ type ReturnProductHit = {
   netPrice?: number;
   price?: number;
   transferReservedQuantity?: number;
+  serviceHoldQuantity?: number;
   bookedQuantity?: number;
   ecommerceReservedQuantity?: number;
 };
@@ -165,7 +166,8 @@ export class VendorGoodsReturnDialogComponent implements OnInit, OnDestroy {
     const reserved =
       (Number(product.transferReservedQuantity) || 0) +
       (Number(product.bookedQuantity) || 0) +
-      (Number(product.ecommerceReservedQuantity) || 0);
+      (Number(product.ecommerceReservedQuantity) || 0) +
+      (Number(product.serviceHoldQuantity) || 0);
     return Math.max(0, this.round3(stock - reserved));
   }
 

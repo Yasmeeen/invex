@@ -589,6 +589,7 @@ export class BookProductDialogComponent implements OnInit, OnDestroy {
       'Valid productId is required': 'tr_booking_api_invalid_product_id',
       'userId is required': 'tr_booking_api_user_required',
       'Product not found': 'tr_booking_api_product_not_found',
+      'Product is held and cannot be booked': 'tr_product_service_hold_blocked',
     };
     const key = exact[s];
     if (key) {

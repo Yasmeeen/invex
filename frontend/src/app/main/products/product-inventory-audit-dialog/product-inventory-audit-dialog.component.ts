@@ -149,7 +149,8 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
     const stock = Math.max(0, Number(product.stock) || 0);
     const booked = Math.max(0, Math.floor(Number(product.bookedQuantity) || 0));
     const transferReserved = Math.max(0, Math.floor(Number(product.transferReservedQuantity) || 0));
-    const available = Math.max(0, stock - booked - transferReserved);
+    const serviceHold = Math.max(0, Number(product.serviceHoldQuantity) || 0);
+    const available = Math.max(0, stock - booked - transferReserved - serviceHold);
     const location = product.inWarehouse
       ? this.translate.instant('tr_warehouse')
       : product.branch?.name || '—';

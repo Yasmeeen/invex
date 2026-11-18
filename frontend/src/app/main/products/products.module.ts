@@ -16,6 +16,7 @@ import { TransferProductBranchDialogComponent } from './transfer-product-branch-
 import { PendingBranchTransfersComponent } from './pending-branch-transfers/pending-branch-transfers.component';
 import { ProductHistoryDialogComponent } from './product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from './product-inventory-audit-dialog/product-inventory-audit-dialog.component';
+import { ProductServiceHoldDialogComponent } from './product-service-hold-dialog/product-service-hold-dialog.component';
 import { SerialTrackComponent } from './serial-track/serial-track.component';
 import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dialog/payment-splits-dialog.module';
 
@@ -31,6 +32,7 @@ import { PaymentSplitsDialogModule } from '@shared/components/payment-splits-dia
     PendingBranchTransfersComponent,
     ProductHistoryDialogComponent,
     ProductInventoryAuditDialogComponent,
+    ProductServiceHoldDialogComponent,
     SerialTrackComponent,
   ],
   imports: [

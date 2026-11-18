@@ -1,0 +1,56 @@
+<div class="hold-form" [attr.dir]="'auto'">
+  <h2 class="hold-form__title">{{ 'tr_product_hold_title' | translate }}</h2>
+  <p class="hold-form__lead">{{ 'tr_product_hold_lead' | translate }}</p>
+
+  <div class="hold-form__meta">
+    <span>{{ product.name }}</span>
+    <span>{{ product.code }}</span>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label class="hold-form__field">
+      <span>{{ 'tr_product_hold_reason' | translate }}</span>
+      <input
+        class="s-control"
+        type="text"
+        formControlName="reason"
+        maxlength="200"
+        [placeholder]="'tr_product_hold_reason_ph' | translate"
+      />
+    </label>
+
+    <label class="hold-form__field" *ngIf="showQuantity">
+      <span>{{ 'tr_product_hold_qty' | translate }}</span>
+      <input class="s-control" type="number" formControlName="quantity" [min]="1" [max]="maxQuantity" step="1" />
+    </label>
+
+    <label class="hold-form__field">
+      <span>{{ 'tr_product_hold_note' | translate }}</span>
+      <textarea
+        class="s-control"
+        rows="3"
+        formControlName="note"
+        maxlength="500"
+        [placeholder]="'tr_product_hold_note_ph' | translate"
+      ></textarea>
+    </label>
+
+    <div class="hold-form__actions">
+      <button type="button" class="s-btn btn-secondary" (click)="close()" [disabled]="saving || releasing">
+        {{ 'tr_cancel' | translate }}
+      </button>
+      <button
+        type="button"
+        class="s-btn btn-secondary"
+        *ngIf="alreadyHeld"
+        (click)="release()"
+        [disabled]="saving || releasing"
+      >
+        {{ 'tr_product_hold_release' | translate }}
+      </button>
+      <button type="submit" class="s-btn btn-primary" [disabled]="saving || releasing">
+        {{ 'tr_product_hold_save' | translate }}
+      </button>
+    </div>
+  </form>
+</div>

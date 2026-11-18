@@ -193,6 +193,28 @@
       </div>
       <div class="filters-grid__item">
         <div class="form-group mb-0">
+          <label>{{ 'tr_products_hold_filter' | translate }}</label>
+          <div class="input-with-icon bg-white">
+            <ng-select
+              class="s-control s-select width-100"
+              [items]="holdFilterOptions"
+              bindLabel="labelKey"
+              bindValue="id"
+              [clearable]="false"
+              [searchable]="false"
+              [(ngModel)]="holdFilter"
+              name="holdFilter"
+              (ngModelChange)="onListFiltersChange()"
+            >
+              <ng-template ng-label-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+              <ng-template ng-option-tmp let-item="item">{{ item.labelKey | translate }}</ng-template>
+            </ng-select>
+            <i class="fa fa-caret-down input-icon"></i>
+          </div>
+        </div>
+      </div>
+      <div class="filters-grid__item">
+        <div class="form-group mb-0">
           <label>{{ 'tr_products_booking_filter' | translate }}</label>
           <div class="input-with-icon bg-white">
             <ng-select
@@ -385,6 +407,10 @@
                       </span>
                     </span>
                     <span class="products-list__name-text">{{ product.name }}</span>
+                    <span class="sale-hold-label" *ngIf="serviceHoldQty(product) > 0" [attr.title]="serviceHoldTitle(product)">
+                      <i class="fa fa-ban" aria-hidden="true"></i>
+                      {{ serviceHoldLabel(product) }}
+                    </span>
                     <p class="products-list__pickup-hint m-0" *ngIf="remotePickupHint(product) as hint">
                       {{ hint }}
                     </p>
@@ -417,6 +443,16 @@
                     <div class="border-bottom"></div>
                     <div class="single-option" (click)="openProductHistory(product)">
                       {{ "tr_product_history" | translate }}
+                    </div>
+                    <div
+                      class="single-option"
+                      *ngIf="canManageServiceHold(product)"
+                      (click)="openServiceHold(product)"
+                    >
+                      {{
+                        (serviceHoldQty(product) > 0 ? 'tr_product_hold_edit' : 'tr_product_hold_action')
+                          | translate
+                      }}
                     </div>
                     <ng-container *ngIf="canBookProduct(product)">
                       <div
@@ -518,6 +554,10 @@
                 </span>
                 {{ product.name }}
               </div>
+              <div class="sale-hold-label" *ngIf="serviceHoldQty(product) > 0" [attr.title]="serviceHoldTitle(product)">
+                <i class="fa fa-ban" aria-hidden="true"></i>
+                {{ serviceHoldLabel(product) }}
+              </div>
               <p class="products-list__pickup-hint m-0 mt-1" *ngIf="remotePickupHint(product) as hint">
                 {{ hint }}
               </p>
@@ -537,6 +577,16 @@
                 <div class="border-bottom"></div>
                 <div class="single-option" (click)="openProductHistory(product)">
                   {{ "tr_product_history" | translate }}
+                </div>
+                <div
+                  class="single-option"
+                  *ngIf="canManageServiceHold(product)"
+                  (click)="openServiceHold(product)"
+                >
+                  {{
+                    (serviceHoldQty(product) > 0 ? 'tr_product_hold_edit' : 'tr_product_hold_action')
+                      | translate
+                  }}
                 </div>
                 <ng-container *ngIf="canBookProduct(product)">
                   <div

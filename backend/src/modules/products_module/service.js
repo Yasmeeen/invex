@@ -1345,6 +1345,7 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     attrValue,
     includeRemoved,
     inStock,
+    serviceHold,
     supplier_id,
     supplierId,
     vendor_id,
@@ -1378,6 +1379,11 @@ function buildProductsListQuery(queryParams = {}, { cutFromSourceEnabled = false
     }
   } else if (inStock === 'false' || inStock === false) {
     query.stock = { $lte: 0 };
+  }
+
+  const holdFilter = String(serviceHold || '').trim().toLowerCase();
+  if (holdFilter === 'held' || holdFilter === 'stopped' || holdFilter === 'true') {
+    query.serviceHoldQuantity = { $gt: 0 };
   }
 
   if (booked === 'true' || booked === true) {
@@ -1514,7 +1520,7 @@ export const getProducts = async (req, res) => {
         .select('-ecommerceDescription')
         .populate('category', 'name code attributeDefs multiCodePerPiece showProductCodeOnInvoice sellByWeight weightUnit')
         .populate('branch', 'name')
-        .populate('sourceProductId', 'name code stock')
+        .populate('sourceProductId', 'name code stock serviceHoldQuantity')
         .skip(skip)
         .limit(Number(limit))
         .lean(),
@@ -2472,6 +2478,126 @@ export const updateProductPrice = async (req, res) => {
   }
 };
 
+function serviceHoldFreeUnits(product, bookedQty) {
+  const stock = Math.max(0, Number(product?.stock) || 0);
+  const transfer = Math.max(0, Number(product?.transferReservedQuantity) || 0);
+  const booked = Math.max(0, Number(bookedQty) || 0);
+  const ecom = Math.max(0, Number(product?.ecommerceReservedQuantity) || 0);
+  return Math.max(0, stock - transfer - booked - ecom);
+}
+
+/** Stop or release sale + booking for units that stay on the branch books. */
+export const setProductServiceHold = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+
+    const user = await loadUserForBranchTransfer(req.body?.userId);
+    if (!user) {
+      return res.status(400).json({ error: 'userId is required', code: 'USER_REQUIRED' });
+    }
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    try {
+      assertMayInitiateBranchTransfer(user, product);
+    } catch (e) {
+      return res.status(403).json({ error: 'You cannot change this product', code: 'FORBIDDEN' });
+    }
+
+    const release = req.body?.active === false || req.body?.active === 'false';
+    const before = {
+      serviceHoldQuantity: Number(product.serviceHoldQuantity) || 0,
+      serviceHoldReason: product.serviceHoldReason || null,
+      serviceHoldNote: product.serviceHoldNote || '',
+    };
+
+    if (release) {
+      product.serviceHoldQuantity = 0;
+      product.serviceHoldNote = '';
+      product.serviceHoldAt = null;
+      product.serviceHoldBy = null;
+      await product.save();
+      await Product.updateOne({ _id: product._id }, { $unset: { serviceHoldReason: 1 } });
+      product.serviceHoldReason = undefined;
+    } else {
+      const reason = String(req.body?.reason || '').trim().slice(0, 200);
+      if (!reason) {
+        return res.status(400).json({ error: 'Hold reason is required', code: 'HOLD_REASON_REQUIRED' });
+      }
+      const booked = await sumActiveBookedQuantityProducts(product._id);
+      const maxFree = serviceHoldFreeUnits(product, booked);
+      const requested = req.body?.quantity == null || req.body?.quantity === ''
+        ? maxFree
+        : Number(req.body.quantity);
+      const qty = Math.round((Number(requested) || 0) * 1000) / 1000;
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return res.status(400).json({
+          error: 'Not enough free units to hold. Cancel the customer booking first.',
+          code: 'SERVICE_HOLD_NO_FREE_UNITS',
+        });
+      }
+      if (qty > maxFree + 0.0001) {
+        return res.status(400).json({
+          error: 'Not enough free units to hold. Cancel the customer booking first.',
+          code: 'SERVICE_HOLD_NO_FREE_UNITS',
+          available: maxFree,
+        });
+      }
+      product.serviceHoldQuantity = qty;
+      product.serviceHoldReason = reason;
+      product.serviceHoldNote = String(req.body?.note || '').trim().slice(0, 500);
+      product.serviceHoldAt = new Date();
+      product.serviceHoldBy = user._id;
+      await product.save();
+    }
+
+    notifyProductChanged(product._id);
+
+    await auditLog(req, {
+      action: 'update',
+      module: 'products',
+      entityType: 'Product',
+      entityId: product._id,
+      message: release
+        ? `Sale hold released ${product.code || ''}`.trim()
+        : `Sale hold set ${product.code || ''}`.trim(),
+      entityLabel: product.code && product.name ? `${product.code} — ${product.name}` : undefined,
+      metadata: {
+        productId: product._id,
+        productCode: product.code,
+        productName: product.name,
+      },
+      before,
+      after: {
+        serviceHoldQuantity: Number(product.serviceHoldQuantity) || 0,
+        serviceHoldReason: product.serviceHoldReason || null,
+        serviceHoldNote: product.serviceHoldNote || '',
+      },
+    });
+
+    const populated = await Product.findById(product._id)
+      .populate('category', 'name code')
+      .populate('branch', 'name');
+
+    return res.json({
+      message: release ? 'Sale hold released' : 'Sale hold saved',
+      product: populated,
+    });
+  } catch (error) {
+    console.error('❌ setProductServiceHold:', error.message);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message || 'Invalid hold' });
+    }
+    return res.status(500).json({ error: 'Failed to update product hold' });
+  }
+};
+
 
 // Delete product
 export const deleteProduct = async (req, res) => {
@@ -2587,6 +2713,7 @@ export const requestBranchTransfer = async (req, res) => {
       bookedTotal: booked,
       transferReserved: reserved,
       bookedForDestination: bookedForDest,
+      serviceHold: Number(product.serviceHoldQuantity) || 0,
     });
     if (qty > available) {
       return res.status(400).json({
@@ -2745,6 +2872,7 @@ export const approveBranchTransfer = async (req, res) => {
       bookedTotal: booked,
       transferReserved: otherReserved,
       bookedForDestination: bookedForDest,
+      serviceHold: Number(sourceProduct.serviceHoldQuantity) || 0,
     });
     if (qty > available) {
       await session.abortTransaction();
@@ -3369,6 +3497,7 @@ export const transferProductStock = async (req, res) => {
       bookedTotal: booked,
       transferReserved: reserved,
       bookedForDestination: bookedForDest,
+      serviceHold: Number(sourceProduct.serviceHoldQuantity) || 0,
     });
     if (available < transferQty) {
       await session.abortTransaction();

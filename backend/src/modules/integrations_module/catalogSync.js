@@ -22,7 +22,8 @@ function sellableStock(product) {
   const transfer = Number(product.transferReservedQuantity) || 0;
   const booked = Number(product.bookedQuantity) || 0;
   const ecom = Number(product.ecommerceReservedQuantity) || 0;
-  return Math.max(0, stock - transfer - booked - ecom);
+  const serviceHold = Number(product.serviceHoldQuantity) || 0;
+  return Math.max(0, stock - transfer - booked - ecom - serviceHold);
 }
 
 function mapCategory(cat) {

@@ -192,6 +192,7 @@
                     <div class="input-with-icon bg-white width-100">
                       <ng-select
                         class="s-control s-select"
+                        appendTo="body"
                         [items]="vendorSearchItems"
                         [typeahead]="vendorTypeahead$"
                         [loading]="vendorsLoading"
@@ -313,6 +314,7 @@
                       <div class="input-with-icon bg-white width-100">
                         <ng-select
                           class="s-control s-select"
+                          appendTo="body"
                           [items]="branchSalespeople"
                           [clearable]="false"
                           [searchable]="true"
@@ -343,6 +345,7 @@
                       <div class="input-with-icon bg-white width-100">
                         <ng-select
                           class="s-control s-select"
+                          appendTo="body"
                           [items]="branchDeliveryStaff"
                           [clearable]="true"
                           [searchable]="true"
@@ -361,17 +364,19 @@
             </div>
           </div>
  
-      <div class="products-grid" (scroll)="onProductsScroll($event)">
+      <div class="products-grid" #productsGrid>
         <div
           class="product-card"
-          *ngFor="let product of filteredProducts()"
+          *ngFor="let product of filteredProducts(); trackBy: trackProduct"
           (click)="addProduct(product)"
         >
           <div class="product-card__image-wrap">
             <img
               *ngIf="productImageVisible(product)"
-              [src]="product.imageUrl"
+              [src]="cashierCardImageUrl(product.imageUrl)"
               alt=""
+              loading="lazy"
+              decoding="async"
               (error)="onProductImageError(product._id)"
             />
             <div *ngIf="!productImageVisible(product)" class="product-card__image-placeholder" aria-hidden="true">
@@ -405,6 +410,10 @@
           >
             <i class="fa fa-globe" aria-hidden="true"></i>
             {{ 'tr_product_online_badge' | translate }}
+          </div>
+          <div class="cashier-hold-badge" *ngIf="saleHoldLabel(product) as hold" [attr.title]="hold">
+            <i class="fa fa-ban" aria-hidden="true"></i>
+            {{ hold }}
           </div>
           <div class="product-name">{{ product.name }}</div>
           <div class="product-code" *ngIf="product.code">{{ product.code }}</div>
@@ -457,7 +466,7 @@
           </div>
         </div>
         <p class="size-small text-muted m-0 mb-2">{{ 'tr_exchange_active_hint' | translate }}</p>
-        <div class="size-small mb-2" *ngFor="let line of exchangeTradeInLines()">
+        <div class="size-small mb-2" *ngFor="let line of exchangeTradeInLines(); trackBy: trackByTradeInLine">
           <div>
             {{ 'tr_exchange_trade_in_item' | translate }}:
             {{ line?.productPayload?.name }}
@@ -493,7 +502,7 @@
       >
         <div
           class="cashier-booking-bar cashier-booking-bar--warn"
-          *ngFor="let bar of cartForeignBookingBars()"
+          *ngFor="let bar of cartForeignBookingBars(); trackBy: trackByBookingBar"
         >
           <span *ngIf="bar.fromCrm && bar.days <= 0">
             {{
@@ -567,7 +576,7 @@
         </div>
         <div
           class="cashier-booking-bar cashier-booking-bar--deposit"
-          *ngFor="let bar of cartMatchedDepositBars()"
+          *ngFor="let bar of cartMatchedDepositBars(); trackBy: trackByBookingBar"
         >
           <span *ngIf="bar.fullyPaid">
             {{
@@ -610,7 +619,7 @@
                 <img
                   *ngIf="productImageVisible(item)"
                   class="order-line-thumb order-line-thumb--clickable"
-                  [src]="item.imageUrl"
+                  [src]="cashierCardImageUrl(item.imageUrl)"
                   alt=""
                   (click)="openProductDetails(item)"
                   (error)="onProductImageError(item.productId || item._id)"
@@ -802,7 +811,7 @@
   class="invoice-container"
   id="print-container"
   [attr.dir]="(storeSettings.settings$ | async)?.receiptLanguage === 'ar' ? 'rtl' : 'ltr'"
-  *ngIf="printMode === 'sale'"
+  *ngIf="printMode === 'sale' && createdOrder"
 >
   <ng-container *ngIf="storeSettings.settings$ | async as st">
     <!-- Store logo (from Settings) -->

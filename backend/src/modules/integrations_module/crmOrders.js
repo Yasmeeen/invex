@@ -304,7 +304,7 @@ export async function getCrmCatalog(req, res) {
         : { stock: { $gt: 0 } }),
     })
       .select(
-        '_id name code catalogKey price discount stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity category branch imageUrl productType sellByWeightOverride sourceProductId processingExtraCost attributes'
+        '_id name code catalogKey price discount stock transferReservedQuantity serviceHoldQuantity bookedQuantity ecommerceReservedQuantity category branch imageUrl productType sellByWeightOverride sourceProductId processingExtraCost attributes'
       )
       .sort({ name: 1 })
       .lean();
@@ -606,14 +606,19 @@ export async function createCrmOrder(req, res) {
                     $subtract: [
                       {
                         $subtract: [
-                          { $ifNull: ['$stock', 0] },
-                          { $ifNull: ['$transferReservedQuantity', 0] },
+                          {
+                            $subtract: [
+                              { $ifNull: ['$stock', 0] },
+                              { $ifNull: ['$transferReservedQuantity', 0] },
+                            ],
+                          },
+                          { $ifNull: ['$bookedQuantity', 0] },
                         ],
                       },
-                      { $ifNull: ['$bookedQuantity', 0] },
+                      { $ifNull: ['$ecommerceReservedQuantity', 0] },
                     ],
                   },
-                  { $ifNull: ['$ecommerceReservedQuantity', 0] },
+                  { $ifNull: ['$serviceHoldQuantity', 0] },
                 ],
               },
               quantity,

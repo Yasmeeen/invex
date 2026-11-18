@@ -33,6 +33,37 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /**
+     * Units still on the branch books, but not sellable or bookable.
+     * Stock itself is unchanged. Reason is free text written by the user.
+     */
+    serviceHoldQuantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true,
+    },
+    serviceHoldReason: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 200,
+    },
+    serviceHoldNote: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500,
+    },
+    serviceHoldAt: {
+      type: Date,
+      default: null,
+    },
+    serviceHoldBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     discount: {
       type: Number,
       default: 0,

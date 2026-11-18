@@ -6,6 +6,7 @@ import {
     createProduct,
     updateProduct,
     updateProductPrice,
+    setProductServiceHold,
     deleteProduct,
     transferProductStock,
     getProductStats,
@@ -59,6 +60,7 @@ router.post('/import-excel', importProductsFromExcelRows);
 router.post('/sale-price-check', checkSalePriceAgainstPurchase);
 router.put('/:id', updateProduct);         // PUT update
 router.patch('/:id/price', updateProductPrice);
+router.patch('/:id/service-hold', setProductServiceHold);
 router.delete('/deleteProduct/:id', deleteProduct);      // DELETE product
 
 

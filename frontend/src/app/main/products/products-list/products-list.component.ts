@@ -33,6 +33,7 @@ import { ProductsImportMetadata } from '@shared/services/products.service';
 import { TransferProductBranchDialogComponent } from '../transfer-product-branch-dialog/transfer-product-branch-dialog.component';
 import { ProductHistoryDialogComponent } from '../product-history-dialog/product-history-dialog.component';
 import { ProductInventoryAuditDialogComponent } from '../product-inventory-audit-dialog/product-inventory-audit-dialog.component';
+import { ProductServiceHoldDialogComponent } from '../product-service-hold-dialog/product-service-hold-dialog.component';
 import { Router } from '@angular/router';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -78,6 +79,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     | 'with_website_bookings' = 'all';
   /** all | available | out_of_stock — maps to API `inStock` */
   stockFilter: 'all' | 'available' | 'out_of_stock' = 'all';
+  holdFilter: 'all' | 'held' = 'all';
   onlineFilter: 'all' | 'listed' | 'not_listed' = 'all';
 
   readonly locationFilterOptions: Array<{ id: 'all' | 'warehouse' | 'branches'; labelKey: string }> = [
@@ -109,6 +111,14 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     { id: 'all', labelKey: 'tr_products_stock_filter_all' },
     { id: 'available', labelKey: 'tr_products_stock_filter_available' },
     { id: 'out_of_stock', labelKey: 'tr_products_stock_filter_out' },
+  ];
+
+  readonly holdFilterOptions: Array<{
+    id: 'all' | 'held';
+    labelKey: string;
+  }> = [
+    { id: 'all', labelKey: 'tr_products_hold_filter_all' },
+    { id: 'held', labelKey: 'tr_products_hold_filter_held' },
   ];
 
   readonly onlineFilterOptions: Array<{
@@ -215,12 +225,31 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.floor(Number(product.transferReservedQuantity) || 0));
   }
 
+  serviceHoldQty(product: Product): number {
+    return Math.max(0, Number(product?.serviceHoldQuantity) || 0);
+  }
+
+  serviceHoldLabel(product: Product): string {
+    const raw = String(product?.serviceHoldReason || '').trim();
+    if (raw === 'maintenance') return this.translateService.instant('tr_product_hold_maintenance');
+    if (raw === 'at_agent') return this.translateService.instant('tr_product_hold_agent');
+    return raw || this.translateService.instant('tr_product_hold_badge');
+  }
+
+  serviceHoldTitle(product: Product): string {
+    const label = this.serviceHoldLabel(product);
+    const note = String(product?.serviceHoldNote || '').trim();
+    if (note && note !== label) return `${label} — ${note}`;
+    return label;
+  }
+
   /** Units available to move to another branch (free stock + bookings destined for a pickup branch). */
   availableUnitsForBranchTransfer(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const booked = this.bookedQty(product);
     const reserved = this.transferReservedQty(product);
-    const free = Math.max(0, stock - booked - reserved);
+    const hold = this.serviceHoldQty(product);
+    const free = Math.max(0, stock - booked - reserved - hold);
     const remote = (product.remotePickupTransfers || []).reduce(
       (sum, row) => sum + Math.max(0, Number(row.quantity) || 0),
       0
@@ -294,6 +323,68 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return String(pid) === String(myId);
   }
 
+  /** Admins: any product. Branch manager: own branch. Warehouse: warehouse stock only. */
+  canManageServiceHold(product: Product): boolean {
+    if (!product || isModerator(this.globals.currentUser?.role)) {
+      return false;
+    }
+    const role = this.globals.currentUser?.role as string | undefined;
+    if (canPickBranchRole(role)) {
+      return true;
+    }
+    if (isWarehouse(role)) {
+      return !!product.inWarehouse;
+    }
+    if (!isBranchManager(role) || product.inWarehouse) {
+      return false;
+    }
+    const myId = this.globals.currentUser?.branch?._id;
+    const pid =
+      product?.branch &&
+      (typeof product.branch === 'object' ? (product.branch as Branch)._id : product.branch);
+    if (!myId || !pid) {
+      return false;
+    }
+    return String(pid) === String(myId);
+  }
+
+  holdableUnits(product: Product): number {
+    const stock = Math.max(0, Number(product.stock) || 0);
+    const ecom = Math.max(0, Number(product.ecommerceReservedQuantity) || 0);
+    return Math.max(0, stock - this.bookedQty(product) - this.transferReservedQty(product) - ecom);
+  }
+
+  openServiceHold(product: Product): void {
+    if (!this.canManageServiceHold(product)) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_only_own_branch'),
+        'error'
+      );
+      return;
+    }
+    const maxQuantity = this.holdableUnits(product);
+    if (maxQuantity <= 0 && this.serviceHoldQty(product) <= 0) {
+      this.appNotificationService.push(
+        this.translateService.instant('tr_product_hold_none_free'),
+        'error'
+      );
+      return;
+    }
+    this.dialog
+      .open(ProductServiceHoldDialogComponent, {
+        width: '480px',
+        maxWidth: '95vw',
+        autoFocus: false,
+        panelClass: 'product-service-hold-dialog-panel',
+        backdropClass: 'product-service-hold-dialog-backdrop',
+        data: { product, maxQuantity: Math.max(maxQuantity, this.serviceHoldQty(product)) },
+      })
+      .afterClosed()
+      .subscribe((saved) => {
+        if (saved) this.getproducts();
+      });
+  }
+
   showProductActionsMenu(_product: Product): boolean {
     return true;
   }
@@ -329,6 +420,9 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       filterParams['inStock'] = 'true';
     } else if (this.stockFilter === 'out_of_stock') {
       filterParams['inStock'] = 'false';
+    }
+    if (this.holdFilter !== 'all') {
+      filterParams['serviceHold'] = this.holdFilter;
     }
     if (this.showOnlineListingUi) {
       if (this.onlineFilter === 'listed') {
@@ -383,7 +477,8 @@ export class ProductsListComponent implements OnInit, OnDestroy {
   availableToBook(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const reserved = this.transferReservedQty(product);
-    return Math.max(0, stock - this.bookedQty(product) - reserved);
+    const hold = this.serviceHoldQty(product);
+    return Math.max(0, stock - this.bookedQty(product) - reserved - hold);
   }
 
   ngOnInit(): void {

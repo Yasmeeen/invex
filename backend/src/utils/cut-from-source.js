@@ -19,7 +19,8 @@ export function computeSellableUnits(product) {
     (Number(product?.stock) || 0) -
       (Number(product?.transferReservedQuantity) || 0) -
       (Number(product?.bookedQuantity) || 0) -
-      (Number(product?.ecommerceReservedQuantity) || 0)
+      (Number(product?.ecommerceReservedQuantity) || 0) -
+      (Number(product?.serviceHoldQuantity) || 0)
   );
 }
 
@@ -64,7 +65,7 @@ export async function loadSourceProductsById(
   if (!ids.length) return map;
   const fields =
     select ||
-    'name code stock transferReservedQuantity bookedQuantity ecommerceReservedQuantity netPrice branch inWarehouse removedWhenOutOfStock category price sourceProductId';
+    'name code stock transferReservedQuantity serviceHoldQuantity bookedQuantity ecommerceReservedQuantity netPrice branch inWarehouse removedWhenOutOfStock category price sourceProductId';
   const query = Product.find({ _id: { $in: ids } }).select(fields);
   if (session) query.session(session);
   const sources = await query;

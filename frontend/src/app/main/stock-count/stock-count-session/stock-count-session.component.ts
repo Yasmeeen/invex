@@ -178,6 +178,14 @@ export class StockCountSessionComponent implements OnInit, OnDestroy {
     return text === key ? reason || '' : text;
   }
 
+  saleHoldLabel(line: StockCountLine): string {
+    if (!(Number(line?.serviceHoldQuantity) > 0)) return '';
+    const raw = String(line?.serviceHoldReason || '').trim();
+    if (raw === 'maintenance') return this.translate.instant('tr_product_hold_maintenance');
+    if (raw === 'at_agent') return this.translate.instant('tr_product_hold_agent');
+    return raw || this.translate.instant('tr_product_hold_badge');
+  }
+
   emptyKey(): string {
     if (this.section === 'surplus') return 'tr_stock_count_empty_surplus';
     if (this.section === 'scanned') return 'tr_stock_count_empty_scanned';

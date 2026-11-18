@@ -96,6 +96,7 @@ function publicCount(count) {
       ? { _id: branchId, name: count.branchName || count.branch?.name || '' }
       : null,
     branchName: count.branchName || '',
+    stockBasis: count.stockBasis === 'available' ? 'available' : 'recorded',
     categories: (count.categories || []).map((row) => ({
       categoryId: row.categoryId,
       name: row.name || '',
@@ -160,14 +161,16 @@ async function expectedProductsForScope({ locationType, branch, categoryIds }) {
     filter.inWarehouse = { $ne: true };
   }
   const products = await Product.find(filter)
-    .select('name code stock category sellByWeightOverride removedWhenOutOfStock')
+    .select('name code stock transferReservedQuantity category sellByWeightOverride removedWhenOutOfStock')
     .populate('category', 'name sellByWeight')
     .lean();
   return (products || []).filter((product) => !isWeightProduct(product));
 }
 
-function toExpectedItem(product) {
-  const expectedQty = Math.max(0, Math.round(Number(product.stock) || 0));
+function toExpectedItem(product, stockBasis) {
+  const stock = Math.max(0, Math.round(Number(product.stock) || 0));
+  const reserved = Math.max(0, Math.round(Number(product.transferReservedQuantity) || 0));
+  const expectedQty = stockBasis === 'available' ? Math.max(0, stock - reserved) : stock;
   return {
     productId: product._id,
     name: product.name || '',
@@ -226,15 +229,17 @@ export const createStockCount = async (req, res) => {
       branchName = branchDoc.name || '';
     }
 
+    const stockBasis = body.stockBasis === 'available' ? 'available' : 'recorded';
     const products = await expectedProductsForScope({ locationType, branch, categoryIds });
     const expectedItems = products
-      .map(toExpectedItem)
+      .map((product) => toExpectedItem(product, stockBasis))
       .filter((item) => item.expectedQty > 0);
 
     const count = await StockCount.create({
       locationType,
       branch,
       branchName,
+      stockBasis,
       categories: categories.map((category) => ({
         categoryId: category._id,
         name: category.name || '',
@@ -341,15 +346,18 @@ async function attachProductFaces(rows) {
   ];
   if (!ids.length) return rows || [];
   const products = await Product.find({ _id: { $in: ids } })
-    .select('imageUrl ecommerceVariantLabel')
+    .select('imageUrl ecommerceVariantLabel serviceHoldQuantity serviceHoldReason')
     .lean();
   const faces = new Map(products.map((product) => [String(product._id), product]));
   return (rows || []).map((row) => {
     const face = faces.get(String(row.productId || ''));
+    const serviceHoldQuantity = Math.max(0, Number(face?.serviceHoldQuantity) || 0);
     return {
       ...row,
       imageUrl: face?.imageUrl || '',
       subtitle: face?.ecommerceVariantLabel || '',
+      serviceHoldQuantity,
+      serviceHoldReason: serviceHoldQuantity > 0 ? String(face?.serviceHoldReason || '').trim() : '',
     };
   });
 }

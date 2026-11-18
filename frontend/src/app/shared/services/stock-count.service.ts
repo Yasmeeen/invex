@@ -22,6 +22,8 @@ export interface StockCountDto {
   locationType: 'branch' | 'warehouse';
   branch?: { _id: string; name?: string } | null;
   branchName?: string;
+  /** recorded = full stock. available = stock minus outgoing branch transfers. */
+  stockBasis?: 'recorded' | 'available';
   categories: StockCountCategorySnap[];
   status: 'open' | 'completed';
   note?: string;
@@ -46,6 +48,8 @@ export interface StockCountLine {
   diffQty?: number;
   imageUrl?: string;
   subtitle?: string;
+  serviceHoldQuantity?: number;
+  serviceHoldReason?: string;
 }
 
 export type StockCountSection = 'all' | 'shortage' | 'surplus' | 'scanned';
@@ -75,6 +79,7 @@ export interface CreateStockCountPayload {
   categoryIds: string[];
   locationType?: 'branch' | 'warehouse';
   branchId?: string;
+  stockBasis?: 'recorded' | 'available';
   note?: string;
 }
 

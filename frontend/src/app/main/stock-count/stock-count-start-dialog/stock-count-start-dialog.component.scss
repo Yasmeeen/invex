@@ -53,6 +53,11 @@
     gap: 0.35rem;
     font-weight: 600;
   }
+
+  &--stack {
+    flex-direction: column;
+    gap: 0.45rem;
+  }
 }
 
 .stock-count-start-dialog__actions {

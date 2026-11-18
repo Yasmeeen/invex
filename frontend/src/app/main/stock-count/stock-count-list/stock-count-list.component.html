@@ -87,37 +87,44 @@
 
   <div class="plr-4 mt-4" *ngIf="!loading">
     <div class="table-container" *ngIf="counts.length > 0">
-      <table class="s-table table">
+      <table class="s-table table stock-count-table">
         <thead>
           <tr>
-            <th>{{ 'tr_stock_count_started_at' | translate }}</th>
-            <th>{{ 'tr_stock_count_location' | translate }}</th>
-            <th>{{ 'tr_stock_count_categories' | translate }}</th>
-            <th>{{ 'tr_stock_count_status' | translate }}</th>
-            <th>{{ 'tr_stock_count_expected' | translate }}</th>
-            <th>{{ 'tr_stock_count_shortage' | translate }}</th>
-            <th>{{ 'tr_stock_count_surplus' | translate }}</th>
-            <th>{{ 'tr_stock_count_by' | translate }}</th>
+            <th class="col-when">{{ 'tr_stock_count_started_at' | translate }}</th>
+            <th class="col-place">{{ 'tr_stock_count_location' | translate }}</th>
+            <th class="col-cats">{{ 'tr_stock_count_categories' | translate }}</th>
+            <th class="col-status">{{ 'tr_stock_count_status' | translate }}</th>
+            <th class="col-num">{{ 'tr_stock_count_expected' | translate }}</th>
+            <th class="col-num">{{ 'tr_stock_count_shortage' | translate }}</th>
+            <th class="col-num">{{ 'tr_stock_count_surplus' | translate }}</th>
+            <th class="col-by">{{ 'tr_stock_count_by' | translate }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let row of counts" class="stock-count-row" (click)="openCount(row)">
-            <td>{{ formatWhen(row.startedAt) }}</td>
-            <td>{{ locationLabel(row) }}</td>
-            <td>{{ categoriesLabel(row) }}</td>
-            <td>
+            <td class="col-when">{{ formatWhen(row.startedAt) }}</td>
+            <td class="col-place">
+              {{ locationLabel(row) }}
+              <div class="text-muted size-caption" *ngIf="row.stockBasis === 'available'">
+                {{ 'tr_stock_count_basis_available' | translate }}
+              </div>
+            </td>
+            <td class="col-cats">
+              <span class="stock-count-cats" [attr.title]="categoriesLabel(row)">{{ categoriesLabel(row) }}</span>
+            </td>
+            <td class="col-status">
               <span class="stock-count-status" [class.stock-count-status--open]="row.status === 'open'">
                 {{ statusLabel(row) }}
               </span>
             </td>
-            <td>{{ row.summary?.expectedUnits || 0 }}</td>
-            <td [class.stock-count-num--shortage]="(row.summary?.shortageUnits || 0) > 0">
+            <td class="col-num">{{ row.summary?.expectedUnits || 0 }}</td>
+            <td class="col-num" [class.stock-count-num--shortage]="(row.summary?.shortageUnits || 0) > 0">
               {{ row.summary?.shortageUnits || 0 }}
             </td>
-            <td [class.stock-count-num--surplus]="(row.summary?.surplusUnits || 0) > 0">
+            <td class="col-num" [class.stock-count-num--surplus]="(row.summary?.surplusUnits || 0) > 0">
               {{ row.summary?.surplusUnits || 0 }}
             </td>
-            <td>{{ row.createdBy?.name || '—' }}</td>
+            <td class="col-by" [attr.title]="row.createdBy?.name || ''">{{ row.createdBy?.name || '—' }}</td>
           </tr>
         </tbody>
       </table>

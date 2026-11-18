@@ -26,6 +26,13 @@ export function branchIdOf(product) {
   return String(branch);
 }
 
+/** Units still in this location. Transfer reservations are already committed to another branch. */
+export function availableQty(product) {
+  const stock = Math.max(0, Math.round(Number(product?.stock) || 0));
+  const reserved = Math.max(0, Math.round(Number(product?.transferReservedQuantity) || 0));
+  return Math.max(0, stock - reserved);
+}
+
 export function productInLocation(product, count) {
   if (!product || !count) return false;
   if (count.locationType === 'warehouse') return !!product.inWarehouse;
@@ -95,6 +102,7 @@ export function surplusReason(product, count) {
   if ((Number(product.stock) || 0) <= 0) return 'out_of_stock';
   if (!productInLocation(product, count)) return 'other_location';
   if (!categorySelected(product, count)) return 'wrong_category';
+  if (availableQty(product) <= 0) return 'transferred';
   return 'not_expected';
 }
 
@@ -271,6 +279,17 @@ export function classifyScan(count, matches, rawCode) {
         normalized,
         rawCode: raw,
         reason: '',
+        product,
+      };
+    }
+    const reserved = Math.max(0, Math.round(Number(product.transferReservedQuantity) || 0));
+    if (count?.stockBasis === 'available' && reserved > 0 && matched < qty + reserved) {
+      return {
+        action: 'record',
+        kind: 'surplus',
+        reason: 'transferred',
+        normalized,
+        rawCode: raw,
         product,
       };
     }

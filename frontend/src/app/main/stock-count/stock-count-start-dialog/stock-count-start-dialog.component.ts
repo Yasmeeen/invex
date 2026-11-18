@@ -53,6 +53,7 @@ export class StockCountStartDialogComponent implements OnInit, OnDestroy {
       locationType: [defaultLocation],
       branchId: [''],
       categoryIds: [[], Validators.required],
+      stockBasis: ['available'],
       note: ['', Validators.maxLength(500)],
     });
   }
@@ -105,6 +106,7 @@ export class StockCountStartDialogComponent implements OnInit, OnDestroy {
       this.notify.push(this.translate.instant('tr_stock_count_categories_required'), 'error');
       return;
     }
+    const stockBasis = this.form.get('stockBasis')?.value === 'recorded' ? 'recorded' : 'available';
     const locationType = this.form.get('locationType')?.value === 'warehouse' ? 'warehouse' : 'branch';
     const branchId = String(this.form.get('branchId')?.value || '').trim();
     if (this.showBranchPicker && locationType === 'branch' && !branchId) {
@@ -120,6 +122,7 @@ export class StockCountStartDialogComponent implements OnInit, OnDestroy {
           categoryIds,
           locationType: this.showLocationPicker ? locationType : 'branch',
           branchId: this.showBranchPicker ? branchId : undefined,
+          stockBasis,
           note: String(this.form.get('note')?.value || '').trim(),
         })
         .subscribe({

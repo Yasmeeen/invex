@@ -17,6 +17,9 @@
           <i class="fa fa-archive" aria-hidden="true"></i>
           {{ locationLabel() }}
         </span>
+        <span class="stock-session__meta-text" *ngIf="count.stockBasis === 'available'">
+          {{ 'tr_stock_count_basis_available' | translate }}
+        </span>
       </div>
       <p class="stock-session__note" *ngIf="count.note">{{ count.note }}</p>
       <p class="stock-session__closed" *ngIf="!isOpen">{{ 'tr_stock_count_closed_banner' | translate }}</p>
@@ -208,6 +211,7 @@
                   <span>
                     <strong>{{ line.name || line.rawCode || '—' }}</strong>
                     <small *ngIf="line.subtitle">{{ line.subtitle }}</small>
+                    <em class="sale-hold-label" *ngIf="saleHoldLabel(line) as hold" [attr.title]="hold">{{ hold }}</em>
                   </span>
                 </div>
               </td>

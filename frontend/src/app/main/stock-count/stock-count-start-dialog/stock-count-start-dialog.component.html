@@ -57,6 +57,23 @@
     </div>
 
     <div class="form-group">
+      <label>{{ 'tr_stock_count_stock_basis' | translate }}</label>
+      <div class="stock-count-start-dialog__radios stock-count-start-dialog__radios--stack">
+        <label>
+          <input type="radio" formControlName="stockBasis" value="available" />
+          {{ 'tr_stock_count_basis_available' | translate }}
+        </label>
+        <label>
+          <input type="radio" formControlName="stockBasis" value="recorded" />
+          {{ 'tr_stock_count_basis_recorded' | translate }}
+        </label>
+      </div>
+      <p class="text-muted size-caption" *ngIf="form.get('stockBasis')?.value === 'available'">
+        {{ 'tr_stock_count_basis_available_hint' | translate }}
+      </p>
+    </div>
+
+    <div class="form-group">
       <label>{{ 'tr_stock_count_note' | translate }}</label>
       <textarea
         class="s-control width-100"

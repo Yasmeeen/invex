@@ -63,6 +63,15 @@ const stockCountSchema = new mongoose.Schema(
       index: true,
     },
     branchName: { type: String, default: '', trim: true },
+    /**
+     * recorded = full stock.
+     * available = stock minus quantity reserved for a transfer to another branch.
+     */
+    stockBasis: {
+      type: String,
+      enum: ['recorded', 'available'],
+      default: 'recorded',
+    },
     categories: { type: [categorySnapSchema], default: [] },
     /** In-stock units in the chosen categories at start. Shortage is measured against this. */
     expectedItems: { type: [expectedItemSchema], default: [] },

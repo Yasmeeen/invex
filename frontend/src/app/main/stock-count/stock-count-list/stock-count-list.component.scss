@@ -29,12 +29,74 @@
   line-height: 1.5;
 }
 
+.stock-count-table {
+  width: 100%;
+  min-width: 1040px;
+  table-layout: fixed;
+
+  th,
+  td {
+    word-break: normal;
+    overflow-wrap: normal;
+    vertical-align: middle;
+  }
+
+  .col-when {
+    width: 150px;
+  }
+
+  th.col-when {
+    white-space: normal;
+  }
+
+  td.col-when {
+    white-space: nowrap;
+  }
+
+  .col-place {
+    width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .col-status {
+    width: 104px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .col-num {
+    width: 112px;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .col-by {
+    width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 .stock-count-row {
   cursor: pointer;
 }
 
+.stock-count-cats {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+  white-space: normal;
+}
+
 .stock-count-status {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
   background: #eef2f7;

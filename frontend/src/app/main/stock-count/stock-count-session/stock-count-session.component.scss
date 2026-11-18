@@ -18,6 +18,11 @@
   margin-bottom: 1rem;
 }
 
+.stock-session__identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .stock-session__identity h2 {
   margin: 0;
   font-size: 1.45rem;
@@ -77,6 +82,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .stock-session__note,
@@ -91,6 +100,7 @@
   direction: ltr;
   align-items: center;
   gap: 0.45rem;
+  flex: 0 0 auto;
 }
 
 .stock-session__finish,
@@ -104,6 +114,8 @@
   border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .stock-session__finish,
@@ -503,6 +515,25 @@
   small {
     color: #98a2b3;
     margin-top: 0.1rem;
+  }
+
+  .sale-hold-label {
+    display: inline-flex;
+    align-items: center;
+    max-width: 220px;
+    margin-top: 0.28rem;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    background: #fff1f2;
+    border: 1px solid #fda4af;
+    color: #9f1239;
+    font-size: 0.72rem;
+    font-style: normal;
+    font-weight: 800;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

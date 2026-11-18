@@ -132,8 +132,8 @@ export const RECEIPT_ISOLATED_PRINT_CSS = `
   .invoice-return-policy__text { white-space: pre-wrap; word-wrap: break-word; font-weight: 700; }
   .invoice-qr { margin-top: 10px; padding: 4px 3mm 0; }
   .invoice-qr__img {
-    width: 96px;
-    height: 96px;
+    width: 128px;
+    height: 128px;
     display: inline-block;
     image-rendering: pixelated;
   }

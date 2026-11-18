@@ -50,7 +50,7 @@
         {{ 'tr_clear' | translate }} {{ 'tr_date' | translate }}
       </button>
     </div>
-    <div class="col-md-4" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
+    <div class="col-md-4" *ngIf="curentUser?.role == 'Super Admin' || curentUser?.role == 'Co Admin'">
       <div
         class="form-group"
       >
@@ -174,7 +174,7 @@
           </div>
         </div>
       </div>
-      <div class="col-md-3" *ngIf="curentUser.role == 'Super Admin' || curentUser.role == 'Co Admin'">
+      <div class="col-md-3" *ngIf="curentUser?.role == 'Super Admin' || curentUser?.role == 'Co Admin'">
         <div class="form-group mb-0">
           <label>{{ "tr_branch" | translate }}</label>
           <div class="input-with-icon bg-white width-100">
@@ -709,7 +709,19 @@
 
       <div
         class="empty-state-here text-center ptb-8"
-        *ngIf="ordersList.length == 0"
+        *ngIf="listLoadFailed && !ordersLoading"
+      >
+        <p class="weight-bold">{{ 'tr_unexpected_error_message' | translate }}</p>
+        <div class="max-200 max-center mt-4">
+          <button type="button" class="s-btn btn-primary btn-block" (click)="getOrders()">
+            {{ 'tr_refresh' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="empty-state-here text-center ptb-8"
+        *ngIf="ordersList.length == 0 && !listLoadFailed && !ordersLoading"
       >
         <img
           class="placeholder-icon"

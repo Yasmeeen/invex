@@ -22,7 +22,10 @@ constructor(
   private appNotificationService: AppNotificationService
 ) {}
 getOrders(params: any) {
-  return this.http.get(ORDERS_URL, { params: params });
+  return this.http.get(ORDERS_URL, {
+    params: params,
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+  });
 }
 getOrder(orderId: any) {
   return this.http.get(ORDERS_URL+ `/${orderId}`);

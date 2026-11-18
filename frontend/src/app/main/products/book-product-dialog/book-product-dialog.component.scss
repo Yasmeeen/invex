@@ -6,7 +6,14 @@
 
 .booking-select-field {
   position: relative;
-  z-index: 8;
+  z-index: 1;
+
+  /* Later fields share this stacking context. On mobile they sit under the
+     menu, so the opened field must paint above them or the option text mixes
+     with the next label. */
+  &:has(.ng-select-opened) {
+    z-index: 30;
+  }
 
   ::ng-deep ng-select.ng-select-opened {
     z-index: 60 !important;
@@ -14,6 +21,7 @@
 
   ::ng-deep ng-select .ng-dropdown-panel {
     z-index: 70 !important;
+    background: #fff;
   }
 }
 

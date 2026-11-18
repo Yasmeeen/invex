@@ -6,8 +6,7 @@ import {
     HttpResponse,
     HttpHandler,
     HttpEvent,
-    HttpErrorResponse,
-    HttpHeaders
+    HttpErrorResponse
 } from '@angular/common/http';
 
 import { Observable, throwError, of, EMPTY } from 'rxjs';
@@ -25,20 +24,6 @@ export class HttpConfigInterceptor implements HttpInterceptor {
     ) { }
     returnUrl: any;
     intercept(request: any, next: HttpHandler): Observable<HttpEvent<any>> {
-        let headers = {
-          'Access-Control-Allow-Origin': '*'
-      };
-        // if (JSON.parse(localStorage.getItem('sessionHeaders') || '')) {
-        //     headers = JSON.parse(localStorage.getItem('sessionHeaders') || '');
-        // } else {
-        //     headers = {
-        //         'Access-Control-Allow-Origin': '*'
-        //     };
-        // }
-        request = request.clone({
-            setHeaders: { ...headers, ...request.headers.headers }
-        });
-
             return next.handle(request).pipe(
                 map((event: HttpEvent<any>) => {
                     if (event instanceof HttpResponse) {

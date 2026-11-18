@@ -43,6 +43,7 @@ import {
   PaymentMethodOption,
 } from '@shared/constants/payment-method-options';
 import { formatCairoDMY, formatCairoYMD } from '@core/utils/date-tz.util';
+import { normalizeMongoId } from '@core/utils/mongo-id.util';
 import { paymentMethodDisplayLabel } from '@shared/utils/cashier-payment-methods.util';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 import { InvoiceReprintService } from '@shared/services/invoice-reprint.service';
@@ -64,6 +65,9 @@ export class OrdersListComponent implements OnInit {
   fullscreenEnabled = false;
   searchTerm: string;
   isNotAuthorized: boolean = false;
+  /** List request failed. Branch managers are allowed on this page, so this is a reload state, not a permission wall. */
+  listLoadFailed = false;
+  private ordersRequestSeq = 0;
   iscategoryNotAuthorized: boolean = false;
   isToday: boolean = true;
   status = ['restored', 'partially_restored', 'completed'];
@@ -137,7 +141,9 @@ export class OrdersListComponent implements OnInit {
     private invoiceReprint: InvoiceReprintService,
     private route: ActivatedRoute,
     private router: Router
-  ) { }
+  ) {
+    this.curentUser = this.authenticationService.getUserFromLocalStorage();
+  }
 
   orderPaid(order: Order): number {
     return orderDisplayPaid(order);
@@ -327,83 +333,82 @@ export class OrdersListComponent implements OnInit {
     })
   }
 
-  getOrders() {
-   this.curentUser = this.authenticationService.getUserFromLocalStorage();
-   delete this.params.searchBranch;
-   if (this.curentUser.role === 'Cashier' || this.curentUser.role === 'Branch Manager') {
-    const ownBranch = this.curentUser.branch?._id || this.curentUser.branch;
-    if (ownBranch) {
-      this.params.branch = String(ownBranch);
-    }
-   } else if (this.listBranchId) {
-    this.params.branch = this.listBranchId;
-   } else {
-    delete this.params.branch;
-   }
-   if(this.selectedStatus){
-    this.params['status'] = this.selectedStatus
-   }
-   else {
-    delete  this.params['status'] 
-   }
+  /** One list request. A single 403 used to lock the whole invoices page even for a branch manager. */
+  getOrders(isRetry = false): void {
+    this.curentUser = this.authenticationService.getUserFromLocalStorage();
+    const query = this.buildOrdersQuery();
+    const seq = ++this.ordersRequestSeq;
+    this.ordersLoading = true;
+    this.listLoadFailed = false;
+    this.isNotAuthorized = false;
 
-    if (this.selectedPaymentMethod) {
-      this.params['paymentMethod'] = this.selectedPaymentMethod;
-    } else {
-      delete this.params['paymentMethod'];
+    this.subscriptions.push(this.ordersService.getOrders(query).subscribe((response: any) => {
+      if (seq !== this.ordersRequestSeq) return;
+      this.ordersList = response?.orders || [];
+      this.paginationData = response?.meta;
+      this.ordersLoading = false;
+      this.listLoadFailed = false;
+      this.isNotAuthorized = false;
+    }, () => {
+      if (seq !== this.ordersRequestSeq) return;
+      if (!isRetry) {
+        this.getOrders(true);
+        return;
+      }
+      this.ordersLoading = false;
+      this.listLoadFailed = true;
+      this.isNotAuthorized = false;
+    }))
+  }
+
+  /** Only string query values. An object used to become `[object Object]` and some gateways answer that with 403. */
+  private buildOrdersQuery(): Record<string, string> {
+    const query: Record<string, string> = {
+      page: String(this.params?.page || 1),
+      perPage: String(this.paginationPerPage || 10),
+      limit: String(this.paginationPerPage || 10),
+    };
+    const role = String(this.curentUser?.role || '');
+    const ownBranch = this.branchIdOf(this.curentUser);
+    if ((role === 'Cashier' || role === 'Branch Manager') && ownBranch) {
+      query.branch = ownBranch;
+    } else if (role !== 'Cashier' && role !== 'Branch Manager') {
+      const picked = normalizeMongoId(this.listBranchId);
+      if (picked) query.branch = picked;
     }
+
+    const status = String(this.selectedStatus || '').trim();
+    if (status && status !== '[object Object]') query.status = status;
+
+    const payment = String(this.selectedPaymentMethod || '').trim();
+    if (payment && payment !== '[object Object]') query.paymentMethod = payment;
 
     if (this.settlementFilter === 'open' || this.settlementFilter === 'settled') {
-      this.params.settlement = this.settlementFilter;
-    } else {
-      delete this.params.settlement;
+      query.settlement = this.settlementFilter;
     }
 
-    if (this.selectedInstallmentMonths) {
-      this.params['installmentPlanMonths'] = this.selectedInstallmentMonths;
-      if (!this.selectedPaymentMethod) {
-        this.params['paymentMethod'] = 'installment';
-      }
-    } else {
-      delete this.params['installmentPlanMonths'];
+    const months = Math.floor(Number(this.selectedInstallmentMonths));
+    if (Number.isFinite(months) && months > 0) {
+      query.installmentPlanMonths = String(months);
+      if (!query.paymentMethod) query.paymentMethod = 'installment';
     }
 
-    if (this.listFromDate) {
-      this.params.from = formatCairoYMD(this.listFromDate);
-    } else {
-      delete this.params.from;
-    }
-    if (this.listToDate) {
-      this.params.to = formatCairoYMD(this.listToDate);
-    } else {
-      delete this.params.to;
+    if (this.listFromDate) query.from = formatCairoYMD(this.listFromDate);
+    if (this.listToDate) query.to = formatCairoYMD(this.listToDate);
+
+    if (this.sortFilter === 'sale_desc' || this.sortFilter === 'sale_asc') {
+      query.sortBy = 'saleNumber';
+      query.sortDir = this.sortFilter === 'sale_asc' ? 'asc' : 'desc';
     }
 
-    if (this.sortFilter === 'sale_desc') {
-      this.params.sortBy = 'saleNumber';
-      this.params.sortDir = 'desc';
-    } else if (this.sortFilter === 'sale_asc') {
-      this.params.sortBy = 'saleNumber';
-      this.params.sortDir = 'asc';
-    } else {
-      delete this.params.sortBy;
-      delete this.params.sortDir;
-    }
+    const search = String(this.params?.search || '').trim();
+    if (search) query.search = search;
+    return query;
+  }
 
-    this.ordersLoading = true;
-    this.subscriptions.push(this.ordersService.getOrders(this.params).subscribe((response: any) => {
-      this.ordersList = response.orders
-      this.paginationData = response.meta
-      this.ordersLoading = false;
-    },(error:any)=> {
-      if(error.status == 403) {
-        this.isNotAuthorized = true;
-        this.ordersLoading = false;
-      }
-      else {
-        this.appNotificationService.push( this.translateService.instant('tr_unexpected_error_message'), 'error');
-      }
-    }))
+  private branchIdOf(user: any): string | null {
+    if (!user) return null;
+    return normalizeMongoId(user.branch?._id ?? user.branch);
   }
 
 
@@ -546,6 +551,9 @@ export class OrdersListComponent implements OnInit {
   }
 
   getOrderStatistics(){
+    if (!this.curentUser) {
+      this.curentUser = this.authenticationService.getUserFromLocalStorage();
+    }
     const today = new Date();
     if (this.fromDate == null && this.toDate == null) {
       this.isToday = false;
@@ -564,11 +572,11 @@ export class OrdersListComponent implements OnInit {
       branch?: string;
     } = {};
     if (canPickBranchRole(this.curentUser?.role)) {
-      if (this.selectedBranchId) {
-        params.branch = this.selectedBranchId;
-      }
-    } else if (this.globals.currentUser?.branch?._id) {
-      params.branch = this.globals.currentUser.branch._id;
+      const picked = normalizeMongoId(this.selectedBranchId);
+      if (picked) params.branch = picked;
+    } else {
+      const own = this.branchIdOf(this.curentUser) || this.branchIdOf(this.globals.currentUser);
+      if (own) params.branch = own;
     }
     if (this.fromDate) {
       params.from = formatCairoYMD(this.fromDate);
@@ -576,9 +584,6 @@ export class OrdersListComponent implements OnInit {
     if (this.toDate) {
       params.to = formatCairoYMD(this.toDate);
     }
-    if (this.curentUser.role === 'Cashier') {
-      this.params.branch = this.curentUser.branch?._id
-     }
 
     this.dashboardService.getDashboardStats(params).subscribe(res=> {
       this.orderStatistics = res;  

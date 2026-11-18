@@ -379,6 +379,7 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ clientId: 1, createdAt: -1 });
 orderSchema.index({ paymentMethod: 1, status: 1 });
+orderSchema.index({ branch: 1, createdAt: -1 });
 
 const Order = mongoose.model("Order", orderSchema);
 export default Order;

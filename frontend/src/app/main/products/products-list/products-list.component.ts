@@ -660,7 +660,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       if (!key || !val) continue;
       out.push({ key, value: val });
     }
-    return out.slice(0, 8);
+    return out;
   }
 
   productAttributesSummary(p: Product): string {

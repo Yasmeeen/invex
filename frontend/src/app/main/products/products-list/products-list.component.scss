@@ -140,9 +140,9 @@
 
 .products-list__attrs {
   max-width: 320px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .products-cards {
@@ -265,17 +265,22 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: 3px 10px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.06);
   color: #111827;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .product-image{
 img{

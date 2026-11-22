@@ -243,18 +243,31 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return label;
   }
 
+  /** True when a transfer can be started, including by cancelling a pending one. */
+  canStartBranchTransfer(product: Product): boolean {
+    return (
+      this.availableUnitsForBranchTransfer(product) > 0 ||
+      this.availableUnitsIgnoringPendingTransfer(product) > 0
+    );
+  }
+
+  /** Same capacity as a transfer, ignoring units already held by a pending request. */
+  availableUnitsIgnoringPendingTransfer(product: Product): number {
+    return this.availableUnitsForBranchTransfer({ ...product, transferReservedQuantity: 0 });
+  }
+
   /** Units available to move to another branch (free stock + bookings destined for a pickup branch). */
   availableUnitsForBranchTransfer(product: Product): number {
     const stock = Math.max(0, Number(product.stock) || 0);
     const booked = this.bookedQty(product);
     const reserved = this.transferReservedQty(product);
     const hold = this.serviceHoldQty(product);
-    const free = Math.max(0, stock - booked - reserved - hold);
     const remote = (product.remotePickupTransfers || []).reduce(
       (sum, row) => sum + Math.max(0, Number(row.quantity) || 0),
       0
     );
-    return free + remote;
+    const movable = Math.min(booked, remote);
+    return Math.max(0, stock - (booked - movable) - reserved - hold);
   }
 
   remotePickupHint(product: Product): string {
@@ -578,7 +591,7 @@ export class ProductsListComponent implements OnInit, OnDestroy {
       return;
     }
     const maxQ = this.availableUnitsForBranchTransfer(product);
-    if (maxQ <= 0) {
+    if (!this.canStartBranchTransfer(product)) {
       this.appNotificationService.push(
         this.translateService.instant('tr_branch_transfer_no_capacity'),
         'error'

@@ -486,7 +486,7 @@
                     <ng-container *ngIf="canTransferProduct(product)">
                       <div
                         class="single-option"
-                        *ngIf="availableUnitsForBranchTransfer(product) > 0"
+                        *ngIf="canStartBranchTransfer(product)"
                         (click)="openTransferProduct(product)"
                       >
                         {{ "tr_product_transfer_branch" | translate }}
@@ -618,7 +618,7 @@
                 <ng-container *ngIf="canTransferProduct(product)">
                   <div
                     class="single-option"
-                    *ngIf="availableUnitsForBranchTransfer(product) > 0"
+                    *ngIf="canStartBranchTransfer(product)"
                     (click)="openTransferProduct(product)"
                   >
                     {{ "tr_product_transfer_branch" | translate }}

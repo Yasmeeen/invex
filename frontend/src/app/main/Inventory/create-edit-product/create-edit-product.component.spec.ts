@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { of } from 'rxjs';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { BranchesServce } from '@shared/services/branches.service';
@@ -21,6 +21,7 @@ describe('CreateEditProductComponent', () => {
       imports: [FormsModule],
       providers: [
         { provide: MatDialogRef, useValue: { close: () => {} } },
+        { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(null) }) } },
         { provide: ProductsSerivce, useValue: { getProducts: () => of({ products: [] }), requestBranchTransfer: () => of({}) } },
         { provide: BranchesServce, useValue: { getBranchs: () => of({ branches: [] }) } },
         { provide: AppNotificationService, useValue: { push: () => {} } },

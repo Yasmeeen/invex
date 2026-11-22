@@ -350,6 +350,8 @@ requestBranchTransfer(payload: {
   productId: string;
   toBranchId: string;
   quantity: number;
+  /** Cancel this product's pending transfers, then create the new request. */
+  replacePending?: boolean;
 }) {
   return this.http.post<{ message: string; transfer: BranchTransferItem }>(
     `${PRODUCTS_URL}/branch-transfer/request`,

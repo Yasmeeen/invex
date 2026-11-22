@@ -37,9 +37,13 @@ export function transferAvailableQty({
   const booked = Math.max(0, Number(bookedTotal) || 0);
   const reserved = Math.max(0, Number(transferReserved) || 0);
   const hold = Math.max(0, Number(serviceHold) || 0);
-  const extra = Math.max(0, Number(bookedForDestination) || 0);
-  const free = Math.max(0, st - booked - reserved - hold);
-  return free + extra;
+  const extra = Math.min(booked, Math.max(0, Number(bookedForDestination) || 0));
+  // Pickup bookings for this destination may leave with the transfer, so they
+  // are not held back. Pending reservations already include any earlier request
+  // for that same pickup, and must be subtracted before the pickup qty is added
+  // back. Clamping free stock to 0 first counted the pickup a second time.
+  const keptBookings = booked - extra;
+  return Math.max(0, st - keptBookings - reserved - hold);
 }
 
 export async function bookedQuantityForPickupBranch(productOid, toBranchId, { session } = {}) {

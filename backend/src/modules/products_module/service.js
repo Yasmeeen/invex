@@ -2660,8 +2660,52 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+const REPLACED_TRANSFER_REASON = 'اتلغى عشان طلب نقل جديد لنفس الجهاز';
+
+async function withdrawPendingProductTransfers(productId, userId) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  const withdrawn = [];
+  try {
+    const pending = await ProductBranchTransfer.find({
+      product: productId,
+      status: 'pending',
+    }).session(session);
+    let released = 0;
+    for (const transfer of pending) {
+      released += Number(transfer.quantity) || 0;
+      transfer.status = 'rejected';
+      transfer.rejectReason = REPLACED_TRANSFER_REASON;
+      transfer.resolvedBy = userId;
+      transfer.resolvedAt = new Date();
+      await transfer.save({ session });
+      withdrawn.push(transfer);
+    }
+    if (released > 0) {
+      const source = await Product.findById(productId).session(session);
+      if (source) {
+        source.transferReservedQuantity = Math.max(
+          0,
+          (Number(source.transferReservedQuantity) || 0) - released
+        );
+        await source.save({ session });
+      }
+    }
+    await session.commitTransaction();
+    return withdrawn;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
 /** Branch/warehouse → branch transfer pending approval at destination. Body: userId, productId, toBranchId, quantity */
 export const requestBranchTransfer = async (req, res) => {
+  let reservedProductId = null;
+  let reservedQty = 0;
+  let transferPersisted = false;
   try {
     const userId = pickActorUserId(req);
     const { productId, toBranchId, quantity } = req.body;
@@ -2705,26 +2749,127 @@ export const requestBranchTransfer = async (req, res) => {
     }
 
     const booked = await sumActiveBookedQuantityProducts(product._id);
-    const reserved = Number(product.transferReservedQuantity) || 0;
+    let reserved = Number(product.transferReservedQuantity) || 0;
     const stock = Math.max(0, Number(product.stock) || 0);
     const bookedForDest = await bookedQuantityForPickupBranch(product._id, toBranchId);
-    const available = transferAvailableQty({
+    const hold = Number(product.serviceHoldQuantity) || 0;
+    const qtyInputs = {
       stock,
       bookedTotal: booked,
-      transferReserved: reserved,
       bookedForDestination: bookedForDest,
-      serviceHold: Number(product.serviceHoldQuantity) || 0,
-    });
+      serviceHold: hold,
+    };
+    let available = transferAvailableQty({ ...qtyInputs, transferReserved: reserved });
+    const unavailableMessage = (n) =>
+      fromWarehouse
+        ? `Only ${n} unit(s) available to transfer to this branch from warehouse`
+        : `Only ${n} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`;
     if (qty > available) {
-      return res.status(400).json({
-        error: fromWarehouse
-          ? `Only ${available} unit(s) available to transfer to this branch from warehouse`
-          : `Only ${available} unit(s) available to transfer to this branch (free stock plus bookings for that pickup branch)`,
+      const pending = await ProductBranchTransfer.find({
+        product: product._id,
+        status: 'pending',
+      })
+        .populate('toBranch', 'name')
+        .lean();
+      const pendingQty = pending.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+      const availableIfReleased = transferAvailableQty({
+        ...qtyInputs,
+        transferReserved: Math.max(0, reserved - pendingQty),
       });
+      const canReplace = pending.length > 0 && qty <= availableIfReleased;
+      const replacePending =
+        req.body?.replacePending === true || req.body?.replacePending === 'true';
+      if (canReplace && !replacePending) {
+        return res.status(409).json({
+          code: 'PENDING_TRANSFER_EXISTS',
+          error: 'This product already has a pending transfer',
+          pendingTransfers: pending.map((row) => ({
+            _id: row._id,
+            quantity: Number(row.quantity) || 0,
+            toBranchId: row.toBranch?._id ? String(row.toBranch._id) : String(row.toBranch || ''),
+            toBranchName: String(row.toBranch?.name || '').trim(),
+            createdAt: row.createdAt,
+          })),
+        });
+      }
+      if (canReplace && replacePending) {
+        const withdrawn = await withdrawPendingProductTransfers(product._id, userId);
+        for (const transfer of withdrawn) {
+          await auditLog(req, {
+            action: 'branch_transfer_reject',
+            module: 'products',
+            entityType: 'ProductBranchTransfer',
+            entityId: transfer._id,
+            message: `Branch transfer replaced (${Number(transfer.quantity) || 0})`,
+            metadata: {
+              productId: product._id,
+              rejectReason: REPLACED_TRANSFER_REASON,
+              replacedByNewRequest: true,
+            },
+          });
+          const initiatorId = transfer.initiatedBy;
+          if (initiatorId && String(initiatorId) !== String(userId)) {
+            try {
+              const notification = await Notification.create({
+                type: 'branch_transfer_rejected',
+                title: 'Branch transfer replaced',
+                body: `${product.name || 'Product'} ×${Number(transfer.quantity) || 0}: ${REPLACED_TRANSFER_REASON}`,
+                data: {
+                  transferId: transfer._id,
+                  productId: product._id,
+                  quantity: Number(transfer.quantity) || 0,
+                  rejectedById: userId,
+                  rejectReason: REPLACED_TRANSFER_REASON,
+                  replacedByNewRequest: true,
+                },
+                recipients: [initiatorId],
+                readBy: [],
+              });
+              emitToUsers([initiatorId], 'notification:new', { notification });
+            } catch (notifyErr) {
+              console.warn('⚠️ branch transfer replace notification:', notifyErr?.message || notifyErr);
+            }
+          }
+        }
+        const fresh = await Product.findById(product._id).select('transferReservedQuantity').lean();
+        reserved = Number(fresh?.transferReservedQuantity) || 0;
+        available = transferAvailableQty({ ...qtyInputs, transferReserved: reserved });
+      }
+      if (qty > available) {
+        return res.status(400).json({ error: unavailableMessage(available) });
+      }
     }
 
-    product.transferReservedQuantity = reserved + qty;
-    await product.save();
+    const keptBookings = Math.max(0, booked - Math.min(booked, bookedForDest));
+    const reservedProduct = await Product.findOneAndUpdate(
+      {
+        _id: product._id,
+        $expr: {
+          $gte: [
+            {
+              $subtract: [
+                { $max: [0, { $ifNull: ['$stock', 0] }] },
+                {
+                  $add: [
+                    keptBookings,
+                    { $max: [0, { $ifNull: ['$transferReservedQuantity', 0] }] },
+                    { $max: [0, { $ifNull: ['$serviceHoldQuantity', 0] }] },
+                  ],
+                },
+              ],
+            },
+            qty,
+          ],
+        },
+      },
+      { $inc: { transferReservedQuantity: qty } },
+      { new: true }
+    );
+    if (!reservedProduct) {
+      return res.status(400).json({ error: unavailableMessage(available) });
+    }
+    reservedProductId = product._id;
+    reservedQty = qty;
 
     const transfer = await ProductBranchTransfer.create({
       product: product._id,
@@ -2737,6 +2882,7 @@ export const requestBranchTransfer = async (req, res) => {
       status: 'pending',
       initiatedBy: userId,
     });
+    transferPersisted = true;
 
     const populated = await ProductBranchTransfer.findById(transfer._id)
       .populate('product', 'name code')
@@ -2788,6 +2934,14 @@ export const requestBranchTransfer = async (req, res) => {
       transfer: populated,
     });
   } catch (e) {
+    if (reservedProductId && !transferPersisted) {
+      await Product.updateOne(
+        { _id: reservedProductId },
+        { $inc: { transferReservedQuantity: -reservedQty } }
+      ).catch((rollbackErr) => {
+        console.error('requestBranchTransfer reservation rollback:', rollbackErr);
+      });
+    }
     console.error('requestBranchTransfer:', e);
     return res.status(500).json({ error: 'Failed to request branch transfer' });
   }
@@ -2866,15 +3020,14 @@ export const approveBranchTransfer = async (req, res) => {
     const bookedForDest = await bookedQuantityForPickupBranch(sourceProduct._id, transfer.toBranch, {
       session,
     });
-    const otherReserved = Math.max(0, reserved - qty);
-    const available = transferAvailableQty({
+    const availableAlone = transferAvailableQty({
       stock,
       bookedTotal: booked,
-      transferReserved: otherReserved,
+      transferReserved: 0,
       bookedForDestination: bookedForDest,
       serviceHold: Number(sourceProduct.serviceHoldQuantity) || 0,
     });
-    if (qty > available) {
+    if (qty > availableAlone) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
@@ -2884,6 +3037,28 @@ export const approveBranchTransfer = async (req, res) => {
 
     sourceProduct.transferReservedQuantity = Math.max(0, reserved - qty);
     sourceProduct.stock = stock - qty;
+    const supersededTransfers = [];
+    if (sourceProduct.stock <= 0) {
+      const others = await ProductBranchTransfer.find({
+        product: sourceProduct._id,
+        status: 'pending',
+        _id: { $ne: transfer._id },
+      }).session(session);
+      let extraReserved = 0;
+      for (const other of others) {
+        extraReserved += Number(other.quantity) || 0;
+        other.status = 'rejected';
+        other.rejectReason = 'اتلغى لأن نفس الجهاز اتنقل في طلب تاني';
+        other.resolvedBy = userId;
+        other.resolvedAt = new Date();
+        await other.save({ session });
+        supersededTransfers.push(other);
+      }
+      sourceProduct.transferReservedQuantity = Math.max(
+        0,
+        sourceProduct.transferReservedQuantity - extraReserved
+      );
+    }
     await applyZeroStockAfterTransfer(sourceProduct);
     await sourceProduct.save({ session });
 
@@ -3015,6 +3190,21 @@ export const approveBranchTransfer = async (req, res) => {
         toBranchId,
       },
     });
+
+    for (const other of supersededTransfers) {
+      await auditLog(req, {
+        action: 'branch_transfer_reject',
+        module: 'products',
+        entityType: 'ProductBranchTransfer',
+        entityId: other._id,
+        message: `Branch transfer superseded (${Number(other.quantity) || 0})`,
+        metadata: {
+          productId: sourceProduct._id,
+          rejectReason: other.rejectReason,
+          supersededByTransferId: transfer._id,
+        },
+      });
+    }
 
     return res.json({ message: 'Transfer approved and stock moved', transferId: transfer._id });
   } catch (e) {

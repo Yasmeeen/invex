@@ -32,7 +32,7 @@ import { CloudinaryUploadService } from '@shared/services/cloudinary-upload.serv
 import { environment } from 'src/environments/environment';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Globals } from '@core/globals';
-import { isBranchManager } from '@core/utils/role-utils';
+import { canSeeProductSupplierName, isBranchManager, isSupplierAcquiredFrom } from '@core/utils/role-utils';
 import {
   DeskPurchaseProductPayload,
   ProductPurchaseRequestsService,
@@ -648,8 +648,16 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       : 'tr_desk_purchase_deferred_client_hint';
   }
 
+  /** Existing product is sourced from a supplier this role must not see or overwrite. */
+  preserveHiddenSupplierSource = false;
+
   get cashDeskPurchase(): boolean {
     return !!this.data?.cashDeskPurchase;
+  }
+
+  /** Cash-desk purchases still pick a supplier. Catalog editing does not, except the allowed roles. */
+  get showSupplierSourceFields(): boolean {
+    return this.cashDeskPurchase || canSeeProductSupplierName(this.globals.currentUser?.role);
   }
 
   get showCostPriceFields(): boolean {
@@ -673,6 +681,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
       this.activeTab = 'basic';
     }
     if (this.activeTab === 'ecommerce' && !this.showEcommerceTab) {
+      this.activeTab = 'basic';
+    }
+    if (this.activeTab === 'extra' && this.preserveHiddenSupplierSource) {
       this.activeTab = 'basic';
     }
   }
@@ -1535,7 +1546,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.initSourcePartyPhoneLookup();
-    this.initVendorTypeahead();
+    if (this.showSupplierSourceFields) {
+      this.initVendorTypeahead();
+    }
     this.initVariantJoinSearch();
     this.productId = this.data.productId
     this.isEdit = this.data.isEdit
@@ -1684,7 +1697,8 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   getProductData() {
-    this.productsSerivce.getProduct(this.productId).subscribe((response: any) => {
+    const viewerId = this.globals.currentUser?._id ? String(this.globals.currentUser._id) : '';
+    this.productsSerivce.getProduct(this.productId, viewerId).subscribe((response: any) => {
       this.product = response;
       this.productId = response._id;
       this.storeInWarehouse = !!response.inWarehouse;
@@ -1740,6 +1754,11 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
 
   private patchSourcePartyFromProduct(response: any): void {
     const af: ProductAcquiredFrom | null = response?.acquiredFrom || null;
+    if (isSupplierAcquiredFrom(af) && !this.showSupplierSourceFields) {
+      this.preserveHiddenSupplierSource = true;
+      this.ensureActiveTabValid();
+      return;
+    }
     if (!af?.displayName && !af?.phone && !af?.partyType) {
       return;
     }
@@ -2091,6 +2110,9 @@ export class CreateEditProductComponent implements OnInit, OnDestroy {
   }
 
   private attachAcquiredFromToPayload(target: Record<string, unknown>): void {
+    if (this.preserveHiddenSupplierSource) {
+      return;
+    }
     const acquiredFrom = this.buildAcquiredFromPayload();
     if (acquiredFrom) {
       target.acquiredFrom = acquiredFrom;

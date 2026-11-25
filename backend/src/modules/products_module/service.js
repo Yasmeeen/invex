@@ -33,6 +33,12 @@ import {
   stripInventoryCapital,
 } from '../../utils/cost-price-access.js';
 import {
+  canSeeProductSupplierName,
+  isSupplierAcquiredFrom,
+  redactSupplierHistoryEvents,
+  stripSupplierNameFromProduct,
+} from '../../utils/supplier-name-access.js';
+import {
   notifyProductChanged,
   notifyProductDeleted,
 } from '../integrations_module/catalogSync.js';
@@ -159,6 +165,13 @@ async function loadUserForBranchTransfer(userId) {
   return User.findById(userId).select('name role branch').lean();
 }
 
+async function viewerRole(req) {
+  const userId = req.query?.userId || req.query?.user_id || req.body?.userId;
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return null;
+  const user = await User.findById(userId).select('role').lean();
+  return user?.role || null;
+}
+
 async function viewerCannotSeeCostPrice(req) {
   const userId = req.query?.userId || req.query?.user_id || req.body?.userId;
   if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return false;
@@ -168,6 +181,21 @@ async function viewerCannotSeeCostPrice(req) {
   ]);
   if (!user) return false;
   return !canSeeCostPrice(user.role, settings?.rolesHiddenFromCostPrice);
+}
+
+async function viewerCannotSeeSupplierName(req) {
+  const role = await viewerRole(req);
+  if (!role) return false;
+  return !canSeeProductSupplierName(role);
+}
+
+function omitSupplierListFilters(queryParams = {}) {
+  const next = { ...queryParams };
+  delete next.supplier_id;
+  delete next.supplierId;
+  delete next.vendor_id;
+  delete next.vendorId;
+  return next;
 }
 
 function assertMayInitiateBranchTransfer(user, product) {
@@ -1510,10 +1538,14 @@ export const getProducts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
+    const hideSupplier = await viewerCannotSeeSupplierName(req);
     const settingsDoc = await StoreSettings.findOne().sort({ updatedAt: -1 }).lean();
-    const query = await resolveProductsListQuery(req.query, {
-      cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
-    });
+    const query = await resolveProductsListQuery(
+      hideSupplier ? omitSupplierListFilters(req.query) : req.query,
+      {
+        cutFromSourceEnabled: isCutFromSourceEnabled(settingsDoc),
+      }
+    );
 
     const [products, total] = await Promise.all([
       Product.find(query)
@@ -1533,11 +1565,17 @@ export const getProducts = async (req, res) => {
 
     const totalPages = Math.ceil(total / limit);
     // flattenMaps so attributes Map serializes (otherwise JSON → {})
-    const productsOut = await attachRemotePickupTransfers(products.map(toPlainProduct));
+    let productsOut = await attachRemotePickupTransfers(products.map(toPlainProduct));
     const hideCost = await viewerCannotSeeCostPrice(req);
+    if (hideCost) {
+      productsOut = productsOut.map(stripCostFieldsFromProduct);
+    }
+    if (hideSupplier) {
+      productsOut = productsOut.map(stripSupplierNameFromProduct);
+    }
 
     res.json({
-      products: hideCost ? productsOut.map(stripCostFieldsFromProduct) : productsOut,
+      products: productsOut,
       meta: {
         currentPage: Number(page),
         nextPage: page < totalPages ? Number(page) + 1 : null,
@@ -1595,9 +1633,12 @@ export const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const [out] = await attachRemotePickupTransfers([toPlainProduct(product)]);
+    let [out] = await attachRemotePickupTransfers([toPlainProduct(product)]);
     if (await viewerCannotSeeCostPrice(req)) {
-      return res.json(stripCostFieldsFromProduct(out));
+      out = stripCostFieldsFromProduct(out);
+    }
+    if (await viewerCannotSeeSupplierName(req)) {
+      out = stripSupplierNameFromProduct(out);
     }
     res.json(out);
   } catch (error) {
@@ -1688,6 +1729,13 @@ export const createProduct = async (req, res) => {
     } catch (e) {
       const msg = e?.message || 'Invalid source party';
       return res.status(400).json({ error: msg, code: e?.code });
+    }
+    if (
+      acquiredFromFields.acquiredFrom &&
+      isSupplierAcquiredFrom(acquiredFromFields.acquiredFrom) &&
+      (await viewerCannotSeeSupplierName(req))
+    ) {
+      acquiredFromFields = {};
     }
 
     const catRow = await Category.findById(categoryId).select('multiCodePerPiece sellByWeight code').lean();
@@ -2240,6 +2288,16 @@ export const updateProduct = async (req, res) => {
       } catch (e) {
         const msg = e?.message || 'Invalid source party';
         return res.status(400).json({ error: msg, code: e?.code });
+      }
+    }
+
+    if (await viewerCannotSeeSupplierName(req)) {
+      const existingSource = await Product.findById(req.params.id).select('acquiredFrom').lean();
+      const existingIsSupplier = isSupplierAcquiredFrom(existingSource?.acquiredFrom);
+      const incomingIsSupplier = isSupplierAcquiredFrom(acquiredFromSet);
+      if (existingIsSupplier || incomingIsSupplier) {
+        acquiredFromSet = null;
+        acquiredFromUnset = false;
       }
     }
 
@@ -3970,7 +4028,10 @@ export const getProductHistory = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const { events } = await buildProductHistoryEvents(product);
+    let { events } = await buildProductHistoryEvents(product);
+    if (await viewerCannotSeeSupplierName(req)) {
+      events = redactSupplierHistoryEvents(events);
+    }
 
     res.json({
       product: {
@@ -4014,6 +4075,12 @@ export const getProductSerialTrack = async (req, res) => {
     };
     if (await viewerCannotSeeCostPrice(req) && body.product) {
       body.product = stripCostFieldsFromProduct(body.product);
+    }
+    if (await viewerCannotSeeSupplierName(req)) {
+      if (body.product) {
+        body.product = stripSupplierNameFromProduct(body.product);
+      }
+      body.events = redactSupplierHistoryEvents(body.events);
     }
     return res.json(body);
   } catch (error) {

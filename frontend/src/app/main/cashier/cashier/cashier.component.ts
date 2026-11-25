@@ -1881,6 +1881,10 @@ export class CashierComponent implements OnInit, OnDestroy, AfterViewInit {
       inStock: true,
       ...extra,
     };
+    const viewerId = this.curentUser?._id || this.globals.currentUser?._id;
+    if (viewerId) {
+      params['userId'] = String(viewerId);
+    }
     const selectedBranchId = canPickBranchRole(this.curentUser?.role)
       ? this.adminSelectedBranchId
       : this.globals.currentUser?.branch?._id;

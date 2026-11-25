@@ -133,6 +133,10 @@ export class PriceListComponent implements OnInit, OnDestroy {
     if (search) {
       filterParams['search'] = search;
     }
+    const viewerId = this.globals.currentUser?._id;
+    if (viewerId) {
+      filterParams['userId'] = String(viewerId);
+    }
     return filterParams;
   }
 

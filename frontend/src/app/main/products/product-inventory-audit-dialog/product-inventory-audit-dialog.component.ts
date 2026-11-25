@@ -2,6 +2,7 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { TranslateService } from '@ngx-translate/core';
 import { Globals } from '@core/globals';
+import { canSeeProductSupplierName, isSupplierAcquiredFrom } from '@core/utils/role-utils';
 import { Product } from '@core/models/products.model';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import {
@@ -161,7 +162,10 @@ export class ProductInventoryAuditDialogComponent implements OnInit {
       [this.translate.instant('tr_category')]: product.category?.name || '',
       [this.translate.instant('tr_location')]: location,
       [this.translate.instant('tr_product_source_party')]:
-        String(product.acquiredFrom?.displayName || '').trim() || '—',
+        isSupplierAcquiredFrom(product.acquiredFrom) &&
+        !canSeeProductSupplierName(this.globals.currentUser?.role)
+          ? '—'
+          : String(product.acquiredFrom?.displayName || '').trim() || '—',
       [this.translate.instant('tr_stock')]: stock,
       [this.translate.instant('tr_booked')]: booked,
       [this.translate.instant('tr_available')]: available,

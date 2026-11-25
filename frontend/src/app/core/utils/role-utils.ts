@@ -69,6 +69,25 @@ export function normalizeRolesHiddenFromCostPrice(raw: unknown): string[] {
   return out;
 }
 
+/** Supplier name on a product is visible only to these roles. */
+export function canSeeProductSupplierName(role: string | undefined | null): boolean {
+  return (
+    role === 'Super Admin' ||
+    role === 'Co Admin' ||
+    role === 'Admin' ||
+    role === 'Branch Manager'
+  );
+}
+
+/** True when the product source is a supplier (party type or linked vendor). */
+export function isSupplierAcquiredFrom(
+  source: { partyType?: string | null; vendorId?: unknown } | null | undefined
+): boolean {
+  if (!source) return false;
+  if (String(source.partyType || '').toLowerCase() === 'supplier') return true;
+  return source.vendorId != null && String(source.vendorId).trim() !== '';
+}
+
 /** Super Admin always sees cost. Others see it only if their role is not in the hidden list. */
 export function canSeeCostPrice(
   role: string | undefined | null,

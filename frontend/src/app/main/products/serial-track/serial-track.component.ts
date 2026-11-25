@@ -5,7 +5,7 @@ import {
   ProductSerialTrackResponse,
 } from '@core/models/products.model';
 import { Globals } from '@core/globals';
-import { isModerator } from '@core/utils/role-utils';
+import { canSeeProductSupplierName, isModerator, isSupplierAcquiredFrom } from '@core/utils/role-utils';
 import { formatCairoDateTime } from '@core/utils/date-tz.util';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
@@ -89,6 +89,23 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
     return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
+  sourcePartyName(): string {
+    const source = this.result?.product?.acquiredFrom;
+    if (!source) return '';
+    if (isSupplierAcquiredFrom(source) && !canSeeProductSupplierName(this.globals.currentUser?.role)) {
+      return '';
+    }
+    return String(source.displayName || '').trim();
+  }
+
+  private hideHistorySupplierName(details: Record<string, unknown>): boolean {
+    if (canSeeProductSupplierName(this.globals.currentUser?.role)) return false;
+    const party = String(details['acquiredFromPartyType'] || '').toLowerCase();
+    if (party === 'supplier') return true;
+    if (party) return false;
+    return isSupplierAcquiredFrom(this.result?.product?.acquiredFrom);
+  }
+
   goToProducts(): void {
     this.router.navigate(['/products']);
   }
@@ -124,7 +141,8 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
     this.result = null;
     this.eventRows = [];
 
-    this.productsService.trackProductSerial(code).subscribe({
+    const userId = this.globals.currentUser?._id ? String(this.globals.currentUser._id) : '';
+    this.productsService.trackProductSerial(code, userId).subscribe({
       next: (res) => {
         this.result = res;
         this.eventRows = (res?.events || []).map((event) => this.buildEventRow(event));
@@ -250,7 +268,7 @@ export class SerialTrackComponent implements OnInit, OnDestroy {
     if (d['notes']) {
       parts.push({ text: String(d['notes']) });
     }
-    if (d['acquiredFrom']) {
+    if (d['acquiredFrom'] && !this.hideHistorySupplierName(d)) {
       parts.push({ text: String(d['acquiredFrom']) });
     }
     if (d['reason']) {

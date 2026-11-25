@@ -1,7 +1,9 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Product, ProductHistoryEvent, ProductHistoryResponse } from '@core/models/products.model';
+import { Globals } from '@core/globals';
 import { formatCairoDateTime } from '@core/utils/date-tz.util';
+import { canSeeProductSupplierName, isSupplierAcquiredFrom } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { AppNotificationService } from '@shared/services/app-notification.service';
 import { ProductsSerivce } from '@shared/services/products.service';
@@ -21,6 +23,7 @@ export class ProductHistoryDialogComponent implements OnInit {
     private productsService: ProductsSerivce,
     private translate: TranslateService,
     private notify: AppNotificationService,
+    private globals: Globals,
     private ref: MatDialogRef<ProductHistoryDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: ProductHistoryDialogData
   ) {}
@@ -33,7 +36,8 @@ export class ProductHistoryDialogComponent implements OnInit {
     const id = this.data.product?._id;
     if (!id) return;
     this.loading = true;
-    this.productsService.getProductHistory(String(id)).subscribe({
+    const userId = this.globals.currentUser?._id ? String(this.globals.currentUser._id) : '';
+    this.productsService.getProductHistory(String(id), userId).subscribe({
       next: (res) => {
         this.history = res;
         this.loading = false;
@@ -120,7 +124,7 @@ export class ProductHistoryDialogComponent implements OnInit {
     if (d['notes']) {
       parts.push(String(d['notes']));
     }
-    if (d['acquiredFrom']) {
+    if (d['acquiredFrom'] && !this.hideHistorySupplierName(d)) {
       parts.push(String(d['acquiredFrom']));
     }
 
@@ -128,6 +132,14 @@ export class ProductHistoryDialogComponent implements OnInit {
       return event.summary;
     }
     return parts.join(' · ');
+  }
+
+  private hideHistorySupplierName(details: Record<string, unknown>): boolean {
+    if (canSeeProductSupplierName(this.globals.currentUser?.role)) return false;
+    const party = String(details['acquiredFromPartyType'] || '').toLowerCase();
+    if (party === 'supplier') return true;
+    if (party) return false;
+    return isSupplierAcquiredFrom(this.data.product?.acquiredFrom);
   }
 
   productLocation(): string {

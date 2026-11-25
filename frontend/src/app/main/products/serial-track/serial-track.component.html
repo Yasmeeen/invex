@@ -114,10 +114,10 @@
         </div>
         <div
           class="col-md-3 col-6 mb-2"
-          *ngIf="result.product.acquiredFrom?.displayName"
+          *ngIf="sourcePartyName()"
         >
           <span class="meta-label">{{ 'tr_product_source_party' | translate }}</span>
-          <strong>{{ result.product.acquiredFrom?.displayName }}</strong>
+          <strong>{{ sourcePartyName() }}</strong>
         </div>
       </div>
 

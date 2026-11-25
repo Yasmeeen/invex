@@ -411,6 +411,11 @@ export async function buildProductHistoryEvents(product, options = {}) {
         branch: branchName(pr.branch),
         netPrice: payload.netPrice,
         acquiredFrom: payload.acquiredFrom?.displayName || payload.acquiredFrom?.name || '',
+        acquiredFromPartyType:
+          String(payload.acquiredFrom?.partyType || '').toLowerCase() === 'supplier' ||
+          payload.acquiredFrom?.vendorId
+            ? 'supplier'
+            : payload.acquiredFrom?.partyType || '',
       },
     });
 

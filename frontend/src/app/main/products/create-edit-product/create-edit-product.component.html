@@ -54,7 +54,7 @@
                     {{ 'tr_product_tab_payment' | translate }}
                   </button>
                 </li>
-                <li>
+                <li *ngIf="!preserveHiddenSupplierSource">
                   <button
                     type="button"
                     class="product-form-tabs__btn"
@@ -1133,7 +1133,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="row" [hidden]="activeTab !== 'extra'">
+                <div class="row" [hidden]="activeTab !== 'extra' || preserveHiddenSupplierSource">
                   <div class="col-md-12">
                     <div class="party-type-toggle mb-3">
                       <label class="mr-3">
@@ -1145,7 +1145,7 @@
                         />
                         {{ 'tr_party_client' | translate }}
                       </label>
-                      <label>
+                      <label *ngIf="showSupplierSourceFields">
                         <input
                           type="radio"
                           name="sourcePartyType"

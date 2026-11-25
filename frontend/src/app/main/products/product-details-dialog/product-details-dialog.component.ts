@@ -2,6 +2,7 @@ import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Product } from '@core/models/products.model';
 import { Globals } from '@core/globals';
+import { canSeeProductSupplierName, isSupplierAcquiredFrom } from '@core/utils/role-utils';
 import { TranslateService } from '@ngx-translate/core';
 import { StoreSettingsService } from '@shared/services/store-settings.service';
 
@@ -128,7 +129,15 @@ export class ProductDetailsDialogComponent {
     return rows;
   }
 
+  private get hideSupplierSource(): boolean {
+    return (
+      isSupplierAcquiredFrom(this.product?.acquiredFrom) &&
+      !canSeeProductSupplierName(this.globals.currentUser?.role)
+    );
+  }
+
   sourcePartyLabel(): string {
+    if (this.hideSupplierSource) return '';
     const t = this.product?.acquiredFrom?.partyType;
     if (t === 'supplier') return this.translate.instant('tr_party_supplier');
     if (t === 'client') return this.translate.instant('tr_party_client');
@@ -137,11 +146,12 @@ export class ProductDetailsDialogComponent {
 
   sourceDisplayName(): string {
     const a = this.product?.acquiredFrom;
-    if (!a) return '';
+    if (!a || this.hideSupplierSource) return '';
     return String(a.displayName || a.name || '').trim();
   }
 
   hasSource(): boolean {
+    if (this.hideSupplierSource) return false;
     return !!(this.sourceDisplayName() || this.product?.acquiredFrom?.phone);
   }
 

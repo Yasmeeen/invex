@@ -22,8 +22,10 @@ import { Globals } from '@core/globals';
 import {
   canBookAnyProduct,
   canPickBranchRole,
+  canSeeProductSupplierName,
   isBranchManager,
   isModerator,
+  isSupplierAcquiredFrom,
   isWarehouse,
 } from '@core/utils/role-utils';
 import { BookProductDialogComponent } from '../book-product-dialog/book-product-dialog.component';
@@ -182,9 +184,9 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     return this.storeSettings.canSeeCostPrice(this.globals.currentUser?.role);
   }
 
-  /** Moderator: supplier filter is not available. */
+  /** Supplier filter and supplier names: Super Admin, Co Admin, Branch Manager. */
   get showSupplierFilter(): boolean {
-    return !isModerator(this.globals.currentUser?.role);
+    return canSeeProductSupplierName(this.globals.currentUser?.role);
   }
 
   get showOnlineListingUi(): boolean {
@@ -457,6 +459,10 @@ export class ProductsListComponent implements OnInit, OnDestroy {
     if (this.showSupplierFilter && this.selectedSupplierId) {
       filterParams['supplier_id'] = String(this.selectedSupplierId);
     }
+    const viewerId = this.globals.currentUser?._id;
+    if (viewerId) {
+      filterParams['userId'] = String(viewerId);
+    }
     const search = String(this.nameSearchTerm || this.params['search'] || '').trim();
     if (search) {
       filterParams['search'] = search;
@@ -484,7 +490,11 @@ export class ProductsListComponent implements OnInit, OnDestroy {
 
   /** Client or supplier name when product was acquired from someone (optional field). */
   productSourceName(product: Product): string {
-    return String(product.acquiredFrom?.displayName || '').trim();
+    const source = product?.acquiredFrom;
+    if (isSupplierAcquiredFrom(source) && !canSeeProductSupplierName(this.globals.currentUser?.role)) {
+      return '';
+    }
+    return String(source?.displayName || '').trim();
   }
 
   availableToBook(product: Product): number {

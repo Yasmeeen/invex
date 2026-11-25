@@ -221,8 +221,9 @@ getPurchasingRequests(params: any) {
     
   return this.http.get(PURCHASING_URL, { params:params });
 }
-getProduct(productId: any) {
-  return this.http.get(PRODUCTS_URL+ `/${productId}`);
+getProduct(productId: any, userId?: string) {
+  const params = userId ? { userId: String(userId) } : undefined;
+  return this.http.get(PRODUCTS_URL+ `/${productId}`, { params });
 }
 
 createProduct(params: any) {
@@ -443,13 +444,16 @@ getProductsStats(branchId?: any) {
   return this.http.get(PRODUCT_STATS, {params });
 }
 
-getProductHistory(productId: string): Observable<ProductHistoryResponse> {
-  return this.http.get<ProductHistoryResponse>(`${PRODUCTS_URL}/${productId}/history`);
+getProductHistory(productId: string, userId?: string): Observable<ProductHistoryResponse> {
+  const params = userId ? { userId: String(userId) } : undefined;
+  return this.http.get<ProductHistoryResponse>(`${PRODUCTS_URL}/${productId}/history`, { params });
 }
 
-trackProductSerial(code: string): Observable<ProductSerialTrackResponse> {
+trackProductSerial(code: string, userId?: string): Observable<ProductSerialTrackResponse> {
+  const params: Record<string, string> = { code: String(code || '').trim() };
+  if (userId) params.userId = String(userId);
   return this.http.get<ProductSerialTrackResponse>(`${PRODUCTS_URL}/serial-track`, {
-    params: { code: String(code || '').trim() },
+    params,
   });
 }
 
